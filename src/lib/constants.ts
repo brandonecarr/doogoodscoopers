@@ -24,10 +24,8 @@ export const SITE_CONFIG = {
 };
 
 export const NAV_LINKS = [
-  { label: "Residential", href: "/residential" },
-  { label: "Commercial", href: "/commercial" },
-  { label: "About", href: "/about" },
-  { label: "FAQ", href: "/faq" },
+  { label: "Services", href: "/quote" },
+  { label: "Get a Quote", href: "/quote" },
 ];
 
 export const STATS = [
