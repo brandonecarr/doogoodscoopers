@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
     console.log("Checking zip code:", zipCode, "with org:", SWEEPANDGO_ORG_SLUG);
 
     // Call Sweep&Go API to check if zip code is in service area
-    // The API expects a "value" field for the zip code
+    // The API expects "organization" and "value" fields
     const response = await fetch(
       `${SWEEPANDGO_API_URL}/api/v2/client_on_boarding/check_zip_code_exists`,
       {
@@ -38,7 +38,8 @@ export async function POST(request: NextRequest) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          zip_code: zipCode,
+          organization: SWEEPANDGO_ORG_SLUG,
+          value: zipCode,
         }),
       }
     );
