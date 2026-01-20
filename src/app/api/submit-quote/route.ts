@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const SWEEPANDGO_API_URL = process.env.SWEEPANDGO_API_URL || "https://openapi.sweepandgo.com";
-const SWEEPANDGO_API_KEY = process.env.SWEEPANDGO_API_KEY;
+const SWEEPANDGO_TOKEN = process.env.SWEEPANDGO_TOKEN || process.env.SWEEPANDGO_TOKEN;
 const SWEEPANDGO_ORG_SLUG = process.env.SWEEPANDGO_ORG_SLUG || "doogoodscoopers";
 
 interface QuoteSubmission {
@@ -54,8 +54,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!SWEEPANDGO_API_KEY) {
-      console.error("SWEEPANDGO_API_KEY is not configured");
+    if (!SWEEPANDGO_TOKEN) {
+      console.error("SWEEPANDGO_TOKEN is not configured");
       return NextResponse.json(
         { error: "Service configuration error" },
         { status: 500 }
@@ -128,7 +128,7 @@ async function submitInServiceAreaQuote(data: QuoteSubmission) {
     {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${SWEEPANDGO_API_KEY}`,
+        "Authorization": `Bearer ${SWEEPANDGO_TOKEN}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(payload),
@@ -190,7 +190,7 @@ async function submitOutOfServiceAreaLead(data: QuoteSubmission) {
     {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${SWEEPANDGO_API_KEY}`,
+        "Authorization": `Bearer ${SWEEPANDGO_TOKEN}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(payload),
