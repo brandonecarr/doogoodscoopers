@@ -37,6 +37,9 @@ interface QuoteSubmission {
   termsAccepted?: boolean;
   billingInterval?: string;
   category?: string;
+
+  // Cross-sells (add-ons)
+  crossSells?: number[];
 }
 
 export async function POST(request: NextRequest) {
@@ -119,6 +122,8 @@ async function submitInServiceAreaQuote(data: QuoteSubmission) {
     dog_name: data.dogNames || [],
     dog_breed: data.dogBreeds || [],
     safe_dog: data.safeDogs || [],
+    // Cross-sells (add-ons) - array of IDs
+    cross_sells: data.crossSells || [],
   };
 
   console.log("Submitting to create_client_with_package:", JSON.stringify(payload, null, 2));

@@ -103,6 +103,14 @@ interface PricingInfo {
   category?: string;
 }
 
+interface CrossSell {
+  id: number;
+  name: string;
+  service?: string;
+  unit_amount: number;
+  description?: string;
+}
+
 interface PaymentInfo {
   token: string;
   nameOnCard: string;
@@ -186,6 +194,10 @@ function QuoteFormInner() {
   const [error, setError] = useState<string | null>(null);
   const [formOptions, setFormOptions] = useState<FormOptions>(defaultFormOptions);
   const [isLoadingOptions, setIsLoadingOptions] = useState(true);
+
+  // Cross-sells state
+  const [crossSells, setCrossSells] = useState<CrossSell[]>([]);
+  const [selectedCrossSells, setSelectedCrossSells] = useState<number[]>([]);
 
   // Payment step state
   const [nameOnCard, setNameOnCard] = useState("");
@@ -371,6 +383,12 @@ function QuoteFormInner() {
 
       if (result.success && result.pricing) {
         setPricing(result.pricing);
+        // Store cross-sells from the API response
+        if (result.crossSells && Array.isArray(result.crossSells)) {
+          setCrossSells(result.crossSells);
+          // Auto-select all cross-sells by default (user can uncheck)
+          setSelectedCrossSells(result.crossSells.map((cs: CrossSell) => cs.id));
+        }
         return true;
       } else {
         setError("Unable to fetch pricing. Please try again.");
@@ -562,6 +580,8 @@ function QuoteFormInner() {
           // Pricing fields from API
           billingInterval: pricing?.billingInterval || "per_visit",
           category: pricing?.category || "prepaid",
+          // Cross-sells (add-ons)
+          crossSells: selectedCrossSells,
         }),
       });
 
@@ -1365,6 +1385,46 @@ function QuoteFormInner() {
               </div>
             )}
 
+            {/* Cross-sells / Add-ons */}
+            {crossSells.length > 0 && (
+              <div className="bg-white rounded-lg p-4 border border-gray-200">
+                <h4 className="font-medium text-navy-900 mb-3 flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-teal-500" />
+                  Recommended Add-ons
+                </h4>
+                <div className="space-y-3">
+                  {crossSells.map((crossSell) => (
+                    <label
+                      key={crossSell.id}
+                      className="flex items-start gap-3 p-3 rounded-lg border border-gray-100 hover:border-teal-200 hover:bg-teal-50/50 transition-colors cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedCrossSells.includes(crossSell.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedCrossSells([...selectedCrossSells, crossSell.id]);
+                          } else {
+                            setSelectedCrossSells(selectedCrossSells.filter(id => id !== crossSell.id));
+                          }
+                        }}
+                        className="mt-0.5 h-4 w-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                      />
+                      <div className="flex-1">
+                        <div className="flex justify-between items-start">
+                          <span className="font-medium text-navy-900">{crossSell.name}</span>
+                          <span className="text-teal-600 font-semibold">${crossSell.unit_amount}</span>
+                        </div>
+                        {crossSell.description && (
+                          <p className="text-sm text-navy-700/70 mt-0.5">{crossSell.description}</p>
+                        )}
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <FormField label="Name on Card">
               <input
                 type="text"
@@ -1620,6 +1680,22 @@ function QuoteFormInner() {
                       <span className="text-teal-700">Initial Cleanup Fee:</span>
                       <span className="font-semibold text-teal-900">${pricing.initialCleanupFee}</span>
                     </div>
+                  )}
+                  {selectedCrossSells.length > 0 && crossSells.length > 0 && (
+                    <>
+                      <div className="border-t border-teal-200 pt-2 mt-2">
+                        <span className="text-teal-700 text-xs font-medium uppercase">Add-ons:</span>
+                      </div>
+                      {crossSells
+                        .filter(cs => selectedCrossSells.includes(cs.id))
+                        .map(cs => (
+                          <div key={cs.id} className="flex justify-between">
+                            <span className="text-teal-700">{cs.name}:</span>
+                            <span className="font-semibold text-teal-900">${cs.unit_amount}</span>
+                          </div>
+                        ))
+                      }
+                    </>
                   )}
                 </div>
               </div>
