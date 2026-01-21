@@ -58,7 +58,7 @@ const contactSchema = z.object({
 const dogSchema = z.object({
   name: z.string().min(1, "Dog name is required"),
   breed: z.string().optional(),
-  isSafe: z.enum(["yes", "no"], { required_error: "Please indicate if dog is safe" }),
+  isSafe: z.enum(["yes", "no"], { message: "Please indicate if dog is safe" }),
   comments: z.string().optional(),
 });
 
