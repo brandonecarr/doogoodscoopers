@@ -59,8 +59,11 @@ export function QuotePageContent() {
             className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10"
           >
             {/* Column 1 - Description */}
-            <div className="flex items-center">
-              <p className="text-navy-700/70 leading-relaxed">
+            <div className="bg-white rounded-2xl p-5 shadow-card flex flex-col justify-center">
+              <h3 className="font-semibold text-navy-900 mb-3 text-sm">
+                Why Choose Us?
+              </h3>
+              <p className="text-navy-700/70 leading-relaxed text-sm">
                 Ready to take back control of your yard? Fill out the form and
                 we&apos;ll send you a personalized quote based on your specific
                 needs. No hidden fees, no surprises.
@@ -68,32 +71,37 @@ export function QuotePageContent() {
             </div>
 
             {/* Column 2 - Benefits */}
-            <div className="space-y-4">
-              {benefits.map((benefit) => {
-                const Icon = benefit.icon;
-                return (
-                  <div
-                    key={benefit.title}
-                    className="flex items-start gap-3"
-                  >
-                    <div className="flex-shrink-0 w-9 h-9 rounded-full bg-teal-100 flex items-center justify-center">
-                      <Icon className="w-4 h-4 text-teal-600" />
+            <div className="bg-white rounded-2xl p-5 shadow-card flex flex-col justify-center">
+              <h3 className="font-semibold text-navy-900 mb-3 text-sm">
+                What You Get:
+              </h3>
+              <div className="space-y-3">
+                {benefits.map((benefit) => {
+                  const Icon = benefit.icon;
+                  return (
+                    <div
+                      key={benefit.title}
+                      className="flex items-start gap-3"
+                    >
+                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-teal-100 flex items-center justify-center">
+                        <Icon className="w-4 h-4 text-teal-600" />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-navy-900 text-sm">
+                          {benefit.title}
+                        </h4>
+                        <p className="text-navy-700/70 text-xs">{benefit.description}</p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="font-semibold text-navy-900 text-sm">
-                        {benefit.title}
-                      </h3>
-                      <p className="text-navy-700/70 text-xs">{benefit.description}</p>
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
 
             {/* Column 3 - What's Included */}
-            <div className="bg-white rounded-2xl p-5 shadow-card">
+            <div className="bg-white rounded-2xl p-5 shadow-card flex flex-col justify-center">
               <h3 className="font-semibold text-navy-900 mb-3 text-sm">
-                What&apos;s Included in Every Service:
+                What&apos;s Included:
               </h3>
               <ul className="space-y-2">
                 {included.map((item) => (
