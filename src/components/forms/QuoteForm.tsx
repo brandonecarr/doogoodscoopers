@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, ChangeEvent } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -31,6 +31,18 @@ import {
   useStripe,
   useElements,
 } from "@stripe/react-stripe-js";
+
+// Format phone number as (XXX) XXX-XXXX
+const formatPhoneNumber = (value: string): string => {
+  // Remove all non-digits
+  const digits = value.replace(/\D/g, "");
+
+  // Format based on length
+  if (digits.length === 0) return "";
+  if (digits.length <= 3) return `(${digits}`;
+  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
+};
 
 // Initialize Stripe
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "");
@@ -757,6 +769,10 @@ function QuoteFormInner() {
                   <input
                     type="tel"
                     {...serviceForm.register("phone")}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                      const formatted = formatPhoneNumber(e.target.value);
+                      serviceForm.setValue("phone", formatted);
+                    }}
                     className={cn("form-input", serviceForm.formState.errors.phone && "border-red-500")}
                     placeholder="(555) 555-5555"
                   />
@@ -984,7 +1000,14 @@ function QuoteFormInner() {
                 Back
               </button>
               <motion.button
-                onClick={() => setStep("contact")}
+                onClick={() => {
+                  // Pre-populate contact form with data from service step
+                  if (serviceData) {
+                    contactForm.setValue("firstName", serviceData.firstName || "");
+                    contactForm.setValue("phone", serviceData.phone || "");
+                  }
+                  setStep("contact");
+                }}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 className="flex-1 btn-primary py-3"
@@ -1042,6 +1065,10 @@ function QuoteFormInner() {
                   <input
                     type="tel"
                     {...contactForm.register("phone")}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                      const formatted = formatPhoneNumber(e.target.value);
+                      contactForm.setValue("phone", formatted);
+                    }}
                     className={cn("form-input", contactForm.formState.errors.phone && "border-red-500")}
                     placeholder="(909) 555-1234"
                   />
