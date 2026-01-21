@@ -131,15 +131,15 @@ export async function POST(request: NextRequest) {
  * Extracts customer data and sends branded confirmation email
  */
 async function handleFreeQuote(payload: SweepAndGoWebhookPayload): Promise<void> {
-  const data = payload.data || payload;
+  const data = payload.data;
 
   // Extract customer name (try various field formats)
-  const firstName = data.first_name || payload.first_name || "";
-  const lastName = data.last_name || payload.last_name || "";
-  const fullName = data.name || `${firstName} ${lastName}`.trim() || "Valued Customer";
+  const firstName = data?.first_name || payload.first_name || "";
+  const lastName = data?.last_name || payload.last_name || "";
+  const fullName = data?.name || `${firstName} ${lastName}`.trim() || "Valued Customer";
 
   // Extract email
-  const email = data.email || payload.email;
+  const email = data?.email || payload.email;
 
   if (!email) {
     console.log("No email address in webhook payload. Skipping email send.");
@@ -147,8 +147,8 @@ async function handleFreeQuote(payload: SweepAndGoWebhookPayload): Promise<void>
   }
 
   // Extract phone (try various formats)
-  const phone = data.phone ||
-    (data.phone_numbers && data.phone_numbers[0]) ||
+  const phone = data?.phone ||
+    (data?.phone_numbers && data.phone_numbers[0]) ||
     "";
 
   // Build email data from payload
@@ -156,13 +156,13 @@ async function handleFreeQuote(payload: SweepAndGoWebhookPayload): Promise<void>
     customerName: fullName,
     email: email,
     phone: phone,
-    zipCode: data.zip_code || data.zipCode || "",
-    numberOfDogs: data.number_of_dogs || data.numberOfDogs || "",
-    frequency: data.frequency || data.clean_up_frequency || "",
-    quoteAmount: data.quote_amount || data.quoteAmount || data.price || "",
-    address: data.address || data.home_address || "",
-    city: data.city || "",
-    state: data.state || "",
+    zipCode: data?.zip_code || data?.zipCode || "",
+    numberOfDogs: data?.number_of_dogs || data?.numberOfDogs || "",
+    frequency: data?.frequency || data?.clean_up_frequency || "",
+    quoteAmount: data?.quote_amount || data?.quoteAmount || data?.price || "",
+    address: data?.address || data?.home_address || "",
+    city: data?.city || "",
+    state: data?.state || "",
   };
 
   console.log("Processing free:quote for:", emailData.email);
@@ -180,8 +180,7 @@ async function handleFreeQuote(payload: SweepAndGoWebhookPayload): Promise<void>
  * Check if payload contains customer data (for unknown event types)
  */
 function hasCustomerData(payload: SweepAndGoWebhookPayload): boolean {
-  const data = payload.data || payload;
-  return !!(data.email || payload.email);
+  return !!(payload.data?.email || payload.email);
 }
 
 // Also handle GET requests for webhook verification (if Sweep&Go uses this)
