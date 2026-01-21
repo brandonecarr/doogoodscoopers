@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const SWEEPANDGO_API_URL = process.env.SWEEPANDGO_API_URL || "https://openapi.sweepandgo.com";
-const SWEEPANDGO_TOKEN = process.env.SWEEPANDGO_TOKEN || process.env.SWEEPANDGO_TOKEN;
+const SWEEPANDGO_TOKEN = process.env.SWEEPANDGO_TOKEN;
 const SWEEPANDGO_ORG_SLUG = process.env.SWEEPANDGO_ORG_SLUG || "doogoodscoopers";
 
 interface QuoteSubmission {

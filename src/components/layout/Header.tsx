@@ -8,9 +8,20 @@ import { Menu, X, Phone } from "lucide-react";
 import { NAV_LINKS, SITE_CONFIG } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
-export function Header() {
+interface HeaderProps {
+  /**
+   * Set to "light" when the page has a light-colored hero background.
+   * Default is "dark" which uses light text for visibility on dark backgrounds.
+   */
+  variant?: "dark" | "light";
+}
+
+export function Header({ variant = "dark" }: HeaderProps) {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Determine if we should use dark text (for light backgrounds)
+  const useDarkText = isScrolled || variant === "light";
 
   useEffect(() => {
     const handleScroll = () => {
@@ -62,7 +73,7 @@ export function Header() {
                   href={link.href}
                   className={cn(
                     "relative font-medium transition-colors duration-300 group",
-                    isScrolled
+                    useDarkText
                       ? "text-navy-900 hover:text-teal-600"
                       : "text-white/90 hover:text-white"
                   )}
@@ -80,7 +91,7 @@ export function Header() {
               href={`tel:${SITE_CONFIG.phone}`}
               className={cn(
                 "flex items-center gap-2 font-medium transition-colors duration-300",
-                isScrolled
+                useDarkText
                   ? "text-navy-900 hover:text-teal-600"
                   : "text-white/90 hover:text-white"
               )}
@@ -109,7 +120,7 @@ export function Header() {
           <motion.button
             className={cn(
               "lg:hidden relative z-10 p-2 transition-colors",
-              isScrolled || isMobileMenuOpen ? "text-navy-900" : "text-white"
+              useDarkText || isMobileMenuOpen ? "text-navy-900" : "text-white"
             )}
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             whileTap={{ scale: 0.95 }}

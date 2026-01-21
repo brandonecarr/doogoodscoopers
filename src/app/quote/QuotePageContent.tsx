@@ -36,7 +36,7 @@ const included = [
 export function QuotePageContent() {
   return (
     <SmoothScrollProvider>
-      <Header />
+      <Header variant="light" />
       <main className="min-h-screen bg-gradient-to-b from-teal-50 to-white pt-32 pb-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Centered Header */}

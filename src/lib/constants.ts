@@ -24,7 +24,8 @@ export const SITE_CONFIG = {
 };
 
 export const NAV_LINKS = [
-  { id: "services", label: "Services", href: "/quote" },
+  { id: "residential", label: "Residential", href: "/residential-services" },
+  { id: "commercial", label: "Commercial", href: "/commercial-services" },
   { id: "get-quote", label: "Get a Quote", href: "/quote" },
 ];
 
