@@ -98,7 +98,7 @@ export function Footer() {
             <h3 className="text-lg font-semibold">Quick Links</h3>
             <ul className="space-y-3">
               {NAV_LINKS.map((link) => (
-                <li key={link.href}>
+                <li key={link.id}>
                   <Link
                     href={link.href}
                     className="text-white/70 hover:text-teal-300 transition-colors inline-flex items-center gap-2 group"

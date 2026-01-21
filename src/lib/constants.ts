@@ -24,8 +24,8 @@ export const SITE_CONFIG = {
 };
 
 export const NAV_LINKS = [
-  { label: "Services", href: "/quote" },
-  { label: "Get a Quote", href: "/quote" },
+  { id: "services", label: "Services", href: "/quote" },
+  { id: "get-quote", label: "Get a Quote", href: "/quote" },
 ];
 
 export const STATS = [

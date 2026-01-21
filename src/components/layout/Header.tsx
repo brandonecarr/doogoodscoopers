@@ -53,7 +53,7 @@ export function Header() {
           <div className="hidden lg:flex items-center gap-8">
             {NAV_LINKS.map((link, index) => (
               <motion.div
-                key={link.href}
+                key={link.id}
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.1 }}
@@ -137,7 +137,7 @@ export function Header() {
             <div className="max-w-7xl mx-auto px-4 py-6 space-y-4">
               {NAV_LINKS.map((link, index) => (
                 <motion.div
-                  key={link.href}
+                  key={link.id}
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.1 }}

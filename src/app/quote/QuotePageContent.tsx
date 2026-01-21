@@ -25,93 +25,96 @@ const benefits = [
   },
 ];
 
+const included = [
+  "Thorough yard inspection and cleanup",
+  "Removal of all pet waste from your property",
+  "Sanitization of affected areas",
+  "Flexible scheduling that works for you",
+  "100% satisfaction guarantee",
+];
+
 export function QuotePageContent() {
   return (
     <SmoothScrollProvider>
       <Header />
       <main className="min-h-screen bg-gradient-to-b from-teal-50 to-white pt-32 pb-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid lg:grid-cols-2 gap-16 items-start">
-            {/* Left Column - Info */}
-            <motion.div
-              initial={{ opacity: 0, x: -30 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.6 }}
-            >
-              <h1 className="text-display-sm font-bold text-navy-900 mb-6">
-                Get Your{" "}
-                <span className="text-teal-600">Free Quote</span>
-              </h1>
+          {/* Centered Header */}
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="text-center mb-10"
+          >
+            <h1 className="text-display-sm font-bold text-navy-900">
+              Get Your <span className="text-teal-600">Free Quote</span>
+            </h1>
+          </motion.div>
 
-              <p className="text-lg text-navy-700/70 mb-8 leading-relaxed">
+          {/* Info Section - 3 Columns */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+            className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10"
+          >
+            {/* Column 1 - Description */}
+            <div className="flex items-center">
+              <p className="text-navy-700/70 leading-relaxed">
                 Ready to take back control of your yard? Fill out the form and
                 we&apos;ll send you a personalized quote based on your specific
                 needs. No hidden fees, no surprises.
               </p>
+            </div>
 
-              {/* Benefits */}
-              <div className="space-y-6 mb-12">
-                {benefits.map((benefit, index) => {
-                  const Icon = benefit.icon;
-                  return (
-                    <motion.div
-                      key={benefit.title}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.2 + index * 0.1 }}
-                      className="flex items-start gap-4"
-                    >
-                      <div className="flex-shrink-0 w-12 h-12 rounded-full bg-teal-100 flex items-center justify-center">
-                        <Icon className="w-6 h-6 text-teal-600" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-navy-900">
-                          {benefit.title}
-                        </h3>
-                        <p className="text-navy-700/70">{benefit.description}</p>
-                      </div>
-                    </motion.div>
-                  );
-                })}
-              </div>
+            {/* Column 2 - Benefits */}
+            <div className="space-y-4">
+              {benefits.map((benefit) => {
+                const Icon = benefit.icon;
+                return (
+                  <div
+                    key={benefit.title}
+                    className="flex items-start gap-3"
+                  >
+                    <div className="flex-shrink-0 w-9 h-9 rounded-full bg-teal-100 flex items-center justify-center">
+                      <Icon className="w-4 h-4 text-teal-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-navy-900 text-sm">
+                        {benefit.title}
+                      </h3>
+                      <p className="text-navy-700/70 text-xs">{benefit.description}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
 
-              {/* What's Included */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.5 }}
-                className="bg-white rounded-2xl p-6 shadow-card"
-              >
-                <h3 className="font-semibold text-navy-900 mb-4">
-                  What&apos;s Included in Every Service:
-                </h3>
-                <ul className="space-y-3">
-                  {[
-                    "Thorough yard inspection and cleanup",
-                    "Removal of all pet waste from your property",
-                    "Sanitization of affected areas",
-                    "Flexible scheduling that works for you",
-                    "100% satisfaction guarantee",
-                  ].map((item) => (
-                    <li key={item} className="flex items-center gap-3 text-navy-700/80">
-                      <CheckCircle className="w-5 h-5 text-teal-500 flex-shrink-0" />
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              </motion.div>
-            </motion.div>
+            {/* Column 3 - What's Included */}
+            <div className="bg-white rounded-2xl p-5 shadow-card">
+              <h3 className="font-semibold text-navy-900 mb-3 text-sm">
+                What&apos;s Included in Every Service:
+              </h3>
+              <ul className="space-y-2">
+                {included.map((item) => (
+                  <li key={item} className="flex items-center gap-2 text-navy-700/80 text-xs">
+                    <CheckCircle className="w-4 h-4 text-teal-500 flex-shrink-0" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </motion.div>
 
-            {/* Right Column - Form */}
-            <motion.div
-              initial={{ opacity: 0, x: 30 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.6, delay: 0.2 }}
-              className="bg-white rounded-3xl p-8 shadow-card-hover"
-            >
-              <QuoteForm />
-            </motion.div>
-          </div>
+          {/* Quote Form Card */}
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+            className="bg-white rounded-3xl p-8 shadow-card-hover max-w-4xl mx-auto"
+          >
+            <QuoteForm />
+          </motion.div>
         </div>
       </main>
       <Footer />
