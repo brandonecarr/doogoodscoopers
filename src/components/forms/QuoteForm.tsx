@@ -1,17 +1,15 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Send,
   CheckCircle,
   Loader2,
   Dog,
   Home,
-  Calendar,
   MapPin,
   ArrowRight,
   ArrowLeft,
@@ -20,6 +18,8 @@ import {
   Sparkles,
   CreditCard,
   Lock,
+  Bell,
+  PawPrint,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ZipCodeChecker } from "./ZipCodeChecker";
@@ -42,7 +42,7 @@ const serviceSchema = z.object({
   lastCleaned: z.string().min(1, "Please select when yard was last cleaned"),
 });
 
-// Schema for contact info step
+// Schema for contact info step (with gate info)
 const contactSchema = z.object({
   firstName: z.string().min(2, "First name is required"),
   lastName: z.string().min(2, "Last name is required"),
@@ -50,12 +50,30 @@ const contactSchema = z.object({
   phone: z.string().min(10, "Please enter a valid phone number"),
   address: z.string().min(5, "Street address is required"),
   city: z.string().min(2, "City is required"),
+  gateLocation: z.string().min(1, "Please select gate location"),
+  gateCode: z.string().optional(),
+});
+
+// Schema for individual dog info
+const dogSchema = z.object({
+  name: z.string().min(1, "Dog name is required"),
+  breed: z.string().optional(),
+  isSafe: z.enum(["yes", "no"], { required_error: "Please indicate if dog is safe" }),
+  comments: z.string().optional(),
+});
+
+// Schema for notifications step
+const notificationsSchema = z.object({
+  notificationTypes: z.array(z.string()).min(1, "Please select at least one notification type"),
+  notificationChannel: z.string().min(1, "Please select a notification channel"),
 });
 
 type ServiceFormData = z.infer<typeof serviceSchema>;
 type ContactFormData = z.infer<typeof contactSchema>;
+type DogFormData = z.infer<typeof dogSchema>;
+type NotificationsFormData = z.infer<typeof notificationsSchema>;
 
-type Step = "zip" | "service" | "quote" | "contact" | "payment" | "review" | "success" | "out-of-area";
+type Step = "zip" | "service" | "quote" | "contact" | "dogs" | "notifications" | "payment" | "review" | "success" | "out-of-area";
 
 interface PricingInfo {
   basePrice: number;
@@ -85,10 +103,12 @@ interface FormOptions {
   numberOfDogs: FormOption[];
   frequency: FormOption[];
   lastCleaned: FormOption[];
+  gateLocation: FormOption[];
+  notificationTypes: FormOption[];
+  notificationChannels: FormOption[];
 }
 
-// Default fallback options in case API fails
-// Values must match Sweep&Go API expected values exactly
+// Default fallback options
 const defaultFormOptions: FormOptions = {
   numberOfDogs: [
     { value: "1", label: "1 Dog" },
@@ -114,6 +134,23 @@ const defaultFormOptions: FormOptions = {
     { value: "5-6_months", label: "5-6 months ago" },
     { value: "10+_months", label: "10+ months / Never" },
   ],
+  gateLocation: [
+    { value: "left", label: "Left Side" },
+    { value: "right", label: "Right Side" },
+    { value: "alley", label: "Alley" },
+    { value: "no_gate", label: "No Gate" },
+    { value: "other", label: "Other" },
+  ],
+  notificationTypes: [
+    { value: "off_schedule", label: "Off Schedule Alerts" },
+    { value: "on_the_way", label: "On The Way Notifications" },
+    { value: "completed", label: "Service Completed" },
+  ],
+  notificationChannels: [
+    { value: "email", label: "Email" },
+    { value: "sms", label: "Text Message (SMS)" },
+    { value: "call", label: "Phone Call" },
+  ],
 };
 
 // Inner form component that uses Stripe hooks
@@ -126,6 +163,8 @@ function QuoteFormInner() {
   const [inServiceArea, setInServiceArea] = useState(false);
   const [serviceData, setServiceData] = useState<ServiceFormData | null>(null);
   const [contactData, setContactData] = useState<ContactFormData | null>(null);
+  const [dogsData, setDogsData] = useState<DogFormData[]>([]);
+  const [notificationsData, setNotificationsData] = useState<NotificationsFormData | null>(null);
   const [pricing, setPricing] = useState<PricingInfo | null>(null);
   const [paymentInfo, setPaymentInfo] = useState<PaymentInfo | null>(null);
   const [isLoadingPricing, setIsLoadingPricing] = useState(false);
@@ -141,6 +180,10 @@ function QuoteFormInner() {
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
+  // Dogs step state
+  const [currentDogIndex, setCurrentDogIndex] = useState(0);
+  const [tempDogsData, setTempDogsData] = useState<DogFormData[]>([]);
+
   // Fetch form options from Sweep&Go on mount
   useEffect(() => {
     const fetchFormOptions = async () => {
@@ -150,27 +193,28 @@ function QuoteFormInner() {
 
         if (result.success && result.formOptions) {
           const options = result.formOptions;
-
-          // Sweep&Go returns form_fields as an array with each field having a slug and comma-separated values
           const formFields = options.form_fields || [];
 
-          // Find the relevant fields by slug
           const numberOfDogsField = formFields.find((f: { slug: string }) => f.slug === "number_of_dogs");
           const frequencyField = formFields.find((f: { slug: string }) => f.slug === "clean_up_frequency");
           const lastCleanedField = formFields.find((f: { slug: string }) => f.slug === "last_time_yard_was_thoroughly_cleaned");
+          const gateLocationField = formFields.find((f: { slug: string }) => f.slug === "gate_location");
+          const notificationTypeField = formFields.find((f: { slug: string }) => f.slug === "cleanup_notification_type");
+          const notificationChannelField = formFields.find((f: { slug: string }) => f.slug === "cleanup_notification_chanel");
 
-          // Parse the comma-separated values into dropdown options
           const parsedOptions: FormOptions = {
             numberOfDogs: parseFieldValues(numberOfDogsField?.value, "dogs") || defaultFormOptions.numberOfDogs,
             frequency: parseFieldValues(frequencyField?.value, "frequency") || defaultFormOptions.frequency,
             lastCleaned: parseFieldValues(lastCleanedField?.value, "lastCleaned") || defaultFormOptions.lastCleaned,
+            gateLocation: parseFieldValues(gateLocationField?.value, "gateLocation") || defaultFormOptions.gateLocation,
+            notificationTypes: parseFieldValues(notificationTypeField?.value, "notificationTypes") || defaultFormOptions.notificationTypes,
+            notificationChannels: parseFieldValues(notificationChannelField?.value, "notificationChannels") || defaultFormOptions.notificationChannels,
           };
 
           setFormOptions(parsedOptions);
         }
       } catch (err) {
         console.error("Error fetching form options:", err);
-        // Keep default options on error
       } finally {
         setIsLoadingOptions(false);
       }
@@ -194,7 +238,6 @@ function QuoteFormInner() {
 
   // Format raw values into user-friendly labels
   const formatLabel = (value: string, fieldType: string): string => {
-    // Number of dogs - just add "Dog" or "Dogs"
     if (fieldType === "dogs") {
       const num = parseInt(value);
       if (!isNaN(num)) {
@@ -203,7 +246,6 @@ function QuoteFormInner() {
       return value;
     }
 
-    // Frequency labels
     if (fieldType === "frequency") {
       const frequencyLabels: Record<string, string> = {
         "once_a_week": "Weekly",
@@ -215,7 +257,6 @@ function QuoteFormInner() {
       return frequencyLabels[value] || value.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
     }
 
-    // Last cleaned labels
     if (fieldType === "lastCleaned") {
       const lastCleanedLabels: Record<string, string> = {
         "one_week": "Less than 1 week ago",
@@ -231,7 +272,35 @@ function QuoteFormInner() {
       return lastCleanedLabels[value] || value.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
     }
 
-    // Default: replace underscores and capitalize
+    if (fieldType === "gateLocation") {
+      const gateLabels: Record<string, string> = {
+        "left": "Left Side",
+        "right": "Right Side",
+        "alley": "Alley",
+        "no_gate": "No Gate",
+        "other": "Other",
+      };
+      return gateLabels[value] || value.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+    }
+
+    if (fieldType === "notificationTypes") {
+      const notifLabels: Record<string, string> = {
+        "off_schedule": "Off Schedule Alerts",
+        "on_the_way": "On The Way Notifications",
+        "completed": "Service Completed",
+      };
+      return notifLabels[value] || value.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+    }
+
+    if (fieldType === "notificationChannels") {
+      const channelLabels: Record<string, string> = {
+        "email": "Email",
+        "sms": "Text Message (SMS)",
+        "call": "Phone Call",
+      };
+      return channelLabels[value] || value.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+    }
+
     return value.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
   };
 
@@ -244,7 +313,19 @@ function QuoteFormInner() {
   // Contact form
   const contactForm = useForm<ContactFormData>({
     resolver: zodResolver(contactSchema),
-    defaultValues: contactData || {},
+    defaultValues: contactData || { gateLocation: "", gateCode: "" },
+  });
+
+  // Dog form (for current dog)
+  const dogForm = useForm<DogFormData>({
+    resolver: zodResolver(dogSchema),
+    defaultValues: { name: "", breed: "", isSafe: "yes", comments: "" },
+  });
+
+  // Notifications form
+  const notificationsForm = useForm<NotificationsFormData>({
+    resolver: zodResolver(notificationsSchema),
+    defaultValues: notificationsData || { notificationTypes: ["completed"], notificationChannel: "email" },
   });
 
   // Handle zip code check result
@@ -290,7 +371,7 @@ function QuoteFormInner() {
     }
   };
 
-  // Handle service form submission - go to Quote step
+  // Handle service form submission
   const handleServiceSubmit = async (data: ServiceFormData) => {
     setServiceData(data);
     const success = await fetchPricing(data);
@@ -299,13 +380,68 @@ function QuoteFormInner() {
     }
   };
 
-  // Handle contact form submission - go to Payment step
+  // Handle contact form submission - go to Dogs step
   const handleContactSubmit = (data: ContactFormData) => {
     setContactData(data);
+    // Initialize dogs data array based on number of dogs
+    const numDogs = parseInt(serviceData?.numberOfDogs || "1");
+    const initialDogsData: DogFormData[] = Array(numDogs).fill(null).map(() => ({
+      name: "",
+      breed: "",
+      isSafe: "yes" as const,
+      comments: "",
+    }));
+    setTempDogsData(initialDogsData);
+    setCurrentDogIndex(0);
+    dogForm.reset({ name: "", breed: "", isSafe: "yes", comments: "" });
+    setStep("dogs");
+  };
+
+  // Handle individual dog form submission
+  const handleDogSubmit = (data: DogFormData) => {
+    const updatedDogsData = [...tempDogsData];
+    updatedDogsData[currentDogIndex] = data;
+    setTempDogsData(updatedDogsData);
+
+    const numDogs = parseInt(serviceData?.numberOfDogs || "1");
+    if (currentDogIndex < numDogs - 1) {
+      // Move to next dog
+      setCurrentDogIndex(currentDogIndex + 1);
+      const nextDog = updatedDogsData[currentDogIndex + 1];
+      dogForm.reset(nextDog || { name: "", breed: "", isSafe: "yes", comments: "" });
+    } else {
+      // All dogs entered, save and move to notifications
+      setDogsData(updatedDogsData);
+      setStep("notifications");
+    }
+  };
+
+  // Handle going back to previous dog
+  const handlePreviousDog = () => {
+    if (currentDogIndex > 0) {
+      // Save current dog data
+      const currentData = dogForm.getValues();
+      const updatedDogsData = [...tempDogsData];
+      updatedDogsData[currentDogIndex] = currentData;
+      setTempDogsData(updatedDogsData);
+
+      // Go to previous dog
+      setCurrentDogIndex(currentDogIndex - 1);
+      const prevDog = updatedDogsData[currentDogIndex - 1];
+      dogForm.reset(prevDog || { name: "", breed: "", isSafe: "yes", comments: "" });
+    } else {
+      // Go back to contact
+      setStep("contact");
+    }
+  };
+
+  // Handle notifications form submission
+  const handleNotificationsSubmit = (data: NotificationsFormData) => {
+    setNotificationsData(data);
     setStep("payment");
   };
 
-  // Handle payment form submission - tokenize card and go to Review
+  // Handle payment form submission
   const handlePaymentSubmit = async () => {
     if (!stripe || !elements) {
       setError("Payment system not loaded. Please refresh and try again.");
@@ -377,9 +513,9 @@ function QuoteFormInner() {
     hidePostalCode: true,
   };
 
-  // Final submission - register as new client with payment
+  // Final submission
   const handleFinalSubmit = async () => {
-    if (!serviceData || !contactData || !paymentInfo) return;
+    if (!serviceData || !contactData || !paymentInfo || !notificationsData) return;
 
     setIsSubmitting(true);
     setError(null);
@@ -395,6 +531,16 @@ function QuoteFormInner() {
           state: "CA",
           inServiceArea: true,
           initialCleanupRequired: serviceData.lastCleaned !== "one_week",
+          // Dogs data
+          dogs: dogsData.map(dog => ({
+            name: dog.name,
+            breed: dog.breed || "",
+            safe_dog: dog.isSafe,
+            comments: dog.comments || "",
+          })),
+          // Notification preferences
+          cleanupNotificationType: notificationsData.notificationTypes,
+          cleanupNotificationChannel: notificationsData.notificationChannel,
           // Payment fields
           creditCardToken: paymentInfo.token,
           nameOnCard: paymentInfo.nameOnCard,
@@ -432,12 +578,20 @@ function QuoteFormInner() {
     return option?.label || value.replace(/_/g, " ");
   };
 
-  // Step indicator - updated with Quote and Payment steps
+  // Get gate location label for display
+  const getGateLocationLabel = (value: string) => {
+    const option = formOptions.gateLocation.find((o) => o.value === value);
+    return option?.label || value.replace(/_/g, " ");
+  };
+
+  // Step indicator
   const steps = [
     { id: "zip", label: "Location" },
     { id: "service", label: "Service" },
     { id: "quote", label: "Quote" },
     { id: "contact", label: "Contact" },
+    { id: "dogs", label: "Dogs" },
+    { id: "notifications", label: "Notifications" },
     { id: "payment", label: "Payment" },
     { id: "review", label: "Review" },
   ];
@@ -447,10 +601,9 @@ function QuoteFormInner() {
 
   return (
     <div className="w-full">
-      {/* Progress Indicator - Compact Design */}
+      {/* Progress Indicator */}
       {step !== "out-of-area" && step !== "success" && (
         <div className="mb-8">
-          {/* Step counter and current step label */}
           <div className="flex justify-between items-center mb-3">
             <span className="text-sm font-medium text-navy-900">
               Step {currentStepIndex + 1} of {steps.length}
@@ -460,7 +613,6 @@ function QuoteFormInner() {
             </span>
           </div>
 
-          {/* Progress bar */}
           <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
             <motion.div
               className="h-full bg-gradient-to-r from-teal-400 to-teal-500 rounded-full"
@@ -470,7 +622,6 @@ function QuoteFormInner() {
             />
           </div>
 
-          {/* Step dots - visible on larger screens */}
           <div className="hidden sm:flex justify-between mt-3">
             {steps.map((s, index) => (
               <div key={s.id} className="flex flex-col items-center">
@@ -706,7 +857,6 @@ function QuoteFormInner() {
                 </h4>
                 <div className="space-y-3">
                   {pricing.priceNotConfigured ? (
-                    // Show custom message when recurring price isn't configured
                     <>
                       <div className="py-2">
                         <p className="text-teal-700 font-medium">
@@ -729,7 +879,6 @@ function QuoteFormInner() {
                       )}
                     </>
                   ) : (
-                    // Show normal pricing display
                     <>
                       <div className="flex justify-between items-center py-2 border-b border-teal-200/50">
                         <span className="text-teal-700">Per Cleanup</span>
@@ -768,7 +917,6 @@ function QuoteFormInner() {
               </div>
             ) : null}
 
-            {/* Error Message */}
             {error && (
               <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm">
                 {error}
@@ -797,7 +945,7 @@ function QuoteFormInner() {
           </motion.div>
         )}
 
-        {/* Step 4: Contact Information */}
+        {/* Step 4: Contact Information (with Gate Info) */}
         {step === "contact" && (
           <motion.div
             key="contact"
@@ -878,10 +1026,232 @@ function QuoteFormInner() {
                 </FormField>
               </div>
 
+              {/* Gate Information */}
+              <div className="border-t pt-6 mt-6">
+                <h4 className="text-md font-semibold text-navy-900 mb-4">Gate Access Information</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField label="Where is your gate located?" error={contactForm.formState.errors.gateLocation?.message}>
+                    <select
+                      {...contactForm.register("gateLocation")}
+                      className={cn("form-input", contactForm.formState.errors.gateLocation && "border-red-500")}
+                    >
+                      <option value="">Select...</option>
+                      {formOptions.gateLocation.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </FormField>
+
+                  <FormField label="Gate Code (if applicable)">
+                    <input
+                      type="text"
+                      {...contactForm.register("gateCode")}
+                      className="form-input"
+                      placeholder="e.g., #1234 or leave blank"
+                    />
+                  </FormField>
+                </div>
+              </div>
+
               <div className="flex gap-4 pt-4">
                 <button
                   type="button"
                   onClick={() => setStep("quote")}
+                  className="px-6 py-3 border border-gray-300 rounded-xl text-navy-700 hover:bg-gray-50 transition-colors"
+                >
+                  <ArrowLeft className="w-5 h-5 inline mr-2" />
+                  Back
+                </button>
+                <motion.button
+                  type="submit"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="flex-1 btn-primary py-3"
+                >
+                  Continue to Dog Info
+                  <ArrowRight className="w-5 h-5 inline ml-2" />
+                </motion.button>
+              </div>
+            </form>
+          </motion.div>
+        )}
+
+        {/* Step 5: Dogs Information */}
+        {step === "dogs" && (
+          <motion.div
+            key="dogs"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+          >
+            <form onSubmit={dogForm.handleSubmit(handleDogSubmit)} className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-navy-900 flex items-center gap-2">
+                  <PawPrint className="w-5 h-5 text-teal-500" />
+                  Tell Us About Your Dogs
+                </h3>
+                <span className="text-sm text-teal-600 font-medium">
+                  Dog {currentDogIndex + 1} of {serviceData?.numberOfDogs || 1}
+                </span>
+              </div>
+
+              <div className="bg-teal-50 rounded-lg p-4 border border-teal-200">
+                <p className="text-sm text-teal-700">
+                  Please provide information about each of your dogs so we can serve you better.
+                </p>
+              </div>
+
+              <FormField label={`Dog ${currentDogIndex + 1} Name`} error={dogForm.formState.errors.name?.message}>
+                <input
+                  type="text"
+                  {...dogForm.register("name")}
+                  className={cn("form-input", dogForm.formState.errors.name && "border-red-500")}
+                  placeholder="e.g., Max, Bella"
+                />
+              </FormField>
+
+              <FormField label="Breed (optional)">
+                <input
+                  type="text"
+                  {...dogForm.register("breed")}
+                  className="form-input"
+                  placeholder="e.g., Golden Retriever, Mixed"
+                />
+              </FormField>
+
+              <FormField label="Is this dog safe to be around?" error={dogForm.formState.errors.isSafe?.message}>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      {...dogForm.register("isSafe")}
+                      value="yes"
+                      className="w-4 h-4 text-teal-600 focus:ring-teal-500"
+                    />
+                    <span className="text-navy-700">Yes, friendly</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      {...dogForm.register("isSafe")}
+                      value="no"
+                      className="w-4 h-4 text-teal-600 focus:ring-teal-500"
+                    />
+                    <span className="text-navy-700">No, please be cautious</span>
+                  </label>
+                </div>
+              </FormField>
+
+              <FormField label="Additional Comments (optional)">
+                <textarea
+                  {...dogForm.register("comments")}
+                  className="form-input min-h-[80px]"
+                  placeholder="Any special notes about this dog..."
+                />
+              </FormField>
+
+              <div className="flex gap-4 pt-4">
+                <button
+                  type="button"
+                  onClick={handlePreviousDog}
+                  className="px-6 py-3 border border-gray-300 rounded-xl text-navy-700 hover:bg-gray-50 transition-colors"
+                >
+                  <ArrowLeft className="w-5 h-5 inline mr-2" />
+                  {currentDogIndex === 0 ? "Back" : "Previous Dog"}
+                </button>
+                <motion.button
+                  type="submit"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="flex-1 btn-primary py-3"
+                >
+                  {currentDogIndex < parseInt(serviceData?.numberOfDogs || "1") - 1 ? (
+                    <>
+                      Next Dog
+                      <ArrowRight className="w-5 h-5 inline ml-2" />
+                    </>
+                  ) : (
+                    <>
+                      Continue to Notifications
+                      <ArrowRight className="w-5 h-5 inline ml-2" />
+                    </>
+                  )}
+                </motion.button>
+              </div>
+            </form>
+          </motion.div>
+        )}
+
+        {/* Step 6: Notifications */}
+        {step === "notifications" && (
+          <motion.div
+            key="notifications"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+          >
+            <form onSubmit={notificationsForm.handleSubmit(handleNotificationsSubmit)} className="space-y-6">
+              <h3 className="text-lg font-semibold text-navy-900 flex items-center gap-2">
+                <Bell className="w-5 h-5 text-teal-500" />
+                Notification Preferences
+              </h3>
+
+              <p className="text-navy-700/70">
+                Choose how you&apos;d like to be notified about your service.
+              </p>
+
+              <FormField label="What would you like to be notified about?" error={notificationsForm.formState.errors.notificationTypes?.message}>
+                <div className="space-y-3">
+                  {formOptions.notificationTypes.map((opt) => (
+                    <label key={opt.value} className="flex items-start gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        value={opt.value}
+                        {...notificationsForm.register("notificationTypes")}
+                        className="mt-1 h-4 w-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                      />
+                      <div>
+                        <span className="text-navy-900 font-medium">{opt.label}</span>
+                        {opt.value === "off_schedule" && (
+                          <p className="text-xs text-navy-700/60">Get notified if service is delayed or rescheduled</p>
+                        )}
+                        {opt.value === "on_the_way" && (
+                          <p className="text-xs text-navy-700/60">Know when our team is heading to your home</p>
+                        )}
+                        {opt.value === "completed" && (
+                          <p className="text-xs text-navy-700/60">Confirmation when your cleanup is done</p>
+                        )}
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </FormField>
+
+              <FormField label="How would you like to receive notifications?" error={notificationsForm.formState.errors.notificationChannel?.message}>
+                <div className="space-y-3">
+                  {formOptions.notificationChannels.map((opt) => (
+                    <label key={opt.value} className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="radio"
+                        value={opt.value}
+                        {...notificationsForm.register("notificationChannel")}
+                        className="h-4 w-4 border-gray-300 text-teal-600 focus:ring-teal-500"
+                      />
+                      <span className="text-navy-900">{opt.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </FormField>
+
+              <div className="flex gap-4 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCurrentDogIndex(parseInt(serviceData?.numberOfDogs || "1") - 1);
+                    setStep("dogs");
+                  }}
                   className="px-6 py-3 border border-gray-300 rounded-xl text-navy-700 hover:bg-gray-50 transition-colors"
                 >
                   <ArrowLeft className="w-5 h-5 inline mr-2" />
@@ -901,7 +1271,7 @@ function QuoteFormInner() {
           </motion.div>
         )}
 
-        {/* Step 5: Payment Information */}
+        {/* Step 7: Payment Information */}
         {step === "payment" && (
           <motion.div
             key="payment"
@@ -920,7 +1290,6 @@ function QuoteFormInner() {
               Payment Information
             </h3>
 
-            {/* Pricing reminder */}
             {pricing && !pricing.priceNotConfigured && (
               <div className="bg-teal-50 rounded-lg p-4 border border-teal-200">
                 <div className="flex justify-between items-center">
@@ -942,7 +1311,6 @@ function QuoteFormInner() {
               </div>
             )}
 
-            {/* Name on Card */}
             <FormField label="Name on Card">
               <input
                 type="text"
@@ -954,7 +1322,6 @@ function QuoteFormInner() {
               />
             </FormField>
 
-            {/* Card Element */}
             <div>
               <label className="block text-sm font-medium text-navy-900 mb-1.5">
                 Card Details
@@ -980,7 +1347,6 @@ function QuoteFormInner() {
               )}
             </div>
 
-            {/* Terms of Service Checkbox */}
             <div className="flex items-start gap-3 pt-2">
               <input
                 type="checkbox"
@@ -1002,7 +1368,6 @@ function QuoteFormInner() {
               </label>
             </div>
 
-            {/* Error Message */}
             {error && (
               <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm">
                 {error}
@@ -1012,7 +1377,7 @@ function QuoteFormInner() {
             <div className="flex gap-4 pt-4">
               <button
                 type="button"
-                onClick={() => setStep("contact")}
+                onClick={() => setStep("notifications")}
                 disabled={isProcessingPayment}
                 className="px-6 py-3 border border-gray-300 rounded-xl text-navy-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
               >
@@ -1042,8 +1407,8 @@ function QuoteFormInner() {
           </motion.div>
         )}
 
-        {/* Step 6: Review */}
-        {step === "review" && serviceData && contactData && paymentInfo && (
+        {/* Step 8: Review */}
+        {step === "review" && serviceData && contactData && paymentInfo && notificationsData && (
           <motion.div
             key="review"
             initial={{ opacity: 0, x: 20 }}
@@ -1106,6 +1471,60 @@ function QuoteFormInner() {
                     {contactData.address}, {contactData.city}, CA {zipCode}
                   </p>
                 </div>
+                <div>
+                  <span className="text-navy-700/60">Gate Location:</span>
+                  <p className="font-medium text-navy-900">{getGateLocationLabel(contactData.gateLocation)}</p>
+                </div>
+                {contactData.gateCode && (
+                  <div>
+                    <span className="text-navy-700/60">Gate Code:</span>
+                    <p className="font-medium text-navy-900">{contactData.gateCode}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Dogs Summary */}
+            <div className="bg-gray-50 rounded-xl p-6 space-y-4">
+              <h4 className="font-medium text-navy-900 flex items-center gap-2">
+                <PawPrint className="w-5 h-5 text-teal-500" />
+                Your Dogs
+              </h4>
+              <div className="space-y-3">
+                {dogsData.map((dog, index) => (
+                  <div key={index} className="text-sm border-b border-gray-200 pb-3 last:border-0 last:pb-0">
+                    <p className="font-medium text-navy-900">{dog.name}</p>
+                    <div className="flex gap-4 text-navy-700/60">
+                      {dog.breed && <span>Breed: {dog.breed}</span>}
+                      <span>Safe: {dog.isSafe === "yes" ? "Yes" : "No"}</span>
+                    </div>
+                    {dog.comments && <p className="text-navy-700/60 text-xs mt-1">{dog.comments}</p>}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Notifications Summary */}
+            <div className="bg-gray-50 rounded-xl p-6 space-y-4">
+              <h4 className="font-medium text-navy-900 flex items-center gap-2">
+                <Bell className="w-5 h-5 text-teal-500" />
+                Notification Preferences
+              </h4>
+              <div className="text-sm">
+                <div>
+                  <span className="text-navy-700/60">Notify me about:</span>
+                  <p className="font-medium text-navy-900">
+                    {notificationsData.notificationTypes.map(t =>
+                      formOptions.notificationTypes.find(opt => opt.value === t)?.label || t
+                    ).join(", ")}
+                  </p>
+                </div>
+                <div className="mt-2">
+                  <span className="text-navy-700/60">Via:</span>
+                  <p className="font-medium text-navy-900">
+                    {formOptions.notificationChannels.find(opt => opt.value === notificationsData.notificationChannel)?.label || notificationsData.notificationChannel}
+                  </p>
+                </div>
               </div>
             </div>
 
@@ -1152,7 +1571,6 @@ function QuoteFormInner() {
               </div>
             )}
 
-            {/* Error Message */}
             {error && (
               <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm">
                 {error}
