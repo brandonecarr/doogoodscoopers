@@ -39,20 +39,23 @@ export async function POST(request: NextRequest) {
 
     // Try 1: PUT to residential onboarding (creates a lead/partial registration)
     // This is the main endpoint that accepts all the quote fields
+    // Generate a placeholder email if not provided (required field)
+    const placeholderEmail = body.email || `quote-${Date.now()}@doogoodscoopers.com`;
+
     const onboardingPayload = {
       organization: SWEEPANDGO_ORG_SLUG,
-      zip_code: parseInt(body.zipCode) || body.zipCode,
-      number_of_dogs: parseInt(body.numberOfDogs) || body.numberOfDogs,
+      zip_code: String(body.zipCode), // Must be string
+      number_of_dogs: parseInt(body.numberOfDogs) || 1,
       clean_up_frequency: body.frequency,
       last_time_yard_was_thoroughly_cleaned: body.lastCleaned || "one_week",
       first_name: body.firstName || "Website Visitor",
       last_name: "Quote Request",
-      email: body.email || "",
+      email: placeholderEmail, // Required field
       cell_phone_number: body.phone || "",
-      city: "",
-      home_address: "",
+      city: "Pending", // Required field - placeholder
+      home_address: "Quote Request - Address TBD", // Required field - placeholder
       state: "CA",
-      initial_cleanup_required: false,
+      initial_cleanup_required: true, // Must be true or false, not false as invalid
       coupon_code: body.couponCode || "",
     };
 
@@ -106,17 +109,18 @@ export async function POST(request: NextRequest) {
     // Try 2: POST to create_client_with_package (without payment - may create lead)
     const clientPayload = {
       organization: SWEEPANDGO_ORG_SLUG,
-      zip_code: body.zipCode,
-      number_of_dogs: body.numberOfDogs,
+      zip_code: String(body.zipCode),
+      number_of_dogs: String(body.numberOfDogs),
       clean_up_frequency: body.frequency,
       last_time_yard_was_thoroughly_cleaned: body.lastCleaned || "one_week",
       first_name: body.firstName || "Website Visitor",
       last_name: "Quote Request",
-      email: body.email || `quote-${Date.now()}@placeholder.temp`,
+      email: placeholderEmail,
       phone_numbers: body.phone ? [body.phone] : [],
-      city: "",
-      home_address: "",
+      city: "Pending", // Required field
+      home_address: "Quote Request - Address TBD", // Required field
       state: "CA",
+      cross_sell_id: [], // Required field - empty array
     };
 
     console.log("Submitting to create_client_with_package:", JSON.stringify(clientPayload, null, 2));
