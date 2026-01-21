@@ -371,11 +371,33 @@ function QuoteFormInner() {
     }
   };
 
+  // Submit free quote lead to Sweep&Go (triggers email notification to owner)
+  const submitFreeQuoteLead = async (data: ServiceFormData) => {
+    try {
+      await fetch("/api/submit-free-quote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          zipCode,
+          numberOfDogs: data.numberOfDogs,
+          frequency: data.frequency,
+          lastCleaned: data.lastCleaned,
+        }),
+      });
+      // Fire and forget - don't wait for result or show errors
+    } catch (err) {
+      console.error("Error submitting free quote lead:", err);
+      // Silent fail - don't disrupt user flow
+    }
+  };
+
   // Handle service form submission
   const handleServiceSubmit = async (data: ServiceFormData) => {
     setServiceData(data);
     const success = await fetchPricing(data);
     if (success) {
+      // Submit free quote lead to trigger email notification
+      submitFreeQuoteLead(data);
       setStep("quote");
     }
   };
