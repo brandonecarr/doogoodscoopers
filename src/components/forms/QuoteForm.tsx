@@ -35,8 +35,10 @@ import {
 // Initialize Stripe
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "");
 
-// Schema for service details step
+// Schema for service details step (includes basic contact for quote notification)
 const serviceSchema = z.object({
+  firstName: z.string().min(2, "First name is required"),
+  phone: z.string().min(10, "Please enter a valid phone number"),
   numberOfDogs: z.string().min(1, "Please select number of dogs"),
   frequency: z.string().min(1, "Please select a frequency"),
   lastCleaned: z.string().min(1, "Please select when yard was last cleaned"),
@@ -379,6 +381,8 @@ function QuoteFormInner() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           zipCode,
+          firstName: data.firstName,
+          phone: data.phone,
           numberOfDogs: data.numberOfDogs,
           frequency: data.frequency,
           lastCleaned: data.lastCleaned,
@@ -735,9 +739,34 @@ function QuoteFormInner() {
               </div>
 
               <h3 className="text-lg font-semibold text-navy-900 flex items-center gap-2">
+                <User className="w-5 h-5 text-teal-500" />
+                Get Your Quote
+              </h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField label="First Name" error={serviceForm.formState.errors.firstName?.message}>
+                  <input
+                    type="text"
+                    {...serviceForm.register("firstName")}
+                    className={cn("form-input", serviceForm.formState.errors.firstName && "border-red-500")}
+                    placeholder="Your first name"
+                  />
+                </FormField>
+
+                <FormField label="Cell Phone" error={serviceForm.formState.errors.phone?.message}>
+                  <input
+                    type="tel"
+                    {...serviceForm.register("phone")}
+                    className={cn("form-input", serviceForm.formState.errors.phone && "border-red-500")}
+                    placeholder="(555) 555-5555"
+                  />
+                </FormField>
+              </div>
+
+              <h4 className="text-md font-semibold text-navy-900 flex items-center gap-2 pt-2">
                 <Dog className="w-5 h-5 text-teal-500" />
                 Service Details
-              </h3>
+              </h4>
 
               {isLoadingOptions ? (
                 <div className="flex items-center justify-center py-8">

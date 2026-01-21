@@ -15,14 +15,6 @@ interface FreeQuoteSubmission {
   couponCode?: string;
 }
 
-// List of endpoints to try for submitting free quote leads
-const FREE_QUOTE_ENDPOINTS = [
-  "/api/v2/free_quotes",
-  "/api/v2/client_on_boarding/free_quote",
-  "/api/v1/free_quotes",
-  "/api/v1/residential/free_quote",
-];
-
 export async function POST(request: NextRequest) {
   try {
     const body: FreeQuoteSubmission = await request.json();
@@ -43,61 +35,135 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Build the payload matching Sweep&Go's expected format
-    // Based on the email screenshot fields
-    const payload = {
+    const results: { endpoint: string; method: string; status: number; error?: string }[] = [];
+
+    // Try 1: PUT to residential onboarding (creates a lead/partial registration)
+    // This is the main endpoint that accepts all the quote fields
+    const onboardingPayload = {
       organization: SWEEPANDGO_ORG_SLUG,
-      zip_code: body.zipCode,
+      zip_code: parseInt(body.zipCode) || body.zipCode,
       number_of_dogs: parseInt(body.numberOfDogs) || body.numberOfDogs,
       clean_up_frequency: body.frequency,
-      last_time_yard_was_thoroughly_cleaned: body.lastCleaned || "",
-      first_name: body.firstName || "",
-      cell_phone_number: body.phone || "",
+      last_time_yard_was_thoroughly_cleaned: body.lastCleaned || "one_week",
+      first_name: body.firstName || "Website Visitor",
+      last_name: "Quote Request",
       email: body.email || "",
+      cell_phone_number: body.phone || "",
+      city: "",
+      home_address: "",
+      state: "CA",
+      initial_cleanup_required: false,
       coupon_code: body.couponCode || "",
     };
 
-    console.log("Submitting free quote to Sweep&Go:", JSON.stringify(payload, null, 2));
+    console.log("Submitting to residential/onboarding:", JSON.stringify(onboardingPayload, null, 2));
 
-    // Try each endpoint until one succeeds
-    const results: { endpoint: string; status: number; error?: string }[] = [];
+    try {
+      const onboardingResponse = await fetch(
+        `${SWEEPANDGO_API_URL}/api/v1/residential/onboarding`,
+        {
+          method: "PUT",
+          headers: {
+            "Authorization": `Bearer ${SWEEPANDGO_TOKEN}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(onboardingPayload),
+        }
+      );
 
-    for (const endpoint of FREE_QUOTE_ENDPOINTS) {
-      try {
-        const response = await fetch(`${SWEEPANDGO_API_URL}${endpoint}`, {
+      console.log("Sweep&Go residential/onboarding status:", onboardingResponse.status);
+
+      if (onboardingResponse.ok) {
+        const result = await onboardingResponse.json();
+        console.log("Sweep&Go residential/onboarding response:", JSON.stringify(result, null, 2));
+
+        return NextResponse.json({
+          success: true,
+          message: "Free quote lead submitted successfully",
+          endpoint: "/api/v1/residential/onboarding",
+          data: result,
+        });
+      }
+
+      const errorText = await onboardingResponse.text();
+      console.error("Sweep&Go residential/onboarding error:", onboardingResponse.status, errorText);
+      results.push({
+        endpoint: "/api/v1/residential/onboarding",
+        method: "PUT",
+        status: onboardingResponse.status,
+        error: errorText
+      });
+    } catch (err) {
+      console.error("Error calling residential/onboarding:", err);
+      results.push({
+        endpoint: "/api/v1/residential/onboarding",
+        method: "PUT",
+        status: 0,
+        error: err instanceof Error ? err.message : String(err)
+      });
+    }
+
+    // Try 2: POST to create_client_with_package (without payment - may create lead)
+    const clientPayload = {
+      organization: SWEEPANDGO_ORG_SLUG,
+      zip_code: body.zipCode,
+      number_of_dogs: body.numberOfDogs,
+      clean_up_frequency: body.frequency,
+      last_time_yard_was_thoroughly_cleaned: body.lastCleaned || "one_week",
+      first_name: body.firstName || "Website Visitor",
+      last_name: "Quote Request",
+      email: body.email || `quote-${Date.now()}@placeholder.temp`,
+      phone_numbers: body.phone ? [body.phone] : [],
+      city: "",
+      home_address: "",
+      state: "CA",
+    };
+
+    console.log("Submitting to create_client_with_package:", JSON.stringify(clientPayload, null, 2));
+
+    try {
+      const clientResponse = await fetch(
+        `${SWEEPANDGO_API_URL}/api/v2/client_on_boarding/create_client_with_package`,
+        {
           method: "POST",
           headers: {
             "Authorization": `Bearer ${SWEEPANDGO_TOKEN}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(payload),
-        });
-
-        console.log(`Sweep&Go ${endpoint} status:`, response.status);
-
-        if (response.ok) {
-          const result = await response.json();
-          console.log(`Sweep&Go ${endpoint} response:`, JSON.stringify(result, null, 2));
-
-          return NextResponse.json({
-            success: true,
-            message: "Free quote submitted successfully",
-            endpoint: endpoint,
-            data: result,
-          });
+          body: JSON.stringify(clientPayload),
         }
+      );
 
-        const errorText = await response.text();
-        console.error(`Sweep&Go ${endpoint} error:`, response.status, errorText);
-        results.push({ endpoint, status: response.status, error: errorText });
-      } catch (endpointError) {
-        console.error(`Error calling ${endpoint}:`, endpointError);
-        results.push({
-          endpoint,
-          status: 0,
-          error: endpointError instanceof Error ? endpointError.message : String(endpointError)
+      console.log("Sweep&Go create_client_with_package status:", clientResponse.status);
+
+      if (clientResponse.ok) {
+        const result = await clientResponse.json();
+        console.log("Sweep&Go create_client_with_package response:", JSON.stringify(result, null, 2));
+
+        return NextResponse.json({
+          success: true,
+          message: "Free quote lead submitted successfully",
+          endpoint: "/api/v2/client_on_boarding/create_client_with_package",
+          data: result,
         });
       }
+
+      const errorText = await clientResponse.text();
+      console.error("Sweep&Go create_client_with_package error:", clientResponse.status, errorText);
+      results.push({
+        endpoint: "/api/v2/client_on_boarding/create_client_with_package",
+        method: "POST",
+        status: clientResponse.status,
+        error: errorText
+      });
+    } catch (err) {
+      console.error("Error calling create_client_with_package:", err);
+      results.push({
+        endpoint: "/api/v2/client_on_boarding/create_client_with_package",
+        method: "POST",
+        status: 0,
+        error: err instanceof Error ? err.message : String(err)
+      });
     }
 
     // All endpoints failed - return success anyway to not block user
