@@ -233,7 +233,7 @@ export function CommercialServicesContent() {
                   <span className="text-teal-600">Commercial Properties</span>
                 </h1>
 
-                <p className="text-xl text-navy-700/80 mb-8 max-w-2xl">
+                <p className="text-xl text-navy-700/80 mb-8 max-w-2xl mx-auto lg:mx-0">
                   Dog waste stinking up your community? Get a free pet waste
                   management plan for your HOA, apartment complex, or commercial
                   property.
@@ -252,20 +252,24 @@ export function CommercialServicesContent() {
 
               {/* Hero Image */}
               <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
+                initial={{ opacity: 0, scale: 0.95 }}
                 animate={heroInView ? { opacity: 1, scale: 1 } : {}}
                 transition={{ duration: 0.8, delay: 0.3 }}
-                className="relative hidden lg:block"
+                className="relative mt-10 lg:mt-0"
               >
-                <div className="relative w-full aspect-square max-w-md mx-auto">
+                <div className="relative w-full aspect-[4/3] rounded-2xl overflow-hidden shadow-2xl">
                   <Image
-                    src="/images/commercial/commercial-hero.png"
-                    alt="Commercial Pet Waste Management"
+                    src="/images/commercial/commercial-hero.jpg"
+                    alt="Professional team installing pet waste station"
                     fill
-                    className="object-contain"
+                    className="object-cover"
                     priority
                   />
+                  {/* Subtle overlay gradient */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-navy-900/10 to-transparent" />
                 </div>
+                {/* Decorative element behind image */}
+                <div className="absolute -bottom-4 -right-4 w-full h-full bg-teal-500/20 rounded-2xl -z-10" />
               </motion.div>
             </div>
           </div>
@@ -442,10 +446,10 @@ export function CommercialServicesContent() {
               >
                 <div className="relative aspect-[4/3] rounded-2xl overflow-hidden shadow-xl">
                   <Image
-                    src="/images/commercial/waste-station.jpg"
-                    alt="Pet waste station installation"
+                    src="/images/commercial/team-scooping.jpg"
+                    alt="DooGoodScoopers team cleaning near a pet waste station"
                     fill
-                    className="object-cover"
+                    className="object-cover object-center"
                   />
                 </div>
                 {/* Decorative element */}

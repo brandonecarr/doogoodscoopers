@@ -26,6 +26,7 @@ export const SITE_CONFIG = {
 export const NAV_LINKS = [
   { id: "residential", label: "Residential", href: "/residential-services" },
   { id: "commercial", label: "Commercial", href: "/commercial-services" },
+  { id: "about", label: "About", href: "/about-doogoodscoopers" },
   { id: "get-quote", label: "Get a Quote", href: "/quote" },
 ];
 

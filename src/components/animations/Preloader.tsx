@@ -256,7 +256,7 @@ export function Preloader({ onComplete }: PreloaderProps) {
               {/* Low opacity logo (background) */}
               <Image
                 src="/logo.png"
-                alt="Doo Good Scoopers"
+                alt="DooGoodScoopers"
                 width={600}
                 height={200}
                 className="h-32 md:h-40 w-auto opacity-10"
@@ -273,7 +273,7 @@ export function Preloader({ onComplete }: PreloaderProps) {
               >
                 <Image
                   src="/logo.png"
-                  alt="Doo Good Scoopers"
+                  alt="DooGoodScoopers"
                   width={600}
                   height={200}
                   className="h-32 md:h-40 w-auto"

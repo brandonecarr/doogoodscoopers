@@ -61,6 +61,12 @@
   --font-heading: var(--font-montserrat), system-ui, sans-serif;
   --font-body: var(--font-montserrat), system-ui, sans-serif;
   --font-display: var(--font-bebas), system-ui, sans-serif;
+  --font-handwriting: 'Kalam', cursive;
+}
+
+/* Handwriting font utility */
+.font-handwriting {
+  font-family: var(--font-handwriting), cursive !important;
 }
 
 /* ===== LENIS SMOOTH SCROLL ===== */

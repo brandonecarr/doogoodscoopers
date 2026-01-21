@@ -1,8 +1,19 @@
 "use client";
 
-import { useEffect, useRef, ReactNode } from "react";
+import { useEffect, useRef, ReactNode, createContext, useContext, useCallback, useState } from "react";
 import Lenis from "@studio-freight/lenis";
 import { gsap, ScrollTrigger } from "@/lib/gsap";
+
+interface SmoothScrollContextType {
+  stopScroll: () => void;
+  startScroll: () => void;
+}
+
+const SmoothScrollContext = createContext<SmoothScrollContextType | null>(null);
+
+export function useSmoothScroll() {
+  return useContext(SmoothScrollContext);
+}
 
 interface SmoothScrollProviderProps {
   children: ReactNode;
@@ -10,6 +21,7 @@ interface SmoothScrollProviderProps {
 
 export function SmoothScrollProvider({ children }: SmoothScrollProviderProps) {
   const lenisRef = useRef<Lenis | null>(null);
+  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
     const lenis = new Lenis({
@@ -20,6 +32,7 @@ export function SmoothScrollProvider({ children }: SmoothScrollProviderProps) {
     });
 
     lenisRef.current = lenis;
+    setIsReady(true);
 
     // Sync Lenis with GSAP ScrollTrigger
     lenis.on("scroll", ScrollTrigger.update);
@@ -38,5 +51,17 @@ export function SmoothScrollProvider({ children }: SmoothScrollProviderProps) {
     };
   }, []);
 
-  return <>{children}</>;
+  const stopScroll = useCallback(() => {
+    lenisRef.current?.stop();
+  }, []);
+
+  const startScroll = useCallback(() => {
+    lenisRef.current?.start();
+  }, []);
+
+  return (
+    <SmoothScrollContext.Provider value={{ stopScroll, startScroll }}>
+      {children}
+    </SmoothScrollContext.Provider>
+  );
 }

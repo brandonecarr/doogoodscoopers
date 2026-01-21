@@ -1418,7 +1418,7 @@ function QuoteFormInner() {
                 <a href="/privacy" target="_blank" className="text-teal-600 hover:underline">
                   Privacy Policy
                 </a>
-                . I authorize Doo Good Scoopers to charge my card for the services described above.
+                . I authorize DooGoodScoopers to charge my card for the services described above.
               </label>
             </div>
 
@@ -1683,7 +1683,7 @@ function QuoteFormInner() {
             >
               <CheckCircle className="w-10 h-10" />
             </motion.div>
-            <h3 className="text-2xl font-bold text-navy-900 mb-2">Welcome to Doo Good Scoopers!</h3>
+            <h3 className="text-2xl font-bold text-navy-900 mb-2">Welcome to DooGoodScoopers!</h3>
             <p className="text-navy-700/70 max-w-md mx-auto mb-4">
               Your service request has been submitted successfully. We&apos;ll be in touch shortly to schedule your first cleanup!
             </p>

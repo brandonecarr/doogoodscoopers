@@ -167,7 +167,7 @@ async function submitInServiceAreaQuote(data: QuoteSubmission) {
 
   return NextResponse.json({
     success: true,
-    message: "Welcome to Doo Good Scoopers! Your service registration is complete.",
+    message: "Welcome to DooGoodScoopers! Your service registration is complete.",
     data: result,
   });
 }

@@ -51,7 +51,7 @@ export function Header({ variant = "dark" }: HeaderProps) {
             >
               <Image
                 src="/logo.png"
-                alt="Doo Good Scoopers"
+                alt="DooGoodScoopers"
                 width={180}
                 height={60}
                 className="h-10 md:h-12 w-auto"

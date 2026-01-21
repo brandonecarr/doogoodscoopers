@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { cn } from "@/lib/utils";
+import { useSmoothScroll } from "@/components/providers/SmoothScrollProvider";
 
 const US_STATES = [
   { value: "", label: "Select" },
@@ -89,6 +90,25 @@ export function CommercialContactModal({
 }: CommercialContactModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
+  const smoothScroll = useSmoothScroll();
+
+  // Lock body scroll and stop Lenis when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+      document.documentElement.style.overflow = "hidden";
+      smoothScroll?.stopScroll();
+    } else {
+      document.body.style.overflow = "";
+      document.documentElement.style.overflow = "";
+      smoothScroll?.startScroll();
+    }
+    return () => {
+      document.body.style.overflow = "";
+      document.documentElement.style.overflow = "";
+      smoothScroll?.startScroll();
+    };
+  }, [isOpen, smoothScroll]);
 
   const {
     register,
@@ -165,20 +185,21 @@ export function CommercialContactModal({
             onClick={handleClose}
           />
 
-          {/* Modal */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
+          {/* Modal Container */}
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            onClick={handleClose}
           >
-            <div
-              className="bg-white rounded-2xl shadow-elevated w-full max-w-lg max-h-[90vh] overflow-y-auto pointer-events-auto"
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+              className="bg-white rounded-2xl shadow-elevated w-full max-w-lg max-h-[90vh] flex flex-col"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header */}
-              <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between rounded-t-2xl">
+              <div className="flex-shrink-0 bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between rounded-t-2xl">
                 <h2 className="text-xl font-bold text-navy-900">
                   Commercial Services Inquiry
                 </h2>
@@ -191,8 +212,13 @@ export function CommercialContactModal({
                 </button>
               </div>
 
-              {/* Form */}
-              <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-5">
+              {/* Form - scrollable */}
+              <div
+                className="overflow-y-scroll overscroll-contain"
+                style={{ maxHeight: "calc(90vh - 73px)", WebkitOverflowScrolling: "touch" }}
+                onWheel={(e) => e.stopPropagation()}
+              >
+                <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4">
                 {submitSuccess ? (
                   <motion.div
                     initial={{ opacity: 0, y: 10 }}
@@ -406,8 +432,8 @@ export function CommercialContactModal({
                       </label>
                       <textarea
                         {...register("notes")}
-                        rows={4}
-                        className="w-full px-4 py-3 border border-gray-200 rounded-lg transition-colors resize-y focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                        rows={3}
+                        className="w-full px-4 py-2.5 border border-gray-200 rounded-lg transition-colors resize-y focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                         placeholder="Tell us about your property and any specific needs..."
                       />
                     </div>
@@ -449,7 +475,7 @@ export function CommercialContactModal({
                       whileTap={{ scale: isSubmitting ? 1 : 0.98 }}
                       className={cn(
                         "w-full py-3.5 px-6 rounded-full font-semibold text-white transition-all",
-                        "bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700",
+                        "bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700",
                         "shadow-lg hover:shadow-xl",
                         "disabled:opacity-70 disabled:cursor-not-allowed"
                       )}
@@ -483,9 +509,10 @@ export function CommercialContactModal({
                     </motion.button>
                   </>
                 )}
-              </form>
-            </div>
-          </motion.div>
+                </form>
+              </div>
+            </motion.div>
+          </div>
         </>
       )}
     </AnimatePresence>

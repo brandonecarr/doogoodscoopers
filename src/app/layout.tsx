@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Montserrat, Bebas_Neue } from "next/font/google";
+import { Montserrat, Bebas_Neue, Homemade_Apple } from "next/font/google";
 import "./globals.css";
 
 const montserrat = Montserrat({
@@ -12,6 +12,13 @@ const bebasNeue = Bebas_Neue({
   weight: "400",
   subsets: ["latin"],
   variable: "--font-bebas",
+  display: "swap",
+});
+
+const homemadeApple = Homemade_Apple({
+  weight: "400",
+  subsets: ["latin"],
+  variable: "--font-handwriting",
   display: "swap",
 });
 
@@ -85,7 +92,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${montserrat.variable} ${bebasNeue.variable}`}>
+    <html lang="en" className={`${montserrat.variable} ${bebasNeue.variable} ${homemadeApple.variable}`}>
       <head>
         <link rel="icon" href="/favicon.ico" sizes="any" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
