@@ -386,8 +386,20 @@ function QuoteFormInner() {
         // Store cross-sells from the API response
         if (result.crossSells && Array.isArray(result.crossSells)) {
           setCrossSells(result.crossSells);
-          // Auto-select all cross-sells by default (user can uncheck)
-          setSelectedCrossSells(result.crossSells.map((cs: CrossSell) => cs.id));
+          // Auto-select required cross-sells (like initial cleanup) based on service needs
+          // The initial cleanup cross-sell is required when lastCleaned indicates yard needs initial cleaning
+          const requiredCrossSellIds = result.crossSells
+            .filter((cs: CrossSell) => {
+              const name = (cs.name || '').toLowerCase();
+              const isInitialCleanup = name.includes('initial');
+              // Initial cleanup is required if yard hasn't been cleaned recently
+              if (isInitialCleanup && result.pricing?.initialCleanupFee > 0) {
+                return true;
+              }
+              return false;
+            })
+            .map((cs: CrossSell) => cs.id);
+          setSelectedCrossSells(requiredCrossSellIds);
         }
         return true;
       } else {
@@ -1385,15 +1397,17 @@ function QuoteFormInner() {
               </div>
             )}
 
-            {/* Cross-sells / Add-ons */}
-            {crossSells.length > 0 && (
+            {/* Cross-sells / Add-ons - only show optional ones (not initial cleanup which is shown in pricing) */}
+            {crossSells.filter(cs => !(cs.name || '').toLowerCase().includes('initial')).length > 0 && (
               <div className="bg-white rounded-lg p-4 border border-gray-200">
                 <h4 className="font-medium text-navy-900 mb-3 flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-teal-500" />
-                  Recommended Add-ons
+                  Optional Add-ons
                 </h4>
                 <div className="space-y-3">
-                  {crossSells.map((crossSell) => (
+                  {crossSells
+                    .filter(cs => !(cs.name || '').toLowerCase().includes('initial'))
+                    .map((crossSell) => (
                     <label
                       key={crossSell.id}
                       className="flex items-start gap-3 p-3 rounded-lg border border-gray-100 hover:border-teal-200 hover:bg-teal-50/50 transition-colors cursor-pointer"
@@ -1681,13 +1695,16 @@ function QuoteFormInner() {
                       <span className="font-semibold text-teal-900">${pricing.initialCleanupFee}</span>
                     </div>
                   )}
-                  {selectedCrossSells.length > 0 && crossSells.length > 0 && (
+                  {/* Show optional add-ons (excluding initial cleanup which is shown above) */}
+                  {crossSells
+                    .filter(cs => selectedCrossSells.includes(cs.id) && !(cs.name || '').toLowerCase().includes('initial'))
+                    .length > 0 && (
                     <>
                       <div className="border-t border-teal-200 pt-2 mt-2">
                         <span className="text-teal-700 text-xs font-medium uppercase">Add-ons:</span>
                       </div>
                       {crossSells
-                        .filter(cs => selectedCrossSells.includes(cs.id))
+                        .filter(cs => selectedCrossSells.includes(cs.id) && !(cs.name || '').toLowerCase().includes('initial'))
                         .map(cs => (
                           <div key={cs.id} className="flex justify-between">
                             <span className="text-teal-700">{cs.name}:</span>
