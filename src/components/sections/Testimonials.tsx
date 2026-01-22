@@ -51,6 +51,23 @@ export function Testimonials() {
       if (lenis) lenis.start();
     };
 
+    // Track active modal for wheel event interception
+    let activeModal: HTMLElement | null = null;
+
+    const closeModal = () => {
+      activeModal = null;
+      unlockScroll();
+    };
+
+    // Global wheel handler to intercept wheel events on modal content
+    // Uses capture phase to stop events before Lenis sees them
+    const globalWheelHandler = (e: WheelEvent) => {
+      if (activeModal && activeModal.contains(e.target as Node)) {
+        // Stop propagation so Lenis doesn't see this event
+        e.stopPropagation();
+      }
+    };
+
     // Use click event delegation to detect when "Read more" is clicked
     const handleClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
@@ -60,19 +77,43 @@ export function Testimonials() {
           target.textContent?.toLowerCase().includes('read more')) {
         setTimeout(lockScroll, 100);
       }
-      // Check for close button clicks
+      // Check for close button clicks or clicking outside modal content
       if (target.closest('.ti-close') ||
           target.closest('[class*="close"]') ||
-          target.closest('.ti-modal-close')) {
-        setTimeout(unlockScroll, 100);
+          target.closest('.ti-modal-close') ||
+          target.classList.contains('ti-modal') ||
+          target.classList.contains('ti-overlay')) {
+        setTimeout(closeModal, 100);
       }
     };
 
     document.addEventListener('click', handleClick);
 
-    // Also watch for modal elements being added/removed
+    // Add listener in capture phase to intercept before Lenis
+    document.addEventListener('wheel', globalWheelHandler, { capture: true, passive: true });
+
+    // Listen for Escape key to close modal
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && activeModal) {
+        closeModal();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+
+    // Also watch for modal elements being added/removed or hidden
     const modalObserver = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
+        // Check for attribute changes (like display: none or visibility: hidden)
+        if (mutation.type === 'attributes' && mutation.target instanceof HTMLElement) {
+          const node = mutation.target;
+          if (activeModal && (activeModal === node || activeModal.contains(node))) {
+            const style = window.getComputedStyle(node);
+            if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') {
+              closeModal();
+            }
+          }
+        }
+
         for (const node of mutation.addedNodes) {
           if (node instanceof HTMLElement) {
             // Check for any overlay/modal-like elements from TrustIndex
@@ -85,19 +126,14 @@ export function Testimonials() {
               node.querySelector('[class*="ti-"]');
 
             if (isFixedOverlay || isTrustIndex) {
+              // Track this as the active modal for wheel event interception
+              activeModal = node;
+
               // Add data-lenis-prevent to the modal and ALL its children
-              // This tells Lenis to completely ignore scroll events on these elements
               node.setAttribute('data-lenis-prevent', '');
               node.querySelectorAll('*').forEach((child) => {
                 child.setAttribute('data-lenis-prevent', '');
               });
-
-              // Add wheel event listener to stop propagation to Lenis
-              const handleWheel = (e: Event) => {
-                e.stopPropagation();
-              };
-              node.addEventListener('wheel', handleWheel, { passive: true });
-              (node as HTMLElement & { _wheelHandler?: (e: Event) => void })._wheelHandler = handleWheel;
 
               lockScroll();
             }
@@ -105,35 +141,23 @@ export function Testimonials() {
         }
         for (const node of mutation.removedNodes) {
           if (node instanceof HTMLElement) {
-            const wasFixedOverlay = node.style.position === 'fixed';
-            const wasTrustIndex =
-              node.className.includes('ti-') ||
-              node.id?.includes('ti-');
-
-            if (wasFixedOverlay || wasTrustIndex) {
-              // Clean up wheel handler if it exists
-              const handler = (node as HTMLElement & { _wheelHandler?: (e: Event) => void })._wheelHandler;
-              if (handler) {
-                node.removeEventListener('wheel', handler);
-              }
-
-              // Check if any modal is still open
-              const stillHasModal = document.querySelector('[style*="position: fixed"]');
-              if (!stillHasModal) {
-                unlockScroll();
-              }
+            // Clear active modal reference if this node is or contains the modal
+            if (activeModal === node || (activeModal && node.contains(activeModal))) {
+              closeModal();
             }
           }
         }
       }
     });
 
-    modalObserver.observe(document.body, { childList: true, subtree: true });
+    modalObserver.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class'] });
 
     return () => {
       observer.disconnect();
       modalObserver.disconnect();
       document.removeEventListener('click', handleClick);
+      document.removeEventListener('wheel', globalWheelHandler, { capture: true });
+      document.removeEventListener('keydown', handleKeyDown);
       unlockScroll();
       // Cleanup on unmount
       const existingScript = document.querySelector(
