@@ -159,21 +159,21 @@ export function StatsCounter() {
 
                   {/* Top Badge */}
                   <div className="absolute top-4 left-4 right-4">
-                    <div className="flex items-center gap-2">
-                      <motion.div
-                        initial={{ scale: 0 }}
-                        animate={isInView ? { scale: 1 } : {}}
-                        transition={{
-                          delay: 0.3 + index * 0.1,
-                          type: "spring",
-                          stiffness: 200,
-                        }}
-                        className="backdrop-blur-sm rounded-full p-2 bg-white/20"
-                      >
-                        <Icon className="w-5 h-5 text-white" />
-                      </motion.div>
+                    <motion.div
+                      initial={{ scale: 0, opacity: 0 }}
+                      animate={isInView ? { scale: 1, opacity: 1 } : {}}
+                      transition={{
+                        delay: 0.3 + index * 0.1,
+                        type: "spring",
+                        stiffness: 200,
+                      }}
+                      className="inline-flex items-center gap-2 backdrop-blur-sm rounded-full pl-2 pr-4 py-2 bg-white/15"
+                    >
+                      <div className="rounded-full p-1.5 bg-white/20">
+                        <Icon className="w-4 h-4 text-white" />
+                      </div>
                       <span className="text-xs font-medium text-white/90">{stat.tagline}</span>
-                    </div>
+                    </motion.div>
                   </div>
 
                   {/* Bottom Stats Display */}
