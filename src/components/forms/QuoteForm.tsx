@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, ChangeEvent } from "react";
+import { useState, useEffect, useRef, ChangeEvent } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -180,6 +180,7 @@ const defaultFormOptions: FormOptions = {
 function QuoteFormInner() {
   const stripe = useStripe();
   const elements = useElements();
+  const formRef = useRef<HTMLDivElement>(null);
 
   const [step, setStep] = useState<Step>("zip");
   const [zipCode, setZipCode] = useState("");
@@ -355,15 +356,29 @@ function QuoteFormInner() {
     defaultValues: notificationsData || { notificationTypes: ["completed"], notificationChannel: "email" },
   });
 
+  // Scroll to top of form when changing steps
+  const scrollToForm = () => {
+    if (formRef.current) {
+      formRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
+
+  // Helper to change step and scroll to top
+  const goToStep = (newStep: Step) => {
+    setStep(newStep);
+    // Small delay to allow the new step to render before scrolling
+    setTimeout(scrollToForm, 100);
+  };
+
   // Handle zip code check result
   const handleZipResult = (result: { inServiceArea: boolean; zipCode: string }) => {
     setZipCode(result.zipCode);
     setInServiceArea(result.inServiceArea);
 
     if (result.inServiceArea) {
-      setStep("service");
+      goToStep("service");
     } else {
-      setStep("out-of-area");
+      goToStep("out-of-area");
     }
   };
 
@@ -416,7 +431,7 @@ function QuoteFormInner() {
     setServiceData(data);
     const success = await fetchPricing(data);
     if (success) {
-      setStep("quote");
+      goToStep("quote");
     }
   };
 
@@ -434,7 +449,7 @@ function QuoteFormInner() {
     setTempDogsData(initialDogsData);
     setCurrentDogIndex(0);
     dogForm.reset({ name: "", breed: "", isSafe: "yes", comments: "" });
-    setStep("dogs");
+    goToStep("dogs");
   };
 
   // Handle individual dog form submission
@@ -452,7 +467,7 @@ function QuoteFormInner() {
     } else {
       // All dogs entered, save and move to notifications
       setDogsData(updatedDogsData);
-      setStep("notifications");
+      goToStep("notifications");
     }
   };
 
@@ -469,16 +484,17 @@ function QuoteFormInner() {
       setCurrentDogIndex(currentDogIndex - 1);
       const prevDog = updatedDogsData[currentDogIndex - 1];
       dogForm.reset(prevDog || { name: "", breed: "", isSafe: "yes", comments: "" });
+      scrollToForm();
     } else {
       // Go back to contact
-      setStep("contact");
+      goToStep("contact");
     }
   };
 
   // Handle notifications form submission
   const handleNotificationsSubmit = (data: NotificationsFormData) => {
     setNotificationsData(data);
-    setStep("payment");
+    goToStep("payment");
   };
 
   // Handle payment form submission
@@ -523,7 +539,7 @@ function QuoteFormInner() {
           token: token.id,
           nameOnCard: nameOnCard,
         });
-        setStep("review");
+        goToStep("review");
       }
     } catch (err) {
       console.error("Payment tokenization error:", err);
@@ -596,7 +612,7 @@ function QuoteFormInner() {
       const result = await response.json();
 
       if (result.success) {
-        setStep("success");
+        goToStep("success");
       } else {
         setError(result.error || "Something went wrong. Please try again.");
       }
@@ -642,7 +658,7 @@ function QuoteFormInner() {
   const progressPercent = ((currentStepIndex + 1) / steps.length) * 100;
 
   return (
-    <div className="w-full">
+    <div ref={formRef} className="w-full">
       {/* Progress Indicator */}
       {step !== "out-of-area" && step !== "success" && (
         <div className="mb-8">
@@ -722,7 +738,7 @@ function QuoteFormInner() {
           >
             <OutOfAreaForm zipCode={zipCode} />
             <button
-              onClick={() => setStep("zip")}
+              onClick={() => goToStep("zip")}
               className="mt-4 text-teal-600 hover:text-teal-700 text-sm flex items-center gap-1 mx-auto"
             >
               <ArrowLeft className="w-4 h-4" />
@@ -747,7 +763,7 @@ function QuoteFormInner() {
                 </span>
                 <button
                   type="button"
-                  onClick={() => setStep("zip")}
+                  onClick={() => goToStep("zip")}
                   className="ml-auto text-teal-600 text-sm hover:underline"
                 >
                   Change
@@ -842,7 +858,7 @@ function QuoteFormInner() {
               <div className="flex gap-4 pt-4">
                 <button
                   type="button"
-                  onClick={() => setStep("zip")}
+                  onClick={() => goToStep("zip")}
                   className="px-6 py-3 border border-gray-300 rounded-xl text-navy-700 hover:bg-gray-50 transition-colors"
                 >
                   <ArrowLeft className="w-5 h-5 inline mr-2" />
@@ -997,7 +1013,7 @@ function QuoteFormInner() {
             <div className="flex gap-4 pt-4">
               <button
                 type="button"
-                onClick={() => setStep("service")}
+                onClick={() => goToStep("service")}
                 className="px-6 py-3 border border-gray-300 rounded-xl text-navy-700 hover:bg-gray-50 transition-colors"
               >
                 <ArrowLeft className="w-5 h-5 inline mr-2" />
@@ -1010,7 +1026,7 @@ function QuoteFormInner() {
                     contactForm.setValue("firstName", serviceData.firstName || "");
                     contactForm.setValue("phone", serviceData.phone || "");
                   }
-                  setStep("contact");
+                  goToStep("contact");
                 }}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
@@ -1140,7 +1156,7 @@ function QuoteFormInner() {
               <div className="flex gap-4 pt-4">
                 <button
                   type="button"
-                  onClick={() => setStep("quote")}
+                  onClick={() => goToStep("quote")}
                   className="px-6 py-3 border border-gray-300 rounded-xl text-navy-700 hover:bg-gray-50 transition-colors"
                 >
                   <ArrowLeft className="w-5 h-5 inline mr-2" />
@@ -1332,7 +1348,7 @@ function QuoteFormInner() {
                   type="button"
                   onClick={() => {
                     setCurrentDogIndex(parseInt(serviceData?.numberOfDogs || "1") - 1);
-                    setStep("dogs");
+                    goToStep("dogs");
                   }}
                   className="px-6 py-3 border border-gray-300 rounded-xl text-navy-700 hover:bg-gray-50 transition-colors"
                 >
@@ -1501,7 +1517,7 @@ function QuoteFormInner() {
             <div className="flex gap-4 pt-4">
               <button
                 type="button"
-                onClick={() => setStep("notifications")}
+                onClick={() => goToStep("notifications")}
                 disabled={isProcessingPayment}
                 className="px-6 py-3 border border-gray-300 rounded-xl text-navy-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
               >
@@ -1723,7 +1739,7 @@ function QuoteFormInner() {
             <div className="flex gap-4 pt-4">
               <button
                 type="button"
-                onClick={() => setStep("payment")}
+                onClick={() => goToStep("payment")}
                 className="px-6 py-3 border border-gray-300 rounded-xl text-navy-700 hover:bg-gray-50 transition-colors"
               >
                 <ArrowLeft className="w-5 h-5 inline mr-2" />
