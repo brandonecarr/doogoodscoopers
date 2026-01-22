@@ -3,7 +3,7 @@
 import { useRef } from "react";
 import Link from "next/link";
 import { motion, useScroll, useTransform } from "framer-motion";
-import { ArrowRight, Sparkles } from "lucide-react";
+import { ArrowRight, Sparkles, PawPrint } from "lucide-react";
 import { FloatingElements } from "@/components/animations/FloatingElements";
 import { TextReveal, LineReveal } from "@/components/animations/TextReveal";
 
@@ -152,16 +152,14 @@ export function Hero() {
           <div className="flex items-center gap-2">
             <div className="flex">
               {[...Array(5)].map((_, i) => (
-                <motion.svg
+                <motion.div
                   key={i}
                   initial={{ opacity: 0, scale: 0 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: 1.4 + i * 0.1 }}
-                  className="w-5 h-5 text-yellow-400 fill-current"
-                  viewBox="0 0 20 20"
                 >
-                  <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z" />
-                </motion.svg>
+                  <PawPrint className="w-5 h-5 text-[#008EFF] fill-[#008EFF]" />
+                </motion.div>
               ))}
             </div>
             <span className="text-white/70">5.0 Rating</span>
