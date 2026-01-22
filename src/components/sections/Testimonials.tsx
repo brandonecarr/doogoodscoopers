@@ -1,12 +1,31 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useEffect } from "react";
 import { motion, useInView } from "framer-motion";
 import { PawPrint } from "lucide-react";
 
 export function Testimonials() {
   const ref = useRef<HTMLElement>(null);
   const isInView = useInView(ref, { once: true, margin: "-100px" });
+
+  useEffect(() => {
+    // Load TrustIndex script
+    const script = document.createElement("script");
+    script.src = "https://cdn.trustindex.io/loader.js?66c43da43da848017c26e042639";
+    script.async = true;
+    script.defer = true;
+    document.body.appendChild(script);
+
+    return () => {
+      // Cleanup on unmount
+      const existingScript = document.querySelector(
+        'script[src*="trustindex.io/loader.js"]'
+      );
+      if (existingScript) {
+        existingScript.remove();
+      }
+    };
+  }, []);
 
   return (
     <section
@@ -36,12 +55,7 @@ export function Testimonials() {
           transition={{ delay: 0.2, duration: 0.6 }}
           className="w-full"
         >
-          <iframe
-            src="https://cdn.trustindex.io/amp-widget.html#66c43da43da848017c26e042639"
-            style={{ width: "100%", height: "450px", border: "none", overflow: "hidden" }}
-            title="Google Reviews - DooGoodScoopers"
-            loading="lazy"
-          />
+          {/* TrustIndex widget will be injected here by the script */}
         </motion.div>
 
         {/* Additional Trust Elements */}
