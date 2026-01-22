@@ -123,7 +123,8 @@ async function submitInServiceAreaQuote(data: QuoteSubmission) {
     dog_breed: data.dogBreeds || [],
     safe_dog: data.safeDogs || [],
     // Cross-sells (add-ons) - array of IDs
-    cross_sells: data.crossSells || [],
+    // The v2 API expects cross_sell_id as an array
+    cross_sell_id: data.crossSells || [],
   };
 
   console.log("Submitting to create_client_with_package:", JSON.stringify(payload, null, 2));
