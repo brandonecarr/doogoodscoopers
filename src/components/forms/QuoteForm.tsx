@@ -440,9 +440,35 @@ function QuoteFormInner() {
     }
   };
 
+  // Save quote lead to database
+  const saveQuoteLead = async (data: ServiceFormData, stepName: string) => {
+    try {
+      await fetch("/api/save-quote-lead", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          firstName: data.firstName,
+          phone: data.phone,
+          zipCode,
+          numberOfDogs: data.numberOfDogs,
+          frequency: data.frequency,
+          lastCleaned: data.lastCleaned,
+          lastStep: stepName,
+        }),
+      });
+    } catch (err) {
+      // Don't block the flow if lead save fails
+      console.error("Error saving quote lead:", err);
+    }
+  };
+
   // Handle service form submission
   const handleServiceSubmit = async (data: ServiceFormData) => {
     setServiceData(data);
+
+    // Save the lead when user clicks "Get My Quote"
+    await saveQuoteLead(data, "quote");
+
     const success = await fetchPricing(data);
     if (success) {
       goToStep("quote");
