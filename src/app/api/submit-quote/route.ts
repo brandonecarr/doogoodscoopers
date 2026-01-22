@@ -36,6 +36,10 @@ interface QuoteSubmission {
   dogBreeds?: string[];
   safeDogs?: boolean[];
 
+  // Notification preferences
+  cleanupNotificationType?: string[];
+  cleanupNotificationChannel?: string;
+
   // Flags
   inServiceArea: boolean;
   initialCleanupRequired?: boolean;
@@ -115,9 +119,11 @@ async function submitInServiceAreaQuote(data: QuoteSubmission) {
 
   if (data.dogs && data.dogs.length > 0) {
     // New format: array of dog objects
+    // Frontend sends safe_dog: true for safe dogs, false for dangerous dogs
+    // We preserve the actual value from frontend
     dogNames = data.dogs.map(d => d.name || "");
     dogBreeds = data.dogs.map(d => d.breed || "");
-    safeDogs = data.dogs.map(d => d.safe_dog !== false); // Default to true if not specified
+    safeDogs = data.dogs.map(d => d.safe_dog === true); // Explicitly check for true
     dogComments = data.dogs.map(d => d.comments || "");
     console.log("Parsed dogs from array format:", { dogNames, dogBreeds, safeDogs, dogComments });
   } else if (data.dogNames) {
@@ -127,6 +133,11 @@ async function submitInServiceAreaQuote(data: QuoteSubmission) {
     safeDogs = data.safeDogs || [];
     console.log("Using legacy dog arrays:", { dogNames, dogBreeds, safeDogs });
   }
+
+  // Extract notification preferences
+  const notificationType = data.cleanupNotificationType?.join(",") || "";
+  const notificationChannel = data.cleanupNotificationChannel || "";
+  console.log("Notification preferences:", { notificationType, notificationChannel });
 
   // Try v2 API first - create_client_with_package may have better Stripe support
   const v2Payload: Record<string, unknown> = {
@@ -157,13 +168,13 @@ async function submitInServiceAreaQuote(data: QuoteSubmission) {
     dog_breed: dogBreeds,
     safe_dog: safeDogs,
     dog_comment: dogComments,
+    // Notification preferences
+    cleanup_notification_type: notificationType,
+    cleanup_notification_channel: notificationChannel,
+    // Cross-sells - always include (even if empty) to satisfy v2 API requirement
+    cross_sells: data.crossSells?.map(String) || [],
+    cross_sell_id: data.crossSells?.map(String) || [],
   };
-
-  // Cross-sells
-  if (data.crossSells && data.crossSells.length > 0) {
-    v2Payload.cross_sells = data.crossSells.map(String);
-    v2Payload.cross_sell_id = data.crossSells.map(String);
-  }
 
   console.log("=== SWEEP&GO V2 SUBMISSION ===");
   console.log("Payload:", JSON.stringify(v2Payload, null, 2));
@@ -224,11 +235,12 @@ async function submitInServiceAreaQuote(data: QuoteSubmission) {
       dog_breed: dogBreeds,
       safe_dog: safeDogs,
       dog_comment: dogComments,
+      // Notification preferences
+      cleanup_notification_type: notificationType,
+      cleanup_notification_channel: notificationChannel,
+      // Cross-sells
+      cross_sells: data.crossSells?.map(String) || [],
     };
-
-    if (data.crossSells && data.crossSells.length > 0) {
-      v1Payload.cross_sells = data.crossSells.map(String);
-    }
 
     console.log("=== SWEEP&GO V1 SUBMISSION ===");
     console.log("Payload:", JSON.stringify(v1Payload, null, 2));
