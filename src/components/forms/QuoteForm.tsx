@@ -24,6 +24,7 @@ import {
 import { cn } from "@/lib/utils";
 import { ZipCodeChecker } from "./ZipCodeChecker";
 import { OutOfAreaForm } from "./OutOfAreaForm";
+import { LegalModal } from "@/components/ui/LegalModal";
 import { loadStripe } from "@stripe/stripe-js";
 import {
   Elements,
@@ -208,6 +209,10 @@ function QuoteFormInner() {
   const [isCardComplete, setIsCardComplete] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+
+  // Legal modal state
+  const [legalModalOpen, setLegalModalOpen] = useState(false);
+  const [legalModalType, setLegalModalType] = useState<"terms" | "privacy">("terms");
 
   // Dogs step state
   const [currentDogIndex, setCurrentDogIndex] = useState(0);
@@ -1517,13 +1522,27 @@ function QuoteFormInner() {
               />
               <label htmlFor="terms" className="text-sm text-navy-700">
                 I agree to the{" "}
-                <a href="/terms" target="_blank" className="text-teal-600 hover:underline">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLegalModalType("terms");
+                    setLegalModalOpen(true);
+                  }}
+                  className="text-teal-600 hover:underline"
+                >
                   Terms of Service
-                </a>{" "}
+                </button>{" "}
                 and{" "}
-                <a href="/privacy" target="_blank" className="text-teal-600 hover:underline">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLegalModalType("privacy");
+                    setLegalModalOpen(true);
+                  }}
+                  className="text-teal-600 hover:underline"
+                >
                   Privacy Policy
-                </a>
+                </button>
                 . I authorize DooGoodScoopers to charge my card for the services described above.
               </label>
             </div>
@@ -1818,6 +1837,13 @@ function QuoteFormInner() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Legal Modal */}
+      <LegalModal
+        isOpen={legalModalOpen}
+        onClose={() => setLegalModalOpen(false)}
+        type={legalModalType}
+      />
     </div>
   );
 }
