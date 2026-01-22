@@ -34,11 +34,11 @@ export function Testimonials() {
           initial={{ opacity: 0, y: 30 }}
           animate={isInView ? { opacity: 1, y: 0 } : {}}
           transition={{ delay: 0.2, duration: 0.6 }}
-          className="w-full -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8"
+          className="w-full"
         >
           <iframe
             src="https://cdn.trustindex.io/amp-widget.html#66c43da43da848017c26e042639"
-            style={{ width: "100vw", maxWidth: "100vw", marginLeft: "calc(-50vw + 50%)", height: "450px", border: "none", overflow: "hidden" }}
+            style={{ width: "100%", height: "450px", border: "none", overflow: "hidden" }}
             title="Google Reviews - DooGoodScoopers"
             loading="lazy"
           />
