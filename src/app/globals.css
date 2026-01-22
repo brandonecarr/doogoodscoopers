@@ -456,7 +456,15 @@ select.form-input {
 body:has(.ti-modal),
 body:has(.ti-review-modal),
 body:has([class*="ti-popup"]),
-body:has([class*="modal"][class*="ti-"]) {
+body:has([class*="modal"][class*="ti-"]),
+body:has([id*="ti-"][style*="fixed"]) {
+  overflow: hidden !important;
+}
+
+html:has(.ti-modal),
+html:has(.ti-review-modal),
+html:has([class*="ti-popup"]),
+html:has([id*="ti-"][style*="fixed"]) {
   overflow: hidden !important;
 }
 
@@ -464,9 +472,21 @@ body:has([class*="modal"][class*="ti-"]) {
 .ti-modal,
 .ti-review-modal,
 [class*="ti-popup"],
-[class*="modal"][class*="ti-"] {
+[class*="modal"][class*="ti-"],
+[id*="ti-"][style*="fixed"] {
   overflow-y: auto !important;
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* TrustIndex modal inner content should scroll */
+[id*="ti-"][style*="fixed"] > div,
+.ti-modal > div,
+.ti-review-modal > div {
+  max-height: 90vh;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 
 /* ===== REDUCED MOTION ===== */

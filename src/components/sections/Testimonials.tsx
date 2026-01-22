@@ -35,27 +35,69 @@ export function Testimonials() {
     observer.observe(document.body, { childList: true, subtree: true });
 
     // Watch for TrustIndex modal opens to lock body scroll
+    const lockScroll = () => {
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+      // Stop Lenis if it exists
+      const lenis = (window as unknown as { lenis?: { stop: () => void } }).lenis;
+      if (lenis) lenis.stop();
+    };
+
+    const unlockScroll = () => {
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
+      // Resume Lenis if it exists
+      const lenis = (window as unknown as { lenis?: { start: () => void } }).lenis;
+      if (lenis) lenis.start();
+    };
+
+    // Use click event delegation to detect when "Read more" is clicked
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      // Check if clicked element is a "Read more" link or inside a TrustIndex review card
+      if (target.closest('.ti-read-more') ||
+          target.closest('[class*="read-more"]') ||
+          target.textContent?.toLowerCase().includes('read more')) {
+        setTimeout(lockScroll, 100);
+      }
+      // Check for close button clicks
+      if (target.closest('.ti-close') ||
+          target.closest('[class*="close"]') ||
+          target.closest('.ti-modal-close')) {
+        setTimeout(unlockScroll, 100);
+      }
+    };
+
+    document.addEventListener('click', handleClick);
+
+    // Also watch for modal elements being added/removed
     const modalObserver = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
         for (const node of mutation.addedNodes) {
           if (node instanceof HTMLElement) {
-            const isModal = node.classList.contains('ti-modal') ||
-                           node.classList.contains('ti-review-modal') ||
-                           node.className.includes('ti-popup') ||
-                           (node.className.includes('modal') && node.className.includes('ti-'));
-            if (isModal) {
-              document.body.style.overflow = 'hidden';
+            // Check for any overlay/modal-like elements from TrustIndex
+            if (node.style.position === 'fixed' ||
+                node.style.zIndex === '9999' ||
+                node.className.includes('ti-') ||
+                node.id?.includes('ti-')) {
+              const hasOverlay = node.style.backgroundColor?.includes('rgba') ||
+                                node.querySelector('[style*="rgba"]');
+              if (hasOverlay || node.querySelector('.ti-review-item')) {
+                lockScroll();
+              }
             }
           }
         }
         for (const node of mutation.removedNodes) {
           if (node instanceof HTMLElement) {
-            const isModal = node.classList.contains('ti-modal') ||
-                           node.classList.contains('ti-review-modal') ||
-                           node.className.includes('ti-popup') ||
-                           (node.className.includes('modal') && node.className.includes('ti-'));
-            if (isModal) {
-              document.body.style.overflow = '';
+            if (node.style.position === 'fixed' ||
+                node.className.includes('ti-') ||
+                node.id?.includes('ti-')) {
+              // Check if any modal is still open
+              const stillHasModal = document.querySelector('[style*="position: fixed"][style*="z-index"]');
+              if (!stillHasModal) {
+                unlockScroll();
+              }
             }
           }
         }
@@ -67,7 +109,8 @@ export function Testimonials() {
     return () => {
       observer.disconnect();
       modalObserver.disconnect();
-      document.body.style.overflow = '';
+      document.removeEventListener('click', handleClick);
+      unlockScroll();
       // Cleanup on unmount
       const existingScript = document.querySelector(
         'script[src*="trustindex.io/loader.js"]'
