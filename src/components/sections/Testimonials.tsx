@@ -85,14 +85,20 @@ export function Testimonials() {
               node.querySelector('[class*="ti-"]');
 
             if (isFixedOverlay || isTrustIndex) {
-              // Add data-lenis-prevent to prevent Lenis from scrolling
+              // Add data-lenis-prevent to the modal and ALL its children
+              // This tells Lenis to completely ignore scroll events on these elements
               node.setAttribute('data-lenis-prevent', '');
-              // Also add to all scrollable children
-              node.querySelectorAll('*').forEach(child => {
-                if (child instanceof HTMLElement) {
-                  child.setAttribute('data-lenis-prevent', '');
-                }
+              node.querySelectorAll('*').forEach((child) => {
+                child.setAttribute('data-lenis-prevent', '');
               });
+
+              // Add wheel event listener to stop propagation to Lenis
+              const handleWheel = (e: Event) => {
+                e.stopPropagation();
+              };
+              node.addEventListener('wheel', handleWheel, { passive: true });
+              (node as HTMLElement & { _wheelHandler?: (e: Event) => void })._wheelHandler = handleWheel;
+
               lockScroll();
             }
           }
@@ -105,6 +111,12 @@ export function Testimonials() {
               node.id?.includes('ti-');
 
             if (wasFixedOverlay || wasTrustIndex) {
+              // Clean up wheel handler if it exists
+              const handler = (node as HTMLElement & { _wheelHandler?: (e: Event) => void })._wheelHandler;
+              if (handler) {
+                node.removeEventListener('wheel', handler);
+              }
+
               // Check if any modal is still open
               const stillHasModal = document.querySelector('[style*="position: fixed"]');
               if (!stillHasModal) {
