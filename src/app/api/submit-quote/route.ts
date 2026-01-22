@@ -176,10 +176,12 @@ async function submitInServiceAreaQuote(data: QuoteSubmission) {
     // Notification preferences
     cleanup_notification_type: notificationType,
     cleanup_notification_channel: notificationChannel,
-    // Cross-sells - always include (even if empty) to satisfy v2 API requirement
-    cross_sells: data.crossSells?.map(String) || [],
-    cross_sell_id: data.crossSells?.map(String) || [],
   };
+
+  // Only add cross_sell_id if there are actual cross-sells selected
+  if (data.crossSells && data.crossSells.length > 0) {
+    v2Payload.cross_sell_id = data.crossSells.map(String);
+  }
 
   console.log("=== SWEEP&GO V2 SUBMISSION ===");
   console.log("Payload:", JSON.stringify(v2Payload, null, 2));
