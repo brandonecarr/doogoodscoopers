@@ -32,6 +32,8 @@ export function SmoothScrollProvider({ children }: SmoothScrollProviderProps) {
     });
 
     lenisRef.current = lenis;
+    // Expose lenis globally for third-party widgets
+    (window as unknown as { lenis: Lenis }).lenis = lenis;
     setIsReady(true);
 
     // Sync Lenis with GSAP ScrollTrigger

@@ -76,25 +76,37 @@ export function Testimonials() {
         for (const node of mutation.addedNodes) {
           if (node instanceof HTMLElement) {
             // Check for any overlay/modal-like elements from TrustIndex
-            if (node.style.position === 'fixed' ||
-                node.style.zIndex === '9999' ||
-                node.className.includes('ti-') ||
-                node.id?.includes('ti-')) {
-              const hasOverlay = node.style.backgroundColor?.includes('rgba') ||
-                                node.querySelector('[style*="rgba"]');
-              if (hasOverlay || node.querySelector('.ti-review-item')) {
-                lockScroll();
-              }
+            const isFixedOverlay =
+              window.getComputedStyle(node).position === 'fixed' ||
+              node.style.position === 'fixed';
+            const isTrustIndex =
+              node.className.includes('ti-') ||
+              node.id?.includes('ti-') ||
+              node.querySelector('[class*="ti-"]');
+
+            if (isFixedOverlay || isTrustIndex) {
+              // Add data-lenis-prevent to prevent Lenis from scrolling
+              node.setAttribute('data-lenis-prevent', '');
+              // Also add to all scrollable children
+              node.querySelectorAll('*').forEach(child => {
+                if (child instanceof HTMLElement) {
+                  child.setAttribute('data-lenis-prevent', '');
+                }
+              });
+              lockScroll();
             }
           }
         }
         for (const node of mutation.removedNodes) {
           if (node instanceof HTMLElement) {
-            if (node.style.position === 'fixed' ||
-                node.className.includes('ti-') ||
-                node.id?.includes('ti-')) {
+            const wasFixedOverlay = node.style.position === 'fixed';
+            const wasTrustIndex =
+              node.className.includes('ti-') ||
+              node.id?.includes('ti-');
+
+            if (wasFixedOverlay || wasTrustIndex) {
               // Check if any modal is still open
-              const stillHasModal = document.querySelector('[style*="position: fixed"][style*="z-index"]');
+              const stillHasModal = document.querySelector('[style*="position: fixed"]');
               if (!stillHasModal) {
                 unlockScroll();
               }
