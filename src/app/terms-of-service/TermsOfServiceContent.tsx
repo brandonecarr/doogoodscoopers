@@ -2,69 +2,11 @@
 
 import { useRef } from "react";
 import { motion, useInView } from "framer-motion";
-import { FileText, CreditCard, Calendar, Clock, Sparkles, Shield, ArrowRight, Phone } from "lucide-react";
+import { FileText, ArrowRight, Phone } from "lucide-react";
 import Link from "next/link";
 import { SmoothScrollProvider } from "@/components/providers/SmoothScrollProvider";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
-
-const termsData = [
-  {
-    icon: CreditCard,
-    title: "Payment Methods",
-    content: [
-      "DooGoodScoopers processes payments through a secure client portal.",
-      "Customers link their credit/debit card to our secure platform, and invoices are generated and paid automatically.",
-      "Your card will need to be linked to your account by the time we arrive at your home for service.",
-    ],
-  },
-  {
-    icon: Calendar,
-    title: "Billing Cycle",
-    content: [
-      "Monthly billing occurs on the 1st of each month before service delivery.",
-      "For initial or one-time cleanups, payment is due upon job completion.",
-      "When starting recurring services, customers are billed for both the initial cleanup and the remainder of that month.",
-      "Example: A customer starting weekly service on 1/14/2025 at $80/month would be charged $140 on that date (initial cleanup plus two remaining weeks), then $80 monthly thereafter.",
-      "Unpaid accounts are removed from the service schedule until payment processes.",
-      "Monthly service charges are non-refundable.",
-    ],
-  },
-  {
-    icon: Clock,
-    title: "Service Scheduling",
-    content: [
-      "We cannot guarantee specific arrival times due to route optimization.",
-      "Routes operate approximately 7am to dark.",
-      "Customers receive approximately 60 minutes notice via text before arrival.",
-      "Service days remain consistent weekly unless advance notice of changes is provided.",
-    ],
-  },
-  {
-    icon: Calendar,
-    title: "Holiday Services",
-    content: [
-      "When service dates fall on major holidays, we may skip that week and perform double cleanup the following week.",
-      "Customers remain charged for both weeks' accumulated waste during holiday periods.",
-    ],
-  },
-  {
-    icon: Sparkles,
-    title: "Equipment Sanitation",
-    content: [
-      "We disinfect all equipment after each cleanup using organic, kennel-grade disinfectant.",
-      "This prevents germ transmission between properties and ensures a safe, hygienic service.",
-    ],
-  },
-  {
-    icon: Shield,
-    title: "Data Usage",
-    content: [
-      "DooGoodScoopers retains collected data for business operations and performance analysis.",
-      "By accepting these terms, customers authorize the use of their information for advertising and marketing purposes.",
-    ],
-  },
-];
 
 export function TermsOfServiceContent() {
   const heroRef = useRef<HTMLDivElement>(null);
@@ -122,48 +64,55 @@ export function TermsOfServiceContent() {
               initial={{ opacity: 0, y: 20 }}
               animate={contentInView ? { opacity: 1, y: 0 } : {}}
               transition={{ duration: 0.6 }}
-              className="prose prose-lg max-w-none"
+              className="prose prose-lg prose-gray max-w-none prose-headings:text-navy-900 prose-h2:text-2xl prose-h2:font-bold prose-h2:mt-12 prose-h2:mb-4 prose-p:text-gray-600 prose-p:leading-relaxed"
             >
-              <p className="text-gray-600 text-lg leading-relaxed mb-12">
-                By using DooGoodScoopers services, you agree to the following
-                terms and conditions. These policies ensure a smooth and
-                professional experience for all our customers.
+              <h2>How do I pay?</h2>
+              <p>
+                DooGoodScoopers processes payments via our client portal. Customers link their credit/debit card to the portal, and invoices are generated and paid automatically.
+              </p>
+              <p>
+                <strong>Please note: your card will need to be linked to your account by the time we arrive at your home for service.</strong>
               </p>
 
-              <div className="space-y-12">
-                {termsData.map((section, index) => {
-                  const Icon = section.icon;
-                  return (
-                    <motion.div
-                      key={section.title}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={contentInView ? { opacity: 1, y: 0 } : {}}
-                      transition={{ duration: 0.5, delay: index * 0.1 }}
-                      className="bg-gray-50 rounded-2xl p-8"
-                    >
-                      <div className="flex items-center gap-4 mb-6">
-                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-teal-500 to-teal-600 flex items-center justify-center text-white">
-                          <Icon className="w-6 h-6" />
-                        </div>
-                        <h2 className="text-2xl font-bold text-navy-900 m-0">
-                          {section.title}
-                        </h2>
-                      </div>
-                      <ul className="space-y-3 m-0 p-0 list-none">
-                        {section.content.map((item, idx) => (
-                          <li
-                            key={idx}
-                            className="flex items-start gap-3 text-gray-600"
-                          >
-                            <span className="w-1.5 h-1.5 rounded-full bg-teal-500 mt-2.5 flex-shrink-0" />
-                            <span>{item}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </motion.div>
-                  );
-                })}
-              </div>
+              <h2>Do you bill monthly?</h2>
+              <p>
+                We bill on the 1st of each month before service delivery. For initial and one-time cleanups, we bill upon job completion.
+              </p>
+              <p>
+                If you are a new customer signing up for recurring services, you will be billed at the time of sign-up for your initial cleanup. You will then be billed for the remaining portion of the month on your first regular service date.
+              </p>
+              <p>
+                <strong>Example:</strong> A customer, let&apos;s call him John, signs up for weekly service on 1/14/2025 with a monthly rate of $80/month. John would be charged at the time of sign-up for his initial cleanup. Then, on his first regular service date, John would be billed for the remainder of January. Since his service date would fall two more times in January (on 1/22 &amp; 1/29), he would be charged $40 that day (or $20 per visit). Going forward, John would be charged $80 per month.
+              </p>
+              <p>
+                <em>Note: if your account is unpaid, you will be removed from our service schedule until payment processes.</em>
+              </p>
+              <p>
+                <strong>Monthly service charges are non-refundable.</strong>
+              </p>
+
+              <h2>What time will you be at my home?</h2>
+              <p>
+                We can&apos;t guarantee a specific time since our service days are optimized as routes. Depending on time of year, routes may run 7am to dark. Customers should expect an approximate 60 minute heads up via text when we are on the way.
+              </p>
+              <p>
+                If you sign up with us, and we tell you that your service day is Wednesday, it will be Wednesday every week, unless we advise you otherwise in advance.
+              </p>
+
+              <h2>What Happens If my Service Day is on a Holiday?</h2>
+              <p>
+                On occasion, your service date may fall on a holiday. When this happens, we may skip service that week, and perform a double cleanup the following week. You will still be charged for the waste accumulated during this period.
+              </p>
+
+              <h2>Do you disinfect your equipment?</h2>
+              <p>
+                Yes! We disinfect all equipment after each and every cleanup. We use an organic, kennel grade disinfectant. This ensures that we don&apos;t pass germs from one home to the next.
+              </p>
+
+              <h2>Data Usage</h2>
+              <p>
+                DooGoodScoopers retains the data collected to assess business performance and improve quality of service. By accepting these terms, DooGoodScoopers may use the data provided for advertising and/or marketing purposes.
+              </p>
 
               {/* Last Updated */}
               <motion.div
