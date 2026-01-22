@@ -359,7 +359,15 @@ function QuoteFormInner() {
   // Scroll to top of form when changing steps
   const scrollToForm = () => {
     if (formRef.current) {
-      formRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+      // Get the element's position and scroll with an offset for the fixed header
+      const headerOffset = 100; // Account for fixed header
+      const elementPosition = formRef.current.getBoundingClientRect().top;
+      const offsetPosition = elementPosition + window.scrollY - headerOffset;
+
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: "smooth"
+      });
     }
   };
 
