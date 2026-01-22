@@ -5,6 +5,13 @@ const SWEEPANDGO_API_URL = process.env.SWEEPANDGO_API_URL || "https://openapi.sw
 const SWEEPANDGO_TOKEN = process.env.SWEEPANDGO_TOKEN;
 const SWEEPANDGO_ORG_SLUG = process.env.SWEEPANDGO_ORG_SLUG || "doogoodscoopers";
 
+interface DogInfo {
+  name: string;
+  breed?: string;
+  safe_dog?: boolean;
+  comments?: string;
+}
+
 interface QuoteSubmission {
   // Service details
   zipCode: string;
@@ -23,7 +30,8 @@ interface QuoteSubmission {
   city: string;
   state: string;
 
-  // Dog info (optional)
+  // Dog info - support both formats
+  dogs?: DogInfo[]; // New format from frontend
   dogNames?: string[];
   dogBreeds?: string[];
   safeDogs?: boolean[];
@@ -99,9 +107,31 @@ async function submitInServiceAreaQuote(data: QuoteSubmission) {
     );
   }
 
+  // Extract dog info - support both array of objects (new) and separate arrays (legacy)
+  let dogNames: string[] = [];
+  let dogBreeds: string[] = [];
+  let safeDogs: boolean[] = [];
+  let dogComments: string[] = [];
+
+  if (data.dogs && data.dogs.length > 0) {
+    // New format: array of dog objects
+    dogNames = data.dogs.map(d => d.name || "");
+    dogBreeds = data.dogs.map(d => d.breed || "");
+    safeDogs = data.dogs.map(d => d.safe_dog !== false); // Default to true if not specified
+    dogComments = data.dogs.map(d => d.comments || "");
+    console.log("Parsed dogs from array format:", { dogNames, dogBreeds, safeDogs, dogComments });
+  } else if (data.dogNames) {
+    // Legacy format: separate arrays
+    dogNames = data.dogNames;
+    dogBreeds = data.dogBreeds || [];
+    safeDogs = data.safeDogs || [];
+    console.log("Using legacy dog arrays:", { dogNames, dogBreeds, safeDogs });
+  }
+
   // Try v2 API first - create_client_with_package may have better Stripe support
   const v2Payload: Record<string, unknown> = {
     organization: SWEEPANDGO_ORG_SLUG,
+    organization_id: SWEEPANDGO_ORG_SLUG, // v2 API requires organization_id
     email: data.email,
     first_name: data.firstName,
     last_name: data.lastName,
@@ -122,10 +152,11 @@ async function submitInServiceAreaQuote(data: QuoteSubmission) {
     expiry: data.expiry,
     postal: data.zipCode,
     terms_open_api: true,
-    // Dog info
-    dog_name: data.dogNames || [],
-    dog_breed: data.dogBreeds || [],
-    safe_dog: data.safeDogs || [],
+    // Dog info - extracted from either format
+    dog_name: dogNames,
+    dog_breed: dogBreeds,
+    safe_dog: safeDogs,
+    dog_comment: dogComments,
   };
 
   // Cross-sells
@@ -134,8 +165,11 @@ async function submitInServiceAreaQuote(data: QuoteSubmission) {
     v2Payload.cross_sell_id = data.crossSells.map(String);
   }
 
-  console.log("Submitting to v2 create_client_with_package:", JSON.stringify(v2Payload, null, 2));
-  console.log("Token being sent:", data.creditCardToken);
+  console.log("=== SWEEP&GO V2 SUBMISSION ===");
+  console.log("Payload:", JSON.stringify(v2Payload, null, 2));
+  console.log("Credit card token:", data.creditCardToken);
+  console.log("Expiry:", data.expiry);
+  console.log("Name on card:", data.nameOnCard);
 
   // Try v2 endpoint first
   let response = await fetch(
@@ -152,11 +186,17 @@ async function submitInServiceAreaQuote(data: QuoteSubmission) {
 
   console.log("Sweep&Go v2 API status:", response.status);
 
+  // Track which API was used for logging
+  let apiUsed = "v2";
+
   // If v2 fails, fall back to v1
   if (!response.ok) {
     const v2ErrorText = await response.text();
-    console.log("v2 API error response:", response.status, v2ErrorText);
-    console.log("Falling back to v1 residential onboarding");
+    console.log("=== V2 API FAILED ===");
+    console.log("Status:", response.status);
+    console.log("Error:", v2ErrorText);
+    console.log("Falling back to v1 residential onboarding...");
+    apiUsed = "v1";
 
     const v1Payload: Record<string, unknown> = {
       organization: SWEEPANDGO_ORG_SLUG,
@@ -179,16 +219,19 @@ async function submitInServiceAreaQuote(data: QuoteSubmission) {
       expiry: data.expiry,
       postal: data.zipCode,
       terms_open_api: true,
-      dog_name: data.dogNames || [],
-      dog_breed: data.dogBreeds || [],
-      safe_dog: data.safeDogs || [],
+      // Dog info - use extracted arrays
+      dog_name: dogNames,
+      dog_breed: dogBreeds,
+      safe_dog: safeDogs,
+      dog_comment: dogComments,
     };
 
     if (data.crossSells && data.crossSells.length > 0) {
       v1Payload.cross_sells = data.crossSells.map(String);
     }
 
-    console.log("Submitting to v1 residential onboarding:", JSON.stringify(v1Payload, null, 2));
+    console.log("=== SWEEP&GO V1 SUBMISSION ===");
+    console.log("Payload:", JSON.stringify(v1Payload, null, 2));
 
     response = await fetch(
       `${SWEEPANDGO_API_URL}/api/v1/residential/onboarding`,
@@ -230,7 +273,8 @@ async function submitInServiceAreaQuote(data: QuoteSubmission) {
   }
 
   const result = await response.json();
-  console.log("Sweep&Go onboarding response:", JSON.stringify(result, null, 2));
+  console.log(`=== SWEEP&GO ${apiUsed.toUpperCase()} SUCCESS ===`);
+  console.log("Full response:", JSON.stringify(result, null, 2));
 
   // Log payment-related fields from response
   console.log("Payment info in response:", {
@@ -238,6 +282,8 @@ async function submitInServiceAreaQuote(data: QuoteSubmission) {
     payment_method: result.payment_method,
     billing: result.billing,
     credit_card: result.credit_card,
+    card_on_file: result.card_on_file,
+    stripe_customer_id: result.stripe_customer_id,
   });
 
   return NextResponse.json({
