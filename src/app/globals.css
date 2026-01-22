@@ -199,6 +199,35 @@ h1, h2, h3, h4, h5, h6 {
 .animation-delay-500 { animation-delay: 500ms; }
 .animation-delay-700 { animation-delay: 700ms; }
 .animation-delay-1000 { animation-delay: 1000ms; }
+.animation-delay-2000 { animation-delay: 2000ms; }
+.animation-delay-4000 { animation-delay: 4000ms; }
+
+/* Fluid blob animation */
+@keyframes blob {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  20% {
+    transform: translate(100px, -80px) scale(1.15);
+  }
+  40% {
+    transform: translate(-60px, 60px) scale(0.9);
+  }
+  60% {
+    transform: translate(80px, 40px) scale(1.1);
+  }
+  80% {
+    transform: translate(-40px, -60px) scale(0.95);
+  }
+}
+
+.animate-blob {
+  animation: blob 7s ease-in-out infinite;
+}
+
+.animate-blob-reverse {
+  animation: blob 7s ease-in-out infinite reverse;
+}
 
 /* GPU acceleration */
 .will-change-transform {

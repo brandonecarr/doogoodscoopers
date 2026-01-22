@@ -96,8 +96,17 @@ export async function POST(request: NextRequest) {
 }
 
 async function submitInServiceAreaQuote(data: QuoteSubmission) {
+  // Debug: Log what we received from the frontend
+  console.log("=== RECEIVED FROM FRONTEND ===");
+  console.log("creditCardToken:", data.creditCardToken);
+  console.log("creditCardToken type:", typeof data.creditCardToken);
+  console.log("creditCardToken length:", data.creditCardToken?.length);
+  console.log("nameOnCard:", data.nameOnCard);
+  console.log("Full data object keys:", Object.keys(data));
+
   // Validate payment info is present
   if (!data.creditCardToken || !data.nameOnCard) {
+    console.log("VALIDATION FAILED - missing payment info");
     return NextResponse.json(
       { error: "Payment information is required to complete registration." },
       { status: 400 }
@@ -155,13 +164,9 @@ async function submitInServiceAreaQuote(data: QuoteSubmission) {
     clean_up_frequency: data.frequency,
     last_time_yard_was_thoroughly_cleaned: data.lastCleaned || "two_weeks",
     initial_cleanup_required: data.initialCleanupRequired ? "1" : "0",
-    // Payment fields - try both field name variations
-    payment_method: "credit_card",
+    // Payment fields - Sweep&Go only needs token and name for Stripe
     credit_card_token: data.creditCardToken,
-    token: data.creditCardToken, // Alternative field name
     name_on_card: data.nameOnCard,
-    expiry: data.expiry,
-    postal: data.zipCode,
     terms_open_api: true,
     // Dog info - extracted from either format
     dog_name: dogNames,
@@ -223,12 +228,9 @@ async function submitInServiceAreaQuote(data: QuoteSubmission) {
       clean_up_frequency: data.frequency,
       last_time_yard_was_thoroughly_cleaned: data.lastCleaned || "two_weeks",
       initial_cleanup_required: data.initialCleanupRequired ? "1" : "0",
-      // Payment fields
-      payment_method: "credit_card",
+      // Payment fields - Sweep&Go only needs token and name for Stripe
       credit_card_token: data.creditCardToken,
       name_on_card: data.nameOnCard,
-      expiry: data.expiry,
-      postal: data.zipCode,
       terms_open_api: true,
       // Dog info - use extracted arrays
       dog_name: dogNames,

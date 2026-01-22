@@ -14,6 +14,10 @@ const stats = [
     suffix: "",
     decimals: 1,
     color: "text-yellow-400",
+    image: "/images/stats/google-reviews.jpg",
+    tagline: "Perfect 5-star rating on Google",
+    accent: "from-yellow-500 to-amber-500",
+    bgColor: "#008EFF",
   },
   {
     icon: Users,
@@ -22,6 +26,9 @@ const stats = [
     suffix: "+",
     decimals: 0,
     color: "text-teal-500",
+    image: "https://images.unsplash.com/photo-1491438590914-bc09fcaaf77a?w=800&h=1000&fit=crop",
+    tagline: "Families trusting us with their yards",
+    accent: "from-teal-500 to-cyan-500",
   },
   {
     icon: Dog,
@@ -30,6 +37,9 @@ const stats = [
     suffix: "+",
     decimals: 0,
     color: "text-navy-600",
+    image: "/images/stats/happy-dog.jpg",
+    tagline: "Pups enjoying cleaner yards",
+    accent: "from-blue-500 to-indigo-500",
   },
   {
     icon: CheckCircle,
@@ -38,6 +48,9 @@ const stats = [
     suffix: "",
     decimals: 0,
     color: "text-teal-600",
+    image: "/images/stats/clean-yard.jpg",
+    tagline: "Yards cleaned and counting",
+    accent: "from-emerald-500 to-teal-500",
   },
 ];
 
@@ -96,7 +109,7 @@ export function StatsCounter() {
           variants={containerVariants}
           initial="hidden"
           animate={isInView ? "visible" : "hidden"}
-          className="grid grid-cols-2 lg:grid-cols-4 gap-8"
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
         >
           {stats.map((stat, index) => {
             const Icon = stat.icon;
@@ -104,52 +117,95 @@ export function StatsCounter() {
               <motion.div
                 key={stat.label}
                 variants={itemVariants}
-                className="relative group h-full"
+                className="relative group"
               >
-                <div className="bg-white rounded-2xl p-8 shadow-card hover:shadow-card-hover transition-shadow duration-300 text-center h-full flex flex-col justify-center min-h-[240px]">
-                  {/* Icon */}
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={isInView ? { scale: 1 } : {}}
-                    transition={{
-                      delay: 0.3 + index * 0.1,
-                      type: "spring",
-                      stiffness: 200,
-                    }}
-                    className={`inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-50 mb-4 mx-auto ${stat.color}`}
-                  >
-                    <Icon className="w-8 h-8" />
-                  </motion.div>
-
-                  {/* Value */}
-                  <div className="text-4xl md:text-5xl font-bold text-navy-900 mb-2">
-                    <NumberCounter
-                      value={stat.value}
-                      suffix={stat.suffix}
-                      decimals={stat.decimals}
-                      duration={2}
+                <div
+                  className="relative overflow-hidden h-80 sm:h-96 rounded-3xl"
+                  style={{
+                    boxShadow: '0 2.8px 2.2px rgba(0, 0, 0, 0.034), 0 6.7px 5.3px rgba(0, 0, 0, 0.048), 0 12.5px 10px rgba(0, 0, 0, 0.06), 0 22.3px 17.9px rgba(0, 0, 0, 0.072), 0 41.8px 33.4px rgba(0, 0, 0, 0.086), 0 100px 80px rgba(0, 0, 0, 0.12)',
+                  }}
+                >
+                  {/* Background */}
+                  {stat.image && stat.image.startsWith('http') ? (
+                    <img
+                      src={stat.image}
+                      alt={stat.label}
+                      className="absolute inset-0 w-full h-full object-cover"
                     />
+                  ) : stat.bgColor ? (
+                    <div
+                      className="absolute inset-0"
+                      style={{ backgroundColor: stat.bgColor }}
+                    />
+                  ) : (
+                    <div className="absolute inset-0 bg-gradient-to-br from-navy-800 to-navy-900" />
+                  )}
+                  {/* Gradient Overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+
+                  {/* Top Badge */}
+                  <div className="absolute top-4 left-4 right-4">
+                    <div className="flex items-center gap-2">
+                      <motion.div
+                        initial={{ scale: 0 }}
+                        animate={isInView ? { scale: 1 } : {}}
+                        transition={{
+                          delay: 0.3 + index * 0.1,
+                          type: "spring",
+                          stiffness: 200,
+                        }}
+                        className="backdrop-blur-sm rounded-full p-2 bg-white/20"
+                      >
+                        <Icon className="w-5 h-5 text-white" />
+                      </motion.div>
+                      <span className="text-xs font-medium text-white/90">{stat.tagline}</span>
+                    </div>
                   </div>
 
-                  {/* Label */}
-                  <p className="text-navy-700/70 font-medium">{stat.label}</p>
-
-                  {/* Star rating display - fixed height container */}
-                  <div className="h-8 mt-3 flex items-center justify-center">
-                    {stat.label === "Star Rating" && (
-                      <div className="flex justify-center gap-1">
-                        {[...Array(5)].map((_, i) => (
-                          <motion.div
-                            key={i}
-                            initial={{ opacity: 0, scale: 0 }}
-                            animate={isInView ? { opacity: 1, scale: 1 } : {}}
-                            transition={{ delay: 0.5 + i * 0.1 }}
-                          >
-                            <Star className="w-5 h-5 text-yellow-400 fill-yellow-400" />
-                          </motion.div>
-                        ))}
+                  {/* Bottom Stats Display */}
+                  <div className="absolute bottom-4 left-4 right-4">
+                    <div className="backdrop-blur-sm rounded-2xl p-4 bg-white/10">
+                      {/* Value */}
+                      <div className="text-4xl md:text-5xl font-bold text-white mb-1">
+                        <NumberCounter
+                          value={stat.value}
+                          suffix={stat.suffix}
+                          decimals={stat.decimals}
+                          duration={2}
+                        />
                       </div>
-                    )}
+
+                      {/* Label */}
+                      <p className="text-white/80 font-medium text-sm">{stat.label}</p>
+
+                      {/* Star rating display */}
+                      {stat.label === "Star Rating" && (
+                        <div className="flex gap-1 mt-2">
+                          {[...Array(5)].map((_, i) => (
+                            <motion.div
+                              key={i}
+                              initial={{ opacity: 0, scale: 0 }}
+                              animate={isInView ? { opacity: 1, scale: 1 } : {}}
+                              transition={{ delay: 0.5 + i * 0.1 }}
+                            >
+                              <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
+                            </motion.div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Progress bar accent */}
+                      {stat.label !== "Star Rating" && (
+                        <div className="mt-3 rounded-full h-1 bg-white/20">
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={isInView ? { width: '75%' } : {}}
+                            transition={{ delay: 0.5 + index * 0.1, duration: 1 }}
+                            className={`rounded-full h-1 bg-gradient-to-r ${stat.accent}`}
+                          />
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </motion.div>
