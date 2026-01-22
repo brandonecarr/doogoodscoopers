@@ -451,6 +451,24 @@ select.form-input {
   padding-right: 2.5rem;
 }
 
+/* ===== TRUSTINDEX WIDGET STYLES ===== */
+/* Lock body scroll when TrustIndex modal is open */
+body:has(.ti-modal),
+body:has(.ti-review-modal),
+body:has([class*="ti-popup"]),
+body:has([class*="modal"][class*="ti-"]) {
+  overflow: hidden !important;
+}
+
+/* Ensure TrustIndex modal is scrollable */
+.ti-modal,
+.ti-review-modal,
+[class*="ti-popup"],
+[class*="modal"][class*="ti-"] {
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch;
+}
+
 /* ===== REDUCED MOTION ===== */
 @media (prefers-reduced-motion: reduce) {
   *,

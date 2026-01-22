@@ -34,8 +34,40 @@ export function Testimonials() {
 
     observer.observe(document.body, { childList: true, subtree: true });
 
+    // Watch for TrustIndex modal opens to lock body scroll
+    const modalObserver = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        for (const node of mutation.addedNodes) {
+          if (node instanceof HTMLElement) {
+            const isModal = node.classList.contains('ti-modal') ||
+                           node.classList.contains('ti-review-modal') ||
+                           node.className.includes('ti-popup') ||
+                           (node.className.includes('modal') && node.className.includes('ti-'));
+            if (isModal) {
+              document.body.style.overflow = 'hidden';
+            }
+          }
+        }
+        for (const node of mutation.removedNodes) {
+          if (node instanceof HTMLElement) {
+            const isModal = node.classList.contains('ti-modal') ||
+                           node.classList.contains('ti-review-modal') ||
+                           node.className.includes('ti-popup') ||
+                           (node.className.includes('modal') && node.className.includes('ti-'));
+            if (isModal) {
+              document.body.style.overflow = '';
+            }
+          }
+        }
+      }
+    });
+
+    modalObserver.observe(document.body, { childList: true, subtree: true });
+
     return () => {
       observer.disconnect();
+      modalObserver.disconnect();
+      document.body.style.overflow = '';
       // Cleanup on unmount
       const existingScript = document.querySelector(
         'script[src*="trustindex.io/loader.js"]'
