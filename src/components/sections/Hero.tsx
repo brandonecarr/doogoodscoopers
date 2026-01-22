@@ -134,7 +134,7 @@ export function Hero() {
             whileTap={{ scale: 0.98 }}
           >
             <Link
-              href="/about"
+              href="/about-doogoodscoopers"
               className="inline-flex items-center justify-center rounded-full border-2 border-white bg-white/10 text-white font-semibold hover:bg-white hover:text-navy-900 text-lg px-8 py-4 backdrop-blur-sm transition-all duration-300"
             >
               Learn More
