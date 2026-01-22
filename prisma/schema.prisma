@@ -24,6 +24,7 @@ enum LeadSource {
   OUT_OF_AREA      // Out of service area interest
   CAREERS          // Job application
   COMMERCIAL       // Commercial service inquiry
+  AD_LEAD          // Meta/Facebook ads via Privyr
 }
 
 // =====================
@@ -166,6 +167,52 @@ model CommercialLead {
 
   @@index([status])
   @@index([createdAt])
+}
+
+// =====================
+// AD LEADS (Meta/Facebook via Privyr)
+// =====================
+model AdLead {
+  id              String      @id @default(cuid())
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  // Status tracking
+  status          LeadStatus  @default(NEW)
+  notes           String?     @db.Text
+
+  // Contact info from ad form
+  firstName       String?
+  lastName        String?
+  fullName        String?     // Some forms send full name instead
+  email           String?
+  phone           String?
+
+  // Location (if provided)
+  city            String?
+  state           String?
+  zipCode         String?
+
+  // Ad campaign info
+  adSource        String?     // e.g., "facebook", "instagram", "meta"
+  campaignName    String?     // Name of the ad campaign
+  adSetName       String?     // Ad set name
+  adName          String?     // Individual ad name
+  formName        String?     // Lead form name
+
+  // Privyr specific fields
+  privyrLeadId    String?     @unique  // Privyr's internal lead ID
+
+  // Store any additional custom fields as JSON
+  customFields    Json?
+
+  // Raw webhook payload for debugging
+  rawPayload      Json?
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([adSource])
+  @@index([privyrLeadId])
 }
 
 // =====================

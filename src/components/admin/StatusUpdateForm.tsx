@@ -6,7 +6,7 @@ import type { LeadStatus } from "@/types/leads";
 
 interface StatusUpdateFormProps {
   leadId: string;
-  leadType: "quote" | "outofarea" | "career" | "commercial";
+  leadType: "quote" | "outofarea" | "career" | "commercial" | "adlead";
   currentStatus: LeadStatus;
   notes: string | null;
 }

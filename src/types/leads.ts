@@ -3,7 +3,7 @@
 export type LeadStatus = "NEW" | "CONTACTED" | "QUALIFIED" | "CONVERTED" | "LOST";
 
 // Lead source to track where leads come from
-export type LeadSource = "QUOTE_FORM" | "OUT_OF_AREA" | "CAREERS" | "COMMERCIAL";
+export type LeadSource = "QUOTE_FORM" | "OUT_OF_AREA" | "CAREERS" | "COMMERCIAL" | "AD_LEAD";
 
 // Base interface for common fields
 interface BaseModel {
@@ -74,4 +74,24 @@ export interface CommercialLead extends BaseModel {
   state: string;
   zipCode: string;
   inquiry: string | null;
+}
+
+// Ad Lead model (Meta/Facebook ads via Privyr)
+export interface AdLead extends BaseModel {
+  firstName: string | null;
+  lastName: string | null;
+  fullName: string | null;
+  email: string | null;
+  phone: string | null;
+  city: string | null;
+  state: string | null;
+  zipCode: string | null;
+  adSource: string | null;
+  campaignName: string | null;
+  adSetName: string | null;
+  adName: string | null;
+  formName: string | null;
+  privyrLeadId: string | null;
+  customFields: unknown;
+  rawPayload: unknown;
 }

@@ -4,18 +4,21 @@ import {
   MapPinOff,
   Briefcase,
   Building2,
+  Megaphone,
   TrendingUp,
   Clock,
   CheckCircle,
   AlertCircle,
 } from "lucide-react";
 import prisma from "@/lib/prisma";
-import type { QuoteLead, OutOfAreaLead, CareerApplication, CommercialLead } from "@/types/leads";
+import type { QuoteLead, OutOfAreaLead, CareerApplication, CommercialLead, AdLead } from "@/types/leads";
 
 async function getStats() {
   const [
     quoteLeadsTotal,
     quoteLeadsNew,
+    adLeadsTotal,
+    adLeadsNew,
     outOfAreaTotal,
     outOfAreaNew,
     careersTotal,
@@ -25,6 +28,8 @@ async function getStats() {
   ] = await Promise.all([
     prisma.quoteLead.count(),
     prisma.quoteLead.count({ where: { status: "NEW" } }),
+    prisma.adLead.count(),
+    prisma.adLead.count({ where: { status: "NEW" } }),
     prisma.outOfAreaLead.count(),
     prisma.outOfAreaLead.count({ where: { status: "NEW" } }),
     prisma.careerApplication.count(),
@@ -35,6 +40,7 @@ async function getStats() {
 
   return {
     quoteLeads: { total: quoteLeadsTotal, new: quoteLeadsNew },
+    adLeads: { total: adLeadsTotal, new: adLeadsNew },
     outOfArea: { total: outOfAreaTotal, new: outOfAreaNew },
     careers: { total: careersTotal, new: careersNew },
     commercial: { total: commercialTotal, new: commercialNew },
@@ -42,11 +48,16 @@ async function getStats() {
 }
 
 async function getRecentActivity() {
-  const [quoteLeads, outOfArea, careers, commercial] = await Promise.all([
+  const [quoteLeads, adLeads, outOfArea, careers, commercial] = await Promise.all([
     prisma.quoteLead.findMany({
       orderBy: { createdAt: "desc" },
       take: 3,
       select: { id: true, firstName: true, lastName: true, createdAt: true, status: true },
+    }),
+    prisma.adLead.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 3,
+      select: { id: true, firstName: true, lastName: true, fullName: true, createdAt: true, status: true },
     }),
     prisma.outOfAreaLead.findMany({
       orderBy: { createdAt: "desc" },
@@ -68,6 +79,7 @@ async function getRecentActivity() {
   // Combine and sort by date
   const all = [
     ...(quoteLeads as Pick<QuoteLead, 'id' | 'firstName' | 'lastName' | 'createdAt' | 'status'>[]).map((l) => ({ ...l, type: "quote" as const, name: `${l.firstName} ${l.lastName || ""}`.trim() })),
+    ...(adLeads as Pick<AdLead, 'id' | 'firstName' | 'lastName' | 'fullName' | 'createdAt' | 'status'>[]).map((l) => ({ ...l, type: "adlead" as const, name: l.fullName || `${l.firstName || ""} ${l.lastName || ""}`.trim() || "Unknown" })),
     ...(outOfArea as Pick<OutOfAreaLead, 'id' | 'firstName' | 'lastName' | 'createdAt' | 'status'>[]).map((l) => ({ ...l, type: "outofarea" as const, name: `${l.firstName} ${l.lastName}` })),
     ...(careers as Pick<CareerApplication, 'id' | 'firstName' | 'lastName' | 'createdAt' | 'status'>[]).map((l) => ({ ...l, type: "career" as const, name: `${l.firstName} ${l.lastName}` })),
     ...(commercial as Pick<CommercialLead, 'id' | 'contactName' | 'propertyName' | 'createdAt' | 'status'>[]).map((l) => ({ ...l, type: "commercial" as const, name: l.contactName, propertyName: l.propertyName })),
@@ -86,6 +98,14 @@ const statCards = [
     color: "bg-blue-500",
     lightColor: "bg-blue-50",
     textColor: "text-blue-600",
+  },
+  {
+    name: "Ad Leads",
+    href: "/admin/ad-leads",
+    icon: Megaphone,
+    color: "bg-pink-500",
+    lightColor: "bg-pink-50",
+    textColor: "text-pink-600",
   },
   {
     name: "Out of Area",
@@ -130,6 +150,7 @@ function formatDate(date: Date) {
 function getTypeLabel(type: string) {
   switch (type) {
     case "quote": return "Quote Lead";
+    case "adlead": return "Ad Lead";
     case "outofarea": return "Out of Area";
     case "career": return "Career App";
     case "commercial": return "Commercial";
@@ -140,6 +161,7 @@ function getTypeLabel(type: string) {
 function getTypeHref(type: string, id: string) {
   switch (type) {
     case "quote": return `/admin/quote-leads/${id}`;
+    case "adlead": return `/admin/ad-leads/${id}`;
     case "outofarea": return `/admin/out-of-area/${id}`;
     case "career": return `/admin/careers/${id}`;
     case "commercial": return `/admin/commercial/${id}`;
@@ -153,12 +175,13 @@ export default async function AdminDashboardPage() {
 
   const statsData = [
     { ...statCards[0], total: stats.quoteLeads.total, new: stats.quoteLeads.new },
-    { ...statCards[1], total: stats.outOfArea.total, new: stats.outOfArea.new },
-    { ...statCards[2], total: stats.careers.total, new: stats.careers.new },
-    { ...statCards[3], total: stats.commercial.total, new: stats.commercial.new },
+    { ...statCards[1], total: stats.adLeads.total, new: stats.adLeads.new },
+    { ...statCards[2], total: stats.outOfArea.total, new: stats.outOfArea.new },
+    { ...statCards[3], total: stats.careers.total, new: stats.careers.new },
+    { ...statCards[4], total: stats.commercial.total, new: stats.commercial.new },
   ];
 
-  const totalNew = stats.quoteLeads.new + stats.outOfArea.new + stats.careers.new + stats.commercial.new;
+  const totalNew = stats.quoteLeads.new + stats.adLeads.new + stats.outOfArea.new + stats.careers.new + stats.commercial.new;
 
   return (
     <div className="space-y-8 pb-20 lg:pb-0">
@@ -186,7 +209,7 @@ export default async function AdminDashboardPage() {
       )}
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         {statsData.map((stat) => (
           <Link
             key={stat.name}

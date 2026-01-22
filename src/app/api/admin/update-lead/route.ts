@@ -5,7 +5,7 @@ import type { LeadStatus } from "@/types/leads";
 
 interface UpdateLeadData {
   leadId: string;
-  leadType: "quote" | "outofarea" | "career" | "commercial";
+  leadType: "quote" | "outofarea" | "career" | "commercial" | "adlead";
   status: LeadStatus;
   notes?: string;
 }
@@ -63,6 +63,13 @@ export async function POST(request: Request) {
         });
         break;
 
+      case "adlead":
+        await prisma.adLead.update({
+          where: { id: leadId },
+          data: { status, notes },
+        });
+        break;
+
       default:
         return NextResponse.json(
           { success: false, message: "Invalid lead type" },
@@ -70,11 +77,20 @@ export async function POST(request: Request) {
         );
     }
 
+    // Map leadType to LeadSource enum value
+    const leadTypeMap: Record<string, "QUOTE_FORM" | "OUT_OF_AREA" | "CAREERS" | "COMMERCIAL" | "AD_LEAD"> = {
+      quote: "QUOTE_FORM",
+      outofarea: "OUT_OF_AREA",
+      career: "CAREERS",
+      commercial: "COMMERCIAL",
+      adlead: "AD_LEAD",
+    };
+
     // Log the activity
     await prisma.activityLog.create({
       data: {
         action: "STATUS_UPDATE",
-        leadType: leadType.toUpperCase() as "QUOTE_FORM" | "OUT_OF_AREA" | "CAREERS" | "COMMERCIAL",
+        leadType: leadTypeMap[leadType],
         leadId: leadId,
         details: { status, notes },
         adminEmail: session.email,

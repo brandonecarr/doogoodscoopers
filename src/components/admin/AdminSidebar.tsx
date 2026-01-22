@@ -9,6 +9,7 @@ import {
   MapPinOff,
   Briefcase,
   Building2,
+  Megaphone,
   Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -16,6 +17,7 @@ import { cn } from "@/lib/utils";
 const navigation = [
   { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
   { name: "Quote Leads", href: "/admin/quote-leads", icon: FileText },
+  { name: "Ad Leads", href: "/admin/ad-leads", icon: Megaphone },
   { name: "Out of Area", href: "/admin/out-of-area", icon: MapPinOff },
   { name: "Career Applications", href: "/admin/careers", icon: Briefcase },
   { name: "Commercial Inquiries", href: "/admin/commercial", icon: Building2 },
