@@ -7,7 +7,7 @@ import {
   Target,
   Eye,
   Users,
-  Star,
+  PawPrint,
   Leaf,
   Shield,
   ArrowRight,
@@ -344,9 +344,9 @@ export function AboutContent() {
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Star className="w-5 h-5 text-teal-600" />
+                    <PawPrint className="w-5 h-5 text-teal-600" />
                     <span className="text-navy-900 font-medium">
-                      5-Star Service
+                      5-Paw Service
                     </span>
                   </div>
                 </div>

@@ -2,19 +2,19 @@
 
 import { useRef } from "react";
 import { motion, useInView, type Variants } from "framer-motion";
-import { Star, Users, Dog, CheckCircle } from "lucide-react";
+import { PawPrint, Users, Dog, CheckCircle } from "lucide-react";
 import { NumberCounter } from "@/components/animations/NumberCounter";
 import { FloatingElementsLight } from "@/components/animations/FloatingElements";
 
 const stats = [
   {
-    icon: Star,
+    icon: PawPrint,
     value: 5.0,
-    label: "Star Rating",
+    label: "Paw Rating",
     suffix: "",
     decimals: 1,
     color: "text-yellow-400",
-    tagline: "Perfect 5-star rating on Google",
+    tagline: "Perfect 5-paw rating on Google",
     accent: "from-yellow-500 to-amber-500",
     bgColor: "#008EFF",
     bgImage: "/images/stats/star-rating-bg.png",
@@ -202,7 +202,7 @@ export function StatsCounter() {
                               animate={isInView ? { opacity: 1, scale: 1 } : {}}
                               transition={{ delay: 0.5 + i * 0.1 }}
                             >
-                              <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
+                              <PawPrint className="w-4 h-4 text-[#008EFF] fill-[#008EFF]" />
                             </motion.div>
                           ))}
                         </div>
