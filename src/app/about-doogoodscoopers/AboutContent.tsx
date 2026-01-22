@@ -21,10 +21,10 @@ import { Footer } from "@/components/layout/Footer";
 // Values
 const values = [
   {
-    icon: Star,
+    icon: PawPrint,
     title: "Excellence",
     description:
-      "We strive to deliver five-star service experiences with every visit.",
+      "We strive to deliver five-paw service experiences with every visit.",
   },
   {
     icon: Heart,
