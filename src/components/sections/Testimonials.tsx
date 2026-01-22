@@ -116,16 +116,18 @@ export function Testimonials() {
 
         for (const node of mutation.addedNodes) {
           if (node instanceof HTMLElement) {
-            // Check for any overlay/modal-like elements from TrustIndex
-            const isFixedOverlay =
-              window.getComputedStyle(node).position === 'fixed' ||
-              node.style.position === 'fixed';
-            const isTrustIndex =
-              node.className.includes('ti-') ||
-              node.id?.includes('ti-') ||
-              node.querySelector('[class*="ti-"]');
+            // Only detect actual modal overlays, not the regular widget
+            const computedStyle = window.getComputedStyle(node);
+            const isFixedOverlay = computedStyle.position === 'fixed';
+            const hasHighZIndex = parseInt(computedStyle.zIndex) > 1000;
+            const isModalClass =
+              node.className.includes('modal') ||
+              node.className.includes('overlay') ||
+              node.className.includes('ti-modal') ||
+              node.className.includes('ti-overlay');
 
-            if (isFixedOverlay || isTrustIndex) {
+            // Must be a fixed overlay with high z-index OR have modal-specific classes
+            if (isFixedOverlay && (hasHighZIndex || isModalClass)) {
               // Track this as the active modal for wheel event interception
               activeModal = node;
 
