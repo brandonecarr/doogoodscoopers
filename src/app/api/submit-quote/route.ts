@@ -151,9 +151,11 @@ async function submitInServiceAreaQuote(data: QuoteSubmission) {
 
   console.log("Sweep&Go v2 API status:", response.status);
 
-  // If v2 fails with 422 (validation error on cross_sell_id), fall back to v1
-  if (response.status === 422) {
-    console.log("v2 returned 422, falling back to v1 residential onboarding");
+  // If v2 fails, fall back to v1
+  if (!response.ok) {
+    const v2ErrorText = await response.text();
+    console.log("v2 API error response:", response.status, v2ErrorText);
+    console.log("Falling back to v1 residential onboarding");
 
     const v1Payload: Record<string, unknown> = {
       organization: SWEEPANDGO_ORG_SLUG,

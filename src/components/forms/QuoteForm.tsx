@@ -631,10 +631,14 @@ function QuoteFormInner() {
         goToStep("success");
       } else {
         setError(result.error || "Something went wrong. Please try again.");
+        // Scroll to top of form to show error message
+        setTimeout(scrollToForm, 100);
       }
     } catch (err) {
       console.error("Error submitting:", err);
       setError("Unable to complete your registration. Please try again.");
+      // Scroll to top of form to show error message
+      setTimeout(scrollToForm, 100);
     } finally {
       setIsSubmitting(false);
     }
