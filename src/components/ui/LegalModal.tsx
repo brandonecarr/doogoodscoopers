@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
+import { useSmoothScroll } from "@/components/providers/SmoothScrollProvider";
 
 interface LegalModalProps {
   isOpen: boolean;
@@ -11,77 +12,99 @@ interface LegalModalProps {
 }
 
 export function LegalModal({ isOpen, onClose, type }: LegalModalProps) {
-  const modalRef = useRef<HTMLDivElement>(null);
+  const smoothScroll = useSmoothScroll();
 
-  // Close on escape key
+  // Lock body scroll and stop Lenis when modal is open
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
+
     if (isOpen) {
       document.addEventListener("keydown", handleEscape);
       document.body.style.overflow = "hidden";
+      document.documentElement.style.overflow = "hidden";
+      smoothScroll?.stopScroll();
+    } else {
+      document.body.style.overflow = "";
+      document.documentElement.style.overflow = "";
+      smoothScroll?.startScroll();
     }
+
     return () => {
       document.removeEventListener("keydown", handleEscape);
-      document.body.style.overflow = "unset";
+      document.body.style.overflow = "";
+      document.documentElement.style.overflow = "";
+      smoothScroll?.startScroll();
     };
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, smoothScroll]);
 
-  // Close on backdrop click
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) onClose();
+  const handleClose = () => {
+    onClose();
   };
 
   return (
     <AnimatePresence>
       {isOpen && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.2 }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-          onClick={handleBackdropClick}
-        >
+        <>
+          {/* Backdrop */}
           <motion.div
-            ref={modalRef}
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="relative w-full max-w-3xl max-h-[85vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+            className="fixed inset-0 z-50 bg-navy-900/60 backdrop-blur-sm"
+            onClick={handleClose}
+          />
+
+          {/* Modal Container */}
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            onClick={handleClose}
           >
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-navy-800 to-navy-900">
-              <h2 className="text-xl font-bold text-white">
-                {type === "terms" ? "Terms of Service" : "Privacy Policy"}
-              </h2>
-              <button
-                onClick={onClose}
-                className="p-2 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors"
-                aria-label="Close modal"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-navy-800 to-navy-900 rounded-t-2xl">
+                <h2 className="text-xl font-bold text-white">
+                  {type === "terms" ? "Terms of Service" : "Privacy Policy"}
+                </h2>
+                <button
+                  onClick={handleClose}
+                  className="p-2 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+                  aria-label="Close modal"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
 
-            {/* Content */}
-            <div className="flex-1 overflow-y-auto p-6">
-              {type === "terms" ? <TermsContent /> : <PrivacyContent />}
-            </div>
-
-            {/* Footer */}
-            <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
-              <button
-                onClick={onClose}
-                className="w-full sm:w-auto px-6 py-2.5 bg-teal-500 hover:bg-teal-600 text-white font-medium rounded-lg transition-colors"
+              {/* Content - scrollable */}
+              <div
+                className="flex-1 overflow-y-scroll overscroll-contain p-6"
+                style={{ WebkitOverflowScrolling: "touch" }}
+                onWheel={(e) => e.stopPropagation()}
               >
-                Close
-              </button>
-            </div>
-          </motion.div>
-        </motion.div>
+                {type === "terms" ? <TermsContent /> : <PrivacyContent />}
+              </div>
+
+              {/* Footer */}
+              <div className="flex-shrink-0 px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-2xl">
+                <button
+                  onClick={handleClose}
+                  className="w-full sm:w-auto px-6 py-2.5 bg-teal-500 hover:bg-teal-600 text-white font-medium rounded-lg transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        </>
       )}
     </AnimatePresence>
   );
