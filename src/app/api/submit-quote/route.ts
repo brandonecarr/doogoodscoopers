@@ -112,9 +112,9 @@ async function submitInServiceAreaQuote(data: QuoteSubmission) {
     zip_code: data.zipCode,
     number_of_dogs: parseInt(data.numberOfDogs) || 1,
     clean_up_frequency: data.frequency,
-    last_time_yard_was_thoroughly_cleaned: data.lastCleaned || "more_than_2_weeks",
-    // API expects string "yes" or "no" for initial_cleanup_required
-    initial_cleanup_required: data.initialCleanupRequired ? "yes" : "no",
+    last_time_yard_was_thoroughly_cleaned: data.lastCleaned || "two_weeks",
+    // API expects boolean for initial_cleanup_required
+    initial_cleanup_required: data.initialCleanupRequired === true,
     // Payment fields
     credit_card_token: data.creditCardToken,
     name_on_card: data.nameOnCard,
