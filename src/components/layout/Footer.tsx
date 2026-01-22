@@ -126,15 +126,6 @@ export function Footer() {
                   Careers
                 </Link>
               </li>
-              <li>
-                <Link
-                  href="/gift-certificate"
-                  className="text-white/70 hover:text-teal-300 transition-colors inline-flex items-center gap-2 group"
-                >
-                  <span className="w-1.5 h-1.5 rounded-full bg-teal-500 opacity-0 group-hover:opacity-100 transition-opacity" />
-                  Gift Certificate
-                </Link>
-              </li>
             </ul>
           </motion.div>
 
@@ -208,10 +199,10 @@ export function Footer() {
             &copy; {new Date().getFullYear()} DooGoodScoopers. All rights reserved.
           </p>
           <div className="flex items-center gap-6 text-sm text-white/50">
-            <Link href="/privacy" className="hover:text-teal-300 transition-colors">
+            <Link href="/privacy-policy" className="hover:text-teal-300 transition-colors">
               Privacy Policy
             </Link>
-            <Link href="/terms" className="hover:text-teal-300 transition-colors">
+            <Link href="/terms-of-service" className="hover:text-teal-300 transition-colors">
               Terms of Service
             </Link>
           </div>
