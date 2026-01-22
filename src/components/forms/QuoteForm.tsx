@@ -1490,7 +1490,7 @@ function QuoteFormInner() {
                       <div className="flex-1">
                         <div className="flex justify-between items-start">
                           <span className="font-medium text-navy-900">{crossSell.name}</span>
-                          <span className="text-teal-600 font-semibold">${crossSell.unit_amount}</span>
+                          <span className="text-teal-600 font-semibold">${crossSell.unit_amount}/session</span>
                         </div>
                         {crossSell.description && (
                           <p className="text-sm text-navy-700/70 mt-0.5">{crossSell.description}</p>
