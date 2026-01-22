@@ -27,7 +27,7 @@ const stats = [
     decimals: 0,
     color: "text-teal-500",
     image: "/images/stats/happy-families.jpg",
-    tagline: "Families trusting us with their yards",
+    tagline: "Families trust us with their yards",
     accent: "from-teal-500 to-cyan-500",
     imageStyle: "object-[30%_40%] scale-125",
   },
@@ -51,7 +51,7 @@ const stats = [
     decimals: 0,
     color: "text-teal-600",
     image: "/images/stats/yards-completed.jpg",
-    tagline: "Yards cleaned and counting",
+    tagline: "We specialize in beautiful yards",
     accent: "from-emerald-500 to-teal-500",
   },
 ];
@@ -167,9 +167,9 @@ export function StatsCounter() {
                         type: "spring",
                         stiffness: 200,
                       }}
-                      className="inline-flex items-center gap-2 backdrop-blur-sm rounded-full pl-2 pr-4 py-2 bg-white/15"
+                      className="inline-flex items-center gap-2 backdrop-blur-md rounded-full pl-2 pr-4 py-2 bg-black/40"
                     >
-                      <div className="rounded-full p-1.5 bg-white/20">
+                      <div className="rounded-full p-1.5 bg-white/25">
                         <Icon className="w-4 h-4 text-white" />
                       </div>
                       <span className="text-xs font-medium text-white/90">{stat.tagline}</span>
@@ -208,17 +208,24 @@ export function StatsCounter() {
                         </div>
                       )}
 
-                      {/* Progress bar accent */}
-                      {stat.label !== "Star Rating" && (
-                        <div className="mt-3 rounded-full h-1 bg-white/20">
+                      {/* Animated paw prints */}
+                      <div className="flex gap-1.5 mt-3">
+                        {[...Array(5)].map((_, i) => (
                           <motion.div
-                            initial={{ width: 0 }}
-                            animate={isInView ? { width: '75%' } : {}}
-                            transition={{ delay: 0.5 + index * 0.1, duration: 1 }}
-                            className={`rounded-full h-1 bg-gradient-to-r ${stat.accent}`}
-                          />
-                        </div>
-                      )}
+                            key={i}
+                            initial={{ opacity: 0, scale: 0, y: 5 }}
+                            animate={isInView ? { opacity: 1, scale: 1, y: 0 } : {}}
+                            transition={{
+                              delay: 0.6 + index * 0.1 + i * 0.08,
+                              type: "spring",
+                              stiffness: 300,
+                              damping: 15,
+                            }}
+                          >
+                            <PawPrint className="w-3.5 h-3.5 text-white/70 fill-white/70" />
+                          </motion.div>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
