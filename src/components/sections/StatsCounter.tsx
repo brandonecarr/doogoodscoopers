@@ -14,10 +14,10 @@ const stats = [
     suffix: "",
     decimals: 1,
     color: "text-yellow-400",
-    image: "/images/stats/google-reviews.jpg",
     tagline: "Perfect 5-star rating on Google",
     accent: "from-yellow-500 to-amber-500",
     bgColor: "#008EFF",
+    bgImage: "/images/stats/star-rating-bg.png",
   },
   {
     icon: Users,
@@ -26,9 +26,10 @@ const stats = [
     suffix: "+",
     decimals: 0,
     color: "text-teal-500",
-    image: "https://images.unsplash.com/photo-1491438590914-bc09fcaaf77a?w=800&h=1000&fit=crop",
+    image: "/images/stats/happy-families.jpg",
     tagline: "Families trusting us with their yards",
     accent: "from-teal-500 to-cyan-500",
+    imageStyle: "object-[30%_40%] scale-125",
   },
   {
     icon: Dog,
@@ -37,9 +38,10 @@ const stats = [
     suffix: "+",
     decimals: 0,
     color: "text-navy-600",
-    image: "/images/stats/happy-dog.jpg",
+    image: "/images/stats/happy-dogs.jpg",
     tagline: "Pups enjoying cleaner yards",
     accent: "from-blue-500 to-indigo-500",
+    imageStyle: "object-[50%_35%]",
   },
   {
     icon: CheckCircle,
@@ -48,7 +50,7 @@ const stats = [
     suffix: "",
     decimals: 0,
     color: "text-teal-600",
-    image: "/images/stats/clean-yard.jpg",
+    image: "/images/stats/yards-completed.jpg",
     tagline: "Yards cleaned and counting",
     accent: "from-emerald-500 to-teal-500",
   },
@@ -126,12 +128,24 @@ export function StatsCounter() {
                   }}
                 >
                   {/* Background */}
-                  {stat.image && stat.image.startsWith('http') ? (
+                  {stat.image ? (
                     <img
                       src={stat.image}
                       alt={stat.label}
-                      className="absolute inset-0 w-full h-full object-cover"
+                      className={`absolute inset-0 w-full h-full object-cover ${stat.imageStyle || ''}`}
                     />
+                  ) : stat.bgImage ? (
+                    <>
+                      <img
+                        src={stat.bgImage}
+                        alt={stat.label}
+                        className="absolute inset-0 w-full h-full object-cover"
+                      />
+                      <div
+                        className="absolute inset-0"
+                        style={{ backgroundColor: stat.bgColor, opacity: 0.85 }}
+                      />
+                    </>
                   ) : stat.bgColor ? (
                     <div
                       className="absolute inset-0"
