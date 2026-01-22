@@ -116,8 +116,10 @@ async function submitInServiceAreaQuote(data: QuoteSubmission) {
     // API expects string "1" or "0" for initial_cleanup_required (Laravel convention)
     initial_cleanup_required: data.initialCleanupRequired ? "1" : "0",
     // Payment fields
+    payment_method: "credit_card",
     credit_card_token: data.creditCardToken,
     name_on_card: data.nameOnCard,
+    postal: data.zipCode,  // Billing postal code (using service address zip)
     terms_open_api: true, // User accepted terms in the form
     // Optional fields
     dog_name: data.dogNames || [],
