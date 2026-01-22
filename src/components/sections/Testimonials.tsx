@@ -51,114 +51,58 @@ export function Testimonials() {
       if (lenis) lenis.start();
     };
 
-    // Track active modal for wheel event interception
-    let activeModal: HTMLElement | null = null;
+    // Track if modal is open (based on user clicks, not DOM observation)
+    let modalOpen = false;
 
-    const closeModal = () => {
-      activeModal = null;
-      unlockScroll();
+    const openModal = () => {
+      modalOpen = true;
+      lockScroll();
     };
 
-    // Global wheel handler to intercept wheel events on modal content
-    // Uses capture phase to stop events before Lenis sees them
-    const globalWheelHandler = (e: WheelEvent) => {
-      if (activeModal && activeModal.contains(e.target as Node)) {
-        // Stop propagation so Lenis doesn't see this event
-        e.stopPropagation();
+    const closeModal = () => {
+      if (modalOpen) {
+        modalOpen = false;
+        unlockScroll();
       }
     };
 
     // Use click event delegation to detect when "Read more" is clicked
     const handleClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-      // Check if clicked element is a "Read more" link or inside a TrustIndex review card
+
+      // Check if clicked element is a "Read more" link
       if (target.closest('.ti-read-more') ||
           target.closest('[class*="read-more"]') ||
-          target.textContent?.toLowerCase().includes('read more')) {
-        setTimeout(lockScroll, 100);
+          (target.textContent?.toLowerCase().includes('read more') && target.tagName !== 'DIV')) {
+        setTimeout(openModal, 100);
+        return;
       }
-      // Check for close button clicks or clicking outside modal content
-      if (target.closest('.ti-close') ||
+
+      // Check for close button clicks or clicking on overlay background
+      if (modalOpen && (
+          target.closest('.ti-close') ||
           target.closest('[class*="close"]') ||
           target.closest('.ti-modal-close') ||
           target.classList.contains('ti-modal') ||
-          target.classList.contains('ti-overlay')) {
+          target.classList.contains('ti-overlay') ||
+          (target.style.position === 'fixed' && target.style.background?.includes('rgba')))) {
         setTimeout(closeModal, 100);
       }
     };
 
     document.addEventListener('click', handleClick);
 
-    // Add listener in capture phase to intercept before Lenis
-    document.addEventListener('wheel', globalWheelHandler, { capture: true, passive: true });
-
     // Listen for Escape key to close modal
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && activeModal) {
+      if (e.key === 'Escape' && modalOpen) {
         closeModal();
       }
     };
     document.addEventListener('keydown', handleKeyDown);
 
-    // Also watch for modal elements being added/removed or hidden
-    const modalObserver = new MutationObserver((mutations) => {
-      for (const mutation of mutations) {
-        // Check for attribute changes (like display: none or visibility: hidden)
-        if (mutation.type === 'attributes' && mutation.target instanceof HTMLElement) {
-          const node = mutation.target;
-          if (activeModal && (activeModal === node || activeModal.contains(node))) {
-            const style = window.getComputedStyle(node);
-            if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') {
-              closeModal();
-            }
-          }
-        }
-
-        for (const node of mutation.addedNodes) {
-          if (node instanceof HTMLElement) {
-            // Only detect actual modal overlays, not the regular widget
-            const computedStyle = window.getComputedStyle(node);
-            const isFixedOverlay = computedStyle.position === 'fixed';
-            const hasHighZIndex = parseInt(computedStyle.zIndex) > 1000;
-            const isModalClass =
-              node.className.includes('modal') ||
-              node.className.includes('overlay') ||
-              node.className.includes('ti-modal') ||
-              node.className.includes('ti-overlay');
-
-            // Must be a fixed overlay with high z-index OR have modal-specific classes
-            if (isFixedOverlay && (hasHighZIndex || isModalClass)) {
-              // Track this as the active modal for wheel event interception
-              activeModal = node;
-
-              // Add data-lenis-prevent to the modal and ALL its children
-              node.setAttribute('data-lenis-prevent', '');
-              node.querySelectorAll('*').forEach((child) => {
-                child.setAttribute('data-lenis-prevent', '');
-              });
-
-              lockScroll();
-            }
-          }
-        }
-        for (const node of mutation.removedNodes) {
-          if (node instanceof HTMLElement) {
-            // Clear active modal reference if this node is or contains the modal
-            if (activeModal === node || (activeModal && node.contains(activeModal))) {
-              closeModal();
-            }
-          }
-        }
-      }
-    });
-
-    modalObserver.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class'] });
-
     return () => {
       observer.disconnect();
-      modalObserver.disconnect();
       document.removeEventListener('click', handleClick);
-      document.removeEventListener('wheel', globalWheelHandler, { capture: true });
       document.removeEventListener('keydown', handleKeyDown);
       unlockScroll();
       // Cleanup on unmount
