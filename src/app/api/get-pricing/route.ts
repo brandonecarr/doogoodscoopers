@@ -69,6 +69,7 @@ export async function GET(request: NextRequest) {
 
     // Log the raw response for debugging
     console.log("Sweep&Go pricing API response:", JSON.stringify(data, null, 2));
+    console.log("Sweep&Go cross_sells from API:", JSON.stringify(data.cross_sells, null, 2));
 
     // Parse the price value - Sweep&Go returns price as an object: { price: { value: "85.00", category: "prepaid", billing_interval: "monthly" } }
     // Or sometimes as a flat value field, or null if not configured
@@ -113,6 +114,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Some configurations may have initial cleanup as a cross-sell
+    let initialCleanupCrossSellId: number | null = null;
     if (data.cross_sells && Array.isArray(data.cross_sells)) {
       const initialCleanup = data.cross_sells.find(
         (cs: Record<string, unknown>) => {
@@ -121,8 +123,11 @@ export async function GET(request: NextRequest) {
           return name.includes('initial') || service.includes('initial');
         }
       );
-      if (initialCleanup && !initialCleanupFee) {
-        initialCleanupFee = parseFloat(String(initialCleanup.unit_amount)) || 0;
+      if (initialCleanup) {
+        initialCleanupCrossSellId = typeof initialCleanup.id === 'number' ? initialCleanup.id : null;
+        if (!initialCleanupFee) {
+          initialCleanupFee = parseFloat(String(initialCleanup.unit_amount)) || 0;
+        }
       }
     }
 
@@ -164,6 +169,7 @@ export async function GET(request: NextRequest) {
         recurringPrice: perVisitPrice,      // Per-visit price for display
         monthlyPrice: monthlyPrice,          // Monthly total
         initialCleanupFee: initialCleanupFee,
+        initialCleanupCrossSellId: initialCleanupCrossSellId,  // ID needed for API submission
         taxRate: taxRate,
         total: recurringPrice,
         frequency: frequency,

@@ -97,42 +97,44 @@ async function submitInServiceAreaQuote(data: QuoteSubmission) {
     );
   }
 
-  // Submit to Sweep&Go create_client_with_package endpoint
+  // Submit to Sweep&Go v1 residential onboarding endpoint
   // This creates the client and sets up their payment method
-  const payload = {
+  // Using v1 instead of v2 because cross_sells is optional in v1
+  const payload: Record<string, unknown> = {
     organization: SWEEPANDGO_ORG_SLUG,
     email: data.email,
     first_name: data.firstName,
     last_name: data.lastName,
-    phone_numbers: [data.phone],
+    cell_phone_number: data.phone,
     home_address: data.address,
     city: data.city,
     state: data.state || "CA",
     zip_code: data.zipCode,
-    number_of_dogs: data.numberOfDogs,
+    number_of_dogs: parseInt(data.numberOfDogs) || 1,
     clean_up_frequency: data.frequency,
     last_time_yard_was_thoroughly_cleaned: data.lastCleaned || "more_than_2_weeks",
+    initial_cleanup_required: data.initialCleanupRequired || false,
     // Payment fields
     credit_card_token: data.creditCardToken,
     name_on_card: data.nameOnCard,
     terms_open_api: true, // User accepted terms in the form
-    billing_interval: data.billingInterval || "per_visit",
-    category: data.category || "prepaid",
     // Optional fields
     dog_name: data.dogNames || [],
     dog_breed: data.dogBreeds || [],
     safe_dog: data.safeDogs || [],
-    // Cross-sells (add-ons) - array of IDs
-    // The v2 API expects cross_sell_id as an array
-    cross_sell_id: data.crossSells || [],
   };
 
-  console.log("Submitting to create_client_with_package:", JSON.stringify(payload, null, 2));
+  // Cross-sells (add-ons) - optional in v1 API
+  if (data.crossSells && data.crossSells.length > 0) {
+    payload.cross_sells = data.crossSells.map(String);  // v1 expects string array
+  }
+
+  console.log("Submitting to v1 residential onboarding:", JSON.stringify(payload, null, 2));
 
   const response = await fetch(
-    `${SWEEPANDGO_API_URL}/api/v2/client_on_boarding/create_client_with_package`,
+    `${SWEEPANDGO_API_URL}/api/v1/residential/onboarding`,
     {
-      method: "POST",
+      method: "PUT",
       headers: {
         "Authorization": `Bearer ${SWEEPANDGO_TOKEN}`,
         "Content-Type": "application/json",
@@ -141,11 +143,11 @@ async function submitInServiceAreaQuote(data: QuoteSubmission) {
     }
   );
 
-  console.log("Sweep&Go create_client_with_package status:", response.status);
+  console.log("Sweep&Go v1 onboarding status:", response.status);
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error("Sweep&Go create_client_with_package error:", response.status, errorText);
+    console.error("Sweep&Go v1 onboarding error:", response.status, errorText);
 
     // Try to parse error for more specific message
     let errorMessage = "Unable to complete your registration. Please try again or call us directly.";
@@ -169,7 +171,7 @@ async function submitInServiceAreaQuote(data: QuoteSubmission) {
   }
 
   const result = await response.json();
-  console.log("Sweep&Go create_client_with_package response:", JSON.stringify(result, null, 2));
+  console.log("Sweep&Go v1 onboarding response:", JSON.stringify(result, null, 2));
 
   return NextResponse.json({
     success: true,

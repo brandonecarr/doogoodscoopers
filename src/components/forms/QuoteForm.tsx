@@ -94,6 +94,7 @@ interface PricingInfo {
   recurringPrice: number;
   monthlyPrice?: number;
   initialCleanupFee: number;
+  initialCleanupCrossSellId?: number | null;
   total: number;
   frequency: string;
   numberOfDogs: string;
@@ -386,21 +387,16 @@ function QuoteFormInner() {
         // Store cross-sells from the API response
         if (result.crossSells && Array.isArray(result.crossSells)) {
           setCrossSells(result.crossSells);
-          // Auto-select required cross-sells (like initial cleanup) based on service needs
-          // The initial cleanup cross-sell is required when lastCleaned indicates yard needs initial cleaning
-          const requiredCrossSellIds = result.crossSells
-            .filter((cs: CrossSell) => {
-              const name = (cs.name || '').toLowerCase();
-              const isInitialCleanup = name.includes('initial');
-              // Initial cleanup is required if yard hasn't been cleaned recently
-              if (isInitialCleanup && result.pricing?.initialCleanupFee > 0) {
-                return true;
-              }
-              return false;
-            })
-            .map((cs: CrossSell) => cs.id);
-          setSelectedCrossSells(requiredCrossSellIds);
         }
+
+        // Auto-select required cross-sells (like initial cleanup) based on pricing info
+        // The initial cleanup cross-sell ID is provided directly from the pricing API
+        const requiredCrossSellIds: number[] = [];
+        if (result.pricing?.initialCleanupCrossSellId && result.pricing?.initialCleanupFee > 0) {
+          requiredCrossSellIds.push(result.pricing.initialCleanupCrossSellId);
+        }
+        setSelectedCrossSells(requiredCrossSellIds);
+
         return true;
       } else {
         setError("Unable to fetch pricing. Please try again.");
