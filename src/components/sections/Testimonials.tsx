@@ -34,77 +34,36 @@ export function Testimonials() {
 
     observer.observe(document.body, { childList: true, subtree: true });
 
-    // Watch for TrustIndex modal opens to lock body scroll
-    const lockScroll = () => {
-      document.body.style.overflow = 'hidden';
-      document.documentElement.style.overflow = 'hidden';
-      // Stop Lenis if it exists
-      const lenis = (window as unknown as { lenis?: { stop: () => void } }).lenis;
-      if (lenis) lenis.stop();
-    };
-
-    const unlockScroll = () => {
-      document.body.style.overflow = '';
-      document.documentElement.style.overflow = '';
-      // Resume Lenis if it exists
-      const lenis = (window as unknown as { lenis?: { start: () => void } }).lenis;
-      if (lenis) lenis.start();
-    };
-
-    // Track if modal is open (based on user clicks, not DOM observation)
-    let modalOpen = false;
-
-    const openModal = () => {
-      modalOpen = true;
-      lockScroll();
-    };
-
-    const closeModal = () => {
-      if (modalOpen) {
-        modalOpen = false;
-        unlockScroll();
+    // Helper to check if an element is inside a fixed overlay (modal)
+    const isInsideFixedOverlay = (element: HTMLElement | null): HTMLElement | null => {
+      while (element && element !== document.body) {
+        const style = window.getComputedStyle(element);
+        if (style.position === 'fixed' && parseInt(style.zIndex) > 100) {
+          return element;
+        }
+        element = element.parentElement;
       }
+      return null;
     };
 
-    // Use click event delegation to detect when "Read more" is clicked
-    const handleClick = (e: MouseEvent) => {
+    // Global wheel handler - intercept wheel events on fixed overlays
+    // This runs in capture phase to stop events before Lenis sees them
+    const handleWheel = (e: WheelEvent) => {
       const target = e.target as HTMLElement;
+      const fixedOverlay = isInsideFixedOverlay(target);
 
-      // Check if clicked element is a "Read more" link
-      if (target.closest('.ti-read-more') ||
-          target.closest('[class*="read-more"]') ||
-          (target.textContent?.toLowerCase().includes('read more') && target.tagName !== 'DIV')) {
-        setTimeout(openModal, 100);
-        return;
-      }
-
-      // Check for close button clicks or clicking on overlay background
-      if (modalOpen && (
-          target.closest('.ti-close') ||
-          target.closest('[class*="close"]') ||
-          target.closest('.ti-modal-close') ||
-          target.classList.contains('ti-modal') ||
-          target.classList.contains('ti-overlay') ||
-          (target.style.position === 'fixed' && target.style.background?.includes('rgba')))) {
-        setTimeout(closeModal, 100);
+      if (fixedOverlay) {
+        // Stop propagation so Lenis doesn't intercept this scroll
+        e.stopPropagation();
       }
     };
 
-    document.addEventListener('click', handleClick);
-
-    // Listen for Escape key to close modal
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && modalOpen) {
-        closeModal();
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
+    // Add in capture phase, must not be passive to allow stopPropagation
+    document.addEventListener('wheel', handleWheel, { capture: true });
 
     return () => {
       observer.disconnect();
-      document.removeEventListener('click', handleClick);
-      document.removeEventListener('keydown', handleKeyDown);
-      unlockScroll();
+      document.removeEventListener('wheel', handleWheel, { capture: true });
       // Cleanup on unmount
       const existingScript = document.querySelector(
         'script[src*="trustindex.io/loader.js"]'
