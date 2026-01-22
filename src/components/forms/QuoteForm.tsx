@@ -115,6 +115,7 @@ interface CrossSell {
 interface PaymentInfo {
   token: string;
   nameOnCard: string;
+  expiry: string; // MMYY format for Sweep&Go API
 }
 
 interface FormOption {
@@ -543,9 +544,15 @@ function QuoteFormInner() {
       }
 
       if (token) {
+        // Extract expiry from Stripe token and format as MMYY for Sweep&Go API
+        const expMonth = token.card?.exp_month?.toString().padStart(2, '0') || '';
+        const expYear = token.card?.exp_year?.toString().slice(-2) || '';
+        const expiry = `${expMonth}${expYear}`; // Format: MMYY (e.g., "0926")
+
         setPaymentInfo({
           token: token.id,
           nameOnCard: nameOnCard,
+          expiry: expiry,
         });
         goToStep("review");
       }
@@ -608,6 +615,7 @@ function QuoteFormInner() {
           // Payment fields
           creditCardToken: paymentInfo.token,
           nameOnCard: paymentInfo.nameOnCard,
+          expiry: paymentInfo.expiry,
           termsAccepted: true,
           // Pricing fields from API
           billingInterval: pricing?.billingInterval || "per_visit",

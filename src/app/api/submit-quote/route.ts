@@ -34,6 +34,7 @@ interface QuoteSubmission {
   // Payment info (required for in-service-area submissions)
   creditCardToken?: string;
   nameOnCard?: string;
+  expiry?: string; // MMYY format for card expiration
   termsAccepted?: boolean;
   billingInterval?: string;
   category?: string;
@@ -119,6 +120,7 @@ async function submitInServiceAreaQuote(data: QuoteSubmission) {
     payment_method: "credit_card",
     credit_card_token: data.creditCardToken,
     name_on_card: data.nameOnCard,
+    expiry: data.expiry, // Card expiration in MMYY format (e.g., "0926")
     postal: data.zipCode,  // Billing postal code (using service address zip)
     terms_open_api: true, // User accepted terms in the form
     // Optional fields
