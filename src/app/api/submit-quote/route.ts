@@ -151,7 +151,7 @@ async function submitInServiceAreaQuote(data: QuoteSubmission) {
   // Try v2 API first - create_client_with_package may have better Stripe support
   const v2Payload: Record<string, unknown> = {
     organization: SWEEPANDGO_ORG_SLUG,
-    organization_id: SWEEPANDGO_ORG_SLUG, // v2 API requires organization_id
+    organization_id: "doogoodscoopers-obc2w", // v2 API requires organization_id (different from slug)
     email: data.email,
     first_name: data.firstName,
     last_name: data.lastName,
