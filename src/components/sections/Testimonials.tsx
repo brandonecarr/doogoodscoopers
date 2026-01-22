@@ -6,6 +6,7 @@ import { PawPrint } from "lucide-react";
 
 export function Testimonials() {
   const ref = useRef<HTMLElement>(null);
+  const widgetContainerRef = useRef<HTMLDivElement>(null);
   const isInView = useInView(ref, { once: true, margin: "-100px" });
 
   useEffect(() => {
@@ -16,7 +17,25 @@ export function Testimonials() {
     script.defer = true;
     document.body.appendChild(script);
 
+    // Watch for the TrustIndex widget to be added to the DOM and move it to our container
+    const observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        for (const node of mutation.addedNodes) {
+          if (node instanceof HTMLElement &&
+              (node.classList.contains('ti-widget') || node.getAttribute('data-trustindex-widget'))) {
+            if (widgetContainerRef.current && !widgetContainerRef.current.contains(node)) {
+              widgetContainerRef.current.appendChild(node);
+              observer.disconnect();
+            }
+          }
+        }
+      }
+    });
+
+    observer.observe(document.body, { childList: true, subtree: true });
+
     return () => {
+      observer.disconnect();
       // Cleanup on unmount
       const existingScript = document.querySelector(
         'script[src*="trustindex.io/loader.js"]'
@@ -55,7 +74,7 @@ export function Testimonials() {
           transition={{ delay: 0.2, duration: 0.6 }}
           className="w-full"
         >
-          {/* TrustIndex widget will be injected here by the script */}
+          <div ref={widgetContainerRef} className="trustindex-widget-container" />
         </motion.div>
 
         {/* Additional Trust Elements */}
