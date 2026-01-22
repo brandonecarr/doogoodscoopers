@@ -142,11 +142,17 @@ export function CommercialContactModal({
   const onSubmit = async (data: CommercialContactFormData) => {
     setIsSubmitting(true);
     try {
-      // TODO: Submit to backend/API
-      console.log("Commercial contact form submitted:", data);
+      const response = await fetch("/api/commercial-lead", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
 
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || "Failed to submit inquiry");
+      }
 
       setSubmitSuccess(true);
       reset();

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import prisma from "@/lib/prisma";
 
 const SWEEPANDGO_API_URL = process.env.SWEEPANDGO_API_URL || "https://openapi.sweepandgo.com";
 const SWEEPANDGO_TOKEN = process.env.SWEEPANDGO_TOKEN;
@@ -247,6 +248,22 @@ async function submitInServiceAreaQuote(data: QuoteSubmission) {
 }
 
 async function submitOutOfServiceAreaLead(data: QuoteSubmission) {
+  // Store in our database first
+  try {
+    await prisma.outOfAreaLead.create({
+      data: {
+        firstName: data.firstName,
+        lastName: data.lastName || "",
+        email: data.email || "",
+        phone: data.phone || "",
+        zipCode: data.zipCode,
+      },
+    });
+  } catch (dbError) {
+    console.error("Database error storing out-of-area lead:", dbError);
+    // Continue even if DB fails - we still want to submit to Sweep&Go
+  }
+
   // Submit to out_of_service_form endpoint to capture lead
   const payload = {
     first_name: data.firstName,

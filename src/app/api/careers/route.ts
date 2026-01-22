@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import prisma from "@/lib/prisma";
 
 interface CareerApplication {
   firstName: string;
@@ -25,6 +26,36 @@ interface CareerApplication {
 export async function POST(request: Request) {
   try {
     const data: CareerApplication = await request.json();
+
+    // Store in database
+    try {
+      await prisma.careerApplication.create({
+        data: {
+          firstName: data.firstName,
+          lastName: data.lastName,
+          email: data.email,
+          phone: data.phone,
+          address: data.address,
+          city: data.city,
+          dateOfBirth: data.dateOfBirth,
+          driversLicense: data.driversLicense,
+          ssnLast4: data.ssnLast4,
+          legalCitizen: data.legalCitizen === "yes",
+          hasAutoInsurance: data.hasAutoInsurance === "yes",
+          convictedFelony: data.convictedFelony === "yes",
+          references: data.references,
+          currentEmployment: data.currentEmployment,
+          workDuties: data.workDuties,
+          whyLeftPrevious: data.whyLeftPrevious,
+          mayContactEmployers: data.mayContactEmployers === "yes",
+          previousBossContact: data.previousBossContact,
+          whyWorkHere: data.whyWorkHere,
+        },
+      });
+    } catch (dbError) {
+      console.error("Database error storing career application:", dbError);
+      // Continue even if DB fails - we still want to send the email
+    }
 
     // Validate required fields
     const requiredFields = [

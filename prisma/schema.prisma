@@ -1,0 +1,209 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Lead status enum for tracking lead progress
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  CONVERTED
+  LOST
+}
+
+// Lead source to track where leads come from
+enum LeadSource {
+  QUOTE_FORM       // Started quote but didn't complete
+  OUT_OF_AREA      // Out of service area interest
+  CAREERS          // Job application
+  COMMERCIAL       // Commercial service inquiry
+}
+
+// =====================
+// QUOTE LEADS
+// =====================
+// People who started the quote form but didn't complete signup
+model QuoteLead {
+  id              String      @id @default(cuid())
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  // Status tracking
+  status          LeadStatus  @default(NEW)
+  notes           String?     @db.Text
+
+  // Contact info
+  firstName       String
+  lastName        String?
+  email           String?
+  phone           String
+
+  // Address
+  address         String?
+  city            String?
+  zipCode         String
+
+  // Service details
+  numberOfDogs    String?
+  frequency       String?
+  lastCleaned     String?
+
+  // Gate info
+  gateLocation    String?
+  gateCode        String?
+
+  // Step tracking - which step did they abandon?
+  lastStep        String?
+
+  // Dogs info (stored as JSON)
+  dogsInfo        Json?
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([zipCode])
+}
+
+// =====================
+// OUT OF AREA LEADS
+// =====================
+// People interested but outside service area
+model OutOfAreaLead {
+  id              String      @id @default(cuid())
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  // Status tracking
+  status          LeadStatus  @default(NEW)
+  notes           String?     @db.Text
+
+  // Contact info
+  firstName       String
+  lastName        String
+  email           String
+  phone           String
+  zipCode         String
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([zipCode])
+}
+
+// =====================
+// CAREER APPLICATIONS
+// =====================
+model CareerApplication {
+  id              String      @id @default(cuid())
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  // Status tracking
+  status          LeadStatus  @default(NEW)
+  notes           String?     @db.Text
+
+  // Personal info
+  firstName       String
+  lastName        String
+  email           String
+  phone           String
+  address         String
+  city            String
+  dateOfBirth     String?
+  driversLicense  String?
+  ssnLast4        String?
+
+  // Employment eligibility
+  legalCitizen    Boolean     @default(false)
+  hasAutoInsurance Boolean    @default(false)
+  convictedFelony Boolean     @default(false)
+
+  // Work history
+  references      String?     @db.Text
+  currentEmployment String?   @db.Text
+  workDuties      String?     @db.Text
+  whyLeftPrevious String?     @db.Text
+  mayContactEmployers Boolean @default(false)
+  previousBossContact String? @db.Text
+
+  // Motivation
+  whyWorkHere     String?     @db.Text
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+// =====================
+// COMMERCIAL INQUIRIES
+// =====================
+model CommercialLead {
+  id              String      @id @default(cuid())
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  // Status tracking
+  status          LeadStatus  @default(NEW)
+  notes           String?     @db.Text
+
+  // Contact info
+  contactName     String
+  propertyName    String
+  email           String
+  phone           String
+
+  // Location
+  city            String
+  state           String
+  zipCode         String
+
+  // Additional notes from form
+  inquiry         String?     @db.Text
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+// =====================
+// ADMIN USERS
+// =====================
+model AdminUser {
+  id              String      @id @default(cuid())
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  email           String      @unique
+  passwordHash    String
+  name            String?
+
+  @@index([email])
+}
+
+// =====================
+// ACTIVITY LOG
+// =====================
+// Track admin actions on leads
+model ActivityLog {
+  id              String      @id @default(cuid())
+  createdAt       DateTime    @default(now())
+
+  // Who performed the action
+  adminEmail      String
+
+  // What was the action
+  action          String      // e.g., "status_change", "note_added", "viewed"
+
+  // Which lead was affected
+  leadType        LeadSource
+  leadId          String
+
+  // Details of the change
+  details         Json?
+
+  @@index([leadType, leadId])
+  @@index([createdAt])
+}
