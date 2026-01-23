@@ -86,10 +86,8 @@ export function StatsCounter() {
   return (
     <section
       ref={ref}
-      className="relative py-24 bg-gradient-to-b from-teal-50 to-white overflow-hidden"
+      className="relative py-24 bg-black overflow-hidden"
     >
-      <FloatingElementsLight variant="section" />
-
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <motion.div
@@ -98,10 +96,10 @@ export function StatsCounter() {
           transition={{ duration: 0.6 }}
           className="text-center mb-16"
         >
-          <h2 className="text-display-sm font-bold text-navy-900 mb-4">
+          <h2 className="text-display-sm font-bold text-white mb-4">
             Trusted by Families Across the Inland Empire
           </h2>
-          <p className="text-lg text-navy-700/70 max-w-2xl mx-auto">
+          <p className="text-lg text-white/70 max-w-2xl mx-auto">
             Join hundreds of satisfied customers who have taken back control of their yards
           </p>
         </motion.div>
