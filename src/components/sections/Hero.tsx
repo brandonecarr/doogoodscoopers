@@ -165,9 +165,9 @@ export function Hero() {
             <span className="text-white/70">5.0 Rating</span>
           </div>
           <div className="h-4 w-px bg-white/20" />
-          <span>111+ Happy Families</span>
+          <span>521+ Happy Families</span>
           <div className="h-4 w-px bg-white/20" />
-          <span>60+ ZIP Codes Served</span>
+          <span>90+ ZIP Codes Served</span>
         </motion.div>
       </motion.div>
 

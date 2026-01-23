@@ -21,7 +21,7 @@ const stats = [
   },
   {
     icon: Users,
-    value: 111,
+    value: 521,
     label: "Happy Families",
     suffix: "+",
     decimals: 0,
@@ -33,7 +33,7 @@ const stats = [
   },
   {
     icon: Dog,
-    value: 240,
+    value: 1840,
     label: "Happy Dogs",
     suffix: "+",
     decimals: 0,
@@ -45,7 +45,7 @@ const stats = [
   },
   {
     icon: CheckCircle,
-    value: 2123,
+    value: 22123,
     label: "Yards Completed",
     suffix: "",
     decimals: 0,

@@ -64,7 +64,7 @@ export function ServiceAreas() {
             <div className="flex flex-wrap gap-4 mb-8">
               <div className="flex items-center gap-2 text-teal-300">
                 <CheckCircle className="w-5 h-5" />
-                <span>60+ ZIP Codes</span>
+                <span>90+ ZIP Codes</span>
               </div>
               <div className="flex items-center gap-2 text-teal-300">
                 <CheckCircle className="w-5 h-5" />
