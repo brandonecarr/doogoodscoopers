@@ -59,7 +59,7 @@ export async function POST(request: Request) {
         gateCode: data.gateCode || null,
         status: data.status || "NEW",
         notes: data.notes || null,
-        dogsInfo: data.dogsInfo || null,
+        dogsInfo: data.dogsInfo || undefined,
         lastStep: "Manual Entry",
       },
     });
