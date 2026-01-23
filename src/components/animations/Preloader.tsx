@@ -68,6 +68,7 @@ export function Preloader({ onComplete }: PreloaderProps) {
                 width={144}
                 height={144}
                 className="w-full h-full opacity-40"
+                priority
               />
             </motion.div>
 

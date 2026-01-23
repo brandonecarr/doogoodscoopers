@@ -6,29 +6,25 @@ import { PawPrint } from "lucide-react";
 
 export function Testimonials() {
   const ref = useRef<HTMLElement>(null);
+  const widgetContainerRef = useRef<HTMLDivElement>(null);
   const isInView = useInView(ref, { once: true, margin: "-100px" });
 
   useEffect(() => {
-    // Only load once
-    const existingScript = document.querySelector('script[src*="trustindex.io/loader.js"]');
-    if (existingScript) return;
+    if (!widgetContainerRef.current) return;
 
-    // Load TrustIndex script
+    // Check if widget already loaded in this container
+    if (widgetContainerRef.current.querySelector("script")) return;
+
+    // Create and append the TrustIndex script directly in the container
     const script = document.createElement("script");
     script.src = "https://cdn.trustindex.io/loader.js?66c43da43da848017c26e042639";
-    script.async = true;
-    script.defer = true;
-    document.body.appendChild(script);
-
-    return () => {
-      // Don't remove on unmount - let the widget stay
-    };
+    widgetContainerRef.current.appendChild(script);
   }, []);
 
   return (
     <section
       ref={ref}
-      className="py-24 bg-gradient-to-b from-white to-teal-50 overflow-hidden"
+      className="relative py-24 bg-gradient-to-b from-white to-teal-50 overflow-hidden"
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
@@ -46,18 +42,14 @@ export function Testimonials() {
           </p>
         </motion.div>
 
-        {/* TrustIndex Google Reviews Widget - embedded directly */}
+        {/* TrustIndex Google Reviews Widget */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={isInView ? { opacity: 1, y: 0 } : {}}
           transition={{ delay: 0.2, duration: 0.6 }}
-          className="w-full trustindex-widget-container"
+          className="w-full"
         >
-          {/* TrustIndex will inject the widget here */}
-          <div
-            className="ti-widget"
-            data-widget-id="66c43da43da848017c26e042639"
-          />
+          <div ref={widgetContainerRef} className="trustindex-widget-container" />
         </motion.div>
 
         {/* Additional Trust Elements */}

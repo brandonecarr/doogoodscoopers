@@ -60,7 +60,7 @@ export function CustomerPromise() {
   };
 
   return (
-    <section ref={ref} className="py-24 bg-gradient-to-b from-white via-[#e2faf6] to-white overflow-hidden">
+    <section ref={ref} className="relative py-24 bg-gradient-to-b from-white via-[#e2faf6] to-white overflow-hidden">
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <motion.div

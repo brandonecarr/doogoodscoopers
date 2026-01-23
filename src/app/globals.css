@@ -452,17 +452,67 @@ select.form-input {
 }
 
 /* ===== TRUSTINDEX WIDGET STYLES ===== */
-/* TrustIndex widget container */
+/* Force all TrustIndex elements to stay BELOW the header (z-50 = 50) */
+/* The header uses z-50, so TrustIndex must be z-40 or lower */
+.ti-widget,
+[class*="ti-"],
+[data-trustindex-widget],
+div[src*="trustindex"],
+iframe[src*="trustindex"] {
+  z-index: 40 !important;
+}
+
+/* TrustIndex widget container - keep it contained */
 .trustindex-widget-container {
   position: relative;
   z-index: 1;
 }
 
-/* TrustIndex modals/popups - keep below fixed header (z-[9999]) but above content */
-.ti-review-content,
+/* TrustIndex navigation arrows above cards */
+.trustindex-widget-container button,
+.trustindex-widget-container [class*="btn"],
+.trustindex-widget-container [class*="prev"],
+.trustindex-widget-container [class*="next"],
+.trustindex-widget-container [class*="arrow"],
+.trustindex-widget-container [class*="nav"],
+.trustindex-widget-container [class*="control"],
+.trustindex-widget-container svg {
+  z-index: 100 !important;
+  position: relative;
+}
+
+/* Ensure TrustIndex popups/modals are below header but still visible */
 .ti-modal,
-.ti-popup {
+.ti-review-modal,
+[class*="ti-popup"],
+[class*="ti-overlay"],
+body > [class*="ti-"][style*="position: fixed"],
+body > [class*="ti-"][style*="position:fixed"],
+body > div[style*="position: fixed"][style*="z-index"]:has([class*="ti-"]) {
   z-index: 9998 !important;
+}
+
+/* Lock body scroll when TrustIndex modal is open */
+body:has(.ti-modal),
+body:has(.ti-review-modal),
+body:has([class*="ti-popup"]) {
+  overflow: hidden !important;
+}
+
+/* Ensure TrustIndex modal is scrollable */
+.ti-modal,
+.ti-review-modal,
+[class*="ti-popup"] {
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* TrustIndex modal inner content should scroll */
+.ti-modal > div,
+.ti-review-modal > div {
+  max-height: 90vh;
+  overflow-y: auto !important;
 }
 
 /* ===== REDUCED MOTION ===== */
