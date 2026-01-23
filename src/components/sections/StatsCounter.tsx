@@ -167,12 +167,12 @@ export function StatsCounter() {
                         type: "spring",
                         stiffness: 200,
                       }}
-                      className="flex items-center gap-2 backdrop-blur-md rounded-full px-3 py-2.5 bg-black/40 h-11"
+                      className="inline-flex items-center gap-2 backdrop-blur-md rounded-full pl-2 pr-4 py-2 bg-black/40"
                     >
-                      <div className="rounded-full p-1.5 bg-white/25 flex-shrink-0">
+                      <div className="rounded-full p-1.5 bg-white/25">
                         <Icon className="w-4 h-4 text-white" />
                       </div>
-                      <span className="text-xs font-medium text-white/90 truncate">{stat.tagline}</span>
+                      <span className="text-xs font-medium text-white/90">{stat.tagline}</span>
                     </motion.div>
                   </div>
 
