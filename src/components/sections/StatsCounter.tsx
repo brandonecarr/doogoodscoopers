@@ -27,7 +27,7 @@ const stats = [
     decimals: 0,
     color: "text-teal-500",
     image: "/images/stats/happy-families.jpg",
-    tagline: "Families trust us with their yards",
+    tagline: "Highly trusted staff",
     accent: "from-teal-500 to-cyan-500",
     imageStyle: "object-[30%_40%] scale-125",
   },
@@ -167,12 +167,12 @@ export function StatsCounter() {
                         type: "spring",
                         stiffness: 200,
                       }}
-                      className="inline-flex items-center gap-2 backdrop-blur-md rounded-full pl-2 pr-4 py-2 bg-black/40"
+                      className="flex items-center gap-2 backdrop-blur-md rounded-2xl px-3 py-2.5 bg-black/40 h-11"
                     >
-                      <div className="rounded-full p-1.5 bg-white/25">
+                      <div className="rounded-full p-1.5 bg-white/25 flex-shrink-0">
                         <Icon className="w-4 h-4 text-white" />
                       </div>
-                      <span className="text-xs font-medium text-white/90">{stat.tagline}</span>
+                      <span className="text-xs font-medium text-white/90 truncate">{stat.tagline}</span>
                     </motion.div>
                   </div>
 
