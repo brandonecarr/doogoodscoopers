@@ -203,7 +203,7 @@ export function FAQContent() {
                 <div className="relative rounded-2xl overflow-hidden shadow-xl">
                   <div className="aspect-[4/3] relative">
                     <Image
-                      src="/images/residential/yard-cleanup.jpg"
+                      src="/images/residential/yard-cleanup.webp"
                       alt="Professional yard cleanup service"
                       fill
                       className="object-cover"

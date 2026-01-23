@@ -35,7 +35,7 @@ export function AdminSidebar() {
           <div className="flex items-center flex-shrink-0 px-4">
             <Link href="/admin">
               <Image
-                src="/logo.png"
+                src="/logo.webp"
                 alt="DooGoodScoopers"
                 width={150}
                 height={50}

@@ -35,7 +35,7 @@ const processSteps = [
     description: "Complete our simple online form to get your free instant quote.",
     icon: ClipboardList,
     color: "bg-teal-500",
-    image: "/images/residential/online-sign-up.png",
+    image: "/images/residential/online-sign-up.webp",
   },
   {
     number: 2,
@@ -43,7 +43,7 @@ const processSteps = [
     description: "A representative will contact you to arrange your first service.",
     icon: Phone,
     color: "bg-navy-600",
-    image: "/images/residential/schedule.png",
+    image: "/images/residential/schedule.webp",
   },
   {
     number: 3,
@@ -51,7 +51,7 @@ const processSteps = [
     description: "Receive login credentials to manage your account online.",
     icon: User,
     color: "bg-teal-600",
-    image: "/images/residential/customer-portal.png",
+    image: "/images/residential/customer-portal.webp",
   },
   {
     number: 4,
@@ -59,7 +59,7 @@ const processSteps = [
     description: "Set up automatic billing on the 1st of each month.",
     icon: CreditCard,
     color: "bg-navy-500",
-    image: "/images/residential/payment-method.png",
+    image: "/images/residential/payment-method.webp",
   },
   {
     number: 5,
@@ -67,7 +67,7 @@ const processSteps = [
     description: "Relax while we keep your yard pristine with ongoing service.",
     icon: Sparkles,
     color: "bg-teal-500",
-    image: "/images/residential/celebration.png",
+    image: "/images/residential/celebration.webp",
   },
 ];
 
@@ -249,7 +249,7 @@ export function ResidentialServicesContent() {
               >
                 <div className="relative w-full aspect-square max-w-md mx-auto">
                   <Image
-                    src="/images/residential/scooper-icon.png"
+                    src="/images/residential/scooper-icon.webp"
                     alt="Professional Pet Waste Removal"
                     fill
                     className="object-contain"
@@ -438,7 +438,7 @@ export function ResidentialServicesContent() {
               >
                 <div className="relative aspect-[4/3] rounded-2xl overflow-hidden shadow-xl">
                   <Image
-                    src="/images/residential/scooper-professional.jpg"
+                    src="/images/residential/scooper-professional.webp"
                     alt="Professional pet waste removal technician"
                     fill
                     className="object-cover"
@@ -546,7 +546,7 @@ export function ResidentialServicesContent() {
                     className="relative w-40 h-48 md:w-48 md:h-56"
                   >
                     <Image
-                      src="/images/residential/pump-sprayer.png"
+                      src="/images/residential/pump-sprayer.webp"
                       alt="Yard Odor Destroyer Sprayer"
                       fill
                       className="object-contain drop-shadow-2xl"

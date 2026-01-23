@@ -165,7 +165,7 @@ export function CareersContent() {
               >
                 <div className="relative aspect-[4/3] rounded-2xl overflow-hidden shadow-xl">
                   <Image
-                    src="/images/commercial/team-scooping.jpg"
+                    src="/images/commercial/team-scooping.webp"
                     alt="DooGoodScoopers team at work"
                     fill
                     className="object-cover"

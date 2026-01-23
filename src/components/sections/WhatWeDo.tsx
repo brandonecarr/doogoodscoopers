@@ -6,14 +6,14 @@ import { BeforeAfterSlider } from "@/components/ui/BeforeAfterSlider";
 
 const beforeAfterPairs = [
   {
-    before: "/images/before-after/before-1.jpg",
-    after: "/images/before-after/after-1.jpg",
+    before: "/images/before-after/before-1.webp",
+    after: "/images/before-after/after-1.webp",
     beforeAlt: "Dirty yard with dog waste before cleanup",
     afterAlt: "Clean yard after professional cleanup",
   },
   {
-    before: "/images/before-after/before-2.jpg",
-    after: "/images/before-after/after-2.jpg",
+    before: "/images/before-after/before-2.webp",
+    after: "/images/before-after/after-2.webp",
     beforeAlt: "Backyard with dog waste on gravel",
     afterAlt: "Clean backyard after service",
   },

@@ -147,7 +147,7 @@ export function AboutContent() {
                 >
                   <div className="relative w-[340px] h-[270px] md:w-[400px] md:h-[320px] bg-gray-200 overflow-hidden">
                     <Image
-                      src="/images/residential/yard-cleanup.jpg"
+                      src="/images/residential/yard-cleanup.webp"
                       alt=""
                       fill
                       className="object-cover blur-[2px] opacity-50"
@@ -163,7 +163,7 @@ export function AboutContent() {
                 >
                   <div className="relative w-[340px] h-[270px] md:w-[400px] md:h-[320px] bg-gray-200 overflow-hidden">
                     <Image
-                      src="/images/residential/scooper-professional.jpg"
+                      src="/images/residential/scooper-professional.webp"
                       alt=""
                       fill
                       className="object-cover blur-[2px] opacity-50"
@@ -182,7 +182,7 @@ export function AboutContent() {
                 >
                   <div className="relative w-[340px] h-[270px] md:w-[400px] md:h-[320px]">
                     <Image
-                      src="/images/about/dream-team.jpg"
+                      src="/images/about/dream-team.webp"
                       alt="Brandon and Valerie"
                       fill
                       className="object-cover"
@@ -361,7 +361,7 @@ export function AboutContent() {
               >
                 <div className="relative aspect-[4/3] rounded-2xl overflow-hidden shadow-xl">
                   <Image
-                    src="/images/residential/scooper-professional.jpg"
+                    src="/images/residential/scooper-professional.webp"
                     alt="DooGoodScoopers team at work"
                     fill
                     className="object-cover"

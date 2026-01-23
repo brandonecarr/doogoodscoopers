@@ -259,7 +259,7 @@ export function CommercialServicesContent() {
               >
                 <div className="relative w-full aspect-[4/3] rounded-2xl overflow-hidden shadow-2xl">
                   <Image
-                    src="/images/commercial/commercial-hero.jpg"
+                    src="/images/commercial/commercial-hero.webp"
                     alt="Professional team installing pet waste station"
                     fill
                     className="object-cover"
@@ -446,7 +446,7 @@ export function CommercialServicesContent() {
               >
                 <div className="relative aspect-[4/3] rounded-2xl overflow-hidden shadow-xl">
                   <Image
-                    src="/images/commercial/team-scooping.jpg"
+                    src="/images/commercial/team-scooping.webp"
                     alt="DooGoodScoopers team cleaning near a pet waste station"
                     fill
                     className="object-cover object-center"

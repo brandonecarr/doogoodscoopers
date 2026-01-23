@@ -51,7 +51,7 @@ export default function AdminLoginPage() {
           {/* Logo */}
           <div className="text-center mb-8">
             <Image
-              src="/logo.png"
+              src="/logo.webp"
               alt="DooGoodScoopers"
               width={180}
               height={60}

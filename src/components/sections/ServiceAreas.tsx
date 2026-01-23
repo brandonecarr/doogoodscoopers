@@ -39,7 +39,7 @@ export function ServiceAreas() {
       <div
         className="absolute inset-0 opacity-20"
         style={{
-          backgroundImage: "url('/images/patterns/paw-bone-pattern.png')",
+          backgroundImage: "url('/images/patterns/paw-bone-pattern.webp')",
           backgroundRepeat: "repeat",
           backgroundSize: "600px 600px",
         }}

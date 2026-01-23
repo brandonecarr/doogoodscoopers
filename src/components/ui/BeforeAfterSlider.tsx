@@ -131,7 +131,7 @@ export function BeforeAfterSlider({
           whileTap={{ scale: 0.95 }}
         >
           <Image
-            src="/images/before-after/slider-icon.png"
+            src="/images/before-after/slider-icon.webp"
             alt="Drag to compare"
             width={48}
             height={48}

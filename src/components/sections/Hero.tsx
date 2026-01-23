@@ -33,7 +33,7 @@ export function Hero() {
         <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
           style={{
-            backgroundImage: "url('/images/lawn-background.jpg')",
+            backgroundImage: "url('/images/lawn-background.webp')",
           }}
         />
         {/* Top Gradient Fade - fades the image at the top */}

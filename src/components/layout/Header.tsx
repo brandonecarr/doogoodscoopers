@@ -50,7 +50,7 @@ export function Header({ variant = "dark" }: HeaderProps) {
               whileTap={{ scale: 0.98 }}
             >
               <Image
-                src="/logo.png"
+                src="/logo.webp"
                 alt="DooGoodScoopers"
                 width={180}
                 height={60}
