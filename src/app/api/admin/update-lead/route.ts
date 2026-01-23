@@ -106,3 +106,68 @@ export async function POST(request: Request) {
     );
   }
 }
+
+// PUT method for full lead updates (editing all fields)
+export async function PUT(request: Request) {
+  try {
+    // Check authentication
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
+    const data = await request.json();
+
+    // Validate required fields
+    if (!data.id || !data.firstName || !data.phone || !data.zipCode) {
+      return NextResponse.json(
+        { error: "ID, first name, phone, and ZIP code are required" },
+        { status: 400 }
+      );
+    }
+
+    // Update the lead with all fields
+    const lead = await prisma.quoteLead.update({
+      where: { id: data.id },
+      data: {
+        firstName: data.firstName,
+        lastName: data.lastName || null,
+        email: data.email || null,
+        phone: data.phone,
+        address: data.address || null,
+        city: data.city || null,
+        zipCode: data.zipCode,
+        numberOfDogs: data.numberOfDogs || null,
+        frequency: data.frequency || null,
+        lastCleaned: data.lastCleaned || null,
+        gateLocation: data.gateLocation || null,
+        gateCode: data.gateCode || null,
+        status: data.status || "NEW",
+        notes: data.notes || null,
+        dogsInfo: data.dogsInfo || null,
+      },
+    });
+
+    // Log the activity
+    await prisma.activityLog.create({
+      data: {
+        action: "LEAD_UPDATED",
+        leadType: "QUOTE_FORM",
+        leadId: lead.id,
+        details: { updatedFields: Object.keys(data) },
+        adminEmail: session.email,
+      },
+    });
+
+    return NextResponse.json({ success: true, id: lead.id });
+  } catch (error) {
+    console.error("Error updating lead:", error);
+    return NextResponse.json(
+      { error: "Failed to update lead" },
+      { status: 500 }
+    );
+  }
+}

@@ -86,7 +86,7 @@ export function StatsCounter() {
   return (
     <section
       ref={ref}
-      className="relative py-24 bg-gradient-to-b from-teal-50 to-white overflow-hidden"
+      className="relative pt-24 pb-32 bg-gradient-to-b from-teal-50 to-white overflow-hidden"
     >
       <FloatingElementsLight variant="section" />
 
@@ -122,10 +122,7 @@ export function StatsCounter() {
                 className="relative group"
               >
                 <div
-                  className="relative overflow-hidden h-80 sm:h-96 rounded-3xl"
-                  style={{
-                    boxShadow: '0 2.8px 2.2px rgba(0, 0, 0, 0.034), 0 6.7px 5.3px rgba(0, 0, 0, 0.048), 0 12.5px 10px rgba(0, 0, 0, 0.06), 0 22.3px 17.9px rgba(0, 0, 0, 0.072), 0 41.8px 33.4px rgba(0, 0, 0, 0.086), 0 100px 80px rgba(0, 0, 0, 0.12)',
-                  }}
+                  className="relative overflow-hidden h-80 sm:h-96 rounded-3xl shadow-xl"
                 >
                   {/* Background */}
                   {stat.image ? (

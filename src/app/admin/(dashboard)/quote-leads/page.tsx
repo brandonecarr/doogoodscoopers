@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { FileText, Search, Filter, ChevronRight } from "lucide-react";
+import { FileText, Search, Filter, ChevronRight, Plus } from "lucide-react";
 import prisma from "@/lib/prisma";
 import type { LeadStatus, QuoteLead } from "@/types/leads";
 
@@ -84,8 +84,17 @@ export default async function QuoteLeadsPage({ searchParams }: PageProps) {
           <h1 className="text-2xl font-bold text-navy-900">Quote Leads</h1>
           <p className="text-navy-600 mt-1">{total} total leads</p>
         </div>
-        <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center">
-          <FileText className="w-6 h-6 text-blue-600" />
+        <div className="flex items-center gap-3">
+          <Link
+            href="/admin/quote-leads/new"
+            className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Add New
+          </Link>
+          <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center">
+            <FileText className="w-6 h-6 text-blue-600" />
+          </div>
         </div>
       </div>
 

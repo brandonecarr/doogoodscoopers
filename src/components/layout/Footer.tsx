@@ -183,7 +183,7 @@ export function Footer() {
               <span className="text-sm text-teal-400">+{SERVICE_AREAS.length - 10} more</span>
             </div>
             <p className="text-white/50 text-sm">
-              Serving 60+ zip codes throughout the Inland Empire
+              Serving 90+ zip codes throughout the Inland Empire
             </p>
           </motion.div>
         </motion.div>

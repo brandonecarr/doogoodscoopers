@@ -29,7 +29,7 @@ export const metadata: Metadata = {
     template: "%s | DooGoodScoopers",
   },
   description:
-    "Professional pooper scooper service throughout the Inland Empire. Reliable dog poop removal for a cleaner, healthier yard. Serving 60+ zip codes in San Bernardino and LA counties.",
+    "Professional pooper scooper service throughout the Inland Empire. Reliable dog poop removal for a cleaner, healthier yard. Serving 90+ zip codes in San Bernardino and LA counties.",
   keywords: [
     "dog waste removal",
     "pooper scooper service",

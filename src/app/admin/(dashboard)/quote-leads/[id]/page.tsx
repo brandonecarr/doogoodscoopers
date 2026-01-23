@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Phone, Mail, MapPin, Dog, Calendar, Clock } from "lucide-react";
+import { ArrowLeft, Phone, Mail, MapPin, Dog, Calendar, Clock, Pencil } from "lucide-react";
 import prisma from "@/lib/prisma";
 import type { LeadStatus } from "@/types/leads";
 import StatusUpdateForm from "@/components/admin/StatusUpdateForm";
@@ -75,7 +75,16 @@ export default async function QuoteLeadDetailPage({ params }: PageProps) {
           </h1>
           <p className="text-navy-600 mt-1">Quote Lead</p>
         </div>
-        {getStatusBadge(lead.status)}
+        <div className="flex items-center gap-3">
+          {getStatusBadge(lead.status)}
+          <Link
+            href={`/admin/quote-leads/${lead.id}/edit`}
+            className="flex items-center gap-2 px-4 py-2 bg-navy-600 text-white rounded-lg hover:bg-navy-700 transition-colors"
+          >
+            <Pencil className="w-4 h-4" />
+            Edit
+          </Link>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

@@ -56,10 +56,10 @@ export function WhatWeDo() {
           transition={{ duration: 0.6 }}
           className="text-center mb-16"
         >
-          <h2 className="text-display-sm font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-sky-600 mb-6 tracking-tight">
+          <h2 className="text-display-sm font-bold text-navy-900 mb-4">
             What Exactly Do We Do?
           </h2>
-          <p className="text-lg text-navy-700/70 max-w-3xl mx-auto leading-relaxed">
+          <p className="text-lg text-navy-700/70 max-w-2xl mx-auto">
             We know how busy life can get. Sometimes, there are certain chores that just pile up on you—pun intended. This is why our pooper scoopers service is so valuable.
           </p>
         </motion.div>

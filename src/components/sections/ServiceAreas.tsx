@@ -34,8 +34,18 @@ export function ServiceAreas() {
   };
 
   return (
-    <section ref={ref} className="py-24 bg-navy-900 text-white overflow-hidden">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section ref={ref} className="relative py-24 bg-navy-900 text-white overflow-hidden">
+      {/* Repeating paw pattern background */}
+      <div
+        className="absolute inset-0 opacity-20"
+        style={{
+          backgroundImage: "url('/images/patterns/paw-bone-pattern.png')",
+          backgroundRepeat: "repeat",
+          backgroundSize: "600px 600px",
+        }}
+      />
+
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid lg:grid-cols-2 gap-16 items-center">
           {/* Content */}
           <motion.div
