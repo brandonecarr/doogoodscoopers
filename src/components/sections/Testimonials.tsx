@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import { motion, useInView } from "framer-motion";
 import { PawPrint } from "lucide-react";
 
@@ -8,84 +8,72 @@ export function Testimonials() {
   const ref = useRef<HTMLElement>(null);
   const widgetContainerRef = useRef<HTMLDivElement>(null);
   const isInView = useInView(ref, { once: true, margin: "-100px" });
+  const [widgetLoaded, setWidgetLoaded] = useState(false);
 
   useEffect(() => {
-    // Check if script already exists to prevent duplicates
-    const existingScript = document.querySelector('script[src*="trustindex.io/loader.js"]');
-    if (!existingScript) {
-      // Load TrustIndex script
-      const script = document.createElement("script");
-      script.src = "https://cdn.trustindex.io/loader.js?66c43da43da848017c26e042639";
-      script.async = true;
-      script.defer = true;
-      document.body.appendChild(script);
-    }
+    // Only load widget once and only when in view
+    if (widgetLoaded || !isInView) return;
 
-    // Move existing widget if it exists (from previous render or HMR)
-    const existingWidget = document.querySelector('.ti-widget, [data-trustindex-widget]');
-    if (existingWidget && widgetContainerRef.current && !widgetContainerRef.current.contains(existingWidget)) {
-      widgetContainerRef.current.appendChild(existingWidget);
-    }
-
-    // Watch for the TrustIndex widget to be added to the DOM and move it to our container
-    const observer = new MutationObserver((mutations) => {
-      for (const mutation of mutations) {
-        for (const node of mutation.addedNodes) {
-          if (node instanceof HTMLElement &&
-              (node.classList.contains('ti-widget') || node.getAttribute('data-trustindex-widget'))) {
-            if (widgetContainerRef.current && !widgetContainerRef.current.contains(node)) {
-              widgetContainerRef.current.appendChild(node);
-              observer.disconnect();
-            }
-          }
-        }
-      }
-    });
-
-    observer.observe(document.body, { childList: true, subtree: true });
-
-    // Helper to check if an element is inside a fixed overlay (modal)
-    const isInsideFixedOverlay = (element: HTMLElement | null): HTMLElement | null => {
-      while (element && element !== document.body) {
-        const style = window.getComputedStyle(element);
-        if (style.position === 'fixed' && parseInt(style.zIndex) > 100) {
-          return element;
-        }
-        element = element.parentElement;
-      }
-      return null;
-    };
-
-    // Global wheel handler - intercept wheel events on fixed overlays
-    // This runs in capture phase to stop events before Lenis sees them
-    const handleWheel = (e: WheelEvent) => {
-      const target = e.target as HTMLElement;
-      const fixedOverlay = isInsideFixedOverlay(target);
-
-      if (fixedOverlay) {
-        // Stop propagation so Lenis doesn't intercept this scroll
-        e.stopPropagation();
-      }
-    };
-
-    // Add in capture phase, must not be passive to allow stopPropagation
-    document.addEventListener('wheel', handleWheel, { capture: true });
-
-    return () => {
-      observer.disconnect();
-      document.removeEventListener('wheel', handleWheel, { capture: true });
-      // Cleanup on unmount - remove script and any widget elements
-      const existingScript = document.querySelector(
-        'script[src*="trustindex.io/loader.js"]'
-      );
-      if (existingScript) {
-        existingScript.remove();
-      }
-      // Remove any TrustIndex widget elements that may have been added to body
-      document.querySelectorAll('.ti-widget, [data-trustindex-widget]').forEach(el => {
+    // Clean up any existing TrustIndex elements first
+    const cleanup = () => {
+      // Remove any existing scripts
+      document.querySelectorAll('script[src*="trustindex.io"]').forEach(el => el.remove());
+      // Remove any existing widget elements from body (but not our container)
+      document.querySelectorAll('body > .ti-widget, body > [class*="ti-"]').forEach(el => {
         if (!widgetContainerRef.current?.contains(el)) {
           el.remove();
         }
+      });
+    };
+
+    cleanup();
+
+    // Create and load the TrustIndex script
+    const script = document.createElement("script");
+    script.src = "https://cdn.trustindex.io/loader.js?66c43da43da848017c26e042639";
+    script.async = true;
+    script.defer = true;
+
+    script.onload = () => {
+      setWidgetLoaded(true);
+
+      // Watch for the widget to be created and move it to our container
+      const moveWidget = () => {
+        const widget = document.querySelector('body > .ti-widget, body > [data-trustindex-widget]');
+        if (widget && widgetContainerRef.current && !widgetContainerRef.current.contains(widget)) {
+          widgetContainerRef.current.appendChild(widget);
+        }
+      };
+
+      // Try immediately
+      moveWidget();
+
+      // Also observe for delayed creation
+      const observer = new MutationObserver(() => {
+        moveWidget();
+      });
+
+      observer.observe(document.body, { childList: true, subtree: false });
+
+      // Stop observing after 5 seconds
+      setTimeout(() => observer.disconnect(), 5000);
+    };
+
+    document.body.appendChild(script);
+
+    return () => {
+      cleanup();
+    };
+  }, [isInView, widgetLoaded]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      // Remove script
+      document.querySelectorAll('script[src*="trustindex.io"]').forEach(el => el.remove());
+      // Remove all TrustIndex elements from body
+      document.querySelectorAll('body > .ti-widget, body > [class*="ti-"], body > [data-trustindex-widget]').forEach(el => {
+        el.remove();
       });
     };
   }, []);
@@ -118,7 +106,10 @@ export function Testimonials() {
           transition={{ delay: 0.2, duration: 0.6 }}
           className="w-full"
         >
-          <div ref={widgetContainerRef} className="trustindex-widget-container" />
+          <div
+            ref={widgetContainerRef}
+            className="trustindex-widget-container"
+          />
         </motion.div>
 
         {/* Additional Trust Elements */}
