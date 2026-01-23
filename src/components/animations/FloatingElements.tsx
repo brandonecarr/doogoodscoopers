@@ -206,8 +206,15 @@ function FloatingEmoji({ item, mouseX, mouseY, isMouseOnScreen }: FloatingEmojiP
 export function FloatingElements() {
   const [items] = useState(() => generateFloatingItems());
   const [isMouseOnScreen, setIsMouseOnScreen] = useState(false);
+  const [isReady, setIsReady] = useState(false);
   const mouseX = useMotionValue(-1000);
   const mouseY = useMotionValue(-1000);
+
+  // Defer rendering until after LCP to avoid blocking initial paint
+  useEffect(() => {
+    const timer = requestIdleCallback(() => setIsReady(true), { timeout: 100 });
+    return () => cancelIdleCallback(timer);
+  }, []);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -237,6 +244,10 @@ export function FloatingElements() {
     };
   }, [mouseX, mouseY]);
 
+  if (!isReady) {
+    return <div className="absolute inset-0 overflow-hidden pointer-events-none" />;
+  }
+
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none">
       {items.map((item, index) => (
@@ -258,8 +269,15 @@ interface FloatingElementsLightProps {
 
 export function FloatingElementsLight({ variant = "section" }: FloatingElementsLightProps) {
   const [isMouseOnScreen, setIsMouseOnScreen] = useState(false);
+  const [isReady, setIsReady] = useState(false);
   const mouseX = useMotionValue(-1000);
   const mouseY = useMotionValue(-1000);
+
+  // Defer rendering until after LCP
+  useEffect(() => {
+    const timer = requestIdleCallback(() => setIsReady(true), { timeout: 100 });
+    return () => cancelIdleCallback(timer);
+  }, []);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -301,6 +319,10 @@ export function FloatingElementsLight({ variant = "section" }: FloatingElementsL
         { emoji: "🦴", size: "text-5xl", position: { bottom: "10%", left: "8%" }, rotation: -22, delay: 0.5, yDistance: 25, xDistance: 10, opacity: 0.28, duration: 7, reverse: true },
         { emoji: "🐾", size: "text-4xl", position: { top: "55%", right: "15%" }, rotation: 35, delay: 1, yDistance: 18, xDistance: 8, opacity: 0.32, duration: 6, reverse: false },
       ];
+
+  if (!isReady) {
+    return <div className="absolute inset-0 overflow-hidden pointer-events-none" />;
+  }
 
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none">

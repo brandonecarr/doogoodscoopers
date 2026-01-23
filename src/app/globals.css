@@ -357,9 +357,15 @@ h1, h2, h3, h4, h5, h6 {
   inset: -2px;
   border-radius: 9999px;
   pointer-events: none;
-  padding: 2px;
+  overflow: hidden;
+}
+
+.promo-glow-border::before {
+  content: '';
+  position: absolute;
+  inset: -50%;
   background: conic-gradient(
-    from var(--angle),
+    from 0deg,
     transparent 0%,
     transparent 70%,
     rgba(94, 234, 212, 0.1) 78%,
@@ -369,26 +375,24 @@ h1, h2, h3, h4, h5, h6 {
     #5eead4 98%,
     transparent 100%
   );
-  -webkit-mask:
-    linear-gradient(#fff 0 0) content-box,
-    linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
   animation: promo-spin 4s linear infinite;
+  will-change: transform;
 }
 
-@property --angle {
-  syntax: '<angle>';
-  initial-value: 0deg;
-  inherits: false;
+.promo-glow-border::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  background: rgb(8, 28, 57);
+  border-radius: 9999px;
 }
 
 @keyframes promo-spin {
   from {
-    --angle: 0deg;
+    transform: rotate(0deg);
   }
   to {
-    --angle: 360deg;
+    transform: rotate(360deg);
   }
 }
 
