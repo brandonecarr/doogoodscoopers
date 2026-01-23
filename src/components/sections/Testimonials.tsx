@@ -1,80 +1,27 @@
 "use client";
 
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect } from "react";
 import { motion, useInView } from "framer-motion";
 import { PawPrint } from "lucide-react";
 
 export function Testimonials() {
   const ref = useRef<HTMLElement>(null);
-  const widgetContainerRef = useRef<HTMLDivElement>(null);
   const isInView = useInView(ref, { once: true, margin: "-100px" });
-  const [widgetLoaded, setWidgetLoaded] = useState(false);
 
   useEffect(() => {
-    // Only load widget once and only when in view
-    if (widgetLoaded || !isInView) return;
+    // Only load once
+    const existingScript = document.querySelector('script[src*="trustindex.io/loader.js"]');
+    if (existingScript) return;
 
-    // Clean up any existing TrustIndex elements first
-    const cleanup = () => {
-      // Remove any existing scripts
-      document.querySelectorAll('script[src*="trustindex.io"]').forEach(el => el.remove());
-      // Remove any existing widget elements from body (but not our container)
-      document.querySelectorAll('body > .ti-widget, body > [class*="ti-"]').forEach(el => {
-        if (!widgetContainerRef.current?.contains(el)) {
-          el.remove();
-        }
-      });
-    };
-
-    cleanup();
-
-    // Create and load the TrustIndex script
+    // Load TrustIndex script
     const script = document.createElement("script");
     script.src = "https://cdn.trustindex.io/loader.js?66c43da43da848017c26e042639";
     script.async = true;
     script.defer = true;
-
-    script.onload = () => {
-      setWidgetLoaded(true);
-
-      // Watch for the widget to be created and move it to our container
-      const moveWidget = () => {
-        const widget = document.querySelector('body > .ti-widget, body > [data-trustindex-widget]');
-        if (widget && widgetContainerRef.current && !widgetContainerRef.current.contains(widget)) {
-          widgetContainerRef.current.appendChild(widget);
-        }
-      };
-
-      // Try immediately
-      moveWidget();
-
-      // Also observe for delayed creation
-      const observer = new MutationObserver(() => {
-        moveWidget();
-      });
-
-      observer.observe(document.body, { childList: true, subtree: false });
-
-      // Stop observing after 5 seconds
-      setTimeout(() => observer.disconnect(), 5000);
-    };
-
     document.body.appendChild(script);
 
     return () => {
-      cleanup();
-    };
-  }, [isInView, widgetLoaded]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      // Remove script
-      document.querySelectorAll('script[src*="trustindex.io"]').forEach(el => el.remove());
-      // Remove all TrustIndex elements from body
-      document.querySelectorAll('body > .ti-widget, body > [class*="ti-"], body > [data-trustindex-widget]').forEach(el => {
-        el.remove();
-      });
+      // Don't remove on unmount - let the widget stay
     };
   }, []);
 
@@ -99,16 +46,17 @@ export function Testimonials() {
           </p>
         </motion.div>
 
-        {/* TrustIndex Google Reviews Widget */}
+        {/* TrustIndex Google Reviews Widget - embedded directly */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={isInView ? { opacity: 1, y: 0 } : {}}
           transition={{ delay: 0.2, duration: 0.6 }}
-          className="w-full"
+          className="w-full trustindex-widget-container"
         >
+          {/* TrustIndex will inject the widget here */}
           <div
-            ref={widgetContainerRef}
-            className="trustindex-widget-container"
+            className="ti-widget"
+            data-widget-id="66c43da43da848017c26e042639"
           />
         </motion.div>
 
