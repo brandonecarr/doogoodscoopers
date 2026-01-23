@@ -1,10 +1,11 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Phone, Mail, MapPin, Dog, Calendar, Clock, Pencil } from "lucide-react";
+import { ArrowLeft, Phone, Mail, MapPin, Dog, Calendar, Clock, Pencil, Archive } from "lucide-react";
 import prisma from "@/lib/prisma";
 import type { LeadStatus } from "@/types/leads";
 import StatusUpdateForm from "@/components/admin/StatusUpdateForm";
 import { LeadUpdates } from "@/components/admin/LeadUpdates";
+import { LeadActions } from "@/components/admin/LeadActions";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -126,6 +127,14 @@ export default async function QuoteLeadDetailPage({ params }: PageProps) {
 
   return (
     <div className="space-y-6 pb-20 lg:pb-0">
+      {/* Archived Banner */}
+      {lead.archived && (
+        <div className="flex items-center gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+          <Archive className="w-5 h-5 text-amber-600" />
+          <p className="text-amber-800 font-medium">This lead has been archived</p>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center gap-4">
         <Link
@@ -331,6 +340,13 @@ export default async function QuoteLeadDetailPage({ params }: PageProps) {
               )}
             </div>
           </div>
+
+          {/* Actions */}
+          <LeadActions
+            leadId={lead.id}
+            leadType="quote"
+            isArchived={lead.archived}
+          />
         </div>
       </div>
     </div>

@@ -1,17 +1,19 @@
 import Link from "next/link";
-import { FileText, Search, Filter, ChevronRight, Plus } from "lucide-react";
+import { FileText, Search, Filter, ChevronRight, Plus, Archive } from "lucide-react";
 import prisma from "@/lib/prisma";
 import type { LeadStatus, QuoteLead } from "@/types/leads";
 
 interface PageProps {
-  searchParams: Promise<{ status?: string; search?: string; page?: string }>;
+  searchParams: Promise<{ status?: string; search?: string; page?: string; archived?: string }>;
 }
 
-async function getQuoteLeads(status?: string, search?: string, page: number = 1) {
+async function getQuoteLeads(status?: string, search?: string, page: number = 1, showArchived: boolean = false) {
   const pageSize = 20;
   const skip = (page - 1) * pageSize;
 
-  const where: Record<string, unknown> = {};
+  const where: Record<string, unknown> = {
+    archived: showArchived,
+  };
 
   if (status && status !== "all") {
     where.status = status as LeadStatus;
@@ -68,10 +70,12 @@ function getStatusBadge(status: LeadStatus) {
 
 export default async function QuoteLeadsPage({ searchParams }: PageProps) {
   const params = await searchParams;
+  const showArchived = params.archived === "true";
   const { leads, total, pageSize, currentPage } = await getQuoteLeads(
     params.status,
     params.search,
-    params.page ? parseInt(params.page) : 1
+    params.page ? parseInt(params.page) : 1,
+    showArchived
   );
 
   const totalPages = Math.ceil(total / pageSize);
@@ -81,16 +85,31 @@ export default async function QuoteLeadsPage({ searchParams }: PageProps) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-navy-900">Quote Leads</h1>
-          <p className="text-navy-600 mt-1">{total} total leads</p>
+          <h1 className="text-2xl font-bold text-navy-900">
+            {showArchived ? "Archived Leads" : "Quote Leads"}
+          </h1>
+          <p className="text-navy-600 mt-1">{total} {showArchived ? "archived" : "active"} leads</p>
         </div>
         <div className="flex items-center gap-3">
+          {!showArchived && (
+            <Link
+              href="/admin/quote-leads/new"
+              className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Add New
+            </Link>
+          )}
           <Link
-            href="/admin/quote-leads/new"
-            className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
+            href={showArchived ? "/admin/quote-leads" : "/admin/quote-leads?archived=true"}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+              showArchived
+                ? "bg-teal-600 text-white hover:bg-teal-700"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+            }`}
           >
-            <Plus className="w-4 h-4" />
-            Add New
+            <Archive className="w-4 h-4" />
+            {showArchived ? "View Active" : "View Archived"}
           </Link>
           <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center">
             <FileText className="w-6 h-6 text-blue-600" />
@@ -101,6 +120,9 @@ export default async function QuoteLeadsPage({ searchParams }: PageProps) {
       {/* Filters */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
         <form className="flex flex-col sm:flex-row gap-4">
+          {/* Hidden field to preserve archived state */}
+          {showArchived && <input type="hidden" name="archived" value="true" />}
+
           {/* Search */}
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -227,7 +249,7 @@ export default async function QuoteLeadsPage({ searchParams }: PageProps) {
             <div className="flex gap-2">
               {currentPage > 1 && (
                 <Link
-                  href={`/admin/quote-leads?page=${currentPage - 1}${params.status ? `&status=${params.status}` : ""}${params.search ? `&search=${params.search}` : ""}`}
+                  href={`/admin/quote-leads?page=${currentPage - 1}${params.status ? `&status=${params.status}` : ""}${params.search ? `&search=${params.search}` : ""}${showArchived ? "&archived=true" : ""}`}
                   className="px-3 py-1 border border-gray-200 rounded-lg hover:bg-gray-50"
                 >
                   Previous
@@ -235,7 +257,7 @@ export default async function QuoteLeadsPage({ searchParams }: PageProps) {
               )}
               {currentPage < totalPages && (
                 <Link
-                  href={`/admin/quote-leads?page=${currentPage + 1}${params.status ? `&status=${params.status}` : ""}${params.search ? `&search=${params.search}` : ""}`}
+                  href={`/admin/quote-leads?page=${currentPage + 1}${params.status ? `&status=${params.status}` : ""}${params.search ? `&search=${params.search}` : ""}${showArchived ? "&archived=true" : ""}`}
                   className="px-3 py-1 border border-gray-200 rounded-lg hover:bg-gray-50"
                 >
                   Next

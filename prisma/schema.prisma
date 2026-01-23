@@ -38,6 +38,7 @@ model QuoteLead {
 
   // Status tracking
   status          LeadStatus  @default(NEW)
+  archived        Boolean     @default(false)
   notes           String?     @db.Text
 
   // Contact info
@@ -67,6 +68,7 @@ model QuoteLead {
   dogsInfo        Json?
 
   @@index([status])
+  @@index([archived])
   @@index([createdAt])
   @@index([zipCode])
 }
