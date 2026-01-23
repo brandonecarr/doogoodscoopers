@@ -10,12 +10,22 @@ export function Testimonials() {
   const isInView = useInView(ref, { once: true, margin: "-100px" });
 
   useEffect(() => {
-    // Load TrustIndex script
-    const script = document.createElement("script");
-    script.src = "https://cdn.trustindex.io/loader.js?66c43da43da848017c26e042639";
-    script.async = true;
-    script.defer = true;
-    document.body.appendChild(script);
+    // Check if script already exists to prevent duplicates
+    const existingScript = document.querySelector('script[src*="trustindex.io/loader.js"]');
+    if (!existingScript) {
+      // Load TrustIndex script
+      const script = document.createElement("script");
+      script.src = "https://cdn.trustindex.io/loader.js?66c43da43da848017c26e042639";
+      script.async = true;
+      script.defer = true;
+      document.body.appendChild(script);
+    }
+
+    // Move existing widget if it exists (from previous render or HMR)
+    const existingWidget = document.querySelector('.ti-widget, [data-trustindex-widget]');
+    if (existingWidget && widgetContainerRef.current && !widgetContainerRef.current.contains(existingWidget)) {
+      widgetContainerRef.current.appendChild(existingWidget);
+    }
 
     // Watch for the TrustIndex widget to be added to the DOM and move it to our container
     const observer = new MutationObserver((mutations) => {
@@ -64,13 +74,19 @@ export function Testimonials() {
     return () => {
       observer.disconnect();
       document.removeEventListener('wheel', handleWheel, { capture: true });
-      // Cleanup on unmount
+      // Cleanup on unmount - remove script and any widget elements
       const existingScript = document.querySelector(
         'script[src*="trustindex.io/loader.js"]'
       );
       if (existingScript) {
         existingScript.remove();
       }
+      // Remove any TrustIndex widget elements that may have been added to body
+      document.querySelectorAll('.ti-widget, [data-trustindex-widget]').forEach(el => {
+        if (!widgetContainerRef.current?.contains(el)) {
+          el.remove();
+        }
+      });
     };
   }, []);
 
