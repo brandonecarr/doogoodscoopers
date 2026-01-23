@@ -212,8 +212,8 @@ export function FloatingElements() {
 
   // Defer rendering until after LCP to avoid blocking initial paint
   useEffect(() => {
-    const timer = requestIdleCallback(() => setIsReady(true), { timeout: 100 });
-    return () => cancelIdleCallback(timer);
+    const timer = setTimeout(() => setIsReady(true), 100);
+    return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -275,8 +275,8 @@ export function FloatingElementsLight({ variant = "section" }: FloatingElementsL
 
   // Defer rendering until after LCP
   useEffect(() => {
-    const timer = requestIdleCallback(() => setIsReady(true), { timeout: 100 });
-    return () => cancelIdleCallback(timer);
+    const timer = setTimeout(() => setIsReady(true), 100);
+    return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {
