@@ -4,6 +4,7 @@ import { ArrowLeft, Phone, Mail, MapPin, Dog, Calendar, Clock, Pencil } from "lu
 import prisma from "@/lib/prisma";
 import type { LeadStatus } from "@/types/leads";
 import StatusUpdateForm from "@/components/admin/StatusUpdateForm";
+import { LeadUpdates } from "@/components/admin/LeadUpdates";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -15,6 +16,67 @@ async function getQuoteLead(id: string) {
   });
 
   return lead;
+}
+
+async function getLeadUpdates(leadId: string) {
+  const updates = await prisma.leadUpdate.findMany({
+    where: {
+      leadId,
+      leadType: "QUOTE_FORM",
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return updates;
+}
+
+// Format frequency values like "bi_weekly" → "Bi-Weekly"
+function formatFrequency(frequency: string | null): string {
+  if (!frequency) return "—";
+
+  const frequencyMap: Record<string, string> = {
+    weekly: "Weekly",
+    bi_weekly: "Bi-Weekly",
+    biweekly: "Bi-Weekly",
+    monthly: "Monthly",
+    one_time: "One-Time",
+    onetime: "One-Time",
+    twice_weekly: "Twice Weekly",
+  };
+
+  return frequencyMap[frequency.toLowerCase()] || frequency.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+// Format lastCleaned values like "one_week" → "1 Week Ago"
+function formatLastCleaned(lastCleaned: string | null): string {
+  if (!lastCleaned) return "—";
+
+  const lastCleanedMap: Record<string, string> = {
+    one_week: "1 Week Ago",
+    oneweek: "1 Week Ago",
+    two_weeks: "2 Weeks Ago",
+    twoweeks: "2 Weeks Ago",
+    one_month: "1 Month Ago",
+    onemonth: "1 Month Ago",
+    two_months: "2+ Months Ago",
+    twomonths: "2+ Months Ago",
+    never: "Never",
+    unknown: "Unknown",
+  };
+
+  return lastCleanedMap[lastCleaned.toLowerCase()] || lastCleaned.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+// Format number of dogs
+function formatNumberOfDogs(numberOfDogs: string | null): string {
+  if (!numberOfDogs) return "—";
+
+  const num = parseInt(numberOfDogs, 10);
+  if (!isNaN(num)) {
+    return num === 1 ? "1 Dog" : `${num} Dogs`;
+  }
+
+  return numberOfDogs;
 }
 
 function formatDate(date: Date) {
@@ -46,7 +108,10 @@ function getStatusBadge(status: LeadStatus) {
 
 export default async function QuoteLeadDetailPage({ params }: PageProps) {
   const { id } = await params;
-  const lead = await getQuoteLead(id);
+  const [lead, updates] = await Promise.all([
+    getQuoteLead(id),
+    getLeadUpdates(id),
+  ]);
 
   if (!lead) {
     notFound();
@@ -142,15 +207,15 @@ export default async function QuoteLeadDetailPage({ params }: PageProps) {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="p-4 bg-gray-50 rounded-lg">
                 <p className="text-sm text-gray-500">Number of Dogs</p>
-                <p className="text-xl font-semibold text-navy-900">{lead.numberOfDogs || "—"}</p>
+                <p className="text-xl font-semibold text-navy-900">{formatNumberOfDogs(lead.numberOfDogs)}</p>
               </div>
               <div className="p-4 bg-gray-50 rounded-lg">
                 <p className="text-sm text-gray-500">Frequency</p>
-                <p className="text-xl font-semibold text-navy-900">{lead.frequency || "—"}</p>
+                <p className="text-xl font-semibold text-navy-900">{formatFrequency(lead.frequency)}</p>
               </div>
               <div className="p-4 bg-gray-50 rounded-lg">
                 <p className="text-sm text-gray-500">Last Cleaned</p>
-                <p className="text-xl font-semibold text-navy-900">{lead.lastCleaned || "—"}</p>
+                <p className="text-xl font-semibold text-navy-900">{formatLastCleaned(lead.lastCleaned)}</p>
               </div>
             </div>
 
@@ -205,6 +270,19 @@ export default async function QuoteLeadDetailPage({ params }: PageProps) {
               </div>
             </div>
           )}
+
+          {/* Updates */}
+          <LeadUpdates
+            leadId={lead.id}
+            leadType="quote"
+            updates={updates.map((u) => ({
+              id: u.id,
+              createdAt: u.createdAt.toISOString(),
+              message: u.message,
+              communicationType: u.communicationType,
+              adminEmail: u.adminEmail,
+            }))}
+          />
         </div>
 
         {/* Sidebar */}

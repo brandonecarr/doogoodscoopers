@@ -231,6 +231,29 @@ model AdminUser {
 }
 
 // =====================
+// LEAD UPDATES
+// =====================
+// Track communication updates for leads
+model LeadUpdate {
+  id              String      @id @default(cuid())
+  createdAt       DateTime    @default(now())
+
+  // Which lead this update belongs to
+  leadType        LeadSource
+  leadId          String
+
+  // Update content
+  message         String      @db.Text
+  communicationType String    // "phone_call", "text_message", "email", "in_person", "other"
+
+  // Who added the update
+  adminEmail      String
+
+  @@index([leadType, leadId])
+  @@index([createdAt])
+}
+
+// =====================
 // ACTIVITY LOG
 // =====================
 // Track admin actions on leads
