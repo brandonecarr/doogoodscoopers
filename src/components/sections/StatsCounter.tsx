@@ -167,7 +167,7 @@ export function StatsCounter() {
                         type: "spring",
                         stiffness: 200,
                       }}
-                      className="flex items-center gap-2 backdrop-blur-md rounded-full pl-2 pr-4 py-2 bg-black/40"
+                      className="flex items-center gap-2 backdrop-blur-md rounded-full pl-2 pr-4 py-1.5 bg-black/40"
                     >
                       <div className="rounded-full p-1.5 bg-white/25">
                         <Icon className="w-4 h-4 text-white" />
