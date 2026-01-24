@@ -36,7 +36,13 @@ export async function getAuthUser(): Promise<AuthUser | null> {
     .from("users")
     .select("org_id, role, first_name, last_name, is_active")
     .eq("id", user.id)
-    .single();
+    .single<{
+      org_id: string;
+      role: string;
+      first_name: string | null;
+      last_name: string | null;
+      is_active: boolean;
+    }>();
 
   if (!profile || !profile.is_active) {
     return null;
@@ -196,7 +202,7 @@ export async function signIn(email: string, password: string) {
     .from("users")
     .select("role, is_active")
     .eq("id", data.user.id)
-    .single();
+    .single<{ role: string; is_active: boolean }>();
 
   if (!profile || !profile.is_active) {
     await supabase.auth.signOut();

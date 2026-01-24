@@ -50,7 +50,7 @@ export default function LoginPage() {
         .from("users")
         .select("role, is_active")
         .eq("id", data.user.id)
-        .single();
+        .single<{ role: string; is_active: boolean }>();
 
       if (!profile || !profile.is_active) {
         await supabase.auth.signOut();

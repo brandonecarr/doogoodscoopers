@@ -74,7 +74,13 @@ export function useAuth() {
       .from("users")
       .select("org_id, role, first_name, last_name, is_active")
       .eq("id", user.id)
-      .single();
+      .single<{
+        org_id: string;
+        role: string;
+        first_name: string | null;
+        last_name: string | null;
+        is_active: boolean;
+      }>();
 
     if (profile && profile.is_active) {
       setState({

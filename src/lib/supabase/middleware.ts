@@ -44,7 +44,7 @@ export async function updateSession(request: NextRequest) {
       .from("users")
       .select("role, org_id, is_active")
       .eq("id", user.id)
-      .single();
+      .single<{ role: string; org_id: string; is_active: boolean }>();
 
     if (userData?.is_active) {
       userRole = userData.role;
