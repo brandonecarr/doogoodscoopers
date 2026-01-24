@@ -9,6 +9,10 @@ import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
 import { verifyWebhookSignature } from "@/lib/stripe";
+import {
+  voidFutureJobsForSubscription,
+  regenerateJobsForSubscription,
+} from "@/lib/subscription-jobs";
 
 // Get Supabase client with service role
 function getSupabase() {
@@ -262,6 +266,13 @@ async function handleSubscriptionDeleted(
   supabase: ReturnType<typeof getSupabase>,
   subscription: Stripe.Subscription
 ) {
+  // Get the local subscription to find org_id
+  const { data: localSub } = await supabase
+    .from("subscriptions")
+    .select("id, org_id")
+    .eq("stripe_subscription_id", subscription.id)
+    .single();
+
   const { error } = await supabase
     .from("subscriptions")
     .update({
@@ -272,6 +283,17 @@ async function handleSubscriptionDeleted(
 
   if (error) {
     console.error("Failed to mark subscription as canceled:", error);
+  }
+
+  // Void all future jobs for this subscription
+  if (localSub) {
+    const voidedCount = await voidFutureJobsForSubscription(
+      supabase,
+      localSub.id,
+      localSub.org_id,
+      "Subscription canceled"
+    );
+    console.log(`Voided ${voidedCount} future jobs for canceled subscription ${localSub.id}`);
   }
 
   // Also update client status if this was their only subscription
@@ -302,6 +324,13 @@ async function handleSubscriptionPaused(
   supabase: ReturnType<typeof getSupabase>,
   subscription: Stripe.Subscription
 ) {
+  // Get the local subscription to find org_id
+  const { data: localSub } = await supabase
+    .from("subscriptions")
+    .select("id, org_id")
+    .eq("stripe_subscription_id", subscription.id)
+    .single();
+
   const { error } = await supabase
     .from("subscriptions")
     .update({
@@ -313,6 +342,17 @@ async function handleSubscriptionPaused(
   if (error) {
     console.error("Failed to mark subscription as paused:", error);
   }
+
+  // Void all future jobs for this subscription
+  if (localSub) {
+    const voidedCount = await voidFutureJobsForSubscription(
+      supabase,
+      localSub.id,
+      localSub.org_id,
+      "Subscription paused"
+    );
+    console.log(`Voided ${voidedCount} future jobs for paused subscription ${localSub.id}`);
+  }
 }
 
 /**
@@ -322,6 +362,13 @@ async function handleSubscriptionResumed(
   supabase: ReturnType<typeof getSupabase>,
   subscription: Stripe.Subscription
 ) {
+  // Get the full local subscription for job regeneration
+  const { data: localSub } = await supabase
+    .from("subscriptions")
+    .select("id, org_id, client_id, location_id, frequency, preferred_day, price_per_visit_cents, created_at, status")
+    .eq("stripe_subscription_id", subscription.id)
+    .single();
+
   const { error } = await supabase
     .from("subscriptions")
     .update({
@@ -333,6 +380,19 @@ async function handleSubscriptionResumed(
 
   if (error) {
     console.error("Failed to mark subscription as resumed:", error);
+  }
+
+  // Regenerate jobs for the resumed subscription
+  if (localSub) {
+    // Update the status to ACTIVE for the regeneration function
+    const subscriptionForRegen = { ...localSub, status: "ACTIVE" };
+    const generatedCount = await regenerateJobsForSubscription(
+      supabase,
+      subscriptionForRegen,
+      localSub.org_id,
+      14 // Generate 2 weeks ahead
+    );
+    console.log(`Generated ${generatedCount} jobs for resumed subscription ${localSub.id}`);
   }
 }
 
