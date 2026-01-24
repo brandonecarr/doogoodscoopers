@@ -1,0 +1,668 @@
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[];
+
+export type UserRole =
+  | "OWNER"
+  | "MANAGER"
+  | "OFFICE"
+  | "CREW_LEAD"
+  | "FIELD_TECH"
+  | "ACCOUNTANT"
+  | "CLIENT";
+
+export type ClientStatus = "ACTIVE" | "PAUSED" | "CANCELED" | "DELINQUENT";
+export type SubscriptionStatus = "ACTIVE" | "PAUSED" | "CANCELED" | "PAST_DUE";
+export type JobStatus = "SCHEDULED" | "EN_ROUTE" | "IN_PROGRESS" | "COMPLETED" | "SKIPPED" | "CANCELED";
+export type LeadStatus = "NEW" | "CONTACTED" | "QUALIFIED" | "CONVERTED" | "LOST";
+export type LeadSource = "QUOTE_FORM" | "OUT_OF_AREA" | "COMMERCIAL" | "AD_LEAD" | "REFERRAL" | "OTHER";
+export type Frequency = "WEEKLY" | "BIWEEKLY" | "MONTHLY" | "ONETIME";
+export type NotificationType = "ON_THE_WAY" | "DAY_AHEAD" | "COMPLETED" | "SKIPPED" | "OFF_SCHEDULE" | "PAYMENT_FAILED" | "WELCOME" | "REMARKETING_SMS" | "REMARKETING_EMAIL";
+export type Channel = "SMS" | "EMAIL";
+
+export interface Database {
+  public: {
+    Tables: {
+      organizations: {
+        Row: {
+          id: string;
+          name: string;
+          slug: string;
+          logo_url: string | null;
+          primary_color: string;
+          secondary_color: string;
+          phone: string | null;
+          email: string | null;
+          website: string | null;
+          address: Json;
+          timezone: string;
+          settings: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          slug: string;
+          logo_url?: string | null;
+          primary_color?: string;
+          secondary_color?: string;
+          phone?: string | null;
+          email?: string | null;
+          website?: string | null;
+          address?: Json;
+          timezone?: string;
+          settings?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          slug?: string;
+          logo_url?: string | null;
+          primary_color?: string;
+          secondary_color?: string;
+          phone?: string | null;
+          email?: string | null;
+          website?: string | null;
+          address?: Json;
+          timezone?: string;
+          settings?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      users: {
+        Row: {
+          id: string;
+          org_id: string;
+          email: string;
+          role: UserRole;
+          first_name: string | null;
+          last_name: string | null;
+          phone: string | null;
+          avatar_url: string | null;
+          is_active: boolean;
+          last_login_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id: string;
+          org_id: string;
+          email: string;
+          role: UserRole;
+          first_name?: string | null;
+          last_name?: string | null;
+          phone?: string | null;
+          avatar_url?: string | null;
+          is_active?: boolean;
+          last_login_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          email?: string;
+          role?: UserRole;
+          first_name?: string | null;
+          last_name?: string | null;
+          phone?: string | null;
+          avatar_url?: string | null;
+          is_active?: boolean;
+          last_login_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      clients: {
+        Row: {
+          id: string;
+          org_id: string;
+          user_id: string | null;
+          stripe_customer_id: string | null;
+          sweep_and_go_client_id: string | null;
+          client_type: "RESIDENTIAL" | "COMMERCIAL";
+          status: ClientStatus;
+          first_name: string;
+          last_name: string | null;
+          company_name: string | null;
+          email: string | null;
+          phone: string | null;
+          secondary_phone: string | null;
+          referral_source: string | null;
+          referred_by_client_id: string | null;
+          account_credit_cents: number;
+          notes: string | null;
+          tags: string[];
+          notification_preferences: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          user_id?: string | null;
+          stripe_customer_id?: string | null;
+          sweep_and_go_client_id?: string | null;
+          client_type?: "RESIDENTIAL" | "COMMERCIAL";
+          status?: ClientStatus;
+          first_name: string;
+          last_name?: string | null;
+          company_name?: string | null;
+          email?: string | null;
+          phone?: string | null;
+          secondary_phone?: string | null;
+          referral_source?: string | null;
+          referred_by_client_id?: string | null;
+          account_credit_cents?: number;
+          notes?: string | null;
+          tags?: string[];
+          notification_preferences?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          user_id?: string | null;
+          stripe_customer_id?: string | null;
+          sweep_and_go_client_id?: string | null;
+          client_type?: "RESIDENTIAL" | "COMMERCIAL";
+          status?: ClientStatus;
+          first_name?: string;
+          last_name?: string | null;
+          company_name?: string | null;
+          email?: string | null;
+          phone?: string | null;
+          secondary_phone?: string | null;
+          referral_source?: string | null;
+          referred_by_client_id?: string | null;
+          account_credit_cents?: number;
+          notes?: string | null;
+          tags?: string[];
+          notification_preferences?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      locations: {
+        Row: {
+          id: string;
+          org_id: string;
+          client_id: string;
+          name: string | null;
+          address_line1: string;
+          address_line2: string | null;
+          city: string;
+          state: string;
+          zip_code: string;
+          country: string;
+          latitude: number | null;
+          longitude: number | null;
+          gate_code: string | null;
+          gate_location: string | null;
+          access_notes: string | null;
+          service_areas: string[];
+          is_primary: boolean;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          client_id: string;
+          name?: string | null;
+          address_line1: string;
+          address_line2?: string | null;
+          city: string;
+          state?: string;
+          zip_code: string;
+          country?: string;
+          latitude?: number | null;
+          longitude?: number | null;
+          gate_code?: string | null;
+          gate_location?: string | null;
+          access_notes?: string | null;
+          service_areas?: string[];
+          is_primary?: boolean;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          client_id?: string;
+          name?: string | null;
+          address_line1?: string;
+          address_line2?: string | null;
+          city?: string;
+          state?: string;
+          zip_code?: string;
+          country?: string;
+          latitude?: number | null;
+          longitude?: number | null;
+          gate_code?: string | null;
+          gate_location?: string | null;
+          access_notes?: string | null;
+          service_areas?: string[];
+          is_primary?: boolean;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      dogs: {
+        Row: {
+          id: string;
+          org_id: string;
+          client_id: string;
+          location_id: string | null;
+          name: string;
+          breed: string | null;
+          size: "SMALL" | "MEDIUM" | "LARGE" | "XLARGE" | null;
+          color: string | null;
+          is_safe: boolean;
+          safety_notes: string | null;
+          special_instructions: string | null;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          client_id: string;
+          location_id?: string | null;
+          name: string;
+          breed?: string | null;
+          size?: "SMALL" | "MEDIUM" | "LARGE" | "XLARGE" | null;
+          color?: string | null;
+          is_safe?: boolean;
+          safety_notes?: string | null;
+          special_instructions?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          client_id?: string;
+          location_id?: string | null;
+          name?: string;
+          breed?: string | null;
+          size?: "SMALL" | "MEDIUM" | "LARGE" | "XLARGE" | null;
+          color?: string | null;
+          is_safe?: boolean;
+          safety_notes?: string | null;
+          special_instructions?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      subscriptions: {
+        Row: {
+          id: string;
+          org_id: string;
+          client_id: string;
+          location_id: string;
+          plan_id: string;
+          stripe_subscription_id: string | null;
+          status: SubscriptionStatus;
+          frequency: Frequency;
+          preferred_day: string | null;
+          price_per_visit_cents: number;
+          billing_day: number | null;
+          next_service_date: string | null;
+          pause_start_date: string | null;
+          pause_end_date: string | null;
+          canceled_at: string | null;
+          cancel_reason: string | null;
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          client_id: string;
+          location_id: string;
+          plan_id: string;
+          stripe_subscription_id?: string | null;
+          status?: SubscriptionStatus;
+          frequency: Frequency;
+          preferred_day?: string | null;
+          price_per_visit_cents: number;
+          billing_day?: number | null;
+          next_service_date?: string | null;
+          pause_start_date?: string | null;
+          pause_end_date?: string | null;
+          canceled_at?: string | null;
+          cancel_reason?: string | null;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          client_id?: string;
+          location_id?: string;
+          plan_id?: string;
+          stripe_subscription_id?: string | null;
+          status?: SubscriptionStatus;
+          frequency?: Frequency;
+          preferred_day?: string | null;
+          price_per_visit_cents?: number;
+          billing_day?: number | null;
+          next_service_date?: string | null;
+          pause_start_date?: string | null;
+          pause_end_date?: string | null;
+          canceled_at?: string | null;
+          cancel_reason?: string | null;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      jobs: {
+        Row: {
+          id: string;
+          org_id: string;
+          subscription_id: string | null;
+          client_id: string;
+          location_id: string;
+          assigned_to: string | null;
+          route_id: string | null;
+          route_order: number | null;
+          scheduled_date: string;
+          scheduled_time_start: string | null;
+          scheduled_time_end: string | null;
+          status: JobStatus;
+          skip_reason: string | null;
+          started_at: string | null;
+          completed_at: string | null;
+          duration_minutes: number | null;
+          price_cents: number;
+          notes: string | null;
+          internal_notes: string | null;
+          photos: string[];
+          metadata: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          subscription_id?: string | null;
+          client_id: string;
+          location_id: string;
+          assigned_to?: string | null;
+          route_id?: string | null;
+          route_order?: number | null;
+          scheduled_date: string;
+          scheduled_time_start?: string | null;
+          scheduled_time_end?: string | null;
+          status?: JobStatus;
+          skip_reason?: string | null;
+          started_at?: string | null;
+          completed_at?: string | null;
+          duration_minutes?: number | null;
+          price_cents: number;
+          notes?: string | null;
+          internal_notes?: string | null;
+          photos?: string[];
+          metadata?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          subscription_id?: string | null;
+          client_id?: string;
+          location_id?: string;
+          assigned_to?: string | null;
+          route_id?: string | null;
+          route_order?: number | null;
+          scheduled_date?: string;
+          scheduled_time_start?: string | null;
+          scheduled_time_end?: string | null;
+          status?: JobStatus;
+          skip_reason?: string | null;
+          started_at?: string | null;
+          completed_at?: string | null;
+          duration_minutes?: number | null;
+          price_cents?: number;
+          notes?: string | null;
+          internal_notes?: string | null;
+          photos?: string[];
+          metadata?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      leads: {
+        Row: {
+          id: string;
+          org_id: string;
+          source: LeadSource;
+          status: LeadStatus;
+          first_name: string | null;
+          last_name: string | null;
+          email: string | null;
+          phone: string | null;
+          company_name: string | null;
+          zip_code: string | null;
+          city: string | null;
+          state: string | null;
+          address: Json;
+          dog_count: number | null;
+          frequency: string | null;
+          notes: string | null;
+          tags: string[];
+          utm: Json;
+          ad_source: string | null;
+          campaign_name: string | null;
+          referral_code: string | null;
+          custom_fields: Json;
+          converted_client_id: string | null;
+          assigned_to: string | null;
+          last_contacted_at: string | null;
+          archived: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          source: LeadSource;
+          status?: LeadStatus;
+          first_name?: string | null;
+          last_name?: string | null;
+          email?: string | null;
+          phone?: string | null;
+          company_name?: string | null;
+          zip_code?: string | null;
+          city?: string | null;
+          state?: string | null;
+          address?: Json;
+          dog_count?: number | null;
+          frequency?: string | null;
+          notes?: string | null;
+          tags?: string[];
+          utm?: Json;
+          ad_source?: string | null;
+          campaign_name?: string | null;
+          referral_code?: string | null;
+          custom_fields?: Json;
+          converted_client_id?: string | null;
+          assigned_to?: string | null;
+          last_contacted_at?: string | null;
+          archived?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          source?: LeadSource;
+          status?: LeadStatus;
+          first_name?: string | null;
+          last_name?: string | null;
+          email?: string | null;
+          phone?: string | null;
+          company_name?: string | null;
+          zip_code?: string | null;
+          city?: string | null;
+          state?: string | null;
+          address?: Json;
+          dog_count?: number | null;
+          frequency?: string | null;
+          notes?: string | null;
+          tags?: string[];
+          utm?: Json;
+          ad_source?: string | null;
+          campaign_name?: string | null;
+          referral_code?: string | null;
+          custom_fields?: Json;
+          converted_client_id?: string | null;
+          assigned_to?: string | null;
+          last_contacted_at?: string | null;
+          archived?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      onboarding_sessions: {
+        Row: {
+          id: string;
+          org_id: string;
+          status: "IN_PROGRESS" | "COMPLETED" | "ABANDONED";
+          current_step: string | null;
+          in_service_area: boolean | null;
+          zip: string | null;
+          contact_name: string | null;
+          contact_email: string | null;
+          contact_phone: string | null;
+          address: Json;
+          pricing_snapshot: Json;
+          selected_plan_snapshot: Json;
+          dog_count: number | null;
+          frequency: string | null;
+          utm: Json;
+          referral_code: string | null;
+          converted_client_id: string | null;
+          last_activity_at: string;
+          abandoned_at: string | null;
+          remarketing_sent_count: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          status?: "IN_PROGRESS" | "COMPLETED" | "ABANDONED";
+          current_step?: string | null;
+          in_service_area?: boolean | null;
+          zip?: string | null;
+          contact_name?: string | null;
+          contact_email?: string | null;
+          contact_phone?: string | null;
+          address?: Json;
+          pricing_snapshot?: Json;
+          selected_plan_snapshot?: Json;
+          dog_count?: number | null;
+          frequency?: string | null;
+          utm?: Json;
+          referral_code?: string | null;
+          converted_client_id?: string | null;
+          last_activity_at?: string;
+          abandoned_at?: string | null;
+          remarketing_sent_count?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          status?: "IN_PROGRESS" | "COMPLETED" | "ABANDONED";
+          current_step?: string | null;
+          in_service_area?: boolean | null;
+          zip?: string | null;
+          contact_name?: string | null;
+          contact_email?: string | null;
+          contact_phone?: string | null;
+          address?: Json;
+          pricing_snapshot?: Json;
+          selected_plan_snapshot?: Json;
+          dog_count?: number | null;
+          frequency?: string | null;
+          utm?: Json;
+          referral_code?: string | null;
+          converted_client_id?: string | null;
+          last_activity_at?: string;
+          abandoned_at?: string | null;
+          remarketing_sent_count?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      public_metrics_cache: {
+        Row: {
+          org_id: string;
+          satisfied_customers: number;
+          happy_pets: number;
+          completed_yards: number;
+          five_star_reviews: number;
+          computed_at: string;
+        };
+        Insert: {
+          org_id: string;
+          satisfied_customers?: number;
+          happy_pets?: number;
+          completed_yards?: number;
+          five_star_reviews?: number;
+          computed_at?: string;
+        };
+        Update: {
+          org_id?: string;
+          satisfied_customers?: number;
+          happy_pets?: number;
+          completed_yards?: number;
+          five_star_reviews?: number;
+          computed_at?: string;
+        };
+      };
+    };
+    Views: {
+      [_ in never]: never;
+    };
+    Functions: {
+      get_user_org_id: {
+        Args: Record<PropertyKey, never>;
+        Returns: string;
+      };
+      get_user_role: {
+        Args: Record<PropertyKey, never>;
+        Returns: string;
+      };
+    };
+    Enums: {
+      [_ in never]: never;
+    };
+    CompositeTypes: {
+      [_ in never]: never;
+    };
+  };
+}
