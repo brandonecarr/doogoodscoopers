@@ -25,6 +25,10 @@ import { cn } from "@/lib/utils";
 import { ZipCodeChecker } from "./ZipCodeChecker";
 import { OutOfAreaForm } from "./OutOfAreaForm";
 import { LegalModal } from "@/components/ui/LegalModal";
+import { useOnboardingSession } from "@/hooks/useOnboardingSession";
+
+// Feature flag: use v2 APIs (local database) - defaults to true
+const USE_V2_APIS = process.env.NEXT_PUBLIC_USE_V2_APIS !== "false";
 import { loadStripe } from "@stripe/stripe-js";
 import {
   Elements,
@@ -218,11 +222,20 @@ function QuoteFormInner() {
   const [currentDogIndex, setCurrentDogIndex] = useState(0);
   const [tempDogsData, setTempDogsData] = useState<DogFormData[]>([]);
 
-  // Fetch form options from Sweep&Go on mount
+  // Onboarding session tracking
+  const {
+    sessionId,
+    startSession,
+    updateSession,
+    logEvent,
+  } = useOnboardingSession();
+
+  // Fetch form options on mount (use v2 API if enabled)
   useEffect(() => {
     const fetchFormOptions = async () => {
       try {
-        const response = await fetch("/api/get-form-options");
+        const apiPath = USE_V2_APIS ? "/api/v2/get-form-options" : "/api/get-form-options";
+        const response = await fetch(apiPath);
         const result = await response.json();
 
         if (result.success && result.formOptions) {
@@ -385,9 +398,31 @@ function QuoteFormInner() {
   };
 
   // Handle zip code check result
-  const handleZipResult = (result: { inServiceArea: boolean; zipCode: string }) => {
+  const handleZipResult = async (result: { inServiceArea: boolean; zipCode: string }) => {
     setZipCode(result.zipCode);
     setInServiceArea(result.inServiceArea);
+
+    // Start onboarding session on first ZIP check
+    if (!sessionId) {
+      await startSession({
+        currentStep: "zip",
+        zip: result.zipCode,
+        inServiceArea: result.inServiceArea,
+      });
+    } else {
+      // Update existing session
+      await updateSession({
+        zip: result.zipCode,
+        inServiceArea: result.inServiceArea,
+      });
+    }
+
+    // Log ZIP check event
+    await logEvent(
+      result.inServiceArea ? "ZIP_IN_SERVICE" : "ZIP_OUT_OF_SERVICE",
+      "zip",
+      { zipCode: result.zipCode }
+    );
 
     if (result.inServiceArea) {
       goToStep("service");
@@ -408,7 +443,8 @@ function QuoteFormInner() {
         lastCleaned: data.lastCleaned,
       });
 
-      const response = await fetch(`/api/get-pricing?${params.toString()}`);
+      const apiPath = USE_V2_APIS ? "/api/v2/get-pricing" : "/api/get-pricing";
+      const response = await fetch(`${apiPath}?${params.toString()}`);
       const result = await response.json();
 
       if (result.success && result.pricing) {
@@ -622,11 +658,17 @@ function QuoteFormInner() {
     setIsSubmitting(true);
     setError(null);
 
+    // Log submission start event
+    await logEvent("SUBMISSION_STARTED", "review");
+
     try {
-      const response = await fetch("/api/submit-quote", {
+      const apiPath = USE_V2_APIS ? "/api/v2/submit-quote" : "/api/submit-quote";
+      const response = await fetch(apiPath, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          // Include session ID for tracking
+          sessionId,
           ...serviceData,
           ...contactData,
           zipCode,
@@ -648,6 +690,12 @@ function QuoteFormInner() {
           nameOnCard: paymentInfo.nameOnCard,
           expiry: paymentInfo.expiry,
           termsAccepted: true,
+          // Pricing snapshot for v2 API
+          pricingSnapshot: pricing ? {
+            recurringPrice: pricing.recurringPrice,
+            initialCleanupFee: pricing.initialCleanupFee,
+            monthlyPrice: pricing.monthlyPrice,
+          } : undefined,
           // Pricing fields from API
           billingInterval: pricing?.billingInterval || "per_visit",
           category: pricing?.category || "prepaid",
@@ -659,14 +707,24 @@ function QuoteFormInner() {
       const result = await response.json();
 
       if (result.success) {
+        // Log success event
+        await logEvent("SUBMISSION_COMPLETED", "success", {
+          clientId: result.data?.clientId,
+        });
         goToStep("success");
       } else {
+        // Log failure event
+        await logEvent("SUBMISSION_FAILED", "review", { error: result.error });
         setError(result.error || "Something went wrong. Please try again.");
         // Scroll to top of form to show error message
         setTimeout(scrollToForm, 100);
       }
     } catch (err) {
       console.error("Error submitting:", err);
+      // Log failure event
+      await logEvent("SUBMISSION_FAILED", "review", {
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
       setError("Unable to complete your registration. Please try again.");
       // Scroll to top of form to show error message
       setTimeout(scrollToForm, 100);

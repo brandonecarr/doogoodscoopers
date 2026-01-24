@@ -302,8 +302,322 @@ The DooGoodScoopers Team`,
     console.log("   ✓ Referral program configured ($25 credit each)\n");
   }
 
-  // 6. Create Public Metrics Cache
-  console.log("6. Creating public metrics cache...");
+  // 6. Create Pricing Rules
+  console.log("6. Creating pricing rules...");
+
+  // Get service plan IDs
+  const { data: plans } = await supabase
+    .from("service_plans")
+    .select("id, frequency")
+    .eq("org_id", org.id);
+
+  const planMap = new Map(plans?.map((p) => [p.frequency, p.id]) || []);
+
+  // Service area ZIP codes (Inland Empire area)
+  const serviceAreaZips = [
+    "91701", "91708", "91709", "91710", "91711", "91730", "91737", "91739", // Rancho Cucamonga area
+    "91761", "91762", "91763", "91764", "91765", "91766", "91767", "91768", // Ontario/Pomona area
+    "91784", "91785", "91786", "91789", // Claremont/Upland area
+    "92316", "92324", "92335", "92336", "92337", // Fontana/Rialto area
+    "92501", "92503", "92504", "92505", "92506", "92507", "92508", "92509", // Riverside area
+    "92860", "92879", "92880", "92881", "92882", "92883", // Corona/Norco area
+    "91752", // Eastvale
+    "91701", "91702", "91706", "91711", "91750", // Diamond Bar/Chino Hills
+    "92313", "92346", "92354", "92399", "92404", "92405", "92407", "92408", // San Bernardino area
+    "92374", "92376", "92377", // Redlands/Highland area
+  ];
+
+  // Pricing structure:
+  // Weekly: $18/visit for 1 dog, +$5 per additional dog
+  // Bi-Weekly: $22/visit for 1 dog, +$6 per additional dog
+  // Monthly: $45/visit for 1 dog, +$10 per additional dog
+  // One-Time: $65 base, +$15 per additional dog
+  const pricingRules = [
+    // Weekly pricing
+    {
+      name: "Weekly - 1 Dog",
+      frequency: "WEEKLY",
+      min_dogs: 1,
+      max_dogs: 1,
+      base_price_cents: 1800,
+      per_dog_price_cents: 0,
+      initial_cleanup_cents: 0,
+      priority: 10,
+    },
+    {
+      name: "Weekly - 2 Dogs",
+      frequency: "WEEKLY",
+      min_dogs: 2,
+      max_dogs: 2,
+      base_price_cents: 2300,
+      per_dog_price_cents: 0,
+      initial_cleanup_cents: 0,
+      priority: 10,
+    },
+    {
+      name: "Weekly - 3 Dogs",
+      frequency: "WEEKLY",
+      min_dogs: 3,
+      max_dogs: 3,
+      base_price_cents: 2800,
+      per_dog_price_cents: 0,
+      initial_cleanup_cents: 0,
+      priority: 10,
+    },
+    {
+      name: "Weekly - 4+ Dogs",
+      frequency: "WEEKLY",
+      min_dogs: 4,
+      max_dogs: 99,
+      base_price_cents: 2800,
+      per_dog_price_cents: 500,
+      initial_cleanup_cents: 0,
+      priority: 10,
+    },
+    // Bi-Weekly pricing
+    {
+      name: "Bi-Weekly - 1 Dog",
+      frequency: "BIWEEKLY",
+      min_dogs: 1,
+      max_dogs: 1,
+      base_price_cents: 2200,
+      per_dog_price_cents: 0,
+      initial_cleanup_cents: 0,
+      priority: 10,
+    },
+    {
+      name: "Bi-Weekly - 2 Dogs",
+      frequency: "BIWEEKLY",
+      min_dogs: 2,
+      max_dogs: 2,
+      base_price_cents: 2800,
+      per_dog_price_cents: 0,
+      initial_cleanup_cents: 0,
+      priority: 10,
+    },
+    {
+      name: "Bi-Weekly - 3 Dogs",
+      frequency: "BIWEEKLY",
+      min_dogs: 3,
+      max_dogs: 3,
+      base_price_cents: 3400,
+      per_dog_price_cents: 0,
+      initial_cleanup_cents: 0,
+      priority: 10,
+    },
+    {
+      name: "Bi-Weekly - 4+ Dogs",
+      frequency: "BIWEEKLY",
+      min_dogs: 4,
+      max_dogs: 99,
+      base_price_cents: 3400,
+      per_dog_price_cents: 600,
+      initial_cleanup_cents: 0,
+      priority: 10,
+    },
+    // Monthly pricing
+    {
+      name: "Monthly - 1 Dog",
+      frequency: "MONTHLY",
+      min_dogs: 1,
+      max_dogs: 1,
+      base_price_cents: 4500,
+      per_dog_price_cents: 0,
+      initial_cleanup_cents: 0,
+      priority: 10,
+    },
+    {
+      name: "Monthly - 2 Dogs",
+      frequency: "MONTHLY",
+      min_dogs: 2,
+      max_dogs: 2,
+      base_price_cents: 5500,
+      per_dog_price_cents: 0,
+      initial_cleanup_cents: 0,
+      priority: 10,
+    },
+    {
+      name: "Monthly - 3 Dogs",
+      frequency: "MONTHLY",
+      min_dogs: 3,
+      max_dogs: 3,
+      base_price_cents: 6500,
+      per_dog_price_cents: 0,
+      initial_cleanup_cents: 0,
+      priority: 10,
+    },
+    {
+      name: "Monthly - 4+ Dogs",
+      frequency: "MONTHLY",
+      min_dogs: 4,
+      max_dogs: 99,
+      base_price_cents: 6500,
+      per_dog_price_cents: 1000,
+      initial_cleanup_cents: 0,
+      priority: 10,
+    },
+    // One-Time pricing
+    {
+      name: "One-Time - 1 Dog",
+      frequency: "ONETIME",
+      min_dogs: 1,
+      max_dogs: 1,
+      base_price_cents: 6500,
+      per_dog_price_cents: 0,
+      initial_cleanup_cents: 0,
+      priority: 10,
+    },
+    {
+      name: "One-Time - 2 Dogs",
+      frequency: "ONETIME",
+      min_dogs: 2,
+      max_dogs: 2,
+      base_price_cents: 8000,
+      per_dog_price_cents: 0,
+      initial_cleanup_cents: 0,
+      priority: 10,
+    },
+    {
+      name: "One-Time - 3 Dogs",
+      frequency: "ONETIME",
+      min_dogs: 3,
+      max_dogs: 3,
+      base_price_cents: 9500,
+      per_dog_price_cents: 0,
+      initial_cleanup_cents: 0,
+      priority: 10,
+    },
+    {
+      name: "One-Time - 4+ Dogs",
+      frequency: "ONETIME",
+      min_dogs: 4,
+      max_dogs: 99,
+      base_price_cents: 9500,
+      per_dog_price_cents: 1500,
+      initial_cleanup_cents: 0,
+      priority: 10,
+    },
+  ];
+
+  // Check if pricing rules already exist
+  const { data: existingRules } = await supabase
+    .from("pricing_rules")
+    .select("name")
+    .eq("org_id", org.id);
+  const existingRuleNames = new Set(existingRules?.map((r) => r.name) || []);
+
+  for (const rule of pricingRules) {
+    if (existingRuleNames.has(rule.name)) {
+      console.log(`   → ${rule.name} (already exists)`);
+      continue;
+    }
+
+    const planId = planMap.get(rule.frequency);
+    const { error } = await supabase.from("pricing_rules").insert({
+      org_id: org.id,
+      plan_id: planId,
+      name: rule.name,
+      zip_codes: serviceAreaZips,
+      frequency: rule.frequency,
+      min_dogs: rule.min_dogs,
+      max_dogs: rule.max_dogs,
+      base_price_cents: rule.base_price_cents,
+      per_dog_price_cents: rule.per_dog_price_cents,
+      initial_cleanup_cents: rule.initial_cleanup_cents,
+      priority: rule.priority,
+      is_active: true,
+    });
+
+    if (error) {
+      console.error(`   ✗ Failed to create rule ${rule.name}:`, error);
+    } else {
+      console.log(`   ✓ ${rule.name}`);
+    }
+  }
+  console.log("");
+
+  // 7. Create Add-ons
+  console.log("7. Creating add-ons...");
+  const addOns = [
+    {
+      name: "Initial Cleanup - Light",
+      description: "For yards cleaned within the last 2 weeks",
+      price_cents: 0,
+      price_type: "FIXED",
+      is_recurring: false,
+      sort_order: 1,
+    },
+    {
+      name: "Initial Cleanup - Moderate",
+      description: "For yards not cleaned in 2-4 weeks",
+      price_cents: 4900,
+      price_type: "FIXED",
+      is_recurring: false,
+      sort_order: 2,
+    },
+    {
+      name: "Initial Cleanup - Heavy",
+      description: "For yards not cleaned in 1-2 months",
+      price_cents: 9900,
+      price_type: "FIXED",
+      is_recurring: false,
+      sort_order: 3,
+    },
+    {
+      name: "Initial Cleanup - Deep",
+      description: "For yards not cleaned in 3+ months",
+      price_cents: 14900,
+      price_type: "FIXED",
+      is_recurring: false,
+      sort_order: 4,
+    },
+    {
+      name: "Deodorizing Treatment",
+      description: "Pet-safe deodorizing spray for your yard",
+      price_cents: 1500,
+      price_type: "PER_VISIT",
+      is_recurring: true,
+      sort_order: 10,
+    },
+    {
+      name: "Brown Spot Treatment",
+      description: "Enzyme treatment for brown spots",
+      price_cents: 2000,
+      price_type: "PER_VISIT",
+      is_recurring: true,
+      sort_order: 11,
+    },
+  ];
+
+  // Check if add-ons already exist
+  const { data: existingAddOns } = await supabase
+    .from("add_ons")
+    .select("name")
+    .eq("org_id", org.id);
+  const existingAddOnNames = new Set(existingAddOns?.map((a) => a.name) || []);
+
+  for (const addOn of addOns) {
+    if (existingAddOnNames.has(addOn.name)) {
+      console.log(`   → ${addOn.name} (already exists)`);
+      continue;
+    }
+
+    const { error } = await supabase.from("add_ons").insert({
+      org_id: org.id,
+      ...addOn,
+      is_active: true,
+    });
+
+    if (error) {
+      console.error(`   ✗ Failed to create add-on ${addOn.name}:`, error);
+    } else {
+      console.log(`   ✓ ${addOn.name}`);
+    }
+  }
+  console.log("");
+
+  // 8. Create Public Metrics Cache
+  console.log("8. Creating public metrics cache...");
   const { error: metricsError } = await supabase
     .from("public_metrics_cache")
     .upsert(
