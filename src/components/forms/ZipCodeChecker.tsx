@@ -4,9 +4,6 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { MapPin, CheckCircle, XCircle, Loader2 } from "lucide-react";
 
-// Feature flag: use v2 APIs (local database) - defaults to true
-const USE_V2_APIS = process.env.NEXT_PUBLIC_USE_V2_APIS !== "false";
-
 interface ZipCodeCheckerProps {
   onResult: (result: { inServiceArea: boolean; zipCode: string; message: string }) => void;
   initialZipCode?: string;
@@ -34,8 +31,7 @@ export function ZipCodeChecker({ onResult, initialZipCode = "" }: ZipCodeChecker
     setResult(null);
 
     try {
-      const apiPath = USE_V2_APIS ? "/api/v2/check-zip" : "/api/check-zip";
-      const response = await fetch(apiPath, {
+      const response = await fetch("/api/v2/check-zip", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ zipCode }),

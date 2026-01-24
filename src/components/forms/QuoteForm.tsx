@@ -27,8 +27,6 @@ import { OutOfAreaForm } from "./OutOfAreaForm";
 import { LegalModal } from "@/components/ui/LegalModal";
 import { useOnboardingSession } from "@/hooks/useOnboardingSession";
 
-// Feature flag: use v2 APIs (local database) - defaults to true
-const USE_V2_APIS = process.env.NEXT_PUBLIC_USE_V2_APIS !== "false";
 import { loadStripe } from "@stripe/stripe-js";
 import {
   Elements,
@@ -234,8 +232,7 @@ function QuoteFormInner() {
   useEffect(() => {
     const fetchFormOptions = async () => {
       try {
-        const apiPath = USE_V2_APIS ? "/api/v2/get-form-options" : "/api/get-form-options";
-        const response = await fetch(apiPath);
+        const response = await fetch("/api/v2/get-form-options");
         const result = await response.json();
 
         if (result.success && result.formOptions) {
@@ -443,8 +440,7 @@ function QuoteFormInner() {
         lastCleaned: data.lastCleaned,
       });
 
-      const apiPath = USE_V2_APIS ? "/api/v2/get-pricing" : "/api/get-pricing";
-      const response = await fetch(`${apiPath}?${params.toString()}`);
+      const response = await fetch(`/api/v2/get-pricing?${params.toString()}`);
       const result = await response.json();
 
       if (result.success && result.pricing) {
@@ -662,8 +658,7 @@ function QuoteFormInner() {
     await logEvent("SUBMISSION_STARTED", "review");
 
     try {
-      const apiPath = USE_V2_APIS ? "/api/v2/submit-quote" : "/api/submit-quote";
-      const response = await fetch(apiPath, {
+      const response = await fetch("/api/v2/submit-quote", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

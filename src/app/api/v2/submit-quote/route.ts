@@ -2,9 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import Stripe from "stripe";
 
-// Feature flag to also submit to Sweep&Go (compatibility mode)
-const USE_SWEEPANDGO_COMPAT = process.env.FEATURE_FLAG_COMPAT_SWEEPNGO === "true";
-
 // Lazy Stripe initialization
 let stripeInstance: Stripe | null = null;
 function getStripe(): Stripe {
@@ -365,16 +362,6 @@ async function submitInServiceAreaQuote(data: QuoteSubmission) {
       });
     }
 
-    // 10. Also submit to Sweep&Go if compatibility mode is enabled
-    if (USE_SWEEPANDGO_COMPAT) {
-      try {
-        await submitToSweepAndGo(data, stripeCustomer.id);
-      } catch (sweepError) {
-        // Log but don't fail - local DB is the source of truth
-        console.error("Sweep&Go sync failed:", sweepError);
-      }
-    }
-
     return NextResponse.json({
       success: true,
       message: "Welcome to DooGoodScoopers! Your service registration is complete.",
@@ -440,16 +427,6 @@ async function submitOutOfServiceAreaLead(data: QuoteSubmission) {
     }
   }
 
-  // Also submit to Sweep&Go if compatibility mode is enabled
-  if (USE_SWEEPANDGO_COMPAT) {
-    try {
-      await submitOutOfAreaToSweepAndGo(data);
-    } catch {
-      // Log but don't fail
-      console.error("Sweep&Go out-of-area sync failed");
-    }
-  }
-
   return NextResponse.json({
     success: true,
     message:
@@ -468,99 +445,4 @@ function getNextServiceDate(): string {
   }
 
   return date.toISOString().split("T")[0];
-}
-
-// Submit to Sweep&Go for compatibility mode
-async function submitToSweepAndGo(
-  data: QuoteSubmission,
-  stripeCustomerId: string
-): Promise<void> {
-  const SWEEPANDGO_API_URL =
-    process.env.SWEEPANDGO_API_URL || "https://openapi.sweepandgo.com";
-  const SWEEPANDGO_TOKEN = process.env.SWEEPANDGO_TOKEN;
-  const SWEEPANDGO_ORG_SLUG =
-    process.env.SWEEPANDGO_ORG_SLUG || "doogoodscoopers";
-
-  if (!SWEEPANDGO_TOKEN) {
-    throw new Error("Sweep&Go token not configured");
-  }
-
-  const dogNames = data.dogs?.map((d) => d.name) || [];
-  const dogBreeds = data.dogs?.map((d) => d.breed || "") || [];
-  const safeDogs = data.dogs?.map((d) => d.safe_dog === true || d.safe_dog === "yes") || [];
-  const dogComments = data.dogs?.map((d) => d.comments || "") || [];
-
-  const payload = {
-    organization: SWEEPANDGO_ORG_SLUG,
-    email: data.email,
-    first_name: data.firstName,
-    last_name: data.lastName,
-    cell_phone_number: data.phone,
-    home_address: data.address,
-    city: data.city,
-    state: data.state || "CA",
-    zip_code: data.zipCode,
-    number_of_dogs: parseInt(data.numberOfDogs) || 1,
-    clean_up_frequency: data.frequency,
-    last_time_yard_was_thoroughly_cleaned: data.lastCleaned || "two_weeks",
-    initial_cleanup_required: data.initialCleanupRequired ? "1" : "0",
-    credit_card_token: data.creditCardToken,
-    name_on_card: data.nameOnCard,
-    terms_open_api: true,
-    dog_name: dogNames,
-    dog_breed: dogBreeds,
-    safe_dog: safeDogs,
-    dog_comment: dogComments,
-    cleanup_notification_type: data.cleanupNotificationType?.join(",") || "",
-    cleanup_notification_channel: data.cleanupNotificationChannel || "",
-    stripe_customer_id: stripeCustomerId,
-  };
-
-  const response = await fetch(
-    `${SWEEPANDGO_API_URL}/api/v2/client_on_boarding/create_client_with_package`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${SWEEPANDGO_TOKEN}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    }
-  );
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Sweep&Go API error: ${response.status} - ${errorText}`);
-  }
-}
-
-async function submitOutOfAreaToSweepAndGo(data: QuoteSubmission): Promise<void> {
-  const SWEEPANDGO_API_URL =
-    process.env.SWEEPANDGO_API_URL || "https://openapi.sweepandgo.com";
-  const SWEEPANDGO_TOKEN = process.env.SWEEPANDGO_TOKEN;
-
-  if (!SWEEPANDGO_TOKEN) {
-    return;
-  }
-
-  await fetch(
-    `${SWEEPANDGO_API_URL}/api/v2/client_on_boarding/out_of_service_form`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${SWEEPANDGO_TOKEN}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        first_name: data.firstName,
-        last_name: data.lastName,
-        email: data.email,
-        phone: data.phone,
-        zip_code: data.zipCode,
-        home_address: data.address || "",
-        city: data.city || "",
-        state: data.state || "CA",
-      }),
-    }
-  );
 }

@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
-// Feature flag to use Sweep&Go as fallback
-const USE_SWEEPANDGO_FALLBACK = process.env.FEATURE_FLAG_COMPAT_SWEEPNGO === "true";
-
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -28,12 +25,6 @@ export async function POST(request: NextRequest) {
 
     if (orgError || !org) {
       console.error("Failed to get organization:", orgError);
-
-      // Fall back to Sweep&Go if enabled
-      if (USE_SWEEPANDGO_FALLBACK) {
-        return await checkZipViaSweepAndGo(zipCode);
-      }
-
       return NextResponse.json(
         { error: "Service configuration error", inServiceArea: false },
         { status: 500 }
@@ -50,12 +41,6 @@ export async function POST(request: NextRequest) {
 
     if (rulesError) {
       console.error("Failed to check pricing rules:", rulesError);
-
-      // Fall back to Sweep&Go if enabled
-      if (USE_SWEEPANDGO_FALLBACK) {
-        return await checkZipViaSweepAndGo(zipCode);
-      }
-
       return NextResponse.json(
         { error: "Unable to verify service area", inServiceArea: false },
         { status: 500 }
@@ -99,67 +84,6 @@ export async function POST(request: NextRequest) {
     console.error("Error checking zip code:", error);
     return NextResponse.json(
       { error: "An error occurred while checking your ZIP code", inServiceArea: false },
-      { status: 500 }
-    );
-  }
-}
-
-// Fallback to Sweep&Go API (for compatibility mode)
-async function checkZipViaSweepAndGo(zipCode: string): Promise<NextResponse> {
-  const SWEEPANDGO_API_URL = process.env.SWEEPANDGO_API_URL || "https://openapi.sweepandgo.com";
-  const SWEEPANDGO_TOKEN = process.env.SWEEPANDGO_TOKEN;
-  const SWEEPANDGO_ORG_SLUG = process.env.SWEEPANDGO_ORG_SLUG || "doogoodscoopers";
-
-  if (!SWEEPANDGO_TOKEN) {
-    return NextResponse.json(
-      { error: "Service configuration error", inServiceArea: false },
-      { status: 500 }
-    );
-  }
-
-  try {
-    const response = await fetch(
-      `${SWEEPANDGO_API_URL}/api/v2/client_on_boarding/check_zip_code_exists`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${SWEEPANDGO_TOKEN}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          organization: SWEEPANDGO_ORG_SLUG,
-          value: zipCode,
-        }),
-      }
-    );
-
-    if (!response.ok) {
-      if (response.status === 404 || response.status === 422) {
-        return NextResponse.json({
-          inServiceArea: false,
-          message: "We don't currently serve this area, but we're expanding!",
-        });
-      }
-      throw new Error(`Sweep&Go API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const inServiceArea =
-      data.exists === "exists" ||
-      data.exists === true ||
-      data.success === true;
-
-    return NextResponse.json({
-      inServiceArea,
-      message: inServiceArea
-        ? "Great news! We service your area."
-        : "We don't currently serve this area, but we're expanding!",
-      zipCode,
-    });
-  } catch (error) {
-    console.error("Sweep&Go fallback error:", error);
-    return NextResponse.json(
-      { error: "Unable to verify service area", inServiceArea: false },
       { status: 500 }
     );
   }

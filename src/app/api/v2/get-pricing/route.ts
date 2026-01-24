@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
-// Feature flag to use Sweep&Go as fallback
-const USE_SWEEPANDGO_FALLBACK = process.env.FEATURE_FLAG_COMPAT_SWEEPNGO === "true";
-
 // Map frontend frequency values to database values
 const frequencyMap: Record<string, string> = {
   once_a_week: "WEEKLY",
@@ -81,12 +78,6 @@ export async function GET(request: NextRequest) {
 
     if (orgError || !org) {
       console.error("Failed to get organization:", orgError);
-
-      // Fall back to Sweep&Go if enabled
-      if (USE_SWEEPANDGO_FALLBACK) {
-        return await getPricingViaSweepAndGo(zipCode, numberOfDogs, frequency, lastCleaned);
-      }
-
       return NextResponse.json(
         { error: "Service configuration error" },
         { status: 500 }
@@ -104,11 +95,6 @@ export async function GET(request: NextRequest) {
 
     if (rulesError) {
       console.error("Failed to fetch pricing rules:", rulesError);
-
-      if (USE_SWEEPANDGO_FALLBACK) {
-        return await getPricingViaSweepAndGo(zipCode, numberOfDogs, frequency, lastCleaned);
-      }
-
       return NextResponse.json(
         { error: "Unable to fetch pricing information" },
         { status: 500 }
@@ -124,11 +110,6 @@ export async function GET(request: NextRequest) {
     });
 
     if (!matchingRule) {
-      // Fall back to default or Sweep&Go
-      if (USE_SWEEPANDGO_FALLBACK) {
-        return await getPricingViaSweepAndGo(zipCode, numberOfDogs, frequency, lastCleaned);
-      }
-
       return NextResponse.json({
         success: true,
         pricing: {
@@ -234,105 +215,6 @@ export async function GET(request: NextRequest) {
     console.error("Error fetching pricing:", error);
     return NextResponse.json(
       { error: "An error occurred while fetching pricing" },
-      { status: 500 }
-    );
-  }
-}
-
-// Fallback to Sweep&Go API (for compatibility mode)
-async function getPricingViaSweepAndGo(
-  zipCode: string,
-  numberOfDogs: string,
-  frequency: string,
-  lastCleaned: string | null
-): Promise<NextResponse> {
-  const SWEEPANDGO_API_URL = process.env.SWEEPANDGO_API_URL || "https://openapi.sweepandgo.com";
-  const SWEEPANDGO_TOKEN = process.env.SWEEPANDGO_TOKEN;
-  const SWEEPANDGO_ORG_SLUG = process.env.SWEEPANDGO_ORG_SLUG || "doogoodscoopers";
-
-  if (!SWEEPANDGO_TOKEN) {
-    return NextResponse.json(
-      { error: "Service configuration error" },
-      { status: 500 }
-    );
-  }
-
-  try {
-    const params = new URLSearchParams({
-      organization: SWEEPANDGO_ORG_SLUG,
-      number_of_dogs: numberOfDogs,
-      zip_code: zipCode,
-      clean_up_frequency: frequency,
-    });
-
-    if (lastCleaned) {
-      params.append("last_time_yard_was_thoroughly_cleaned", lastCleaned);
-    }
-
-    const response = await fetch(
-      `${SWEEPANDGO_API_URL}/api/v2/client_on_boarding/price_registration_form?${params.toString()}`,
-      {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${SWEEPANDGO_TOKEN}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`Sweep&Go API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    // Parse the Sweep&Go response (same logic as original get-pricing route)
-    let recurringPrice = 0;
-    let billingInterval = data.show_price_options?.default_billing_interval || "per_visit";
-
-    if (data.price && typeof data.price === "object") {
-      recurringPrice = parseFloat(data.price.value) || 0;
-      billingInterval = data.price.billing_interval || billingInterval;
-    }
-
-    let initialCleanupFee = parseFloat(data.initial_cleanup_fee) || 0;
-    let initialCleanupCrossSellId: number | null = null;
-
-    if (data.cross_sells && Array.isArray(data.cross_sells)) {
-      const initialCleanup = data.cross_sells.find(
-        (cs: { name?: string; service?: string }) => {
-          const name = typeof cs.name === "string" ? cs.name.toLowerCase() : "";
-          return name.includes("initial");
-        }
-      );
-      if (initialCleanup) {
-        initialCleanupCrossSellId = initialCleanup.id;
-        if (!initialCleanupFee) {
-          initialCleanupFee = parseFloat(String(initialCleanup.unit_amount)) || 0;
-        }
-      }
-    }
-
-    return NextResponse.json({
-      success: true,
-      pricing: {
-        basePrice: recurringPrice,
-        recurringPrice,
-        initialCleanupFee,
-        initialCleanupCrossSellId,
-        taxRate: parseFloat(data.tax_percent) || 0,
-        total: recurringPrice,
-        frequency,
-        numberOfDogs,
-        billingInterval,
-        priceNotConfigured: data.price === null,
-      },
-      crossSells: data.cross_sells || [],
-    });
-  } catch (error) {
-    console.error("Sweep&Go fallback error:", error);
-    return NextResponse.json(
-      { error: "Unable to fetch pricing information" },
       { status: 500 }
     );
   }
