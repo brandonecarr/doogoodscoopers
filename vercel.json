@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/v2/cron/mark-abandoned",
+      "schedule": "*/15 * * * *"
+    }
+  ]
+}

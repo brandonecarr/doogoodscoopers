@@ -1,17 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import Stripe from "stripe";
-
-// Lazy Stripe initialization
-let stripeInstance: Stripe | null = null;
-function getStripe(): Stripe {
-  if (!stripeInstance) {
-    stripeInstance = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
-      apiVersion: "2025-12-15.clover",
-    });
-  }
-  return stripeInstance;
-}
+import { sendWelcomeEmail, sendNewCustomerNotificationEmail } from "@/lib/email";
+import { getStripe } from "@/lib/stripe";
 
 interface DogInfo {
   name: string;
@@ -68,6 +59,10 @@ interface QuoteSubmission {
 
   // Cross-sells (add-ons)
   crossSells?: string[];
+
+  // Referral & Gift Certificates
+  referralCode?: string;
+  giftCertificateCode?: string;
 }
 
 // Map frontend frequency to database frequency
@@ -286,7 +281,7 @@ async function submitInServiceAreaQuote(data: QuoteSubmission) {
       .eq("is_active", true)
       .single() as { data: { id: string } | null; error: Error | null };
 
-    // 7. Create Subscription
+    // 7. Create Local Subscription
     const pricePerVisitCents = Math.round(
       (data.pricingSnapshot?.recurringPrice || 0) * 100
     );
@@ -310,6 +305,134 @@ async function submitInServiceAreaQuote(data: QuoteSubmission) {
     if (subscriptionError) {
       console.error("Failed to create subscription:", subscriptionError);
       // Don't fail - subscription can be created later
+    }
+
+    // 7b. Create Stripe Subscription for recurring billing
+    let stripeSubscriptionId: string | null = null;
+    if (subscription && pricePerVisitCents > 0 && dbFrequency !== "ONETIME") {
+      try {
+        const stripe = getStripe();
+
+        // Map frequency to Stripe interval
+        const intervalMap: Record<string, { interval: "week" | "month"; interval_count: number }> = {
+          WEEKLY: { interval: "week", interval_count: 1 },
+          BIWEEKLY: { interval: "week", interval_count: 2 },
+          MONTHLY: { interval: "month", interval_count: 1 },
+        };
+        const { interval, interval_count } = intervalMap[dbFrequency] || intervalMap.WEEKLY;
+
+        // Create product for this subscription
+        const product = await stripe.products.create({
+          name: `Pet Waste Removal - ${dbFrequency}`,
+          metadata: {
+            subscription_id: subscription.id,
+            client_id: client.id,
+            org_id: org.id,
+          },
+        });
+
+        // Create price for the product
+        const price = await stripe.prices.create({
+          product: product.id,
+          unit_amount: pricePerVisitCents,
+          currency: "usd",
+          recurring: {
+            interval,
+            interval_count,
+          },
+        });
+
+        // Create the Stripe subscription
+        const stripeSubscription = await stripe.subscriptions.create({
+          customer: stripeCustomer.id,
+          items: [{ price: price.id }],
+          metadata: {
+            subscription_id: subscription.id,
+            client_id: client.id,
+            org_id: org.id,
+          },
+          payment_behavior: "default_incomplete",
+          payment_settings: {
+            save_default_payment_method: "on_subscription",
+          },
+          expand: ["latest_invoice.payment_intent"],
+        });
+
+        stripeSubscriptionId = stripeSubscription.id;
+
+        // Update local subscription with Stripe subscription ID
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (supabase as any)
+          .from("subscriptions")
+          .update({ stripe_subscription_id: stripeSubscriptionId })
+          .eq("id", subscription.id);
+
+        console.log(`Created Stripe subscription ${stripeSubscriptionId} for client ${client.id}`);
+      } catch (stripeSubError) {
+        console.error("Failed to create Stripe subscription:", stripeSubError);
+        // Don't fail the registration - we can create the subscription later
+      }
+    }
+
+    // 7c. Create invoice for initial cleanup fee if required
+    let initialCleanupInvoiceId: string | null = null;
+    const initialCleanupCents = Math.round(
+      (data.pricingSnapshot?.initialCleanupFee || 0) * 100
+    );
+
+    if (data.initialCleanupRequired && initialCleanupCents > 0) {
+      try {
+        const stripe = getStripe();
+
+        // Create invoice item for initial cleanup
+        await stripe.invoiceItems.create({
+          customer: stripeCustomer.id,
+          amount: initialCleanupCents,
+          currency: "usd",
+          description: "Initial Yard Cleanup - One-time fee for first-time deep cleaning",
+        });
+
+        // Create the invoice (draft, not auto-charged)
+        const invoice = await stripe.invoices.create({
+          customer: stripeCustomer.id,
+          collection_method: "send_invoice",
+          days_until_due: 7,
+          auto_advance: true, // Automatically finalize when due
+          metadata: {
+            type: "initial_cleanup",
+            client_id: client.id,
+            org_id: org.id,
+          },
+        });
+
+        // Finalize the invoice so it can be paid
+        await stripe.invoices.finalizeInvoice(invoice.id);
+
+        initialCleanupInvoiceId = invoice.id;
+
+        // Create local invoice record
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (supabase as any).from("invoices").insert({
+          org_id: org.id,
+          client_id: client.id,
+          stripe_invoice_id: invoice.id,
+          invoice_number: `INV-${Date.now().toString(36).toUpperCase()}`,
+          status: "OPEN",
+          subtotal_cents: initialCleanupCents,
+          discount_cents: 0,
+          tax_cents: 0,
+          total_cents: initialCleanupCents,
+          amount_paid_cents: 0,
+          amount_due_cents: initialCleanupCents,
+          due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+          notes: "Initial yard cleanup fee",
+        });
+
+        console.log(`Created initial cleanup invoice ${invoice.id} for $${(initialCleanupCents / 100).toFixed(2)}`);
+      } catch (invoiceError) {
+        console.error("Failed to create initial cleanup invoice:", invoiceError);
+        // Don't fail registration - invoice can be created manually
+      }
     }
 
     // 8. Create subscription add-ons if any
@@ -336,7 +459,107 @@ async function submitInServiceAreaQuote(data: QuoteSubmission) {
       }
     }
 
-    // 9. Update onboarding session if provided
+    // 9. Handle referral code if provided
+    let referralApplied = false;
+    if (data.referralCode) {
+      try {
+        // Find the referrer by their referral code
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: referrer } = await (supabase as any)
+          .from("clients")
+          .select("id, first_name, last_name")
+          .eq("org_id", org.id)
+          .eq("referral_code", data.referralCode.toUpperCase())
+          .single() as { data: { id: string; first_name: string; last_name: string } | null; error: Error | null };
+
+        if (referrer) {
+          // Create referral record
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await (supabase as any).from("referrals").insert({
+            org_id: org.id,
+            referrer_client_id: referrer.id,
+            referee_client_id: client.id,
+            referral_code: data.referralCode.toUpperCase(),
+            status: "CONVERTED",
+            converted_at: new Date().toISOString(),
+          });
+
+          referralApplied = true;
+          console.log(`Referral tracked: ${referrer.first_name} ${referrer.last_name} referred ${data.firstName} ${data.lastName}`);
+        }
+      } catch (referralError) {
+        console.error("Error processing referral:", referralError);
+        // Don't fail the registration for referral issues
+      }
+    }
+
+    // 10. Handle gift certificate if provided
+    let giftCertificateApplied = false;
+    let giftCertificateAmount = 0;
+    if (data.giftCertificateCode) {
+      try {
+        // Find and validate the gift certificate
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: giftCert } = await (supabase as any)
+          .from("gift_certificates")
+          .select("id, code, amount_cents, balance_cents, status, expires_at")
+          .eq("org_id", org.id)
+          .eq("code", data.giftCertificateCode.toUpperCase())
+          .eq("status", "ACTIVE")
+          .single() as { data: { id: string; code: string; amount_cents: number; balance_cents: number; status: string; expires_at: string | null } | null; error: Error | null };
+
+        if (giftCert && giftCert.balance_cents > 0) {
+          // Check if expired
+          const isExpired = giftCert.expires_at && new Date(giftCert.expires_at) < new Date();
+
+          if (!isExpired) {
+            // Apply as account credit
+            const creditAmount = giftCert.balance_cents;
+
+            // Create account credit for the client
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await (supabase as any).from("account_credits").insert({
+              org_id: org.id,
+              client_id: client.id,
+              amount_cents: creditAmount,
+              balance_cents: creditAmount,
+              source: "GIFT_CERTIFICATE",
+              reference_id: giftCert.id,
+              notes: `Applied from gift certificate ${giftCert.code}`,
+            });
+
+            // Record the redemption
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await (supabase as any).from("gift_certificate_redemptions").insert({
+              org_id: org.id,
+              gift_certificate_id: giftCert.id,
+              client_id: client.id,
+              amount_cents: creditAmount,
+            });
+
+            // Update gift certificate balance
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await (supabase as any)
+              .from("gift_certificates")
+              .update({
+                balance_cents: 0,
+                status: "REDEEMED",
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", giftCert.id);
+
+            giftCertificateApplied = true;
+            giftCertificateAmount = creditAmount / 100;
+            console.log(`Gift certificate ${giftCert.code} applied: $${giftCertificateAmount}`);
+          }
+        }
+      } catch (giftCertError) {
+        console.error("Error processing gift certificate:", giftCertError);
+        // Don't fail the registration for gift certificate issues
+      }
+    }
+
+    // 11. Update onboarding session if provided
     if (data.sessionId) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (supabase as any)
@@ -358,9 +581,44 @@ async function submitInServiceAreaQuote(data: QuoteSubmission) {
         payload: {
           clientId: client.id,
           subscriptionId: subscription?.id,
+          referralApplied,
+          giftCertificateApplied,
+          giftCertificateAmount,
         },
       });
     }
+
+    // 12. Send welcome emails (non-blocking)
+    const nextServiceDate = getNextServiceDate();
+    const frequencyLabel = getFrequencyLabel(data.frequency);
+
+    // Send welcome email to customer
+    sendWelcomeEmail({
+      customerName: data.firstName,
+      email: data.email,
+      frequency: frequencyLabel,
+      numberOfDogs: data.numberOfDogs,
+      address: data.address,
+      city: data.city,
+      state: data.state,
+      zipCode: data.zipCode,
+      nextServiceDate,
+      recurringPrice: data.pricingSnapshot?.recurringPrice,
+    }).catch((err) => console.error("Failed to send welcome email:", err));
+
+    // Send notification to business owner
+    sendNewCustomerNotificationEmail({
+      customerName: `${data.firstName} ${data.lastName}`,
+      email: data.email,
+      frequency: frequencyLabel,
+      numberOfDogs: data.numberOfDogs,
+      address: data.address,
+      city: data.city,
+      state: data.state,
+      zipCode: data.zipCode,
+      nextServiceDate,
+      recurringPrice: data.pricingSnapshot?.recurringPrice,
+    }).catch((err) => console.error("Failed to send notification email:", err));
 
     return NextResponse.json({
       success: true,
@@ -369,6 +627,12 @@ async function submitInServiceAreaQuote(data: QuoteSubmission) {
         clientId: client.id,
         subscriptionId: subscription?.id,
         stripeCustomerId: stripeCustomer.id,
+        stripeSubscriptionId: stripeSubscriptionId || undefined,
+        initialCleanupInvoiceId: initialCleanupInvoiceId || undefined,
+        initialCleanupAmount: initialCleanupInvoiceId ? initialCleanupCents / 100 : undefined,
+        referralApplied,
+        giftCertificateApplied,
+        giftCertificateAmount: giftCertificateApplied ? giftCertificateAmount : undefined,
       },
     });
   } catch (error) {
@@ -378,6 +642,22 @@ async function submitInServiceAreaQuote(data: QuoteSubmission) {
       { status: 500 }
     );
   }
+}
+
+// Helper to get human-readable frequency label
+function getFrequencyLabel(frequency: string): string {
+  const labels: Record<string, string> = {
+    once_a_week: "Weekly",
+    two_times_a_week: "Twice Weekly",
+    weekly: "Weekly",
+    bi_weekly: "Bi-Weekly",
+    biweekly: "Bi-Weekly",
+    once_a_month: "Monthly",
+    monthly: "Monthly",
+    one_time: "One-Time",
+    onetime: "One-Time",
+  };
+  return labels[frequency.toLowerCase()] || frequency;
 }
 
 async function submitOutOfServiceAreaLead(data: QuoteSubmission) {
