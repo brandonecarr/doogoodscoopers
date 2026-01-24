@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background -->
+  <rect width="512" height="512" rx="64" fill="#002842"/>
+
+  <!-- Paw print icon -->
+  <g fill="#14B8A6" transform="translate(96, 96) scale(0.625)">
+    <!-- Main pad -->
+    <ellipse cx="256" cy="340" rx="100" ry="80"/>
+
+    <!-- Top left toe -->
+    <ellipse cx="140" cy="180" rx="50" ry="60" transform="rotate(-15, 140, 180)"/>
+
+    <!-- Top right toe -->
+    <ellipse cx="372" cy="180" rx="50" ry="60" transform="rotate(15, 372, 180)"/>
+
+    <!-- Bottom left toe -->
+    <ellipse cx="110" cy="280" rx="45" ry="55" transform="rotate(-25, 110, 280)"/>
+
+    <!-- Bottom right toe -->
+    <ellipse cx="402" cy="280" rx="45" ry="55" transform="rotate(25, 402, 280)"/>
+  </g>
+
+  <!-- DGS text -->
+  <text x="256" y="470" font-family="Arial, sans-serif" font-size="72" font-weight="bold" fill="white" text-anchor="middle">DGS</text>
+</svg>

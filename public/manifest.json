@@ -1,21 +1,44 @@
 {
-  "name": "DooGoodScoopers",
-  "short_name": "DooGoodScoopers",
-  "description": "Professional dog waste removal service in the Inland Empire",
-  "start_url": "/",
+  "name": "DooGoodScoopers Field",
+  "short_name": "DGS Field",
+  "description": "Field technician app for DooGoodScoopers pet waste removal service",
+  "start_url": "/app/field",
+  "scope": "/app/field",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#ffffff",
   "theme_color": "#002842",
+  "categories": ["business", "productivity"],
   "icons": [
     {
-      "src": "/images/icons/icon-192x192.png",
-      "sizes": "192x192",
-      "type": "image/png"
+      "src": "/images/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
     },
     {
-      "src": "/images/icons/icon-512x512.png",
+      "src": "/images/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/images/icons/icon-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Today's Route",
+      "short_name": "Route",
+      "url": "/app/field/route"
+    },
+    {
+      "name": "Clock In/Out",
+      "short_name": "Shift",
+      "url": "/app/field/shift"
     }
   ]
 }

@@ -3,9 +3,12 @@
  *
  * Provides authentication and permission checking for API routes.
  * Uses Supabase Auth with RBAC permission checks.
+ * Supports both Bearer token (for PWAs) and cookie-based (for SSR) authentication.
  */
 
 import { createClient } from "@supabase/supabase-js";
+import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
 import { hasPermission, type Permission } from "@/lib/rbac";
 import type { UserRole } from "@/lib/supabase/types";
 
@@ -28,6 +31,36 @@ function getSupabase() {
     throw new Error("Supabase environment variables not configured");
   }
   return createClient(url, serviceKey);
+}
+
+/**
+ * Get Supabase client that reads auth from cookies
+ */
+async function getSupabaseWithCookies() {
+  const cookieStore = await cookies();
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!url || !anonKey) {
+    throw new Error("Supabase environment variables not configured");
+  }
+
+  return createServerClient(url, anonKey, {
+    cookies: {
+      getAll() {
+        return cookieStore.getAll();
+      },
+      setAll(cookiesToSet) {
+        try {
+          cookiesToSet.forEach(({ name, value, options }) =>
+            cookieStore.set(name, value, options)
+          );
+        } catch {
+          // Ignored in Server Components / API routes
+        }
+      },
+    },
+  });
 }
 
 /**
@@ -69,6 +102,43 @@ async function verifyToken(authHeader: string | null): Promise<ApiUser | null> {
   };
 }
 
+/**
+ * Verify authentication via cookies (for SSR/browser requests)
+ */
+async function verifyCookieAuth(): Promise<ApiUser | null> {
+  try {
+    const supabase = await getSupabaseWithCookies();
+    const { data: { user }, error } = await supabase.auth.getUser();
+
+    if (error || !user) {
+      return null;
+    }
+
+    // Get user profile from database using service role
+    const serviceSupabase = getSupabase();
+    const { data: profile } = await serviceSupabase
+      .from("users")
+      .select("org_id, role, first_name, last_name, is_active")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile || !profile.is_active) {
+      return null;
+    }
+
+    return {
+      id: user.id,
+      email: user.email!,
+      orgId: profile.org_id,
+      role: profile.role as UserRole,
+      firstName: profile.first_name,
+      lastName: profile.last_name,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export interface AuthResult {
   user: ApiUser | null;
   error: string | null;
@@ -77,13 +147,20 @@ export interface AuthResult {
 
 /**
  * Authenticate an API request
+ * Tries Bearer token first, then falls back to cookie-based auth
  */
 export async function authenticateRequest(
   request: Request
 ): Promise<AuthResult> {
   const authHeader = request.headers.get("Authorization");
 
-  const user = await verifyToken(authHeader);
+  // Try Bearer token authentication first
+  let user = await verifyToken(authHeader);
+
+  // If no Bearer token, try cookie-based authentication
+  if (!user) {
+    user = await verifyCookieAuth();
+  }
 
   if (!user) {
     return {
