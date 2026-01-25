@@ -31,13 +31,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if zip code is in any active pricing rule
+    // Check if zip code is in the Service Area rules (REGULAR or PREMIUM)
     const { data: rules, error: rulesError } = await supabase
       .from("pricing_rules")
-      .select("id, zip_codes")
+      .select("id, name, zone, zip_codes")
       .eq("org_id", org.id)
       .eq("is_active", true)
-      .returns<{ id: string; zip_codes: string[] | null }[]>();
+      .in("name", ["Service Area - REGULAR", "Service Area - PREMIUM"])
+      .returns<{ id: string; name: string; zone: string; zip_codes: string[] | null }[]>();
 
     if (rulesError) {
       console.error("Failed to check pricing rules:", rulesError);
@@ -47,11 +48,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if the zip code exists in any rule's zip_codes array
-    const inServiceArea = rules?.some((rule) => {
+    // Check if the zip code exists in any Service Area rule
+    let inServiceArea = false;
+    let pricingZone: "REGULAR" | "PREMIUM" | null = null;
+
+    for (const rule of rules || []) {
       const zipCodes = rule.zip_codes as string[] | null;
-      return zipCodes && zipCodes.includes(zipCode);
-    }) ?? false;
+      if (zipCodes && zipCodes.includes(zipCode)) {
+        inServiceArea = true;
+        pricingZone = rule.zone as "REGULAR" | "PREMIUM";
+        break;
+      }
+    }
 
     // Also check zip_frequency_restrictions for blocked zips
     if (inServiceArea) {
@@ -75,6 +83,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       inServiceArea,
+      pricingZone,
       message: inServiceArea
         ? "Great news! We service your area."
         : "We don't currently serve this area, but we're expanding!",
