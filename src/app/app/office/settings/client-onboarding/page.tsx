@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import ServiceAreaSetup from "./ServiceAreaSetup";
 import SignupFormSetup from "./SignupFormSetup";
@@ -33,8 +34,17 @@ const tabs: Tab[] = [
   { id: "privacy", label: "PRIVACY POLICY" },
 ];
 
-export default function ClientOnboardingPage() {
+function ClientOnboardingContent() {
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get("tab") as TabId | null;
   const [activeTab, setActiveTab] = useState<TabId>("service-area");
+
+  // Set active tab from URL param on mount
+  useEffect(() => {
+    if (tabParam && tabs.some((t) => t.id === tabParam)) {
+      setActiveTab(tabParam);
+    }
+  }, [tabParam]);
 
   return (
     <div className="space-y-6">
@@ -97,5 +107,13 @@ export default function ClientOnboardingPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function ClientOnboardingPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div></div>}>
+      <ClientOnboardingContent />
+    </Suspense>
   );
 }

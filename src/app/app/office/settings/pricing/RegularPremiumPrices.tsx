@@ -5,14 +5,14 @@ import Link from "next/link";
 import { Pencil, ChevronDown } from "lucide-react";
 import PriceEditModal from "./PriceEditModal";
 
-// Frequency display names and database values
-const frequencies = [
-  { key: "TWICE_WEEKLY", label: "Two Times A Week", dbValue: "TWICE_WEEKLY" },
-  { key: "WEEKLY", label: "Once A Week", dbValue: "WEEKLY" },
-  { key: "BIWEEKLY", label: "Bi Weekly", dbValue: "BIWEEKLY" },
+// All possible frequencies with mapping from onboarding settings to pricing keys
+const allFrequencies = [
+  { key: "TWICE_WEEKLY", label: "Two Times A Week", onboardingKey: "TWO_TIMES_A_WEEK" },
+  { key: "WEEKLY", label: "Once A Week", onboardingKey: "ONCE_A_WEEK" },
+  { key: "BIWEEKLY", label: "Bi Weekly", onboardingKey: "BI_WEEKLY" },
 ] as const;
 
-type FrequencyKey = (typeof frequencies)[number]["key"];
+type FrequencyKey = (typeof allFrequencies)[number]["key"];
 type ZoneType = "REGULAR" | "PREMIUM";
 
 // Price matrix structure: { frequency: { dogCount: priceCents } }
@@ -40,6 +40,7 @@ export default function RegularPremiumPrices() {
     premium: { ...defaultPriceMatrix },
     ruleIds: {},
   });
+  const [enabledFrequencies, setEnabledFrequencies] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editModal, setEditModal] = useState<{
@@ -49,15 +50,30 @@ export default function RegularPremiumPrices() {
     prices: { [dogCount: number]: number };
   } | null>(null);
 
-  const fetchPricing = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch("/api/admin/pricing-rules");
-      if (!response.ok) {
+
+      // Fetch both pricing rules and onboarding settings in parallel
+      const [pricingResponse, settingsResponse] = await Promise.all([
+        fetch("/api/admin/pricing-rules"),
+        fetch("/api/admin/onboarding-settings"),
+      ]);
+
+      if (!pricingResponse.ok) {
         throw new Error("Failed to fetch pricing rules");
       }
-      const data = await response.json();
-      const rules = data.rules || [];
+
+      const pricingData = await pricingResponse.json();
+      const rules = pricingData.rules || [];
+
+      // Parse onboarding settings for enabled frequencies
+      let cleanupFrequencies: string[] = [];
+      if (settingsResponse.ok) {
+        const settingsData = await settingsResponse.json();
+        cleanupFrequencies = settingsData.settings?.onboarding?.cleanupFrequencies || [];
+      }
+      setEnabledFrequencies(cleanupFrequencies);
 
       // Organize rules into price matrices
       const regular: PriceMatrix = {
@@ -99,8 +115,13 @@ export default function RegularPremiumPrices() {
   }, []);
 
   useEffect(() => {
-    fetchPricing();
-  }, [fetchPricing]);
+    fetchData();
+  }, [fetchData]);
+
+  // Filter frequencies based on what's enabled in onboarding settings
+  const activeFrequencies = allFrequencies.filter((freq) =>
+    enabledFrequencies.includes(freq.onboardingKey)
+  );
 
   const handleEdit = (zone: ZoneType, frequency: FrequencyKey) => {
     const matrix = zone === "PREMIUM" ? pricing.premium : pricing.regular;
@@ -151,7 +172,7 @@ export default function RegularPremiumPrices() {
       }
 
       // Refresh data
-      await fetchPricing();
+      await fetchData();
       setEditModal(null);
     } catch (err) {
       console.error("Error saving prices:", err);
@@ -164,7 +185,7 @@ export default function RegularPremiumPrices() {
   };
 
   const getFrequencyLabel = (key: FrequencyKey) => {
-    return frequencies.find((f) => f.key === key)?.label || key;
+    return allFrequencies.find((f) => f.key === key)?.label || key;
   };
 
   if (loading) {
@@ -199,6 +220,7 @@ export default function RegularPremiumPrices() {
         description="Please enter your fixed cost prepaid prices. Regular pricing affects clients living in regular zip codes. If you do not offer certain options (example: once a month), you should skip updating those prices."
         matrix={pricing.regular}
         zone="REGULAR"
+        frequencies={activeFrequencies}
         onEdit={handleEdit}
         formatPrice={formatPrice}
         getFrequencyLabel={getFrequencyLabel}
@@ -207,7 +229,7 @@ export default function RegularPremiumPrices() {
       {/* Manage frequencies link */}
       <div className="text-sm">
         <Link
-          href="/app/office/settings/client-onboarding"
+          href="/app/office/settings/client-onboarding?tab=signup-form"
           className="text-teal-600 hover:text-teal-700 underline"
         >
           Manage cleanup frequencies within Client Onboarding &gt; Signup Form
@@ -220,6 +242,7 @@ export default function RegularPremiumPrices() {
         description="Please enter your fixed cost prepaid prices. Premium pricing affects clients living in premium zip codes. If you do not offer certain options (example: once a month), you should skip updating those prices."
         matrix={pricing.premium}
         zone="PREMIUM"
+        frequencies={activeFrequencies}
         onEdit={handleEdit}
         formatPrice={formatPrice}
         getFrequencyLabel={getFrequencyLabel}
@@ -241,11 +264,18 @@ export default function RegularPremiumPrices() {
   );
 }
 
+interface FrequencyItem {
+  key: FrequencyKey;
+  label: string;
+  onboardingKey: string;
+}
+
 interface PricingTableProps {
   title: string;
   description: string;
   matrix: PriceMatrix;
   zone: ZoneType;
+  frequencies: readonly FrequencyItem[];
   onEdit: (zone: ZoneType, frequency: FrequencyKey) => void;
   formatPrice: (cents: number) => string;
   getFrequencyLabel: (key: FrequencyKey) => string;
@@ -256,10 +286,24 @@ function PricingTable({
   description,
   matrix,
   zone,
+  frequencies,
   onEdit,
   formatPrice,
-  getFrequencyLabel,
 }: PricingTableProps) {
+  if (frequencies.length === 0) {
+    return (
+      <section>
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">{title}</h3>
+        <p className="text-sm text-gray-600 mb-4">{description}</p>
+        <div className="text-center py-8 bg-gray-50 rounded-lg border border-gray-200">
+          <p className="text-gray-500">
+            No cleanup frequencies are enabled. Enable frequencies in Client Onboarding settings.
+          </p>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section>
       <h3 className="text-lg font-semibold text-gray-900 mb-2">{title}</h3>
