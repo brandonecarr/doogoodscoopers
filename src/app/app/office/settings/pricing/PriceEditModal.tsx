@@ -27,6 +27,8 @@ export default function PriceEditModal({
   maxDogs,
 }: PriceEditModalProps) {
   const [prices, setPrices] = useState<{ [dogCount: number]: number }>(initialPrices);
+  // Track raw input strings to avoid cursor jumping
+  const [inputValues, setInputValues] = useState<{ [dogCount: number]: string }>({});
   const [bulkChangeType, setBulkChangeType] = useState<ChangeType>("amount");
   const [bulkDirection, setBulkDirection] = useState<ChangeDirection>("increase");
   const [bulkValue, setBulkValue] = useState<string>("");
@@ -37,17 +39,32 @@ export default function PriceEditModal({
   useEffect(() => {
     if (isOpen) {
       setPrices(initialPrices);
+      setInputValues({}); // Clear raw inputs so they show formatted values
       setBulkValue("");
       setSaveError(null);
     }
   }, [isOpen, initialPrices]);
 
   const handlePriceChange = (dogCount: number, value: string) => {
-    // Remove non-numeric characters except decimal point
-    const cleanValue = value.replace(/[^\d.]/g, "");
-    const dollars = parseFloat(cleanValue) || 0;
-    const cents = Math.round(dollars * 100);
-    setPrices((prev) => ({ ...prev, [dogCount]: cents }));
+    // Store raw input value to prevent cursor jumping
+    setInputValues((prev) => ({ ...prev, [dogCount]: value }));
+  };
+
+  const handlePriceBlur = (dogCount: number) => {
+    const rawValue = inputValues[dogCount];
+    if (rawValue !== undefined) {
+      // Convert to cents on blur
+      const cleanValue = rawValue.replace(/[^\d.]/g, "");
+      const dollars = parseFloat(cleanValue) || 0;
+      const cents = Math.round(dollars * 100);
+      setPrices((prev) => ({ ...prev, [dogCount]: cents }));
+      // Clear raw input so it shows formatted value
+      setInputValues((prev) => {
+        const updated = { ...prev };
+        delete updated[dogCount];
+        return updated;
+      });
+    }
   };
 
   const applyBulkChange = () => {
@@ -77,6 +94,7 @@ export default function PriceEditModal({
       }
       return updated;
     });
+    setInputValues({}); // Clear raw inputs to show new formatted values
     setBulkValue("");
   };
 
@@ -84,7 +102,15 @@ export default function PriceEditModal({
     setSaving(true);
     setSaveError(null);
     try {
-      await onSave(prices);
+      // Convert any pending input values before saving
+      const finalPrices = { ...prices };
+      for (const [dogCountStr, rawValue] of Object.entries(inputValues)) {
+        const dogCount = parseInt(dogCountStr);
+        const cleanValue = rawValue.replace(/[^\d.]/g, "");
+        const dollars = parseFloat(cleanValue) || 0;
+        finalPrices[dogCount] = Math.round(dollars * 100);
+      }
+      await onSave(finalPrices);
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : "Failed to save prices");
     } finally {
@@ -186,8 +212,9 @@ export default function PriceEditModal({
                   </span>
                   <input
                     type="text"
-                    value={formatDollars(prices[dogCount] || 0)}
+                    value={inputValues[dogCount] !== undefined ? inputValues[dogCount] : formatDollars(prices[dogCount] || 0)}
                     onChange={(e) => handlePriceChange(dogCount, e.target.value)}
+                    onBlur={() => handlePriceBlur(dogCount)}
                     className="w-full pl-7 pr-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
                   />
                 </div>
