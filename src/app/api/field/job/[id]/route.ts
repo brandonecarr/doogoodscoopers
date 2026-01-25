@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { authenticateRequest, errorResponse } from "@/lib/api-auth";
+import { queueMarketingSync } from "@/lib/marketing-sync";
 
 // Get Supabase client with service role
 function getSupabase() {
@@ -313,6 +314,11 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       },
     });
 
+    // Trigger one-time client remarketing on job completion
+    if (action === "complete") {
+      await triggerOnetimeRemarketing(supabase, auth.user.orgId, id);
+    }
+
     return NextResponse.json({
       job: {
         id: updatedJob.id,
@@ -328,5 +334,86 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       { error: "Invalid request body" },
       { status: 400 }
     );
+  }
+}
+
+/**
+ * Queue marketing sync for one-time client after job completion
+ * Only triggers if client has a one-time subscription
+ */
+async function triggerOnetimeRemarketing(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  orgId: string,
+  jobId: string
+): Promise<void> {
+  try {
+    // Get job with client and subscription info
+    const { data: job } = await supabase
+      .from("jobs")
+      .select(`
+        id,
+        client_id,
+        location_id,
+        client:client_id (
+          id,
+          first_name,
+          last_name,
+          email,
+          phone
+        ),
+        location:location_id (
+          address_line1,
+          address_line2,
+          city,
+          state,
+          zip_code
+        )
+      `)
+      .eq("id", jobId)
+      .single();
+
+    if (!job || !job.client_id) return;
+
+    // Check if client has a one-time subscription
+    const { data: subscription } = await supabase
+      .from("subscriptions")
+      .select("id, frequency")
+      .eq("client_id", job.client_id)
+      .eq("status", "ACTIVE")
+      .single();
+
+    // Only trigger for one-time subscriptions
+    if (!subscription || subscription.frequency !== "ONETIME") return;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = job.client as any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const location = job.location as any;
+
+    if (!client) return;
+
+    // Queue the marketing sync event
+    await queueMarketingSync({
+      orgId,
+      eventType: "ONETIME_JOB_COMPLETED",
+      contact: {
+        email: client.email,
+        phone: client.phone,
+        firstName: client.first_name,
+        lastName: client.last_name,
+        address: location ? {
+          line1: location.address_line1,
+          line2: location.address_line2,
+          city: location.city,
+          state: location.state,
+          zip: location.zip_code,
+        } : undefined,
+      },
+      tags: ["one-time", "completed-job", "remarketing-eligible"],
+    });
+  } catch (error) {
+    // Log but don't fail the job completion
+    console.error("Error triggering one-time remarketing:", error);
   }
 }

@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import Stripe from "stripe";
 import { sendWelcomeEmail, sendNewCustomerNotificationEmail } from "@/lib/email";
 import { getStripe } from "@/lib/stripe";
+import { queueMarketingSync } from "@/lib/marketing-sync";
 
 interface DogInfo {
   name: string;
@@ -473,16 +474,90 @@ async function submitInServiceAreaQuote(data: QuoteSubmission) {
           .single() as { data: { id: string; first_name: string; last_name: string } | null; error: Error | null };
 
         if (referrer) {
+          // Get referral program settings
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const { data: referralSettings } = await (supabase as any)
+            .from("referral_program_settings")
+            .select("is_enabled, reward_referrer_cents, reward_referee_cents, reward_type")
+            .eq("org_id", org.id)
+            .single();
+
+          const autoIssueRewards = referralSettings?.is_enabled &&
+            (referralSettings?.reward_referrer_cents > 0 || referralSettings?.reward_referee_cents > 0);
+
           // Create referral record
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          await (supabase as any).from("referrals").insert({
+          const { data: referralRecord } = await (supabase as any).from("referrals").insert({
             org_id: org.id,
             referrer_client_id: referrer.id,
-            referee_client_id: client.id,
+            converted_client_id: client.id,
+            referrer_name: `${referrer.first_name} ${referrer.last_name}`,
+            referee_name: `${data.firstName} ${data.lastName}`,
+            referee_email: data.email,
+            referee_phone: data.phone || null,
             referral_code: data.referralCode.toUpperCase(),
-            status: "CONVERTED",
+            status: autoIssueRewards ? "REWARDED" : "CONVERTED",
             converted_at: new Date().toISOString(),
-          });
+          }).select().single();
+
+          // Auto-issue rewards if program is enabled
+          if (autoIssueRewards && referralRecord) {
+            const rewardType = referralSettings.reward_type || "ACCOUNT_CREDIT";
+
+            // Issue referrer reward
+            if (referralSettings.reward_referrer_cents > 0) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              await (supabase as any).from("referral_rewards").insert({
+                org_id: org.id,
+                referral_id: referralRecord.id,
+                client_id: referrer.id,
+                amount_cents: referralSettings.reward_referrer_cents,
+                reward_type: rewardType,
+                issued_at: new Date().toISOString(),
+              });
+
+              // Add account credit for referrer
+              if (rewardType === "ACCOUNT_CREDIT") {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                await (supabase as any).from("account_credits").insert({
+                  org_id: org.id,
+                  client_id: referrer.id,
+                  amount_cents: referralSettings.reward_referrer_cents,
+                  balance_cents: referralSettings.reward_referrer_cents,
+                  source: "REFERRAL",
+                  reference_id: referralRecord.id,
+                });
+              }
+            }
+
+            // Issue referee reward
+            if (referralSettings.reward_referee_cents > 0) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              await (supabase as any).from("referral_rewards").insert({
+                org_id: org.id,
+                referral_id: referralRecord.id,
+                client_id: client.id,
+                amount_cents: referralSettings.reward_referee_cents,
+                reward_type: rewardType,
+                issued_at: new Date().toISOString(),
+              });
+
+              // Add account credit for referee (new customer)
+              if (rewardType === "ACCOUNT_CREDIT") {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                await (supabase as any).from("account_credits").insert({
+                  org_id: org.id,
+                  client_id: client.id,
+                  amount_cents: referralSettings.reward_referee_cents,
+                  balance_cents: referralSettings.reward_referee_cents,
+                  source: "REFERRAL",
+                  reference_id: referralRecord.id,
+                });
+              }
+            }
+
+            console.log(`Referral rewards issued: referrer ${referrer.id} and referee ${client.id}`);
+          }
 
           referralApplied = true;
           console.log(`Referral tracked: ${referrer.first_name} ${referrer.last_name} referred ${data.firstName} ${data.lastName}`);
@@ -619,6 +694,33 @@ async function submitInServiceAreaQuote(data: QuoteSubmission) {
       nextServiceDate,
       recurringPrice: data.pricingSnapshot?.recurringPrice,
     }).catch((err) => console.error("Failed to send notification email:", err));
+
+    // 13. Queue marketing sync for new signup (non-blocking)
+    const isOnetimeSignup = dbFrequency === "ONETIME";
+    queueMarketingSync({
+      orgId: org.id,
+      eventType: isOnetimeSignup ? "ONETIME_SIGNUP" : "RECURRING_SIGNUP",
+      contact: {
+        email: data.email,
+        phone: data.phone,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        address: {
+          line1: data.address,
+          city: data.city,
+          state: data.state,
+          zip: data.zipCode,
+        },
+        dogCount: parseInt(data.numberOfDogs) || 1,
+        frequency: frequencyLabel,
+        subscriptionValue: data.pricingSnapshot?.recurringPrice,
+      },
+      tags: [
+        isOnetimeSignup ? "one-time" : "recurring",
+        `frequency-${dbFrequency.toLowerCase()}`,
+        referralApplied ? "referred" : "organic",
+      ],
+    }).catch((err) => console.error("Failed to queue marketing sync:", err));
 
     return NextResponse.json({
       success: true,

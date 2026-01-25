@@ -500,3 +500,151 @@ ${SITE_CONFIG.address.city}, ${SITE_CONFIG.address.state} ${SITE_CONFIG.address.
 ${SITE_CONFIG.email}
   `.trim();
 }
+
+/**
+ * Gift Certificate Email
+ */
+export interface GiftCertificateEmailData {
+  recipientEmail: string;
+  recipientName: string;
+  code: string;
+  amount: number;
+  message?: string;
+  purchaserName?: string;
+  expiresAt?: string;
+}
+
+export async function sendGiftCertificateEmail(data: GiftCertificateEmailData): Promise<boolean> {
+  const transporter = createTransporter();
+
+  if (!transporter) {
+    console.log("Email transporter not available. Skipping gift certificate email.");
+    return false;
+  }
+
+  const fromEmail = process.env.SMTP_FROM || SITE_CONFIG.email;
+  const fromName = process.env.SMTP_FROM_NAME || SITE_CONFIG.name;
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://doogoodscoopers.com";
+
+  const primaryColor = "#0d4b4a";
+  const accentColor = "#14b8a6";
+
+  const expirationText = data.expiresAt
+    ? `This gift certificate expires on ${new Date(data.expiresAt).toLocaleDateString()}.`
+    : "This gift certificate never expires.";
+
+  const emailHtml = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>You've Received a Gift!</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f3f4f6;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td align="center" style="padding: 40px 20px;">
+        <table role="presentation" style="max-width: 600px; width: 100%; border-collapse: collapse; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+          <tr>
+            <td style="background-color: ${primaryColor}; padding: 32px 40px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700;">
+                You've Received a Gift!
+              </h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 40px;">
+              <p style="margin: 0 0 24px; font-size: 16px; color: #374151; line-height: 1.6;">
+                Hi ${data.recipientName}!
+              </p>
+              <p style="margin: 0 0 24px; font-size: 16px; color: #374151; line-height: 1.6;">
+                ${data.purchaserName ? `${data.purchaserName} has` : "Someone special has"} sent you a gift certificate for ${SITE_CONFIG.name} pet waste removal services!
+              </p>
+              ${data.message ? `
+              <div style="background-color: #f9fafb; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+                <p style="margin: 0; font-size: 14px; color: #6b7280; font-style: italic;">
+                  "${data.message}"
+                </p>
+              </div>
+              ` : ""}
+              <div style="background: linear-gradient(135deg, ${primaryColor} 0%, ${accentColor} 100%); border-radius: 12px; padding: 32px; text-align: center; margin-bottom: 24px;">
+                <p style="margin: 0 0 8px; font-size: 14px; color: rgba(255,255,255,0.8); text-transform: uppercase; letter-spacing: 1px;">
+                  Your Gift Certificate
+                </p>
+                <p style="margin: 0 0 16px; font-size: 48px; font-weight: 700; color: #ffffff;">
+                  $${data.amount.toFixed(2)}
+                </p>
+                <p style="margin: 0; font-size: 24px; font-family: monospace; color: #ffffff; background-color: rgba(255,255,255,0.2); padding: 12px 20px; border-radius: 8px; display: inline-block;">
+                  ${data.code}
+                </p>
+              </div>
+              <p style="margin: 0 0 24px; font-size: 14px; color: #6b7280; line-height: 1.6;">
+                ${expirationText}
+              </p>
+              <div style="text-align: center; margin-bottom: 24px;">
+                <a href="${siteUrl}/quote" style="display: inline-block; background-color: ${accentColor}; color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">
+                  Get Started Now
+                </a>
+              </div>
+              <p style="margin: 0; font-size: 14px; color: #6b7280; line-height: 1.6;">
+                Enter your gift certificate code during signup to apply the credit to your account.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #f9fafb; padding: 24px 40px; text-align: center;">
+              <p style="margin: 0; font-size: 14px; color: #6b7280;">
+                Questions? Call us at ${SITE_CONFIG.phone}
+              </p>
+              <p style="margin: 8px 0 0; font-size: 12px; color: #9ca3af;">
+                ${SITE_CONFIG.name} | ${SITE_CONFIG.address.city}, ${SITE_CONFIG.address.state}
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `;
+
+  const emailText = `
+You've Received a Gift!
+
+Hi ${data.recipientName}!
+
+${data.purchaserName ? `${data.purchaserName} has` : "Someone special has"} sent you a gift certificate for ${SITE_CONFIG.name} pet waste removal services!
+
+${data.message ? `Message: "${data.message}"` : ""}
+
+YOUR GIFT CERTIFICATE
+Amount: $${data.amount.toFixed(2)}
+Code: ${data.code}
+
+${expirationText}
+
+Get started at ${siteUrl}/quote and enter your gift certificate code during signup.
+
+---
+${SITE_CONFIG.name}
+${SITE_CONFIG.phone}
+  `.trim();
+
+  try {
+    await transporter.sendMail({
+      from: `"${fromName}" <${fromEmail}>`,
+      to: data.recipientEmail,
+      subject: `You've received a $${data.amount.toFixed(2)} gift certificate from ${SITE_CONFIG.name}!`,
+      text: emailText,
+      html: emailHtml,
+    });
+
+    console.log(`Gift certificate email sent to ${data.recipientEmail}`);
+    return true;
+  } catch (error) {
+    console.error("Failed to send gift certificate email:", error);
+    return false;
+  }
+}

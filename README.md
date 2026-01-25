@@ -35,72 +35,55 @@ The easiest way to deploy your Next.js app is to use the [Vercel Platform](https
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
 
-## Sweep&Go Webhook Integration
+## Architecture
 
-This site integrates with Sweep&Go for quote management. When a customer submits a quote through the Sweep&Go form, a webhook notification is sent to our server, which then sends branded email confirmations.
+This is the DooGoodScoopers operations platform - a complete pet-waste service management system.
 
-### Webhook Endpoint
+### Tech Stack
 
-```
-POST /api/webhooks/sweepandgo
-```
+- **Framework**: Next.js 16 (App Router) + TypeScript
+- **Database**: Supabase PostgreSQL
+- **Auth**: Supabase Auth with role-based access control
+- **Payments**: Stripe (subscriptions, invoices, gift certificates)
+- **Notifications**: Twilio (SMS) + Resend (Email)
+- **Hosting**: Vercel
 
-### Supported Events
+### Portals
 
-- `free:quote` - Triggered when a customer requests a free quote
+- `/app/office` - Office staff portal (scheduling, dispatch, clients, billing)
+- `/app/field` - Field technician PWA (routes, job completion, photos)
+- `/app/client` - Customer self-service portal
 
-### Setting Up Webhooks in Sweep&Go
-
-1. Log in to your Sweep&Go dashboard
-2. Navigate to **Settings** > **API & Integrations**
-3. Generate or edit an API token
-4. Set the webhook URL to: `https://yourdomain.com/api/webhooks/sweepandgo`
-5. Enable the `free:quote` event
-6. Save your settings
-
-### Local Development Testing
-
-For local development, use [ngrok](https://ngrok.com/) to expose your local server:
-
-```bash
-# Start your dev server
-npm run dev:webpack
-
-# In another terminal, start ngrok
-ngrok http 3000
-
-# Use the ngrok URL (e.g., https://abc123.ngrok.io/api/webhooks/sweepandgo)
-# as your webhook URL in Sweep&Go settings
-```
-
-### Environment Variables
-
-Configure these in `.env.local`:
+### Key Environment Variables
 
 ```env
-# SMTP Configuration for branded emails
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_SECURE=false
-SMTP_USER=your_email@gmail.com
-SMTP_PASS=your_app_password_here
-SMTP_FROM=service@doogoodscoopers.com
-SMTP_FROM_NAME=DooGoodScoopers
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
 
-# Notification recipient
-NOTIFY_EMAIL=service@doogoodscoopers.com
+# Stripe
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
+
+# Twilio
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+TWILIO_PHONE_NUMBER=
+
+# Resend (Email)
+RESEND_API_KEY=
+
+# Organization
+DEFAULT_ORG_ID=doogoodscoopers
 ```
 
-**Note for Gmail:** Use an [App Password](https://myaccount.google.com/apppasswords) instead of your regular password.
+### API Structure
 
-### Email Features
-
-When a `free:quote` webhook is received:
-
-1. **Customer Email**: A branded confirmation email is sent to the customer with:
-   - Quote details (if available)
-   - Service information
-   - Contact information
-   - Next steps
-
-2. **Business Notification**: An internal notification is sent to `NOTIFY_EMAIL` with the customer's details.
+- `/api/v2/*` - Public quote/onboarding APIs
+- `/api/admin/*` - Office portal APIs (authenticated)
+- `/api/field/*` - Field tech APIs (authenticated)
+- `/api/client/*` - Client portal APIs (authenticated)
+- `/api/public/*` - Public APIs (metrics, etc.)
+- `/api/webhooks/*` - Stripe webhook handlers

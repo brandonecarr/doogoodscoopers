@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     // Get client
     const { data: client } = await supabase
       .from("clients")
-      .select("id, referral_code, account_credit_cents, org_id")
+      .select("id, account_credit_cents, org_id")
       .eq("user_id", auth.user.id)
       .single();
 
@@ -92,12 +92,13 @@ export async function GET(request: NextRequest) {
       availableCredit: client.account_credit_cents || 0,
     };
 
-    // Generate referral link
+    // Generate referral code from client ID
+    const referralCode = client.id.split("-")[0].toUpperCase();
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://doogoodscoopers.com";
-    const referralLink = `${baseUrl}/quote?ref=${client.referral_code}`;
+    const referralLink = `${baseUrl}/quote?ref=${referralCode}`;
 
     return NextResponse.json({
-      referralCode: client.referral_code,
+      referralCode,
       referralLink,
       program: settings
         ? {
@@ -160,7 +161,7 @@ export async function POST(request: NextRequest) {
     // Get client
     const { data: client } = await supabase
       .from("clients")
-      .select("id, org_id, referral_code")
+      .select("id, org_id")
       .eq("user_id", auth.user.id)
       .single();
 
@@ -184,12 +185,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Create referral
+    const referralCode = client.id.split("-")[0].toUpperCase();
     const { data: referral, error: createError } = await supabase
       .from("referrals")
       .insert({
         org_id: client.org_id,
         referrer_client_id: client.id,
-        referral_code: client.referral_code,
+        referral_code: referralCode,
         referee_name: name,
         referee_email: email || null,
         referee_phone: phone || null,

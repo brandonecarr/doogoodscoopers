@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { authenticateRequest, errorResponse } from "@/lib/api-auth";
+import { sendClientNotification } from "@/lib/notifications";
 
 // Get Supabase client with service role
 function getSupabase() {
@@ -116,66 +117,33 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       });
     }
 
-    // Build notification message
-    const etaText = eta ? ` (approximately ${eta} minutes)` : "";
-    const addressText = location ? ` at ${location.address_line1}` : "";
-    const message = `Hi ${client.first_name || "there"}! Your Doo Good Scoopers technician is on the way${addressText}${etaText}. See you soon!`;
+    // Build template variables
+    const templateVars = {
+      client_first_name: client.first_name || "there",
+      client_name: `${client.first_name || ""} ${client.last_name || ""}`.trim() || "Customer",
+      eta_minutes: eta ? String(eta) : "",
+      address: location?.address_line1 || "",
+      city: location?.city || "",
+    };
 
     const notificationsSent: string[] = [];
 
-    // Create notification records
-    if (sendSms) {
-      const { error: smsError } = await supabase.from("notifications").insert({
-        org_id: auth.user.orgId,
-        client_id: client.id,
-        job_id: id,
-        type: "ON_THE_WAY",
-        channel: "SMS",
-        recipient: client.phone,
-        message,
-        status: "PENDING",
-        scheduled_for: new Date().toISOString(),
-      });
+    // Send notifications using the notification service
+    const results = await sendClientNotification({
+      orgId: auth.user.orgId,
+      clientId: client.id,
+      jobId: id,
+      type: "ON_THE_WAY",
+      phone: sendSms ? client.phone : undefined,
+      email: sendEmail ? client.email : undefined,
+      variables: templateVars,
+    });
 
-      if (!smsError) {
-        notificationsSent.push("SMS");
-      }
-
-      // TODO: Actually send SMS via Twilio
-      // For now, mark as sent immediately
-      await supabase
-        .from("notifications")
-        .update({ status: "SENT", sent_at: new Date().toISOString() })
-        .eq("job_id", id)
-        .eq("type", "ON_THE_WAY")
-        .eq("channel", "SMS");
+    if (results.sms?.success) {
+      notificationsSent.push("SMS");
     }
-
-    if (sendEmail) {
-      const { error: emailError } = await supabase.from("notifications").insert({
-        org_id: auth.user.orgId,
-        client_id: client.id,
-        job_id: id,
-        type: "ON_THE_WAY",
-        channel: "EMAIL",
-        recipient: client.email,
-        message,
-        status: "PENDING",
-        scheduled_for: new Date().toISOString(),
-      });
-
-      if (!emailError) {
-        notificationsSent.push("EMAIL");
-      }
-
-      // TODO: Actually send email via Resend
-      // For now, mark as sent immediately
-      await supabase
-        .from("notifications")
-        .update({ status: "SENT", sent_at: new Date().toISOString() })
-        .eq("job_id", id)
-        .eq("type", "ON_THE_WAY")
-        .eq("channel", "EMAIL");
+    if (results.email?.success) {
+      notificationsSent.push("EMAIL");
     }
 
     // Update job status to EN_ROUTE if it was SCHEDULED

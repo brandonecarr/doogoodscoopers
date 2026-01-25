@@ -5,7 +5,9 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   Users,
+  UserCog,
   Calendar,
+  Clock,
   Truck,
   FileText,
   DollarSign,
@@ -17,6 +19,8 @@ import {
   BarChart3,
   Dog,
   MapPin,
+  Package,
+  Shield,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AuthUser } from "@/lib/auth-supabase";
@@ -45,6 +49,10 @@ const navigation: NavItem[] = [
   { name: "Messages", href: "/app/office/messages", icon: MessageSquare, permission: "notifications:read" },
   { name: "Gift Cards", href: "/app/office/gift-cards", icon: Gift, permission: "gift_certificates:read" },
   { name: "Referrals", href: "/app/office/referrals", icon: Share2, permission: "referrals:read" },
+  { name: "Staff", href: "/app/office/staff", icon: UserCog, permission: "staff:read" },
+  { name: "Shifts", href: "/app/office/shifts", icon: Clock, permission: "shifts:read" },
+  { name: "Add-Ons", href: "/app/office/add-ons", icon: Package, permission: "pricing:read" },
+  { name: "Zip Guard", href: "/app/office/zip-guard", icon: Shield, permission: "settings:read" },
   { name: "Reports", href: "/app/office/reports", icon: BarChart3, permission: "reports:read" },
   { name: "Settings", href: "/app/office/settings", icon: Settings, permission: "settings:read" },
 ];

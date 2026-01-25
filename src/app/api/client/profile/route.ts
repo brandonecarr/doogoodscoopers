@@ -41,7 +41,6 @@ export async function GET(request: NextRequest) {
         phone,
         status,
         notification_preferences,
-        referral_code,
         account_credit_cents,
         created_at
       `)
@@ -121,7 +120,7 @@ export async function GET(request: NextRequest) {
           onTheWay: true,
           completed: true,
         },
-        referralCode: client.referral_code,
+        referralCode: client.id.split("-")[0].toUpperCase(),
         accountCredit: client.account_credit_cents || 0,
         memberSince: client.created_at,
       },

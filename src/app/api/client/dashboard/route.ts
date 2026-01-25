@@ -40,8 +40,7 @@ export async function GET(request: NextRequest) {
         email,
         phone,
         status,
-        account_credit_cents,
-        referral_code
+        account_credit_cents
       `)
       .eq("user_id", auth.user.id)
       .single();
@@ -130,7 +129,6 @@ export async function GET(request: NextRequest) {
         email: client.email,
         phone: client.phone,
         status: client.status,
-        referralCode: client.referral_code,
       },
       nextService: nextJob
         ? {

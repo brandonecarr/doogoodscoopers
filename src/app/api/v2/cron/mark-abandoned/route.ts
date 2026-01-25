@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { queueMarketingSync } from "@/lib/marketing-sync";
 
 // Abandonment threshold in minutes
 const ABANDONMENT_THRESHOLD_MINUTES = 30;
@@ -28,7 +29,7 @@ export async function GET(request: NextRequest) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: staleSessions, error: fetchError } = await (supabase as any)
       .from("onboarding_sessions")
-      .select("id, org_id, current_step, last_activity_at")
+      .select("id, org_id, current_step, last_activity_at, contact_name, contact_email, contact_phone, zip, frequency, address")
       .eq("status", "IN_PROGRESS")
       .lt("last_activity_at", thresholdISO)
       .limit(100); // Process in batches
@@ -84,6 +85,33 @@ export async function GET(request: NextRequest) {
             idle_minutes: ABANDONMENT_THRESHOLD_MINUTES,
           },
         });
+
+        // Queue marketing sync for partial submission (if contact info exists)
+        if (session.contact_email || session.contact_phone) {
+          const nameParts = (session.contact_name || "").split(" ");
+          const address = session.address || {};
+
+          await queueMarketingSync({
+            orgId: session.org_id,
+            eventType: "PARTIAL_SUBMISSION",
+            contact: {
+              email: session.contact_email || undefined,
+              phone: session.contact_phone || undefined,
+              firstName: nameParts[0] || undefined,
+              lastName: nameParts.slice(1).join(" ") || undefined,
+              address: address.street ? {
+                line1: address.street,
+                city: address.city,
+                state: address.state,
+                zip: session.zip,
+              } : undefined,
+              frequency: session.frequency || undefined,
+            },
+            tags: ["abandoned", `step-${session.current_step || "unknown"}`],
+          }).catch((err) => {
+            console.error(`Failed to queue marketing sync for session ${session.id}:`, err);
+          });
+        }
 
         processedCount++;
       } catch (err) {
