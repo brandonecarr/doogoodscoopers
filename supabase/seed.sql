@@ -64,6 +64,36 @@ ON CONFLICT (id) DO UPDATE SET
   name = EXCLUDED.name,
   updated_at = NOW();
 
+-- Service Area Pricing Rules (for zip code lookup)
+-- These rules define which zip codes are in the service area
+INSERT INTO public.pricing_rules (id, org_id, name, description, zone, zip_codes, base_price_cents, is_active, priority)
+VALUES
+  -- Regular Pricing Service Area (Southern California - Inland Empire)
+  ('b0000000-0000-0000-0000-000000000010'::uuid, 'b2b5d576-aee6-4899-9a2f-c3e1c68e802c'::uuid,
+   'Service Area - REGULAR',
+   'Service area zip codes for regular pricing',
+   'REGULAR',
+   ARRAY['91701', '91708', '91709', '91710', '91711', '91722', '91724', '91730', '91737', '91739',
+         '91744', '91745', '91746', '91748', '91750', '91758', '91761', '91762', '91763', '91764',
+         '91765', '91766', '91767', '91768', '91770', '91784', '91785', '91786', '91790', '92220',
+         '92336', '92337', '92346', '92373', '92374', '92376', '92377', '92392', '92394', '92395',
+         '92501', '92503', '92504', '92505', '92506', '92507', '92508', '92509', '92551', '92553',
+         '92555', '92557', '92582', '92586', '92860', '92870', '92878', '92879', '92880', '92881',
+         '92882', '92883'],
+   0, true, 5),
+  -- Premium Pricing Service Area (extended/outlying areas)
+  ('b0000000-0000-0000-0000-000000000011'::uuid, 'b2b5d576-aee6-4899-9a2f-c3e1c68e802c'::uuid,
+   'Service Area - PREMIUM',
+   'Service area zip codes for premium pricing',
+   'PREMIUM',
+   ARRAY['90604', '90605', '90638', '92223', '92301', '92307', '92308', '92324', '92331', '92334',
+         '92335', '92343', '92344', '92345', '92358', '92359', '92372', '92401', '92403', '92404',
+         '92405', '92407', '92408', '92410', '92411', '92707', '92939', '93551'],
+   0, true, 10)
+ON CONFLICT (id) DO UPDATE SET
+  zip_codes = EXCLUDED.zip_codes,
+  updated_at = NOW();
+
 -- =============================================================================
 -- 5. USERS (Staff)
 -- =============================================================================
