@@ -7,6 +7,7 @@ import SignupFormSetup from "./SignupFormSetup";
 import CalloutDisclaimersSetup from "./CalloutDisclaimersSetup";
 import ThankYouPagesSetup from "./ThankYouPagesSetup";
 import EmailsSetup from "./EmailsSetup";
+import LegalDocumentSetup from "./LegalDocumentSetup";
 
 type TabId =
   | "service-area"
@@ -89,14 +90,10 @@ export default function ClientOnboardingPage() {
         {activeTab === "thank-you" && <ThankYouPagesSetup />}
         {activeTab === "emails" && <EmailsSetup />}
         {activeTab === "terms" && (
-          <div className="text-gray-500 text-center py-12">
-            Terms of Service editor coming soon...
-          </div>
+          <LegalDocumentSetup documentType="termsOfService" title="Terms of Service" />
         )}
         {activeTab === "privacy" && (
-          <div className="text-gray-500 text-center py-12">
-            Privacy Policy editor coming soon...
-          </div>
+          <LegalDocumentSetup documentType="privacyPolicy" title="Privacy Policy" />
         )}
       </div>
     </div>
