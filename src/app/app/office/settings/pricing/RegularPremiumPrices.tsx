@@ -6,10 +6,20 @@ import { Pencil, ChevronDown } from "lucide-react";
 import PriceEditModal from "./PriceEditModal";
 
 // All possible frequencies with mapping from onboarding settings to pricing keys
+// Ordered from most frequent to least frequent
 const allFrequencies = [
+  { key: "SEVEN_TIMES_A_WEEK", label: "Seven Times A Week", onboardingKey: "SEVEN_TIMES_A_WEEK" },
+  { key: "SIX_TIMES_A_WEEK", label: "Six Times A Week", onboardingKey: "SIX_TIMES_A_WEEK" },
+  { key: "FIVE_TIMES_A_WEEK", label: "Five Times A Week", onboardingKey: "FIVE_TIMES_A_WEEK" },
+  { key: "FOUR_TIMES_A_WEEK", label: "Four Times A Week", onboardingKey: "FOUR_TIMES_A_WEEK" },
+  { key: "THREE_TIMES_A_WEEK", label: "Three Times A Week", onboardingKey: "THREE_TIMES_A_WEEK" },
   { key: "TWICE_WEEKLY", label: "Two Times A Week", onboardingKey: "TWO_TIMES_A_WEEK" },
   { key: "WEEKLY", label: "Once A Week", onboardingKey: "ONCE_A_WEEK" },
   { key: "BIWEEKLY", label: "Bi Weekly", onboardingKey: "BI_WEEKLY" },
+  { key: "TWICE_PER_MONTH", label: "Twice Per Month", onboardingKey: "TWICE_PER_MONTH" },
+  { key: "EVERY_THREE_WEEKS", label: "Every Three Weeks", onboardingKey: "EVERY_THREE_WEEKS" },
+  { key: "EVERY_FOUR_WEEKS", label: "Every Four Weeks", onboardingKey: "EVERY_FOUR_WEEKS" },
+  { key: "MONTHLY", label: "Once A Month", onboardingKey: "ONCE_A_MONTH" },
 ] as const;
 
 type FrequencyKey = (typeof allFrequencies)[number]["key"];
@@ -28,11 +38,10 @@ interface PricingData {
   ruleIds: { [key: string]: string }; // Map of "zone_frequency_dogs" to rule ID
 }
 
-const defaultPriceMatrix: PriceMatrix = {
-  TWICE_WEEKLY: { 1: 0, 2: 0, 3: 0, 4: 0 },
-  WEEKLY: { 1: 0, 2: 0, 3: 0, 4: 0 },
-  BIWEEKLY: { 1: 0, 2: 0, 3: 0, 4: 0 },
-};
+// Build default price matrix from all frequencies
+const defaultPriceMatrix: PriceMatrix = Object.fromEntries(
+  allFrequencies.map((f) => [f.key, { 1: 0, 2: 0, 3: 0, 4: 0 }])
+);
 
 export default function RegularPremiumPrices() {
   const [pricing, setPricing] = useState<PricingData>({
@@ -75,17 +84,14 @@ export default function RegularPremiumPrices() {
       }
       setEnabledFrequencies(cleanupFrequencies);
 
-      // Organize rules into price matrices
-      const regular: PriceMatrix = {
-        TWICE_WEEKLY: { 1: 0, 2: 0, 3: 0, 4: 0 },
-        WEEKLY: { 1: 0, 2: 0, 3: 0, 4: 0 },
-        BIWEEKLY: { 1: 0, 2: 0, 3: 0, 4: 0 },
-      };
-      const premium: PriceMatrix = {
-        TWICE_WEEKLY: { 1: 0, 2: 0, 3: 0, 4: 0 },
-        WEEKLY: { 1: 0, 2: 0, 3: 0, 4: 0 },
-        BIWEEKLY: { 1: 0, 2: 0, 3: 0, 4: 0 },
-      };
+      // Organize rules into price matrices - dynamically create from all frequencies
+      const frequencyKeys = allFrequencies.map((f) => f.key);
+      const regular: PriceMatrix = Object.fromEntries(
+        frequencyKeys.map((k) => [k, { 1: 0, 2: 0, 3: 0, 4: 0 }])
+      );
+      const premium: PriceMatrix = Object.fromEntries(
+        frequencyKeys.map((k) => [k, { 1: 0, 2: 0, 3: 0, 4: 0 }])
+      );
       const ruleIds: { [key: string]: string } = {};
 
       for (const rule of rules) {
@@ -94,8 +100,8 @@ export default function RegularPremiumPrices() {
         const dogCount = rule.min_dogs || 1;
         const priceCents = rule.base_price_cents || 0;
 
-        // Only process recurring frequencies
-        if (!["WEEKLY", "BIWEEKLY", "TWICE_WEEKLY"].includes(frequency)) {
+        // Skip ONETIME - that's handled in InitialPrices tab
+        if (frequency === "ONETIME") {
           continue;
         }
 

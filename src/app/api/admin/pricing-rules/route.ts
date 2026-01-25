@@ -100,7 +100,21 @@ export async function POST(request: NextRequest) {
 
     // Validate frequency if provided
     if (body.frequency) {
-      const validFrequencies = ["WEEKLY", "BIWEEKLY", "MONTHLY", "ONETIME"];
+      const validFrequencies = [
+        "SEVEN_TIMES_A_WEEK",
+        "SIX_TIMES_A_WEEK",
+        "FIVE_TIMES_A_WEEK",
+        "FOUR_TIMES_A_WEEK",
+        "THREE_TIMES_A_WEEK",
+        "TWICE_WEEKLY",
+        "WEEKLY",
+        "BIWEEKLY",
+        "TWICE_PER_MONTH",
+        "EVERY_THREE_WEEKS",
+        "EVERY_FOUR_WEEKS",
+        "MONTHLY",
+        "ONETIME",
+      ];
       if (!validFrequencies.includes(body.frequency)) {
         return NextResponse.json(
           { error: "Invalid frequency" },
@@ -216,7 +230,22 @@ export async function PUT(request: NextRequest) {
       updates.zone = body.zone;
     }
     if (body.frequency !== undefined) {
-      if (body.frequency && !["WEEKLY", "BIWEEKLY", "MONTHLY", "ONETIME"].includes(body.frequency)) {
+      const validFrequencies = [
+        "SEVEN_TIMES_A_WEEK",
+        "SIX_TIMES_A_WEEK",
+        "FIVE_TIMES_A_WEEK",
+        "FOUR_TIMES_A_WEEK",
+        "THREE_TIMES_A_WEEK",
+        "TWICE_WEEKLY",
+        "WEEKLY",
+        "BIWEEKLY",
+        "TWICE_PER_MONTH",
+        "EVERY_THREE_WEEKS",
+        "EVERY_FOUR_WEEKS",
+        "MONTHLY",
+        "ONETIME",
+      ];
+      if (body.frequency && !validFrequencies.includes(body.frequency)) {
         return NextResponse.json(
           { error: "Invalid frequency" },
           { status: 400 }
