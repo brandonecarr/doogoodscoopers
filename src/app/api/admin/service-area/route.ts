@@ -143,17 +143,33 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    let currentZips = new Set<string>((existingRule?.zip_codes as string[]) || []);
+    const currentZips = new Set<string>((existingRule?.zip_codes as string[]) || []);
+
+    // Track results for detailed feedback
+    const added: string[] = [];
+    const alreadyExisted: string[] = [];
+    const deleted: string[] = [];
+    const notFound: string[] = [];
 
     if (action === "add") {
-      // Add new zip codes
+      // Add new zip codes, track which ones already exist
       for (const zip of zipCodes) {
-        currentZips.add(zip);
+        if (currentZips.has(zip)) {
+          alreadyExisted.push(zip);
+        } else {
+          currentZips.add(zip);
+          added.push(zip);
+        }
       }
     } else {
-      // Delete zip codes
+      // Delete zip codes, track which ones weren't found
       for (const zip of zipCodes) {
-        currentZips.delete(zip);
+        if (currentZips.has(zip)) {
+          currentZips.delete(zip);
+          deleted.push(zip);
+        } else {
+          notFound.push(zip);
+        }
       }
     }
 
@@ -197,13 +213,58 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({
+    // Build response with detailed results
+    const response: {
+      success: boolean;
+      action: string;
+      zone: string;
+      zipCodes: string[];
+      added?: string[];
+      alreadyExisted?: string[];
+      deleted?: string[];
+      notFound?: string[];
+      message: string;
+    } = {
       success: true,
       action,
       zone,
       zipCodes: updatedZips,
-      message: `Successfully ${action === "add" ? "added" : "removed"} ${zipCodes.length} zip code(s)`,
-    });
+      message: "",
+    };
+
+    if (action === "add") {
+      response.added = added;
+      response.alreadyExisted = alreadyExisted;
+
+      if (added.length > 0 && alreadyExisted.length === 0) {
+        response.message = `Successfully added ${added.length} zip code(s)`;
+      } else if (added.length === 0 && alreadyExisted.length > 0) {
+        response.message = `All ${alreadyExisted.length} zip code(s) already exist`;
+        response.success = false;
+      } else if (added.length > 0 && alreadyExisted.length > 0) {
+        response.message = `Added ${added.length} zip code(s). ${alreadyExisted.length} already existed`;
+      } else {
+        response.message = "No zip codes to add";
+        response.success = false;
+      }
+    } else {
+      response.deleted = deleted;
+      response.notFound = notFound;
+
+      if (deleted.length > 0 && notFound.length === 0) {
+        response.message = `Successfully deleted ${deleted.length} zip code(s)`;
+      } else if (deleted.length === 0 && notFound.length > 0) {
+        response.message = `None of the ${notFound.length} zip code(s) were found in the list`;
+        response.success = false;
+      } else if (deleted.length > 0 && notFound.length > 0) {
+        response.message = `Deleted ${deleted.length} zip code(s). ${notFound.length} not found`;
+      } else {
+        response.message = "No zip codes to delete";
+        response.success = false;
+      }
+    }
+
+    return NextResponse.json(response);
   } catch (error) {
     console.error("Error processing service area update:", error);
     return NextResponse.json(
