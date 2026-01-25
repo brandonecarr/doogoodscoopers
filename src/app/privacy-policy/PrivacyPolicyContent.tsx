@@ -14,6 +14,7 @@ import {
   Monitor,
   Cookie,
   Link as LinkIcon,
+  Link2,
   Lock,
   Trash2,
   Baby,
@@ -23,17 +24,95 @@ import {
   Database,
   RefreshCw,
   HelpCircle,
-  type LucideIcon
+  CreditCard,
+  Calendar,
+  CalendarX,
+  Clock,
+  MapPin,
+  Settings,
+  Star,
+  Heart,
+  CheckCircle,
+  AlertCircle,
+  Info,
+  Sparkles,
+  Zap,
+  Home,
+  Truck,
+  DollarSign,
+  Percent,
+  Gift,
+  Award,
+  Target,
+  Briefcase,
+  type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { SmoothScrollProvider } from "@/components/providers/SmoothScrollProvider";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 
+// Icon mapping for dynamic content
+const iconMap: Record<string, LucideIcon> = {
+  "credit-card": CreditCard,
+  calendar: Calendar,
+  "calendar-x": CalendarX,
+  clock: Clock,
+  shield: Shield,
+  "help-circle": HelpCircle,
+  "file-text": FileText,
+  lock: Lock,
+  mail: Mail,
+  phone: Phone,
+  "map-pin": MapPin,
+  user: User,
+  settings: Settings,
+  bell: Bell,
+  star: Star,
+  heart: Heart,
+  "check-circle": CheckCircle,
+  "alert-circle": AlertCircle,
+  info: Info,
+  sparkles: Sparkles,
+  zap: Zap,
+  home: Home,
+  truck: Truck,
+  "dollar-sign": DollarSign,
+  percent: Percent,
+  gift: Gift,
+  award: Award,
+  target: Target,
+  briefcase: Briefcase,
+  database: Database,
+  share: Share2,
+  ban: Ban,
+  activity: Activity,
+  monitor: Monitor,
+  cookie: Cookie,
+  link: Link2,
+  baby: Baby,
+  "message-square": MessageSquare,
+  refresh: RefreshCw,
+  trash: Trash2,
+};
+
 interface PolicySection {
   icon: LucideIcon;
   title: string;
   content: React.ReactNode;
+}
+
+// Dynamic section from database
+interface DynamicSection {
+  id: string;
+  icon: string;
+  title: string;
+  content: string;
+}
+
+interface PrivacyPolicyContentProps {
+  dynamicSections?: DynamicSection[] | null;
+  lastUpdated?: string | null;
 }
 
 const policyData: PolicySection[] = [
@@ -407,13 +486,16 @@ const policyData: PolicySection[] = [
   },
 ];
 
-export function PrivacyPolicyContent() {
+export function PrivacyPolicyContent({ dynamicSections, lastUpdated }: PrivacyPolicyContentProps) {
   const heroRef = useRef<HTMLDivElement>(null);
   const heroInView = useInView(heroRef, { once: true });
   const contentRef = useRef<HTMLDivElement>(null);
   const contentInView = useInView(contentRef, { once: true, margin: "-100px" });
   const ctaRef = useRef<HTMLDivElement>(null);
   const ctaInView = useInView(ctaRef, { once: true, margin: "-100px" });
+
+  // Use dynamic sections if available, otherwise fall back to hardcoded data
+  const useDynamic = dynamicSections && dynamicSections.length > 0;
 
   return (
     <SmoothScrollProvider>
@@ -469,28 +551,54 @@ export function PrivacyPolicyContent() {
               </p>
 
               <div className="space-y-8">
-                {policyData.map((section, index) => {
-                  const Icon = section.icon;
-                  return (
-                    <motion.div
-                      key={section.title}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={contentInView ? { opacity: 1, y: 0 } : {}}
-                      transition={{ duration: 0.5, delay: index * 0.05 }}
-                      className="bg-gray-50 rounded-2xl p-8"
-                    >
-                      <div className="flex items-center gap-4 mb-6">
-                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-teal-500 to-teal-600 flex items-center justify-center text-white">
-                          <Icon className="w-6 h-6" />
-                        </div>
-                        <h2 className="text-2xl font-bold text-navy-900">
-                          {section.title}
-                        </h2>
-                      </div>
-                      {section.content}
-                    </motion.div>
-                  );
-                })}
+                {useDynamic
+                  ? dynamicSections.map((section, index) => {
+                      const Icon = iconMap[section.icon] || HelpCircle;
+                      return (
+                        <motion.div
+                          key={section.id}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={contentInView ? { opacity: 1, y: 0 } : {}}
+                          transition={{ duration: 0.5, delay: index * 0.05 }}
+                          className="bg-gray-50 rounded-2xl p-8"
+                        >
+                          <div className="flex items-center gap-4 mb-6">
+                            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-teal-500 to-teal-600 flex items-center justify-center text-white">
+                              <Icon className="w-6 h-6" />
+                            </div>
+                            <h2 className="text-2xl font-bold text-navy-900">
+                              {section.title}
+                            </h2>
+                          </div>
+                          <div
+                            className="prose prose-gray max-w-none [&_p]:text-gray-600 [&_p]:mb-4 [&_p:last-child]:mb-0 [&_ul]:space-y-2 [&_ul]:mb-4 [&_li]:text-gray-600 [&_strong]:font-semibold [&_em]:italic [&_a]:text-teal-600 [&_a]:underline [&_a:hover]:text-teal-700"
+                            dangerouslySetInnerHTML={{ __html: section.content }}
+                          />
+                        </motion.div>
+                      );
+                    })
+                  : policyData.map((section, index) => {
+                      const Icon = section.icon;
+                      return (
+                        <motion.div
+                          key={section.title}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={contentInView ? { opacity: 1, y: 0 } : {}}
+                          transition={{ duration: 0.5, delay: index * 0.05 }}
+                          className="bg-gray-50 rounded-2xl p-8"
+                        >
+                          <div className="flex items-center gap-4 mb-6">
+                            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-teal-500 to-teal-600 flex items-center justify-center text-white">
+                              <Icon className="w-6 h-6" />
+                            </div>
+                            <h2 className="text-2xl font-bold text-navy-900">
+                              {section.title}
+                            </h2>
+                          </div>
+                          {section.content}
+                        </motion.div>
+                      );
+                    })}
               </div>
             </motion.div>
           </div>
