@@ -258,10 +258,12 @@ ON CONFLICT DO NOTHING;
 -- =============================================================================
 -- 11. ROUTES (Today's route)
 -- =============================================================================
-INSERT INTO public.routes (id, org_id, route_date, name, status)
+INSERT INTO public.routes (id, org_id, route_date, name, status, assigned_to)
 VALUES
-  ('e1000000-0000-0000-0000-000000000001'::uuid, 'b2b5d576-aee6-4899-9a2f-c3e1c68e802c'::uuid, CURRENT_DATE, 'Monday Route A', 'PLANNED')
-ON CONFLICT (id) DO NOTHING;
+  ('e1000000-0000-0000-0000-000000000001'::uuid, 'b2b5d576-aee6-4899-9a2f-c3e1c68e802c'::uuid, CURRENT_DATE, 'Monday Route A', 'PLANNED', '55b21f60-d575-4d7b-98ce-539301e6aa9c'::uuid)
+ON CONFLICT (id) DO UPDATE SET
+  assigned_to = EXCLUDED.assigned_to,
+  route_date = CURRENT_DATE;
 
 -- Route stops
 INSERT INTO public.route_stops (id, org_id, route_id, job_id, stop_order, estimated_arrival)
