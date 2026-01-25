@@ -24,7 +24,7 @@ function getSupabase() {
 
 /**
  * GET /api/admin/service-area
- * Get all zip codes grouped by zone (REGULAR/PREMIUM)
+ * Get zip codes from the Service Area rules only (REGULAR/PREMIUM)
  */
 export async function GET(request: NextRequest) {
   const auth = await authenticateWithPermission(request, "settings:read");
@@ -34,42 +34,30 @@ export async function GET(request: NextRequest) {
 
   const supabase = getSupabase();
 
-  // Get all active pricing rules with zip codes
-  const { data: rules, error } = await supabase
+  // Get only the Service Area pricing rules (not all pricing rules)
+  const { data: regularRule } = await supabase
     .from("pricing_rules")
-    .select("id, zone, zip_codes")
+    .select("zip_codes")
     .eq("org_id", auth.user.orgId)
-    .eq("is_active", true);
+    .eq("name", "Service Area - REGULAR")
+    .eq("is_active", true)
+    .single();
 
-  if (error) {
-    console.error("Error fetching pricing rules:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch service area" },
-      { status: 500 }
-    );
-  }
+  const { data: premiumRule } = await supabase
+    .from("pricing_rules")
+    .select("zip_codes")
+    .eq("org_id", auth.user.orgId)
+    .eq("name", "Service Area - PREMIUM")
+    .eq("is_active", true)
+    .single();
 
-  // Aggregate zip codes by zone
-  const regularZips = new Set<string>();
-  const premiumZips = new Set<string>();
-
-  for (const rule of rules || []) {
-    const zips = (rule.zip_codes as string[]) || [];
-    const zone = rule.zone || "REGULAR";
-
-    for (const zip of zips) {
-      if (zone === "PREMIUM") {
-        premiumZips.add(zip);
-      } else {
-        regularZips.add(zip);
-      }
-    }
-  }
+  const regularZips = (regularRule?.zip_codes as string[]) || [];
+  const premiumZips = (premiumRule?.zip_codes as string[]) || [];
 
   return NextResponse.json({
     zipCodes: {
-      regular: Array.from(regularZips),
-      premium: Array.from(premiumZips),
+      regular: regularZips,
+      premium: premiumZips,
     },
   });
 }
@@ -150,11 +138,27 @@ export async function POST(request: NextRequest) {
     const alreadyExisted: string[] = [];
     const deleted: string[] = [];
     const notFound: string[] = [];
+    const inOtherZone: string[] = [];
 
     if (action === "add") {
-      // Add new zip codes, track which ones already exist
+      // Get the OTHER zone's zip codes to check for conflicts
+      const otherZone = zone === "REGULAR" ? "PREMIUM" : "REGULAR";
+      const otherRuleName = `Service Area - ${otherZone}`;
+
+      const { data: otherRule } = await supabase
+        .from("pricing_rules")
+        .select("zip_codes")
+        .eq("org_id", auth.user.orgId)
+        .eq("name", otherRuleName)
+        .single();
+
+      const otherZoneZips = new Set<string>((otherRule?.zip_codes as string[]) || []);
+
+      // Add new zip codes, track which ones already exist or are in the other zone
       for (const zip of zipCodes) {
-        if (currentZips.has(zip)) {
+        if (otherZoneZips.has(zip)) {
+          inOtherZone.push(zip);
+        } else if (currentZips.has(zip)) {
           alreadyExisted.push(zip);
         } else {
           currentZips.add(zip);
@@ -221,6 +225,7 @@ export async function POST(request: NextRequest) {
       zipCodes: string[];
       added?: string[];
       alreadyExisted?: string[];
+      inOtherZone?: string[];
       deleted?: string[];
       notFound?: string[];
       message: string;
@@ -235,17 +240,30 @@ export async function POST(request: NextRequest) {
     if (action === "add") {
       response.added = added;
       response.alreadyExisted = alreadyExisted;
+      response.inOtherZone = inOtherZone;
 
-      if (added.length > 0 && alreadyExisted.length === 0) {
-        response.message = `Successfully added ${added.length} zip code(s)`;
-      } else if (added.length === 0 && alreadyExisted.length > 0) {
-        response.message = `All ${alreadyExisted.length} zip code(s) already exist`;
-        response.success = false;
-      } else if (added.length > 0 && alreadyExisted.length > 0) {
-        response.message = `Added ${added.length} zip code(s). ${alreadyExisted.length} already existed`;
-      } else {
+      const otherZoneName = zone === "REGULAR" ? "Premium" : "Regular";
+      const parts: string[] = [];
+
+      if (added.length > 0) {
+        parts.push(`Added ${added.length} zip code(s)`);
+      }
+      if (alreadyExisted.length > 0) {
+        parts.push(`${alreadyExisted.length} already existed`);
+      }
+      if (inOtherZone.length > 0) {
+        parts.push(`${inOtherZone.length} already in ${otherZoneName} zone`);
+      }
+
+      if (parts.length === 0) {
         response.message = "No zip codes to add";
         response.success = false;
+      } else {
+        response.message = parts.join(". ");
+        // Only full success if all were added
+        if (added.length === 0 || alreadyExisted.length > 0 || inOtherZone.length > 0) {
+          response.success = added.length > 0; // Partial success if at least some were added
+        }
       }
     } else {
       response.deleted = deleted;

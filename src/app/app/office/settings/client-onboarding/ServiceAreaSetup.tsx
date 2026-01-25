@@ -97,15 +97,20 @@ export default function ServiceAreaSetup() {
       const details: string[] = [];
 
       if (action === "add") {
-        if (data.alreadyExisted?.length > 0 && data.added?.length === 0) {
+        if (data.added?.length > 0) {
+          details.push(`Added: ${data.added.join(", ")}`);
+        }
+        if (data.alreadyExisted?.length > 0) {
           messageType = "warning";
           details.push(`Already existed: ${data.alreadyExisted.join(", ")}`);
-        } else if (data.alreadyExisted?.length > 0 && data.added?.length > 0) {
+        }
+        if (data.inOtherZone?.length > 0) {
           messageType = "warning";
-          details.push(`Added: ${data.added.join(", ")}`);
-          details.push(`Already existed: ${data.alreadyExisted.join(", ")}`);
-        } else if (data.added?.length > 0) {
-          details.push(`Added: ${data.added.join(", ")}`);
+          const otherZone = zone === "REGULAR" ? "Premium" : "Regular";
+          details.push(`Already in ${otherZone} zone: ${data.inOtherZone.join(", ")}`);
+        }
+        if (data.added?.length === 0) {
+          messageType = "error";
         }
       } else {
         if (data.notFound?.length > 0 && data.deleted?.length === 0) {
