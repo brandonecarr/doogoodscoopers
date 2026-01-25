@@ -56,10 +56,10 @@ const serviceSchema = z.object({
   phone: z.string().min(10, "Please enter a valid phone number"),
   numberOfDogs: z.string().min(1, "Please select number of dogs"),
   frequency: z.string().min(1, "Please select a frequency"),
-  lastCleaned: z.string().min(1, "Please select when yard was last cleaned"),
+  lastCleaned: z.string(), // Always included, defaults to "one_week" when field is hidden
 });
 
-// Schema for contact info step (with gate info)
+// Schema for contact info step (with property info)
 const contactSchema = z.object({
   firstName: z.string().min(2, "First name is required"),
   lastName: z.string().min(2, "Last name is required"),
@@ -67,8 +67,12 @@ const contactSchema = z.object({
   phone: z.string().min(10, "Please enter a valid phone number"),
   address: z.string().min(5, "Street address is required"),
   city: z.string().min(2, "City is required"),
-  gateLocation: z.string().min(1, "Please select gate location"),
+  gateLocation: z.string().optional(),
   gateCode: z.string().optional(),
+  doggieDoor: z.string().optional(),
+  gatedCommunity: z.string().optional(),
+  garbageCanLocation: z.string().optional(),
+  howHeardAboutUs: z.string().optional(),
 });
 
 // Schema for individual dog info
@@ -133,7 +137,70 @@ interface FormOptions {
   gateLocation: FormOption[];
   notificationTypes: FormOption[];
   notificationChannels: FormOption[];
+  howHeardAboutUs: FormOption[];
 }
+
+// Onboarding settings from admin configuration
+interface OnboardingSettings {
+  couponCode?: { enabled: boolean };
+  maxDogs?: number;
+  lastTimeYardWasCleaned?: { enabled: boolean };
+  requestFirstNameBeforeQuote?: { enabled: boolean };
+  requestLastNameBeforeQuote?: { enabled: boolean };
+  homePhoneNumber?: { enabled: boolean };
+  cellPhoneNumber?: { enabled: boolean; required: boolean };
+  requestCellPhoneBeforeQuote?: { enabled: boolean };
+  requestEmailBeforeQuote?: { enabled: boolean };
+  dogNames?: { enabled: boolean; required: boolean };
+  isDogSafe?: { enabled: boolean };
+  dogBreeds?: { enabled: boolean };
+  commentsForEachDog?: { enabled: boolean };
+  gateLocation?: { enabled: boolean; required: boolean };
+  doggieDoor?: { enabled: boolean; required: boolean };
+  garbageCanLocation?: { enabled: boolean };
+  gatedCommunity?: { enabled: boolean };
+  areasToClean?: { enabled: boolean };
+  cleanupNotifications?: { enabled: boolean; required: boolean };
+  notificationType?: { enabled: boolean; required: boolean };
+  checkPaymentMethod?: { enabled: boolean };
+  howHeardAboutUs?: {
+    enabled: boolean;
+    required: boolean;
+    options: string[];
+  };
+  additionalComments?: { enabled: boolean };
+}
+
+// Default onboarding settings
+const defaultOnboardingSettings: OnboardingSettings = {
+  couponCode: { enabled: true },
+  maxDogs: 5,
+  lastTimeYardWasCleaned: { enabled: true },
+  requestFirstNameBeforeQuote: { enabled: true },
+  requestLastNameBeforeQuote: { enabled: false },
+  homePhoneNumber: { enabled: false },
+  cellPhoneNumber: { enabled: true, required: true },
+  requestCellPhoneBeforeQuote: { enabled: false },
+  requestEmailBeforeQuote: { enabled: false },
+  dogNames: { enabled: true, required: true },
+  isDogSafe: { enabled: true },
+  dogBreeds: { enabled: false },
+  commentsForEachDog: { enabled: false },
+  gateLocation: { enabled: true, required: true },
+  doggieDoor: { enabled: true, required: true },
+  garbageCanLocation: { enabled: false },
+  gatedCommunity: { enabled: false },
+  areasToClean: { enabled: false },
+  cleanupNotifications: { enabled: true, required: true },
+  notificationType: { enabled: true, required: true },
+  checkPaymentMethod: { enabled: false },
+  howHeardAboutUs: {
+    enabled: true,
+    required: true,
+    options: ["SEARCH_ENGINE", "SOCIAL_MEDIA", "REFERRED_BY_FAMILY_OR_FRIEND", "OTHER"],
+  },
+  additionalComments: { enabled: true },
+};
 
 // Default fallback options
 const defaultFormOptions: FormOptions = {
@@ -178,6 +245,17 @@ const defaultFormOptions: FormOptions = {
     { value: "sms", label: "Text Message (SMS)" },
     { value: "call", label: "Phone Call" },
   ],
+  howHeardAboutUs: [
+    { value: "SEARCH_ENGINE", label: "Search Engine (Google, Bing, etc.)" },
+    { value: "SOCIAL_MEDIA", label: "Social Media" },
+    { value: "REFERRED_BY_FAMILY_OR_FRIEND", label: "Referred by Family or Friend" },
+    { value: "PREVIOUS_CLIENT", label: "Previous Client" },
+    { value: "FLIER_FROM_BUSINESS", label: "Flyer from Business" },
+    { value: "VEHICLE_SIGNAGE", label: "Vehicle Signage" },
+    { value: "YARD_SIGN", label: "Yard Sign" },
+    { value: "SALES_REPRESENTATIVE", label: "Sales Representative" },
+    { value: "OTHER", label: "Other" },
+  ],
 };
 
 // Inner form component that uses Stripe hooks
@@ -200,6 +278,7 @@ function QuoteFormInner() {
   const [error, setError] = useState<string | null>(null);
   const [formOptions, setFormOptions] = useState<FormOptions>(defaultFormOptions);
   const [isLoadingOptions, setIsLoadingOptions] = useState(true);
+  const [onboardingSettings, setOnboardingSettings] = useState<OnboardingSettings>(defaultOnboardingSettings);
 
   // Cross-sells state
   const [crossSells, setCrossSells] = useState<CrossSell[]>([]);
@@ -245,6 +324,7 @@ function QuoteFormInner() {
           const gateLocationField = formFields.find((f: { slug: string }) => f.slug === "gate_location");
           const notificationTypeField = formFields.find((f: { slug: string }) => f.slug === "cleanup_notification_type");
           const notificationChannelField = formFields.find((f: { slug: string }) => f.slug === "cleanup_notification_chanel");
+          const howHeardField = formFields.find((f: { slug: string }) => f.slug === "how_heard_about_us");
 
           const parsedOptions: FormOptions = {
             numberOfDogs: parseFieldValues(numberOfDogsField?.value, "dogs") || defaultFormOptions.numberOfDogs,
@@ -253,9 +333,15 @@ function QuoteFormInner() {
             gateLocation: parseFieldValues(gateLocationField?.value, "gateLocation") || defaultFormOptions.gateLocation,
             notificationTypes: parseFieldValues(notificationTypeField?.value, "notificationTypes") || defaultFormOptions.notificationTypes,
             notificationChannels: parseFieldValues(notificationChannelField?.value, "notificationChannels") || defaultFormOptions.notificationChannels,
+            howHeardAboutUs: parseFieldValues(howHeardField?.value, "howHeardAboutUs") || defaultFormOptions.howHeardAboutUs,
           };
 
           setFormOptions(parsedOptions);
+        }
+
+        // Store onboarding settings for conditional rendering
+        if (result.onboardingSettings) {
+          setOnboardingSettings({ ...defaultOnboardingSettings, ...result.onboardingSettings });
         }
       } catch (err) {
         console.error("Error fetching form options:", err);
@@ -345,13 +431,33 @@ function QuoteFormInner() {
       return channelLabels[value] || value.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
     }
 
+    if (fieldType === "howHeardAboutUs") {
+      const howHeardLabels: Record<string, string> = {
+        "SEARCH_ENGINE": "Search Engine (Google, Bing, etc.)",
+        "PREVIOUS_CLIENT": "Previous Client",
+        "REFERRED_BY_FAMILY_OR_FRIEND": "Referred by Family or Friend",
+        "FLIER_FROM_BUSINESS": "Flyer from Business",
+        "DIRECTORY_LISTING": "Directory Listing",
+        "SOCIAL_MEDIA": "Social Media",
+        "VEHICLE_SIGNAGE": "Vehicle Signage",
+        "YARD_SIGN": "Yard Sign",
+        "RADIO_AD": "Radio Ad",
+        "LOCAL_EVENT": "Local Event",
+        "GIFT_CERTIFICATE": "Gift Certificate",
+        "TV_AD": "TV Ad",
+        "SALES_REPRESENTATIVE": "Sales Representative",
+        "OTHER": "Other",
+      };
+      return howHeardLabels[value] || value.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+    }
+
     return value.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
   };
 
   // Service form
   const serviceForm = useForm<ServiceFormData>({
     resolver: zodResolver(serviceSchema),
-    defaultValues: serviceData || {},
+    defaultValues: serviceData || { lastCleaned: "one_week" },
   });
 
   // Contact form
@@ -371,6 +477,16 @@ function QuoteFormInner() {
     resolver: zodResolver(notificationsSchema),
     defaultValues: notificationsData || { notificationTypes: ["completed"], notificationChannel: "email" },
   });
+
+  // Set default values when fields are hidden by admin settings
+  useEffect(() => {
+    if (!isLoadingOptions) {
+      // If lastTimeYardWasCleaned is disabled, set a default value
+      if (onboardingSettings.lastTimeYardWasCleaned?.enabled === false) {
+        serviceForm.setValue("lastCleaned", "one_week");
+      }
+    }
+  }, [isLoadingOptions, onboardingSettings, serviceForm]);
 
   // Scroll to top of form when changing steps
   const scrollToForm = () => {
@@ -943,19 +1059,21 @@ function QuoteFormInner() {
                     </select>
                   </FormField>
 
-                  <FormField label="When was your yard last thoroughly cleaned?" error={serviceForm.formState.errors.lastCleaned?.message}>
-                    <select
-                      {...serviceForm.register("lastCleaned")}
-                      className={cn("form-input", serviceForm.formState.errors.lastCleaned && "border-red-500")}
-                    >
-                      <option value="">Select...</option>
-                      {formOptions.lastCleaned.map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
-                  </FormField>
+                  {onboardingSettings.lastTimeYardWasCleaned?.enabled !== false && (
+                    <FormField label="When was your yard last thoroughly cleaned?" error={serviceForm.formState.errors.lastCleaned?.message}>
+                      <select
+                        {...serviceForm.register("lastCleaned")}
+                        className={cn("form-input", serviceForm.formState.errors.lastCleaned && "border-red-500")}
+                      >
+                        <option value="">Select...</option>
+                        {formOptions.lastCleaned.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                    </FormField>
+                  )}
                 </>
               )}
 
@@ -1228,34 +1346,99 @@ function QuoteFormInner() {
                 </FormField>
               </div>
 
-              {/* Gate Information */}
-              <div className="border-t pt-6 mt-6">
-                <h4 className="text-md font-semibold text-navy-900 mb-4">Gate Access Information</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField label="Where is your gate located?" error={contactForm.formState.errors.gateLocation?.message}>
+              {/* Property Information */}
+              {(onboardingSettings.gateLocation?.enabled !== false ||
+                onboardingSettings.doggieDoor?.enabled ||
+                onboardingSettings.garbageCanLocation?.enabled ||
+                onboardingSettings.gatedCommunity?.enabled) && (
+                <div className="border-t pt-6 mt-6">
+                  <h4 className="text-md font-semibold text-navy-900 mb-4">Property Information</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {onboardingSettings.gateLocation?.enabled !== false && (
+                      <FormField label={`Where is your gate located?${onboardingSettings.gateLocation?.required ? "" : " (optional)"}`} error={contactForm.formState.errors.gateLocation?.message}>
+                        <select
+                          {...contactForm.register("gateLocation")}
+                          className={cn("form-input", contactForm.formState.errors.gateLocation && "border-red-500")}
+                        >
+                          <option value="">Select...</option>
+                          {formOptions.gateLocation.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                      </FormField>
+                    )}
+
+                    {onboardingSettings.gateLocation?.enabled !== false && (
+                      <FormField label="Gate Code (if applicable)">
+                        <input
+                          type="text"
+                          {...contactForm.register("gateCode")}
+                          className="form-input"
+                          placeholder="e.g., #1234 or leave blank"
+                        />
+                      </FormField>
+                    )}
+
+                    {onboardingSettings.doggieDoor?.enabled && (
+                      <FormField label={`Do you have a doggie door?${onboardingSettings.doggieDoor?.required ? "" : " (optional)"}`}>
+                        <select
+                          {...contactForm.register("doggieDoor")}
+                          className="form-input"
+                        >
+                          <option value="">Select...</option>
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                        </select>
+                      </FormField>
+                    )}
+
+                    {onboardingSettings.gatedCommunity?.enabled && (
+                      <FormField label="Is your home in a gated community?">
+                        <select
+                          {...contactForm.register("gatedCommunity")}
+                          className="form-input"
+                        >
+                          <option value="">Select...</option>
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                        </select>
+                      </FormField>
+                    )}
+
+                    {onboardingSettings.garbageCanLocation?.enabled && (
+                      <FormField label="Where should we leave the waste?">
+                        <input
+                          type="text"
+                          {...contactForm.register("garbageCanLocation")}
+                          className="form-input"
+                          placeholder="e.g., Side of house, garbage bin by garage"
+                        />
+                      </FormField>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* How Did You Hear About Us */}
+              {onboardingSettings.howHeardAboutUs?.enabled && (
+                <div className="border-t pt-6 mt-6">
+                  <FormField label={`How did you hear about us?${onboardingSettings.howHeardAboutUs?.required ? "" : " (optional)"}`}>
                     <select
-                      {...contactForm.register("gateLocation")}
-                      className={cn("form-input", contactForm.formState.errors.gateLocation && "border-red-500")}
+                      {...contactForm.register("howHeardAboutUs")}
+                      className="form-input"
                     >
                       <option value="">Select...</option>
-                      {formOptions.gateLocation.map((opt) => (
+                      {formOptions.howHeardAboutUs.map((opt) => (
                         <option key={opt.value} value={opt.value}>
                           {opt.label}
                         </option>
                       ))}
                     </select>
                   </FormField>
-
-                  <FormField label="Gate Code (if applicable)">
-                    <input
-                      type="text"
-                      {...contactForm.register("gateCode")}
-                      className="form-input"
-                      placeholder="e.g., #1234 or leave blank"
-                    />
-                  </FormField>
                 </div>
-              </div>
+              )}
 
               <div className="flex gap-4 pt-4">
                 <button
@@ -1305,54 +1488,62 @@ function QuoteFormInner() {
                 </p>
               </div>
 
-              <FormField label={`Dog ${currentDogIndex + 1} Name`} error={dogForm.formState.errors.name?.message}>
-                <input
-                  type="text"
-                  {...dogForm.register("name")}
-                  className={cn("form-input", dogForm.formState.errors.name && "border-red-500")}
-                  placeholder="e.g., Max, Bella"
-                />
-              </FormField>
+              {onboardingSettings.dogNames?.enabled !== false && (
+                <FormField label={`Dog ${currentDogIndex + 1} Name${onboardingSettings.dogNames?.required ? "" : " (optional)"}`} error={dogForm.formState.errors.name?.message}>
+                  <input
+                    type="text"
+                    {...dogForm.register("name")}
+                    className={cn("form-input", dogForm.formState.errors.name && "border-red-500")}
+                    placeholder="e.g., Max, Bella"
+                  />
+                </FormField>
+              )}
 
-              <FormField label="Breed (optional)">
-                <input
-                  type="text"
-                  {...dogForm.register("breed")}
-                  className="form-input"
-                  placeholder="e.g., Golden Retriever, Mixed"
-                />
-              </FormField>
+              {onboardingSettings.dogBreeds?.enabled && (
+                <FormField label="Breed (optional)">
+                  <input
+                    type="text"
+                    {...dogForm.register("breed")}
+                    className="form-input"
+                    placeholder="e.g., Golden Retriever, Mixed"
+                  />
+                </FormField>
+              )}
 
-              <FormField label="Is this dog safe to be around?" error={dogForm.formState.errors.isSafe?.message}>
-                <div className="flex gap-4">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      {...dogForm.register("isSafe")}
-                      value="yes"
-                      className="w-4 h-4 text-teal-600 focus:ring-teal-500"
-                    />
-                    <span className="text-navy-700">Yes, friendly</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      {...dogForm.register("isSafe")}
-                      value="no"
-                      className="w-4 h-4 text-teal-600 focus:ring-teal-500"
-                    />
-                    <span className="text-navy-700">No, please be cautious</span>
-                  </label>
-                </div>
-              </FormField>
+              {onboardingSettings.isDogSafe?.enabled !== false && (
+                <FormField label="Is this dog safe to be around?" error={dogForm.formState.errors.isSafe?.message}>
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        {...dogForm.register("isSafe")}
+                        value="yes"
+                        className="w-4 h-4 text-teal-600 focus:ring-teal-500"
+                      />
+                      <span className="text-navy-700">Yes, friendly</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        {...dogForm.register("isSafe")}
+                        value="no"
+                        className="w-4 h-4 text-teal-600 focus:ring-teal-500"
+                      />
+                      <span className="text-navy-700">No, please be cautious</span>
+                    </label>
+                  </div>
+                </FormField>
+              )}
 
-              <FormField label="Additional Comments (optional)">
-                <textarea
-                  {...dogForm.register("comments")}
-                  className="form-input min-h-[80px]"
-                  placeholder="Any special notes about this dog..."
-                />
-              </FormField>
+              {onboardingSettings.commentsForEachDog?.enabled && (
+                <FormField label="Additional Comments (optional)">
+                  <textarea
+                    {...dogForm.register("comments")}
+                    className="form-input min-h-[80px]"
+                    placeholder="Any special notes about this dog..."
+                  />
+                </FormField>
+              )}
 
               <div className="flex gap-4 pt-4">
                 <button
@@ -1729,10 +1920,12 @@ function QuoteFormInner() {
                     {contactData.address}, {contactData.city}, CA {zipCode}
                   </p>
                 </div>
-                <div>
-                  <span className="text-navy-700/60">Gate Location:</span>
-                  <p className="font-medium text-navy-900">{getGateLocationLabel(contactData.gateLocation)}</p>
-                </div>
+                {contactData.gateLocation && (
+                  <div>
+                    <span className="text-navy-700/60">Gate Location:</span>
+                    <p className="font-medium text-navy-900">{getGateLocationLabel(contactData.gateLocation)}</p>
+                  </div>
+                )}
                 {contactData.gateCode && (
                   <div>
                     <span className="text-navy-700/60">Gate Code:</span>
