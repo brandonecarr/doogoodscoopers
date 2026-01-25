@@ -53,10 +53,13 @@ const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY 
 // Schema for service details step (includes basic contact for quote notification)
 const serviceSchema = z.object({
   firstName: z.string().min(2, "First name is required"),
+  lastName: z.string().optional(), // Optional, shown when requestLastNameBeforeQuote is enabled
   phone: z.string().min(10, "Please enter a valid phone number"),
+  email: z.string().email("Please enter a valid email").optional().or(z.literal("")), // Optional, shown when requestEmailBeforeQuote is enabled
   numberOfDogs: z.string().min(1, "Please select number of dogs"),
   frequency: z.string().min(1, "Please select a frequency"),
   lastCleaned: z.string(), // Always included, defaults to "one_week" when field is hidden
+  couponCode: z.string().optional(), // Optional coupon code field
 });
 
 // Schema for contact info step (with property info)
@@ -73,6 +76,7 @@ const contactSchema = z.object({
   gatedCommunity: z.string().optional(),
   garbageCanLocation: z.string().optional(),
   howHeardAboutUs: z.string().optional(),
+  additionalComments: z.string().optional(),
 });
 
 // Schema for individual dog info
@@ -290,6 +294,7 @@ function QuoteFormInner() {
   const [isCardComplete, setIsCardComplete] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<"card" | "check">("card");
 
   // Legal modal state
   const [legalModalOpen, setLegalModalOpen] = useState(false);
@@ -687,6 +692,23 @@ function QuoteFormInner() {
 
   // Handle payment form submission
   const handlePaymentSubmit = async () => {
+    if (!termsAccepted) {
+      setError("Please accept the terms of service to continue.");
+      return;
+    }
+
+    // Handle check payment - no card processing needed
+    if (paymentMethod === "check") {
+      setPaymentInfo({
+        token: "CHECK_PAYMENT",
+        nameOnCard: "",
+        expiry: "",
+      });
+      goToStep("review");
+      return;
+    }
+
+    // Handle card payment
     if (!stripe || !elements) {
       setError("Payment system not loaded. Please refresh and try again.");
       return;
@@ -694,11 +716,6 @@ function QuoteFormInner() {
 
     if (!nameOnCard.trim()) {
       setCardError("Please enter the name on your card.");
-      return;
-    }
-
-    if (!termsAccepted) {
-      setError("Please accept the terms of service to continue.");
       return;
     }
 
@@ -797,7 +814,8 @@ function QuoteFormInner() {
           cleanupNotificationType: notificationsData.notificationTypes,
           cleanupNotificationChannel: notificationsData.notificationChannel,
           // Payment fields
-          creditCardToken: paymentInfo.token,
+          paymentMethod: paymentInfo.token === "CHECK_PAYMENT" ? "check" : "card",
+          creditCardToken: paymentInfo.token === "CHECK_PAYMENT" ? null : paymentInfo.token,
           nameOnCard: paymentInfo.nameOnCard,
           expiry: paymentInfo.expiry,
           termsAccepted: true,
@@ -996,27 +1014,53 @@ function QuoteFormInner() {
               </h3>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField label="First Name" error={serviceForm.formState.errors.firstName?.message}>
-                  <input
-                    type="text"
-                    {...serviceForm.register("firstName")}
-                    className={cn("form-input", serviceForm.formState.errors.firstName && "border-red-500")}
-                    placeholder="Your first name"
-                  />
-                </FormField>
+                {onboardingSettings.requestFirstNameBeforeQuote?.enabled !== false && (
+                  <FormField label="First Name" error={serviceForm.formState.errors.firstName?.message}>
+                    <input
+                      type="text"
+                      {...serviceForm.register("firstName")}
+                      className={cn("form-input", serviceForm.formState.errors.firstName && "border-red-500")}
+                      placeholder="Your first name"
+                    />
+                  </FormField>
+                )}
 
-                <FormField label="Cell Phone" error={serviceForm.formState.errors.phone?.message}>
-                  <input
-                    type="tel"
-                    {...serviceForm.register("phone")}
-                    onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                      const formatted = formatPhoneNumber(e.target.value);
-                      serviceForm.setValue("phone", formatted);
-                    }}
-                    className={cn("form-input", serviceForm.formState.errors.phone && "border-red-500")}
-                    placeholder="(555) 555-5555"
-                  />
-                </FormField>
+                {onboardingSettings.requestLastNameBeforeQuote?.enabled && (
+                  <FormField label="Last Name" error={serviceForm.formState.errors.lastName?.message}>
+                    <input
+                      type="text"
+                      {...serviceForm.register("lastName")}
+                      className={cn("form-input", serviceForm.formState.errors.lastName && "border-red-500")}
+                      placeholder="Your last name"
+                    />
+                  </FormField>
+                )}
+
+                {onboardingSettings.requestCellPhoneBeforeQuote?.enabled !== false && (
+                  <FormField label="Cell Phone" error={serviceForm.formState.errors.phone?.message}>
+                    <input
+                      type="tel"
+                      {...serviceForm.register("phone")}
+                      onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                        const formatted = formatPhoneNumber(e.target.value);
+                        serviceForm.setValue("phone", formatted);
+                      }}
+                      className={cn("form-input", serviceForm.formState.errors.phone && "border-red-500")}
+                      placeholder="(555) 555-5555"
+                    />
+                  </FormField>
+                )}
+
+                {onboardingSettings.requestEmailBeforeQuote?.enabled && (
+                  <FormField label="Email" error={serviceForm.formState.errors.email?.message}>
+                    <input
+                      type="email"
+                      {...serviceForm.register("email")}
+                      className={cn("form-input", serviceForm.formState.errors.email && "border-red-500")}
+                      placeholder="your@email.com"
+                    />
+                  </FormField>
+                )}
               </div>
 
               <h4 className="text-md font-semibold text-navy-900 flex items-center gap-2 pt-2">
@@ -1072,6 +1116,17 @@ function QuoteFormInner() {
                           </option>
                         ))}
                       </select>
+                    </FormField>
+                  )}
+
+                  {onboardingSettings.couponCode?.enabled && (
+                    <FormField label="Coupon Code (optional)">
+                      <input
+                        type="text"
+                        {...serviceForm.register("couponCode")}
+                        className="form-input"
+                        placeholder="Enter coupon code if you have one"
+                      />
                     </FormField>
                   )}
                 </>
@@ -1246,7 +1301,13 @@ function QuoteFormInner() {
                   // Pre-populate contact form with data from service step
                   if (serviceData) {
                     contactForm.setValue("firstName", serviceData.firstName || "");
+                    if (serviceData.lastName) {
+                      contactForm.setValue("lastName", serviceData.lastName);
+                    }
                     contactForm.setValue("phone", serviceData.phone || "");
+                    if (serviceData.email) {
+                      contactForm.setValue("email", serviceData.email);
+                    }
                   }
                   goToStep("contact");
                 }}
@@ -1436,6 +1497,19 @@ function QuoteFormInner() {
                         </option>
                       ))}
                     </select>
+                  </FormField>
+                </div>
+              )}
+
+              {/* Additional Comments */}
+              {onboardingSettings.additionalComments?.enabled && (
+                <div className="border-t pt-6 mt-6">
+                  <FormField label="Additional Comments (optional)">
+                    <textarea
+                      {...contactForm.register("additionalComments")}
+                      className="form-input min-h-[100px]"
+                      placeholder="Any additional notes or special instructions for our team..."
+                    />
                   </FormField>
                 </div>
               )}
@@ -1683,6 +1757,57 @@ function QuoteFormInner() {
               Payment Information
             </h3>
 
+            {/* Payment Method Selection */}
+            {onboardingSettings.checkPaymentMethod?.enabled && (
+              <div className="space-y-3">
+                <label className="block text-sm font-medium text-navy-900">Payment Method</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <label
+                    className={cn(
+                      "flex items-center gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all",
+                      paymentMethod === "card"
+                        ? "border-teal-500 bg-teal-50"
+                        : "border-gray-200 hover:border-gray-300"
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="paymentMethod"
+                      value="card"
+                      checked={paymentMethod === "card"}
+                      onChange={() => setPaymentMethod("card")}
+                      className="h-4 w-4 text-teal-600 focus:ring-teal-500"
+                    />
+                    <div>
+                      <span className="font-medium text-navy-900">Credit/Debit Card</span>
+                      <p className="text-xs text-navy-700/60">Automatic payments</p>
+                    </div>
+                  </label>
+                  <label
+                    className={cn(
+                      "flex items-center gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all",
+                      paymentMethod === "check"
+                        ? "border-teal-500 bg-teal-50"
+                        : "border-gray-200 hover:border-gray-300"
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="paymentMethod"
+                      value="check"
+                      checked={paymentMethod === "check"}
+                      onChange={() => setPaymentMethod("check")}
+                      className="h-4 w-4 text-teal-600 focus:ring-teal-500"
+                    />
+                    <div>
+                      <span className="font-medium text-navy-900">Pay by Check</span>
+                      <p className="text-xs text-navy-700/60">Mail or leave checks</p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+            )}
+
             {pricing && !pricing.priceNotConfigured && (
               <div className="bg-teal-50 rounded-lg p-4 border border-teal-200">
                 <div className="flex justify-between items-center">
@@ -1746,41 +1871,59 @@ function QuoteFormInner() {
               </div>
             )}
 
-            <FormField label="Name on Card">
-              <input
-                type="text"
-                value={nameOnCard}
-                onChange={(e) => setNameOnCard(e.target.value)}
-                placeholder="John Doe"
-                className="form-input"
-                disabled={isProcessingPayment}
-              />
-            </FormField>
-
-            <div>
-              <label className="block text-sm font-medium text-navy-900 mb-1.5">
-                Card Details
-              </label>
-              <div className="relative">
-                <CreditCard className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-navy-400 pointer-events-none" />
-                <div className="w-full pl-12 pr-4 py-3.5 rounded-lg border border-gray-200 focus-within:border-teal-400 focus-within:ring-2 focus-within:ring-teal-100 transition-all bg-white">
-                  <CardElement
-                    options={cardElementOptions}
-                    onChange={(e) => {
-                      setIsCardComplete(e.complete);
-                      if (e.error) {
-                        setCardError(e.error.message);
-                      } else {
-                        setCardError(null);
-                      }
-                    }}
+            {/* Card Payment Fields */}
+            {paymentMethod === "card" && (
+              <>
+                <FormField label="Name on Card">
+                  <input
+                    type="text"
+                    value={nameOnCard}
+                    onChange={(e) => setNameOnCard(e.target.value)}
+                    placeholder="John Doe"
+                    className="form-input"
+                    disabled={isProcessingPayment}
                   />
+                </FormField>
+
+                <div>
+                  <label className="block text-sm font-medium text-navy-900 mb-1.5">
+                    Card Details
+                  </label>
+                  <div className="relative">
+                    <CreditCard className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-navy-400 pointer-events-none" />
+                    <div className="w-full pl-12 pr-4 py-3.5 rounded-lg border border-gray-200 focus-within:border-teal-400 focus-within:ring-2 focus-within:ring-teal-100 transition-all bg-white">
+                      <CardElement
+                        options={cardElementOptions}
+                        onChange={(e) => {
+                          setIsCardComplete(e.complete);
+                          if (e.error) {
+                            setCardError(e.error.message);
+                          } else {
+                            setCardError(null);
+                          }
+                        }}
+                      />
+                    </div>
+                  </div>
+                  {cardError && (
+                    <p className="mt-1 text-sm text-red-500">{cardError}</p>
+                  )}
                 </div>
+              </>
+            )}
+
+            {/* Check Payment Info */}
+            {paymentMethod === "check" && (
+              <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                <h4 className="font-medium text-blue-900 mb-2">Pay by Check</h4>
+                <p className="text-sm text-blue-700 mb-2">
+                  You can pay by check after each service visit. Simply mail your check or leave it for our technician during their next visit.
+                </p>
+                <p className="text-sm text-blue-700">
+                  Make checks payable to: <strong>DooGoodScoopers</strong>
+                </p>
               </div>
-              {cardError && (
-                <p className="mt-1 text-sm text-red-500">{cardError}</p>
-              )}
-            </div>
+            )}
 
             <div className="flex items-start gap-3 pt-2">
               <input
@@ -1813,7 +1956,9 @@ function QuoteFormInner() {
                 >
                   Privacy Policy
                 </button>
-                . I authorize DooGoodScoopers to charge my card for the services described above.
+                {paymentMethod === "card"
+                  ? ". I authorize DooGoodScoopers to charge my card for the services described above."
+                  : ". I understand that payment is due after each service."}
               </label>
             </div>
 
@@ -1835,9 +1980,13 @@ function QuoteFormInner() {
               </button>
               <motion.button
                 onClick={handlePaymentSubmit}
-                disabled={!isCardComplete || !stripe || isProcessingPayment}
-                whileHover={{ scale: (!isCardComplete || isProcessingPayment) ? 1 : 1.02 }}
-                whileTap={{ scale: (!isCardComplete || isProcessingPayment) ? 1 : 0.98 }}
+                disabled={
+                  (paymentMethod === "card" && (!isCardComplete || !stripe)) ||
+                  !termsAccepted ||
+                  isProcessingPayment
+                }
+                whileHover={{ scale: (paymentMethod === "card" && !isCardComplete) || isProcessingPayment ? 1 : 1.02 }}
+                whileTap={{ scale: (paymentMethod === "card" && !isCardComplete) || isProcessingPayment ? 1 : 0.98 }}
                 className="flex-1 btn-primary py-3 disabled:opacity-70"
               >
                 {isProcessingPayment ? (
@@ -1986,11 +2135,19 @@ function QuoteFormInner() {
                 Payment Method
               </h4>
               <div className="text-sm">
-                <div className="flex items-center gap-2">
-                  <Lock className="w-4 h-4 text-green-500" />
-                  <span className="text-navy-700">Card ending in ****</span>
-                  <span className="text-navy-700/60">(Name: {paymentInfo.nameOnCard})</span>
-                </div>
+                {paymentInfo.token === "CHECK_PAYMENT" ? (
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-blue-500" />
+                    <span className="text-navy-700">Pay by Check</span>
+                    <span className="text-navy-700/60">(Payment due after each service)</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Lock className="w-4 h-4 text-green-500" />
+                    <span className="text-navy-700">Card ending in ****</span>
+                    <span className="text-navy-700/60">(Name: {paymentInfo.nameOnCard})</span>
+                  </div>
+                )}
               </div>
             </div>
 
