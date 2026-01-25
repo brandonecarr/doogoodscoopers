@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
  * POST /api/admin/onboarding-settings
  * Update onboarding settings for the organization
  *
- * Body: { onboarding?: OnboardingSettings, calloutDisclaimers?: CalloutDisclaimersSettings, thankYouPages?: ThankYouPageSettings }
+ * Body: { onboarding?: OnboardingSettings, calloutDisclaimers?: CalloutDisclaimersSettings, thankYouPages?: ThankYouPageSettings, emailSettings?: EmailSettings }
  */
 export async function POST(request: NextRequest) {
   const auth = await authenticateWithPermission(request, "settings:write");
@@ -67,10 +67,10 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { onboarding, calloutDisclaimers, thankYouPages } = body;
+    const { onboarding, calloutDisclaimers, thankYouPages, emailSettings } = body;
 
     // At least one settings type must be provided
-    if (!onboarding && !calloutDisclaimers && !thankYouPages) {
+    if (!onboarding && !calloutDisclaimers && !thankYouPages && !emailSettings) {
       return NextResponse.json(
         { error: "Missing settings data" },
         { status: 400 }
@@ -108,6 +108,10 @@ export async function POST(request: NextRequest) {
 
     if (thankYouPages) {
       updatedSettings.thankYouPages = thankYouPages;
+    }
+
+    if (emailSettings) {
+      updatedSettings.emailSettings = emailSettings;
     }
 
     // Update organization settings
