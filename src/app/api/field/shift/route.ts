@@ -117,8 +117,8 @@ export async function GET(request: NextRequest) {
           id: shift.id,
           status: shift.status,
           shiftDate: shift.shift_date,
-          clockIn: shift.clock_in,
-          clockOut: shift.clock_out,
+          clockInTime: shift.clock_in,
+          clockOutTime: shift.clock_out,
           vehicleType: shift.vehicle_type,
           startOdometer: shift.start_odometer,
           endOdometer: shift.end_odometer,
@@ -228,7 +228,7 @@ export async function POST(request: NextRequest) {
           shift: {
             id: newShift.id,
             status: newShift.status,
-            clockIn: newShift.clock_in,
+            clockInTime: newShift.clock_in,
             vehicleType: newShift.vehicle_type,
             startOdometer: newShift.start_odometer,
           },
@@ -287,7 +287,7 @@ export async function POST(request: NextRequest) {
           shift: {
             id: updatedShift.id,
             status: updatedShift.status,
-            clockOut: updatedShift.clock_out,
+            clockOutTime: updatedShift.clock_out,
             endOdometer: updatedShift.end_odometer,
           },
         });
