@@ -2,6 +2,9 @@ import { TermsOfServiceContent } from "./TermsOfServiceContent";
 import { Metadata } from "next";
 import { getLegalDocumentSettings } from "@/lib/public-settings";
 
+// Disable caching to always fetch fresh settings
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Terms of Service | DooGoodScoopers",
   description:
