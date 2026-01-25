@@ -16,10 +16,20 @@ interface PricingData {
 
 type ZoneType = "REGULAR" | "PREMIUM";
 
+// Helper to create default prices for a given max dogs
+function createDefaultPrices(maxDogs: number): PriceMatrix {
+  const prices: PriceMatrix = {};
+  for (let i = 1; i <= maxDogs; i++) {
+    prices[i] = 0;
+  }
+  return prices;
+}
+
 export default function InitialPrices() {
+  const [maxDogs, setMaxDogs] = useState(4);
   const [pricing, setPricing] = useState<PricingData>({
-    regular: { 1: 0, 2: 0, 3: 0, 4: 0 },
-    premium: { 1: 0, 2: 0, 3: 0, 4: 0 },
+    regular: createDefaultPrices(4),
+    premium: createDefaultPrices(4),
     ruleIds: {},
   });
   const [loading, setLoading] = useState(true);
@@ -33,15 +43,30 @@ export default function InitialPrices() {
   const fetchPricing = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch("/api/admin/pricing-rules");
-      if (!response.ok) {
+
+      // Fetch both pricing rules and onboarding settings in parallel
+      const [pricingResponse, settingsResponse] = await Promise.all([
+        fetch("/api/admin/pricing-rules"),
+        fetch("/api/admin/onboarding-settings"),
+      ]);
+
+      if (!pricingResponse.ok) {
         throw new Error("Failed to fetch pricing rules");
       }
-      const data = await response.json();
-      const rules = data.rules || [];
 
-      const regular: PriceMatrix = { 1: 0, 2: 0, 3: 0, 4: 0 };
-      const premium: PriceMatrix = { 1: 0, 2: 0, 3: 0, 4: 0 };
+      const pricingData = await pricingResponse.json();
+      const rules = pricingData.rules || [];
+
+      // Parse onboarding settings for max dogs
+      let settingsMaxDogs = 4;
+      if (settingsResponse.ok) {
+        const settingsData = await settingsResponse.json();
+        settingsMaxDogs = settingsData.settings?.onboarding?.maxDogs || 4;
+      }
+      setMaxDogs(settingsMaxDogs);
+
+      const regular: PriceMatrix = createDefaultPrices(settingsMaxDogs);
+      const premium: PriceMatrix = createDefaultPrices(settingsMaxDogs);
       const ruleIds: { [key: string]: string } = {};
 
       for (const rule of rules) {
@@ -53,7 +78,7 @@ export default function InitialPrices() {
         const priceCents = rule.base_price_cents || 0;
 
         const matrix = zone === "PREMIUM" ? premium : regular;
-        if (dogCount >= 1 && dogCount <= 4) {
+        if (dogCount >= 1 && dogCount <= settingsMaxDogs) {
           matrix[dogCount] = priceCents;
           ruleIds[`${zone}_ONETIME_${dogCount}`] = rule.id;
         }
@@ -84,13 +109,15 @@ export default function InitialPrices() {
     if (!editModal) return;
 
     try {
-      for (const [dogCountStr, priceCents] of Object.entries(prices)) {
+      const savePromises = Object.entries(prices).map(async ([dogCountStr, priceCents]) => {
         const dogCount = parseInt(dogCountStr);
         const ruleKey = `${editModal.zone}_ONETIME_${dogCount}`;
         const existingId = pricing.ruleIds[ruleKey];
 
+        let response: Response;
+
         if (existingId) {
-          await fetch("/api/admin/pricing-rules", {
+          response = await fetch("/api/admin/pricing-rules", {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -99,7 +126,7 @@ export default function InitialPrices() {
             }),
           });
         } else {
-          await fetch("/api/admin/pricing-rules", {
+          response = await fetch("/api/admin/pricing-rules", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -113,19 +140,34 @@ export default function InitialPrices() {
             }),
           });
         }
-      }
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          console.error(`Failed to save price for ${dogCount} dog(s):`, errorData);
+          throw new Error(errorData.error || `Failed to save price for ${dogCount} dog(s)`);
+        }
+
+        return response.json();
+      });
+
+      // Wait for all saves to complete
+      await Promise.all(savePromises);
 
       await fetchPricing();
       setEditModal(null);
     } catch (err) {
       console.error("Error saving prices:", err);
-      setError("Failed to save prices");
+      // Re-throw so modal can display the error
+      throw err;
     }
   };
 
   const formatPrice = (cents: number) => {
     return `$${(cents / 100).toFixed(2)}`;
   };
+
+  // Generate array of dog counts from 1 to maxDogs
+  const dogCounts = Array.from({ length: maxDogs }, (_, i) => i + 1);
 
   if (loading) {
     return (
@@ -158,19 +200,21 @@ export default function InitialPrices() {
           <table className="min-w-full">
             <thead>
               <tr className="border-b border-gray-200">
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">1 dog</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">2 dogs</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">3 dogs</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">4 dogs</th>
+                {dogCounts.map((count) => (
+                  <th key={count} className="text-left py-3 px-4 text-sm font-medium text-gray-500">
+                    {count} dog{count > 1 ? "s" : ""}
+                  </th>
+                ))}
                 <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Actions</th>
               </tr>
             </thead>
             <tbody>
               <tr className="border-b border-gray-100 hover:bg-gray-50">
-                <td className="py-3 px-4 text-sm text-gray-900">{formatPrice(pricing.regular[1] || 0)}</td>
-                <td className="py-3 px-4 text-sm text-gray-900">{formatPrice(pricing.regular[2] || 0)}</td>
-                <td className="py-3 px-4 text-sm text-gray-900">{formatPrice(pricing.regular[3] || 0)}</td>
-                <td className="py-3 px-4 text-sm text-gray-900">{formatPrice(pricing.regular[4] || 0)}</td>
+                {dogCounts.map((count) => (
+                  <td key={count} className="py-3 px-4 text-sm text-gray-900">
+                    {formatPrice(pricing.regular[count] || 0)}
+                  </td>
+                ))}
                 <td className="py-3 px-4">
                   <button
                     onClick={() => handleEdit("REGULAR")}
@@ -199,19 +243,21 @@ export default function InitialPrices() {
           <table className="min-w-full">
             <thead>
               <tr className="border-b border-gray-200">
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">1 dog</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">2 dogs</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">3 dogs</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">4 dogs</th>
+                {dogCounts.map((count) => (
+                  <th key={count} className="text-left py-3 px-4 text-sm font-medium text-gray-500">
+                    {count} dog{count > 1 ? "s" : ""}
+                  </th>
+                ))}
                 <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Actions</th>
               </tr>
             </thead>
             <tbody>
               <tr className="border-b border-gray-100 hover:bg-gray-50">
-                <td className="py-3 px-4 text-sm text-gray-900">{formatPrice(pricing.premium[1] || 0)}</td>
-                <td className="py-3 px-4 text-sm text-gray-900">{formatPrice(pricing.premium[2] || 0)}</td>
-                <td className="py-3 px-4 text-sm text-gray-900">{formatPrice(pricing.premium[3] || 0)}</td>
-                <td className="py-3 px-4 text-sm text-gray-900">{formatPrice(pricing.premium[4] || 0)}</td>
+                {dogCounts.map((count) => (
+                  <td key={count} className="py-3 px-4 text-sm text-gray-900">
+                    {formatPrice(pricing.premium[count] || 0)}
+                  </td>
+                ))}
                 <td className="py-3 px-4">
                   <button
                     onClick={() => handleEdit("PREMIUM")}
@@ -237,6 +283,7 @@ export default function InitialPrices() {
           frequency="ONETIME"
           frequencyLabel="Initial/One-Time"
           initialPrices={editModal.prices}
+          maxDogs={maxDogs}
         />
       )}
     </div>

@@ -38,15 +38,27 @@ interface PricingData {
   ruleIds: { [key: string]: string }; // Map of "zone_frequency_dogs" to rule ID
 }
 
+// Helper to create default prices for a given max dogs
+function createDefaultPrices(maxDogs: number): { [dogCount: number]: number } {
+  const prices: { [dogCount: number]: number } = {};
+  for (let i = 1; i <= maxDogs; i++) {
+    prices[i] = 0;
+  }
+  return prices;
+}
+
 // Build default price matrix from all frequencies
-const defaultPriceMatrix: PriceMatrix = Object.fromEntries(
-  allFrequencies.map((f) => [f.key, { 1: 0, 2: 0, 3: 0, 4: 0 }])
-);
+function buildDefaultPriceMatrix(maxDogs: number): PriceMatrix {
+  return Object.fromEntries(
+    allFrequencies.map((f) => [f.key, createDefaultPrices(maxDogs)])
+  );
+}
 
 export default function RegularPremiumPrices() {
+  const [maxDogs, setMaxDogs] = useState(4);
   const [pricing, setPricing] = useState<PricingData>({
-    regular: { ...defaultPriceMatrix },
-    premium: { ...defaultPriceMatrix },
+    regular: buildDefaultPriceMatrix(4),
+    premium: buildDefaultPriceMatrix(4),
     ruleIds: {},
   });
   const [enabledFrequencies, setEnabledFrequencies] = useState<string[]>([]);
@@ -76,21 +88,24 @@ export default function RegularPremiumPrices() {
       const pricingData = await pricingResponse.json();
       const rules = pricingData.rules || [];
 
-      // Parse onboarding settings for enabled frequencies
+      // Parse onboarding settings for enabled frequencies and max dogs
       let cleanupFrequencies: string[] = [];
+      let settingsMaxDogs = 4;
       if (settingsResponse.ok) {
         const settingsData = await settingsResponse.json();
         cleanupFrequencies = settingsData.settings?.onboarding?.cleanupFrequencies || [];
+        settingsMaxDogs = settingsData.settings?.onboarding?.maxDogs || 4;
       }
       setEnabledFrequencies(cleanupFrequencies);
+      setMaxDogs(settingsMaxDogs);
 
       // Organize rules into price matrices - dynamically create from all frequencies
       const frequencyKeys = allFrequencies.map((f) => f.key);
       const regular: PriceMatrix = Object.fromEntries(
-        frequencyKeys.map((k) => [k, { 1: 0, 2: 0, 3: 0, 4: 0 }])
+        frequencyKeys.map((k) => [k, createDefaultPrices(settingsMaxDogs)])
       );
       const premium: PriceMatrix = Object.fromEntries(
-        frequencyKeys.map((k) => [k, { 1: 0, 2: 0, 3: 0, 4: 0 }])
+        frequencyKeys.map((k) => [k, createDefaultPrices(settingsMaxDogs)])
       );
       const ruleIds: { [key: string]: string } = {};
 
@@ -106,7 +121,7 @@ export default function RegularPremiumPrices() {
         }
 
         const matrix = zone === "PREMIUM" ? premium : regular;
-        if (matrix[frequency] && dogCount >= 1 && dogCount <= 4) {
+        if (matrix[frequency] && dogCount >= 1 && dogCount <= settingsMaxDogs) {
           matrix[frequency][dogCount] = priceCents;
           ruleIds[`${zone}_${frequency}_${dogCount}`] = rule.id;
         }
@@ -144,14 +159,16 @@ export default function RegularPremiumPrices() {
 
     try {
       // Save each dog count as a separate rule
-      for (const [dogCountStr, priceCents] of Object.entries(prices)) {
+      const savePromises = Object.entries(prices).map(async ([dogCountStr, priceCents]) => {
         const dogCount = parseInt(dogCountStr);
         const ruleKey = `${editModal.zone}_${editModal.frequency}_${dogCount}`;
         const existingId = pricing.ruleIds[ruleKey];
 
+        let response: Response;
+
         if (existingId) {
           // Update existing rule
-          await fetch("/api/admin/pricing-rules", {
+          response = await fetch("/api/admin/pricing-rules", {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -161,7 +178,7 @@ export default function RegularPremiumPrices() {
           });
         } else {
           // Create new rule
-          await fetch("/api/admin/pricing-rules", {
+          response = await fetch("/api/admin/pricing-rules", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -175,14 +192,26 @@ export default function RegularPremiumPrices() {
             }),
           });
         }
-      }
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          console.error(`Failed to save price for ${dogCount} dog(s):`, errorData);
+          throw new Error(errorData.error || `Failed to save price for ${dogCount} dog(s)`);
+        }
+
+        return response.json();
+      });
+
+      // Wait for all saves to complete
+      await Promise.all(savePromises);
 
       // Refresh data
       await fetchData();
       setEditModal(null);
     } catch (err) {
       console.error("Error saving prices:", err);
-      setError("Failed to save prices");
+      // Re-throw so modal can display the error
+      throw err;
     }
   };
 
@@ -227,9 +256,9 @@ export default function RegularPremiumPrices() {
         matrix={pricing.regular}
         zone="REGULAR"
         frequencies={activeFrequencies}
+        maxDogs={maxDogs}
         onEdit={handleEdit}
         formatPrice={formatPrice}
-        getFrequencyLabel={getFrequencyLabel}
       />
 
       {/* Manage frequencies link */}
@@ -249,9 +278,9 @@ export default function RegularPremiumPrices() {
         matrix={pricing.premium}
         zone="PREMIUM"
         frequencies={activeFrequencies}
+        maxDogs={maxDogs}
         onEdit={handleEdit}
         formatPrice={formatPrice}
-        getFrequencyLabel={getFrequencyLabel}
       />
 
       {/* Edit Modal */}
@@ -264,6 +293,7 @@ export default function RegularPremiumPrices() {
           frequency={editModal.frequency}
           frequencyLabel={getFrequencyLabel(editModal.frequency)}
           initialPrices={editModal.prices}
+          maxDogs={maxDogs}
         />
       )}
     </div>
@@ -282,9 +312,9 @@ interface PricingTableProps {
   matrix: PriceMatrix;
   zone: ZoneType;
   frequencies: readonly FrequencyItem[];
+  maxDogs: number;
   onEdit: (zone: ZoneType, frequency: FrequencyKey) => void;
   formatPrice: (cents: number) => string;
-  getFrequencyLabel: (key: FrequencyKey) => string;
 }
 
 function PricingTable({
@@ -293,9 +323,13 @@ function PricingTable({
   matrix,
   zone,
   frequencies,
+  maxDogs,
   onEdit,
   formatPrice,
 }: PricingTableProps) {
+  // Generate array of dog counts from 1 to maxDogs
+  const dogCounts = Array.from({ length: maxDogs }, (_, i) => i + 1);
+
   if (frequencies.length === 0) {
     return (
       <section>
@@ -320,10 +354,11 @@ function PricingTable({
           <thead>
             <tr className="border-b border-gray-200">
               <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 w-48"></th>
-              <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">1 dog</th>
-              <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">2 dogs</th>
-              <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">3 dogs</th>
-              <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">4 dogs</th>
+              {dogCounts.map((count) => (
+                <th key={count} className="text-left py-3 px-4 text-sm font-medium text-gray-500">
+                  {count} dog{count > 1 ? "s" : ""}
+                </th>
+              ))}
               <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Actions</th>
             </tr>
           </thead>
@@ -331,10 +366,11 @@ function PricingTable({
             {frequencies.map((freq) => (
               <tr key={freq.key} className="border-b border-gray-100 hover:bg-gray-50">
                 <td className="py-3 px-4 text-sm text-gray-900">{freq.label}</td>
-                <td className="py-3 px-4 text-sm text-gray-900">{formatPrice(matrix[freq.key]?.[1] || 0)}</td>
-                <td className="py-3 px-4 text-sm text-gray-900">{formatPrice(matrix[freq.key]?.[2] || 0)}</td>
-                <td className="py-3 px-4 text-sm text-gray-900">{formatPrice(matrix[freq.key]?.[3] || 0)}</td>
-                <td className="py-3 px-4 text-sm text-gray-900">{formatPrice(matrix[freq.key]?.[4] || 0)}</td>
+                {dogCounts.map((count) => (
+                  <td key={count} className="py-3 px-4 text-sm text-gray-900">
+                    {formatPrice(matrix[freq.key]?.[count] || 0)}
+                  </td>
+                ))}
                 <td className="py-3 px-4">
                   <button
                     onClick={() => onEdit(zone, freq.key)}

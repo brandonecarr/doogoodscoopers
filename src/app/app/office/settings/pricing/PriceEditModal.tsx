@@ -6,11 +6,12 @@ import { X } from "lucide-react";
 interface PriceEditModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (prices: { [dogCount: number]: number }) => void;
+  onSave: (prices: { [dogCount: number]: number }) => Promise<void>;
   zone: "REGULAR" | "PREMIUM";
   frequency: string;
   frequencyLabel: string;
   initialPrices: { [dogCount: number]: number };
+  maxDogs: number;
 }
 
 type ChangeType = "amount" | "percentage";
@@ -23,18 +24,21 @@ export default function PriceEditModal({
   zone,
   frequencyLabel,
   initialPrices,
+  maxDogs,
 }: PriceEditModalProps) {
   const [prices, setPrices] = useState<{ [dogCount: number]: number }>(initialPrices);
   const [bulkChangeType, setBulkChangeType] = useState<ChangeType>("amount");
   const [bulkDirection, setBulkDirection] = useState<ChangeDirection>("increase");
   const [bulkValue, setBulkValue] = useState<string>("");
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Reset prices when modal opens with new initial values
   useEffect(() => {
     if (isOpen) {
       setPrices(initialPrices);
       setBulkValue("");
+      setSaveError(null);
     }
   }, [isOpen, initialPrices]);
 
@@ -78,8 +82,11 @@ export default function PriceEditModal({
 
   const handleSave = async () => {
     setSaving(true);
+    setSaveError(null);
     try {
       await onSave(prices);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Failed to save prices");
     } finally {
       setSaving(false);
     }
@@ -167,8 +174,8 @@ export default function PriceEditModal({
           </div>
 
           {/* Individual Prices */}
-          <div className="space-y-3">
-            {[1, 2, 3, 4].map((dogCount) => (
+          <div className="space-y-3 max-h-64 overflow-y-auto">
+            {Array.from({ length: maxDogs }, (_, i) => i + 1).map((dogCount) => (
               <div key={dogCount} className="flex items-center gap-4">
                 <label className="w-20 text-sm text-gray-700">
                   {dogCount} dog{dogCount > 1 ? "s" : ""}
@@ -188,6 +195,13 @@ export default function PriceEditModal({
             ))}
           </div>
         </div>
+
+        {/* Error Display */}
+        {saveError && (
+          <div className="mx-6 mb-4 p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">
+            {saveError}
+          </div>
+        )}
 
         {/* Footer */}
         <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-xl">
