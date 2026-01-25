@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate frequency
-    const validFrequencies = ["WEEKLY", "BIWEEKLY", "MONTHLY", "ONETIME"];
+    const validFrequencies = ["TWICE_WEEKLY", "WEEKLY", "BIWEEKLY", "MONTHLY", "ONETIME"];
     if (!validFrequencies.includes(body.frequency)) {
       return NextResponse.json(
         { error: "Invalid frequency" },
@@ -178,7 +178,7 @@ export async function PUT(request: NextRequest) {
     if (body.name !== undefined) updates.name = body.name;
     if (body.description !== undefined) updates.description = body.description;
     if (body.frequency !== undefined) {
-      const validFrequencies = ["WEEKLY", "BIWEEKLY", "MONTHLY", "ONETIME"];
+      const validFrequencies = ["TWICE_WEEKLY", "WEEKLY", "BIWEEKLY", "MONTHLY", "ONETIME"];
       if (!validFrequencies.includes(body.frequency)) {
         return NextResponse.json(
           { error: "Invalid frequency" },
