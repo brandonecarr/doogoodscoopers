@@ -54,14 +54,16 @@ export async function GET(request: NextRequest) {
         referrer_client_id,
         referrer_name,
         referrer_email,
+        referrer_phone,
         referee_name,
         referee_email,
         referee_phone,
         referral_code,
         status,
         converted_client_id,
-        converted_at,
-        created_at
+        notes,
+        created_at,
+        updated_at
       `)
       .eq("org_id", auth.user.orgId)
       .order("created_at", { ascending: false });
@@ -127,8 +129,10 @@ export async function GET(request: NextRequest) {
     // Calculate stats
     const stats = {
       total: referrals?.length || 0,
-      converted: referrals?.filter(r => r.status === "CONVERTED" || r.status === "REWARDED").length || 0,
+      signedUp: referrals?.filter(r => r.status === "SIGNED_UP").length || 0,
+      rewarded: referrals?.filter(r => r.status === "REWARDED").length || 0,
       pending: referrals?.filter(r => r.status === "NEW" || r.status === "INVITED").length || 0,
+      closed: referrals?.filter(r => r.status === "CLOSED").length || 0,
       totalRewardsIssued: Object.values(rewardsByReferral).reduce(
         (sum, r) => sum + r.referrer + r.referee, 0
       ),
@@ -147,15 +151,17 @@ export async function GET(request: NextRequest) {
         referrerClientId: r.referrer_client_id,
         referrerName: r.referrer_name || clientNames[r.referrer_client_id] || "Unknown",
         referrerEmail: r.referrer_email,
+        referrerPhone: r.referrer_phone,
         refereeName: r.referee_name,
         refereeEmail: r.referee_email,
         refereePhone: r.referee_phone,
         referralCode: r.referral_code,
         status: r.status,
         convertedClientId: r.converted_client_id,
-        convertedAt: r.converted_at,
+        notes: r.notes,
         rewards: rewardsByReferral[r.id] || { referrer: 0, referee: 0 },
         createdAt: r.created_at,
+        updatedAt: r.updated_at,
       })),
       stats: {
         ...stats,

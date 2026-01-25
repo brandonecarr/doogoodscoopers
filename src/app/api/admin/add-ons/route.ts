@@ -62,7 +62,22 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  return NextResponse.json({ addOns });
+  // Transform to camelCase for frontend
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const formattedAddOns = (addOns || []).map((addOn: any) => ({
+    id: addOn.id,
+    name: addOn.name,
+    description: addOn.description,
+    priceCents: addOn.price_cents,
+    priceType: addOn.price_type,
+    isRecurring: addOn.is_recurring,
+    isActive: addOn.is_active,
+    sortOrder: addOn.sort_order,
+    createdAt: addOn.created_at,
+    updatedAt: addOn.updated_at,
+  }));
+
+  return NextResponse.json({ addOns: formattedAddOns });
 }
 
 /**
@@ -78,20 +93,27 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
+    // Accept both camelCase and snake_case
+    const priceCents = body.priceCents ?? body.price_cents;
+    const priceType = body.priceType ?? body.price_type;
+    const isRecurring = body.isRecurring ?? body.is_recurring;
+    const isActive = body.isActive ?? body.is_active;
+    const sortOrderInput = body.sortOrder ?? body.sort_order;
+
     // Validate required fields
-    if (!body.name || body.price_cents === undefined) {
+    if (!body.name || priceCents === undefined) {
       return NextResponse.json(
-        { error: "Name and price_cents are required" },
+        { error: "Name and priceCents are required" },
         { status: 400 }
       );
     }
 
-    // Validate price_type if provided
-    if (body.price_type) {
+    // Validate priceType if provided
+    if (priceType) {
       const validPriceTypes = ["FIXED", "PER_DOG", "PER_VISIT"];
-      if (!validPriceTypes.includes(body.price_type)) {
+      if (!validPriceTypes.includes(priceType)) {
         return NextResponse.json(
-          { error: "Invalid price_type. Must be FIXED, PER_DOG, or PER_VISIT" },
+          { error: "Invalid priceType. Must be FIXED, PER_DOG, or PER_VISIT" },
           { status: 400 }
         );
       }
@@ -117,11 +139,11 @@ export async function POST(request: NextRequest) {
         org_id: auth.user.orgId,
         name: body.name,
         description: body.description || null,
-        price_cents: body.price_cents,
-        price_type: body.price_type || "FIXED",
-        is_recurring: body.is_recurring ?? false,
-        is_active: body.is_active ?? true,
-        sort_order: body.sort_order ?? sortOrder,
+        price_cents: priceCents,
+        price_type: priceType || "FIXED",
+        is_recurring: isRecurring ?? false,
+        is_active: isActive ?? true,
+        sort_order: sortOrderInput ?? sortOrder,
       })
       .select()
       .single();
@@ -134,7 +156,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({ addOn }, { status: 201 });
+    // Return formatted response
+    const formattedAddOn = {
+      id: addOn.id,
+      name: addOn.name,
+      description: addOn.description,
+      priceCents: addOn.price_cents,
+      priceType: addOn.price_type,
+      isRecurring: addOn.is_recurring,
+      isActive: addOn.is_active,
+      sortOrder: addOn.sort_order,
+      createdAt: addOn.created_at,
+      updatedAt: addOn.updated_at,
+    };
+
+    return NextResponse.json({ addOn: formattedAddOn }, { status: 201 });
   } catch (error) {
     console.error("Error creating add-on:", error);
     return NextResponse.json(
@@ -181,24 +217,31 @@ export async function PUT(request: NextRequest) {
       );
     }
 
+    // Accept both camelCase and snake_case
+    const priceCents = body.priceCents ?? body.price_cents;
+    const priceType = body.priceType ?? body.price_type;
+    const isRecurring = body.isRecurring ?? body.is_recurring;
+    const isActive = body.isActive ?? body.is_active;
+    const sortOrderInput = body.sortOrder ?? body.sort_order;
+
     // Build update object
     const updates: Record<string, unknown> = {};
     if (body.name !== undefined) updates.name = body.name;
     if (body.description !== undefined) updates.description = body.description;
-    if (body.price_cents !== undefined) updates.price_cents = body.price_cents;
-    if (body.price_type !== undefined) {
+    if (priceCents !== undefined) updates.price_cents = priceCents;
+    if (priceType !== undefined) {
       const validPriceTypes = ["FIXED", "PER_DOG", "PER_VISIT"];
-      if (!validPriceTypes.includes(body.price_type)) {
+      if (!validPriceTypes.includes(priceType)) {
         return NextResponse.json(
-          { error: "Invalid price_type" },
+          { error: "Invalid priceType" },
           { status: 400 }
         );
       }
-      updates.price_type = body.price_type;
+      updates.price_type = priceType;
     }
-    if (body.is_recurring !== undefined) updates.is_recurring = body.is_recurring;
-    if (body.is_active !== undefined) updates.is_active = body.is_active;
-    if (body.sort_order !== undefined) updates.sort_order = body.sort_order;
+    if (isRecurring !== undefined) updates.is_recurring = isRecurring;
+    if (isActive !== undefined) updates.is_active = isActive;
+    if (sortOrderInput !== undefined) updates.sort_order = sortOrderInput;
 
     // Update the add-on
     const { data: addOn, error } = await supabase
@@ -216,7 +259,21 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({ addOn });
+    // Return formatted response
+    const formattedAddOn = {
+      id: addOn.id,
+      name: addOn.name,
+      description: addOn.description,
+      priceCents: addOn.price_cents,
+      priceType: addOn.price_type,
+      isRecurring: addOn.is_recurring,
+      isActive: addOn.is_active,
+      sortOrder: addOn.sort_order,
+      createdAt: addOn.created_at,
+      updatedAt: addOn.updated_at,
+    };
+
+    return NextResponse.json({ addOn: formattedAddOn });
   } catch (error) {
     console.error("Error updating add-on:", error);
     return NextResponse.json(

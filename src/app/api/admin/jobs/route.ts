@@ -72,7 +72,16 @@ export async function GET(request: NextRequest) {
         gate_location,
         access_notes,
         latitude,
-        longitude
+        longitude,
+        dogs (
+          id,
+          name,
+          breed,
+          is_safe,
+          safety_notes,
+          special_instructions,
+          is_active
+        )
       ),
       subscription:subscription_id (
         id,
@@ -88,14 +97,6 @@ export async function GET(request: NextRequest) {
         id,
         name,
         status
-      ),
-      dogs:dogs!dogs_location_id_fkey (
-        id,
-        name,
-        breed,
-        is_safe,
-        safety_notes,
-        special_instructions
       )
     `, { count: "exact" })
     .eq("org_id", auth.user.orgId)

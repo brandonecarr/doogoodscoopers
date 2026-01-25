@@ -23,8 +23,8 @@ function getSupabase() {
   return createClient(url, serviceKey);
 }
 
-type InvoiceStatus = "DRAFT" | "SENT" | "PAID" | "PARTIAL" | "OVERDUE" | "VOID";
-const INVOICE_STATUSES: InvoiceStatus[] = ["DRAFT", "SENT", "PAID", "PARTIAL", "OVERDUE", "VOID"];
+type InvoiceStatus = "DRAFT" | "OPEN" | "PAID" | "VOID" | "UNCOLLECTIBLE";
+const INVOICE_STATUSES: InvoiceStatus[] = ["DRAFT", "OPEN", "PAID", "VOID", "UNCOLLECTIBLE"];
 
 /**
  * GET /api/admin/invoices
@@ -59,10 +59,11 @@ export async function GET(request: NextRequest) {
       subtotal_cents,
       tax_cents,
       discount_cents,
-      paid_cents,
+      amount_paid_cents,
+      amount_due_cents,
       due_date,
-      issued_date,
       paid_at,
+      voided_at,
       notes,
       created_at,
       updated_at,
@@ -96,12 +97,12 @@ export async function GET(request: NextRequest) {
     query = query.eq("client_id", clientId);
   }
 
-  // Filter by date range
+  // Filter by date range (using created_at since there's no issued_date)
   if (startDate) {
-    query = query.gte("issued_date", startDate);
+    query = query.gte("created_at", startDate);
   }
   if (endDate) {
-    query = query.lte("issued_date", endDate);
+    query = query.lte("created_at", endDate);
   }
 
   // Pagination
@@ -120,20 +121,21 @@ export async function GET(request: NextRequest) {
   // Get stats
   const { data: allInvoices } = await supabase
     .from("invoices")
-    .select("status, total_cents, paid_cents")
+    .select("status, total_cents, amount_paid_cents, amount_due_cents")
     .eq("org_id", auth.user.orgId);
 
   const stats = {
     total: allInvoices?.length || 0,
     draft: allInvoices?.filter((i) => i.status === "DRAFT").length || 0,
-    sent: allInvoices?.filter((i) => i.status === "SENT").length || 0,
+    open: allInvoices?.filter((i) => i.status === "OPEN").length || 0,
     paid: allInvoices?.filter((i) => i.status === "PAID").length || 0,
-    overdue: allInvoices?.filter((i) => i.status === "OVERDUE").length || 0,
+    void: allInvoices?.filter((i) => i.status === "VOID").length || 0,
+    uncollectible: allInvoices?.filter((i) => i.status === "UNCOLLECTIBLE").length || 0,
     totalAmountCents: allInvoices?.reduce((sum, i) => sum + i.total_cents, 0) || 0,
-    paidAmountCents: allInvoices?.reduce((sum, i) => sum + (i.paid_cents || 0), 0) || 0,
+    paidAmountCents: allInvoices?.reduce((sum, i) => sum + (i.amount_paid_cents || 0), 0) || 0,
     outstandingCents: allInvoices
-      ?.filter((i) => !["PAID", "VOID"].includes(i.status))
-      .reduce((sum, i) => sum + (i.total_cents - (i.paid_cents || 0)), 0) || 0,
+      ?.filter((i) => !["PAID", "VOID", "UNCOLLECTIBLE"].includes(i.status))
+      .reduce((sum, i) => sum + (i.amount_due_cents || 0), 0) || 0,
   };
 
   // Format invoices
@@ -146,11 +148,11 @@ export async function GET(request: NextRequest) {
     subtotalCents: inv.subtotal_cents,
     taxCents: inv.tax_cents,
     discountCents: inv.discount_cents,
-    paidCents: inv.paid_cents || 0,
-    balanceCents: inv.total_cents - (inv.paid_cents || 0),
+    amountPaidCents: inv.amount_paid_cents || 0,
+    amountDueCents: inv.amount_due_cents || 0,
     dueDate: inv.due_date,
-    issuedDate: inv.issued_date,
     paidAt: inv.paid_at,
+    voidedAt: inv.voided_at,
     notes: inv.notes,
     createdAt: inv.created_at,
     client: inv.client
@@ -268,9 +270,9 @@ export async function POST(request: NextRequest) {
         tax_cents: taxCents,
         discount_cents: discountCents,
         total_cents: totalCents,
-        paid_cents: 0,
+        amount_paid_cents: 0,
+        amount_due_cents: totalCents,
         due_date: dueDate || null,
-        issued_date: new Date().toISOString().split("T")[0],
         notes: notes || null,
       })
       .select()
@@ -350,7 +352,7 @@ export async function PUT(request: NextRequest) {
     // Verify invoice belongs to org
     const { data: existing } = await supabase
       .from("invoices")
-      .select("id, status, total_cents, paid_cents")
+      .select("id, status, total_cents, amount_paid_cents, amount_due_cents")
       .eq("id", id)
       .eq("org_id", auth.user.orgId)
       .single();
@@ -367,21 +369,25 @@ export async function PUT(request: NextRequest) {
 
       // Handle status-specific updates
       if (status === "PAID") {
-        updates.paid_cents = existing.total_cents;
+        updates.amount_paid_cents = existing.total_cents;
+        updates.amount_due_cents = 0;
         updates.paid_at = new Date().toISOString();
-      } else if (status === "SENT" && existing.status === "DRAFT") {
-        updates.issued_date = new Date().toISOString().split("T")[0];
+      } else if (status === "OPEN" && existing.status === "DRAFT") {
+        // Moving from DRAFT to OPEN
+        updates.amount_due_cents = existing.total_cents - (existing.amount_paid_cents || 0);
+      } else if (status === "VOID") {
+        updates.voided_at = new Date().toISOString();
       }
     }
 
     if (paidCents !== undefined) {
-      updates.paid_cents = paidCents;
+      updates.amount_paid_cents = paidCents;
+      updates.amount_due_cents = existing.total_cents - paidCents;
       // Auto-update status based on payment
       if (paidCents >= existing.total_cents) {
         updates.status = "PAID";
         updates.paid_at = new Date().toISOString();
-      } else if (paidCents > 0) {
-        updates.status = "PARTIAL";
+        updates.amount_due_cents = 0;
       }
     }
 

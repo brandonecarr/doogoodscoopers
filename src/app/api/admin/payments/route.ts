@@ -22,11 +22,9 @@ function getSupabase() {
   return createClient(url, serviceKey);
 }
 
-type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED" | "PARTIAL_REFUND";
-type PaymentMethod = "CARD" | "CASH" | "CHECK" | "ACH" | "OTHER";
+type PaymentStatus = "PENDING" | "SUCCEEDED" | "FAILED" | "REFUNDED" | "PARTIALLY_REFUNDED";
 
-const PAYMENT_STATUSES: PaymentStatus[] = ["PENDING", "COMPLETED", "FAILED", "REFUNDED", "PARTIAL_REFUND"];
-const PAYMENT_METHODS: PaymentMethod[] = ["CARD", "CASH", "CHECK", "ACH", "OTHER"];
+const PAYMENT_STATUSES: PaymentStatus[] = ["PENDING", "SUCCEEDED", "FAILED", "REFUNDED", "PARTIALLY_REFUNDED"];
 
 /**
  * GET /api/admin/payments
@@ -56,14 +54,14 @@ export async function GET(request: NextRequest) {
       `
       id,
       amount_cents,
+      currency,
       status,
       payment_method,
       stripe_payment_intent_id,
-      reference_number,
-      refund_amount_cents,
-      refund_reason,
-      refunded_at,
-      notes,
+      stripe_charge_id,
+      failure_reason,
+      refunded_amount_cents,
+      metadata,
       created_at,
       updated_at,
       client:client_id (
@@ -94,7 +92,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Filter by method
-  if (method && PAYMENT_METHODS.includes(method as PaymentMethod)) {
+  if (method) {
     query = query.eq("payment_method", method);
   }
 
@@ -122,28 +120,28 @@ export async function GET(request: NextRequest) {
   // Get stats
   const { data: allPayments } = await supabase
     .from("payments")
-    .select("status, amount_cents, refund_amount_cents, payment_method")
+    .select("status, amount_cents, refunded_amount_cents, payment_method")
     .eq("org_id", auth.user.orgId);
 
-  const completed = allPayments?.filter((p) => p.status === "COMPLETED") || [];
-  const refunded = allPayments?.filter((p) => ["REFUNDED", "PARTIAL_REFUND"].includes(p.status)) || [];
+  const succeeded = allPayments?.filter((p) => p.status === "SUCCEEDED") || [];
+  const refunded = allPayments?.filter((p) => ["REFUNDED", "PARTIALLY_REFUNDED"].includes(p.status)) || [];
 
   const stats = {
     total: allPayments?.length || 0,
-    completed: completed.length,
+    succeeded: succeeded.length,
     pending: allPayments?.filter((p) => p.status === "PENDING").length || 0,
     failed: allPayments?.filter((p) => p.status === "FAILED").length || 0,
     refunded: refunded.length,
-    totalCollectedCents: completed.reduce((sum, p) => sum + p.amount_cents, 0),
-    totalRefundedCents: refunded.reduce((sum, p) => sum + (p.refund_amount_cents || 0), 0),
+    totalCollectedCents: succeeded.reduce((sum, p) => sum + p.amount_cents, 0),
+    totalRefundedCents: allPayments?.reduce((sum, p) => sum + (p.refunded_amount_cents || 0), 0) || 0,
     netRevenueCents:
-      completed.reduce((sum, p) => sum + p.amount_cents, 0) -
-      refunded.reduce((sum, p) => sum + (p.refund_amount_cents || 0), 0),
+      succeeded.reduce((sum, p) => sum + p.amount_cents, 0) -
+      (allPayments?.reduce((sum, p) => sum + (p.refunded_amount_cents || 0), 0) || 0),
     byMethod: {
-      card: allPayments?.filter((p) => p.payment_method === "CARD" && p.status === "COMPLETED").length || 0,
-      cash: allPayments?.filter((p) => p.payment_method === "CASH" && p.status === "COMPLETED").length || 0,
-      check: allPayments?.filter((p) => p.payment_method === "CHECK" && p.status === "COMPLETED").length || 0,
-      ach: allPayments?.filter((p) => p.payment_method === "ACH" && p.status === "COMPLETED").length || 0,
+      card: allPayments?.filter((p) => p.payment_method === "card" && p.status === "SUCCEEDED").length || 0,
+      cash: allPayments?.filter((p) => p.payment_method === "cash" && p.status === "SUCCEEDED").length || 0,
+      check: allPayments?.filter((p) => p.payment_method === "check" && p.status === "SUCCEEDED").length || 0,
+      ach: allPayments?.filter((p) => p.payment_method === "ach" && p.status === "SUCCEEDED").length || 0,
     },
   };
 
@@ -152,14 +150,14 @@ export async function GET(request: NextRequest) {
   const formattedPayments = (payments || []).map((pmt: any) => ({
     id: pmt.id,
     amountCents: pmt.amount_cents,
+    currency: pmt.currency,
     status: pmt.status,
     paymentMethod: pmt.payment_method,
     stripePaymentIntentId: pmt.stripe_payment_intent_id,
-    referenceNumber: pmt.reference_number,
-    refundAmountCents: pmt.refund_amount_cents || 0,
-    refundReason: pmt.refund_reason,
-    refundedAt: pmt.refunded_at,
-    notes: pmt.notes,
+    stripeChargeId: pmt.stripe_charge_id,
+    failureReason: pmt.failure_reason,
+    refundedAmountCents: pmt.refunded_amount_cents || 0,
+    metadata: pmt.metadata,
     createdAt: pmt.created_at,
     client: pmt.client
       ? {
@@ -213,16 +211,9 @@ export async function POST(request: NextRequest) {
     } = body;
 
     // Validate required fields
-    if (!clientId || !amountCents || !paymentMethod) {
+    if (!clientId || !amountCents) {
       return NextResponse.json(
-        { error: "Client, amount, and payment method are required" },
-        { status: 400 }
-      );
-    }
-
-    if (!PAYMENT_METHODS.includes(paymentMethod)) {
-      return NextResponse.json(
-        { error: "Invalid payment method" },
+        { error: "Client and amount are required" },
         { status: 400 }
       );
     }
@@ -243,7 +234,7 @@ export async function POST(request: NextRequest) {
     if (invoiceId) {
       const { data: invoice } = await supabase
         .from("invoices")
-        .select("id, client_id, total_cents, paid_cents")
+        .select("id, client_id, total_cents, amount_paid_cents")
         .eq("id", invoiceId)
         .eq("org_id", auth.user.orgId)
         .single();
@@ -253,6 +244,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Build metadata
+    const metadata: Record<string, unknown> = {};
+    if (referenceNumber) metadata.referenceNumber = referenceNumber;
+    if (notes) metadata.notes = notes;
+
     // Create payment
     const { data: newPayment, error: paymentError } = await supabase
       .from("payments")
@@ -261,10 +257,9 @@ export async function POST(request: NextRequest) {
         client_id: clientId,
         invoice_id: invoiceId || null,
         amount_cents: amountCents,
-        status: "COMPLETED",
-        payment_method: paymentMethod,
-        reference_number: referenceNumber || null,
-        notes: notes || null,
+        status: "SUCCEEDED",
+        payment_method: paymentMethod || null,
+        metadata,
       })
       .select()
       .single();
@@ -281,18 +276,20 @@ export async function POST(request: NextRequest) {
     if (invoiceId) {
       const { data: invoice } = await supabase
         .from("invoices")
-        .select("total_cents, paid_cents")
+        .select("total_cents, amount_paid_cents")
         .eq("id", invoiceId)
         .single();
 
       if (invoice) {
-        const newPaidCents = (invoice.paid_cents || 0) + amountCents;
-        const newStatus = newPaidCents >= invoice.total_cents ? "PAID" : "PARTIAL";
+        const newPaidCents = (invoice.amount_paid_cents || 0) + amountCents;
+        const newDueCents = Math.max(0, invoice.total_cents - newPaidCents);
+        const newStatus = newPaidCents >= invoice.total_cents ? "PAID" : "OPEN";
 
         await supabase
           .from("invoices")
           .update({
-            paid_cents: newPaidCents,
+            amount_paid_cents: newPaidCents,
+            amount_due_cents: newDueCents,
             status: newStatus,
             paid_at: newStatus === "PAID" ? new Date().toISOString() : null,
             updated_at: new Date().toISOString(),
@@ -347,7 +344,7 @@ export async function PUT(request: NextRequest) {
     // Verify payment belongs to org
     const { data: existing } = await supabase
       .from("payments")
-      .select("id, amount_cents, status, invoice_id, refund_amount_cents")
+      .select("id, amount_cents, status, invoice_id, refunded_amount_cents, metadata")
       .eq("id", id)
       .eq("org_id", auth.user.orgId)
       .single();
@@ -356,14 +353,14 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "Payment not found" }, { status: 404 });
     }
 
-    if (existing.status !== "COMPLETED") {
+    if (existing.status !== "SUCCEEDED") {
       return NextResponse.json(
-        { error: "Can only refund completed payments" },
+        { error: "Can only refund succeeded payments" },
         { status: 400 }
       );
     }
 
-    const totalRefund = (existing.refund_amount_cents || 0) + (refundAmountCents || 0);
+    const totalRefund = (existing.refunded_amount_cents || 0) + (refundAmountCents || 0);
     if (totalRefund > existing.amount_cents) {
       return NextResponse.json(
         { error: "Refund amount exceeds payment amount" },
@@ -372,15 +369,21 @@ export async function PUT(request: NextRequest) {
     }
 
     const newStatus: PaymentStatus =
-      totalRefund >= existing.amount_cents ? "REFUNDED" : "PARTIAL_REFUND";
+      totalRefund >= existing.amount_cents ? "REFUNDED" : "PARTIALLY_REFUNDED";
+
+    // Store refund reason in metadata
+    const updatedMetadata = {
+      ...(existing.metadata || {}),
+      refundReason: refundReason || null,
+      refundedAt: new Date().toISOString(),
+    };
 
     const { data: updatedPayment, error: updateError } = await supabase
       .from("payments")
       .update({
         status: newStatus,
-        refund_amount_cents: totalRefund,
-        refund_reason: refundReason || null,
-        refunded_at: new Date().toISOString(),
+        refunded_amount_cents: totalRefund,
+        metadata: updatedMetadata,
         updated_at: new Date().toISOString(),
       })
       .eq("id", id)
@@ -399,17 +402,19 @@ export async function PUT(request: NextRequest) {
     if (existing.invoice_id) {
       const { data: invoice } = await supabase
         .from("invoices")
-        .select("paid_cents")
+        .select("amount_paid_cents, total_cents")
         .eq("id", existing.invoice_id)
         .single();
 
       if (invoice) {
-        const newPaidCents = Math.max(0, (invoice.paid_cents || 0) - (refundAmountCents || 0));
+        const newPaidCents = Math.max(0, (invoice.amount_paid_cents || 0) - (refundAmountCents || 0));
+        const newDueCents = invoice.total_cents - newPaidCents;
         await supabase
           .from("invoices")
           .update({
-            paid_cents: newPaidCents,
-            status: newPaidCents <= 0 ? "SENT" : "PARTIAL",
+            amount_paid_cents: newPaidCents,
+            amount_due_cents: newDueCents,
+            status: newPaidCents <= 0 ? "OPEN" : (newPaidCents >= invoice.total_cents ? "PAID" : "OPEN"),
             paid_at: null,
             updated_at: new Date().toISOString(),
           })

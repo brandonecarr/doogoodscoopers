@@ -34,11 +34,13 @@ const STAFF_ROLES: UserRole[] = [
 ];
 
 interface StaffProfile {
-  vehicle_type: string | null;
-  license_number: string | null;
+  employee_id: string | null;
   hire_date: string | null;
-  emergency_contact_name: string | null;
-  emergency_contact_phone: string | null;
+  hourly_rate_cents: number | null;
+  vehicle_type: string | null;
+  license_plate: string | null;
+  emergency_contact: Record<string, string> | null;
+  certifications: string[];
   notes: string | null;
 }
 
@@ -76,11 +78,13 @@ export async function GET(request: NextRequest) {
       updated_at,
       staff_profile:staff_profiles!left (
         id,
-        vehicle_type,
-        license_number,
+        employee_id,
         hire_date,
-        emergency_contact_name,
-        emergency_contact_phone,
+        hourly_rate_cents,
+        vehicle_type,
+        license_plate,
+        emergency_contact,
+        certifications,
         notes
       )
     `
@@ -241,14 +245,20 @@ export async function POST(request: NextRequest) {
 
     // Create staff profile if provided
     if (profile) {
+      const emergencyContact: Record<string, string> = {};
+      if (profile.emergencyContactName) emergencyContact.name = profile.emergencyContactName;
+      if (profile.emergencyContactPhone) emergencyContact.phone = profile.emergencyContactPhone;
+
       await supabase.from("staff_profiles").insert({
         org_id: auth.user.orgId,
         user_id: newUser.id,
-        vehicle_type: profile.vehicleType || null,
-        license_number: profile.licenseNumber || null,
+        employee_id: profile.employeeId || null,
         hire_date: profile.hireDate || null,
-        emergency_contact_name: profile.emergencyContactName || null,
-        emergency_contact_phone: profile.emergencyContactPhone || null,
+        hourly_rate_cents: profile.hourlyRateCents || null,
+        vehicle_type: profile.vehicleType || null,
+        license_plate: profile.licensePlate || null,
+        emergency_contact: Object.keys(emergencyContact).length > 0 ? emergencyContact : {},
+        certifications: profile.certifications || [],
         notes: profile.notes || null,
       });
     }
@@ -367,25 +377,42 @@ export async function PUT(request: NextRequest) {
     // Update or create staff profile
     if (profile) {
       const profileData: Partial<StaffProfile> = {};
-      if (profile.vehicleType !== undefined)
-        profileData.vehicle_type = profile.vehicleType;
-      if (profile.licenseNumber !== undefined)
-        profileData.license_number = profile.licenseNumber;
+      if (profile.employeeId !== undefined)
+        profileData.employee_id = profile.employeeId;
       if (profile.hireDate !== undefined)
         profileData.hire_date = profile.hireDate;
-      if (profile.emergencyContactName !== undefined)
-        profileData.emergency_contact_name = profile.emergencyContactName;
-      if (profile.emergencyContactPhone !== undefined)
-        profileData.emergency_contact_phone = profile.emergencyContactPhone;
+      if (profile.hourlyRateCents !== undefined)
+        profileData.hourly_rate_cents = profile.hourlyRateCents;
+      if (profile.vehicleType !== undefined)
+        profileData.vehicle_type = profile.vehicleType;
+      if (profile.licensePlate !== undefined)
+        profileData.license_plate = profile.licensePlate;
+      if (profile.certifications !== undefined)
+        profileData.certifications = profile.certifications;
       if (profile.notes !== undefined) profileData.notes = profile.notes;
+
+      // Handle emergency contact as jsonb
+      if (profile.emergencyContactName !== undefined || profile.emergencyContactPhone !== undefined) {
+        const emergencyContact: Record<string, string> = {};
+        if (profile.emergencyContactName) emergencyContact.name = profile.emergencyContactName;
+        if (profile.emergencyContactPhone) emergencyContact.phone = profile.emergencyContactPhone;
+        profileData.emergency_contact = emergencyContact;
+      }
 
       const { data: existingProfile } = await supabase
         .from("staff_profiles")
-        .select("id")
+        .select("id, emergency_contact")
         .eq("user_id", id)
         .single();
 
       if (existingProfile) {
+        // Merge emergency contact if updating partially
+        if (profileData.emergency_contact && existingProfile.emergency_contact) {
+          profileData.emergency_contact = {
+            ...existingProfile.emergency_contact,
+            ...profileData.emergency_contact,
+          };
+        }
         await supabase
           .from("staff_profiles")
           .update(profileData)
@@ -394,6 +421,8 @@ export async function PUT(request: NextRequest) {
         await supabase.from("staff_profiles").insert({
           org_id: auth.user.orgId,
           user_id: id,
+          emergency_contact: profileData.emergency_contact || {},
+          certifications: profileData.certifications || [],
           ...profileData,
         });
       }
