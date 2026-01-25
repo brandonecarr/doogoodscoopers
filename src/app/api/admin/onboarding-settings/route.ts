@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
  * POST /api/admin/onboarding-settings
  * Update onboarding settings for the organization
  *
- * Body: { onboarding: OnboardingSettings }
+ * Body: { onboarding?: OnboardingSettings, calloutDisclaimers?: CalloutDisclaimersSettings }
  */
 export async function POST(request: NextRequest) {
   const auth = await authenticateWithPermission(request, "settings:write");
@@ -67,11 +67,12 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { onboarding } = body;
+    const { onboarding, calloutDisclaimers } = body;
 
-    if (!onboarding) {
+    // At least one settings type must be provided
+    if (!onboarding && !calloutDisclaimers) {
       return NextResponse.json(
-        { error: "Missing onboarding settings" },
+        { error: "Missing settings data" },
         { status: 400 }
       );
     }
@@ -93,12 +94,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Merge new onboarding settings with existing settings
+    // Merge new settings with existing settings
     const currentSettings = (org?.settings as Record<string, unknown>) || {};
-    const updatedSettings = {
-      ...currentSettings,
-      onboarding,
-    };
+    const updatedSettings = { ...currentSettings };
+
+    if (onboarding) {
+      updatedSettings.onboarding = onboarding;
+    }
+
+    if (calloutDisclaimers) {
+      updatedSettings.calloutDisclaimers = calloutDisclaimers;
+    }
 
     // Update organization settings
     const { error: updateError } = await supabase

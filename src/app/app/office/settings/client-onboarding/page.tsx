@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import ServiceAreaSetup from "./ServiceAreaSetup";
 import SignupFormSetup from "./SignupFormSetup";
+import CalloutDisclaimersSetup from "./CalloutDisclaimersSetup";
 
 type TabId =
   | "service-area"
@@ -82,11 +83,7 @@ export default function ClientOnboardingPage() {
       <div className="bg-white rounded-lg border border-gray-200 p-6">
         {activeTab === "service-area" && <ServiceAreaSetup />}
         {activeTab === "signup-form" && <SignupFormSetup />}
-        {activeTab === "callout-disclaimers" && (
-          <div className="text-gray-500 text-center py-12">
-            Callout & Disclaimers settings coming soon...
-          </div>
-        )}
+        {activeTab === "callout-disclaimers" && <CalloutDisclaimersSetup />}
         {activeTab === "thank-you" && (
           <div className="text-gray-500 text-center py-12">
             Thank You Pages settings coming soon...

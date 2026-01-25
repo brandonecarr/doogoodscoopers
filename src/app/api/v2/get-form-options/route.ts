@@ -166,10 +166,30 @@ export async function GET() {
       .single<{ id: string; settings: Record<string, unknown> | null }>();
 
     // Extract onboarding settings from organization settings
-    const orgSettings = (org?.settings || {}) as { onboarding?: OnboardingSettings };
+    const orgSettings = (org?.settings || {}) as {
+      onboarding?: OnboardingSettings;
+      calloutDisclaimers?: {
+        calloutText?: string;
+        pricingDisclaimers?: string;
+        advertisingDisclaimers?: { id: string; text: string }[];
+        specialPromo?: {
+          title: string;
+          description: string;
+          autoPreselected: boolean;
+        };
+      };
+    };
     const onboardingSettings: OnboardingSettings = {
       ...defaultOnboardingSettings,
       ...(orgSettings.onboarding || {}),
+    };
+
+    // Extract callout/disclaimers settings
+    const calloutDisclaimers = orgSettings.calloutDisclaimers || {
+      calloutText: "",
+      pricingDisclaimers: "",
+      advertisingDisclaimers: [],
+      specialPromo: { title: "", description: "", autoPreselected: false },
     };
 
     // Build form fields based on onboarding settings
@@ -211,6 +231,8 @@ export async function GET() {
         howHeardAboutUs: onboardingSettings.howHeardAboutUs,
         additionalComments: onboardingSettings.additionalComments,
       },
+      // Include callout/disclaimers settings for frontend display
+      calloutDisclaimers,
     });
   } catch (error) {
     console.error("Error fetching form options:", error);
@@ -227,6 +249,12 @@ export async function GET() {
         },
       },
       onboardingSettings: defaultOnboardingSettings,
+      calloutDisclaimers: {
+        calloutText: "",
+        pricingDisclaimers: "",
+        advertisingDisclaimers: [],
+        specialPromo: { title: "", description: "", autoPreselected: false },
+      },
     });
   }
 }

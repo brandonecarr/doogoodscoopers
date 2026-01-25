@@ -175,6 +175,26 @@ interface OnboardingSettings {
   additionalComments?: { enabled: boolean };
 }
 
+// Callout and disclaimers settings from admin configuration
+interface CalloutDisclaimersSettings {
+  calloutText?: string;
+  pricingDisclaimers?: string;
+  advertisingDisclaimers?: { id: string; text: string }[];
+  specialPromo?: {
+    title: string;
+    description: string;
+    autoPreselected: boolean;
+  };
+}
+
+// Default callout/disclaimers settings
+const defaultCalloutDisclaimers: CalloutDisclaimersSettings = {
+  calloutText: "",
+  pricingDisclaimers: "",
+  advertisingDisclaimers: [],
+  specialPromo: { title: "", description: "", autoPreselected: false },
+};
+
 // Default onboarding settings
 const defaultOnboardingSettings: OnboardingSettings = {
   couponCode: { enabled: true },
@@ -283,6 +303,7 @@ function QuoteFormInner() {
   const [formOptions, setFormOptions] = useState<FormOptions>(defaultFormOptions);
   const [isLoadingOptions, setIsLoadingOptions] = useState(true);
   const [onboardingSettings, setOnboardingSettings] = useState<OnboardingSettings>(defaultOnboardingSettings);
+  const [calloutDisclaimers, setCalloutDisclaimers] = useState<CalloutDisclaimersSettings>(defaultCalloutDisclaimers);
 
   // Cross-sells state
   const [crossSells, setCrossSells] = useState<CrossSell[]>([]);
@@ -347,6 +368,11 @@ function QuoteFormInner() {
         // Store onboarding settings for conditional rendering
         if (result.onboardingSettings) {
           setOnboardingSettings({ ...defaultOnboardingSettings, ...result.onboardingSettings });
+        }
+
+        // Store callout/disclaimers settings
+        if (result.calloutDisclaimers) {
+          setCalloutDisclaimers({ ...defaultCalloutDisclaimers, ...result.calloutDisclaimers });
         }
       } catch (err) {
         console.error("Error fetching form options:", err);
@@ -1063,6 +1089,19 @@ function QuoteFormInner() {
                 )}
               </div>
 
+              {/* Advertising Disclaimers */}
+              {calloutDisclaimers.advertisingDisclaimers && calloutDisclaimers.advertisingDisclaimers.length > 0 && (
+                <div className="space-y-2">
+                  {calloutDisclaimers.advertisingDisclaimers.map((disclaimer) => (
+                    disclaimer.text && (
+                      <p key={disclaimer.id} className="text-xs text-navy-700/60">
+                        {disclaimer.text}
+                      </p>
+                    )
+                  ))}
+                </div>
+              )}
+
               <h4 className="text-md font-semibold text-navy-900 flex items-center gap-2 pt-2">
                 <Dog className="w-5 h-5 text-teal-500" />
                 Service Details
@@ -1186,6 +1225,13 @@ function QuoteFormInner() {
               </p>
             </div>
 
+            {/* Callout Text */}
+            {calloutDisclaimers.calloutText && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-amber-800 text-sm">
+                {calloutDisclaimers.calloutText}
+              </div>
+            )}
+
             {/* Service Summary */}
             <div className="bg-gray-50 rounded-xl p-5 space-y-3">
               <h4 className="font-medium text-navy-900 flex items-center gap-2">
@@ -1280,6 +1326,30 @@ function QuoteFormInner() {
                 <span className="ml-2 text-navy-700">Calculating your quote...</span>
               </div>
             ) : null}
+
+            {/* Special Promo */}
+            {calloutDisclaimers.specialPromo?.title && (
+              <div className="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-xl p-5">
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
+                    <Sparkles className="w-5 h-5 text-purple-600" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-purple-900">{calloutDisclaimers.specialPromo.title}</h4>
+                    {calloutDisclaimers.specialPromo.description && (
+                      <p className="text-sm text-purple-700 mt-1">{calloutDisclaimers.specialPromo.description}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Pricing Disclaimers */}
+            {calloutDisclaimers.pricingDisclaimers && (
+              <p className="text-xs text-navy-700/60 italic">
+                {calloutDisclaimers.pricingDisclaimers}
+              </p>
+            )}
 
             {error && (
               <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm">
