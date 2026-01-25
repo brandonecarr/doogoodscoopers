@@ -5,6 +5,7 @@ import Link from "next/link";
 import ServiceAreaSetup from "./ServiceAreaSetup";
 import SignupFormSetup from "./SignupFormSetup";
 import CalloutDisclaimersSetup from "./CalloutDisclaimersSetup";
+import ThankYouPagesSetup from "./ThankYouPagesSetup";
 
 type TabId =
   | "service-area"
@@ -84,11 +85,7 @@ export default function ClientOnboardingPage() {
         {activeTab === "service-area" && <ServiceAreaSetup />}
         {activeTab === "signup-form" && <SignupFormSetup />}
         {activeTab === "callout-disclaimers" && <CalloutDisclaimersSetup />}
-        {activeTab === "thank-you" && (
-          <div className="text-gray-500 text-center py-12">
-            Thank You Pages settings coming soon...
-          </div>
-        )}
+        {activeTab === "thank-you" && <ThankYouPagesSetup />}
         {activeTab === "emails" && (
           <div className="text-gray-500 text-center py-12">
             Email settings coming soon...
