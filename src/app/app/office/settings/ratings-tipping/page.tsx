@@ -91,31 +91,23 @@ function EditModal({
       <div className="flex min-h-full items-center justify-center p-4">
         <div className="fixed inset-0 bg-black/50" onClick={onClose} />
         <div className="relative bg-white rounded-lg shadow-xl w-full max-w-md">
-          <div className="flex items-center justify-between p-4 border-b">
+          <div className="p-6 pb-4">
             <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-500"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
           </div>
-          <div className="p-4">{children}</div>
-          <div className="flex justify-end gap-3 p-4 border-t">
+          <div className="px-6 pb-6">{children}</div>
+          <div className="flex justify-end gap-3 px-6 pb-6">
             <button
               onClick={onClose}
-              className="px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
+              className="px-4 py-2 text-gray-600 font-medium hover:text-gray-800"
             >
-              Cancel
+              CANCEL
             </button>
             <button
               onClick={onSave}
               disabled={saving}
-              className="px-4 py-2 bg-teal-600 text-white rounded-md hover:bg-teal-700 disabled:opacity-50"
+              className="px-4 py-2 bg-teal-600 text-white font-medium rounded-md hover:bg-teal-700 disabled:opacity-50"
             >
-              {saving ? "Saving..." : "Save"}
+              {saving ? "SAVING..." : "SAVE"}
             </button>
           </div>
         </div>
@@ -134,7 +126,7 @@ export default function RatingsTippingSettingsPage() {
     tipAmounts: [2, 5, 10],
   });
   const [editTipAmounts, setEditTipAmounts] = useState(false);
-  const [editedTipAmounts, setEditedTipAmounts] = useState<string>("");
+  const [editedTipAmounts, setEditedTipAmounts] = useState<[string, string, string]>(["2.00", "5.00", "10.00"]);
 
   const fetchSettings = useCallback(async () => {
     try {
@@ -188,17 +180,20 @@ export default function RatingsTippingSettingsPage() {
   };
 
   const handleOpenTipEdit = () => {
-    setEditedTipAmounts(settings.tipAmounts.map((a) => `$${a.toFixed(2)}`).join(", "));
+    const amounts = settings.tipAmounts;
+    setEditedTipAmounts([
+      amounts[0]?.toFixed(2) || "2.00",
+      amounts[1]?.toFixed(2) || "5.00",
+      amounts[2]?.toFixed(2) || "10.00",
+    ]);
     setEditTipAmounts(true);
   };
 
   const saveTipAmounts = async () => {
     setSavingTips(true);
     try {
-      // Parse tip amounts from string like "$2.00, $5.00, $10.00"
+      // Parse tip amounts from three separate inputs
       const amounts = editedTipAmounts
-        .split(",")
-        .map((s) => s.trim().replace("$", ""))
         .map((s) => parseFloat(s))
         .filter((n) => !isNaN(n) && n > 0);
 
@@ -360,20 +355,48 @@ export default function RatingsTippingSettingsPage() {
         onSave={saveTipAmounts}
         saving={savingTips}
       >
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Tip Amounts (comma-separated)
-          </label>
-          <input
-            type="text"
-            value={editedTipAmounts}
-            onChange={(e) => setEditedTipAmounts(e.target.value)}
-            placeholder="$2.00, $5.00, $10.00"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-          />
-          <p className="text-xs text-gray-500 mt-2">
-            Enter amounts separated by commas (e.g., $2.00, $5.00, $10.00)
-          </p>
+        <div className="space-y-6">
+          {/* Amount 1 */}
+          <div>
+            <label className="block text-sm text-gray-500 mb-1">Amount 1</label>
+            <div className="flex items-center gap-2">
+              <span className="text-gray-500">$</span>
+              <input
+                type="text"
+                value={editedTipAmounts[0]}
+                onChange={(e) => setEditedTipAmounts([e.target.value, editedTipAmounts[1], editedTipAmounts[2]])}
+                className="flex-1 px-0 py-2 border-0 border-b border-gray-300 focus:outline-none focus:ring-0 focus:border-teal-500 text-gray-900"
+              />
+            </div>
+          </div>
+
+          {/* Amount 2 */}
+          <div>
+            <label className="block text-sm text-gray-500 mb-1">Amount 2</label>
+            <div className="flex items-center gap-2">
+              <span className="text-gray-500">$</span>
+              <input
+                type="text"
+                value={editedTipAmounts[1]}
+                onChange={(e) => setEditedTipAmounts([editedTipAmounts[0], e.target.value, editedTipAmounts[2]])}
+                className="flex-1 px-0 py-2 border-0 border-b border-gray-300 focus:outline-none focus:ring-0 focus:border-teal-500 text-gray-900"
+              />
+            </div>
+          </div>
+
+          {/* Amount 3 */}
+          <div>
+            <label className="block text-sm text-gray-500 mb-1">Amount 3</label>
+            <div className="flex items-center gap-2">
+              <span className="text-gray-500">$</span>
+              <input
+                type="text"
+                value={editedTipAmounts[2]}
+                onChange={(e) => setEditedTipAmounts([editedTipAmounts[0], editedTipAmounts[1], e.target.value])}
+                className="flex-1 px-0 py-2 border-0 border-b border-gray-300 focus:outline-none focus:ring-0 focus:border-teal-500 text-gray-900"
+              />
+            </div>
+          </div>
         </div>
       </EditModal>
     </div>
