@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { MoreVertical, Calendar, Eye, EyeOff, Pencil, X, ArrowUpDown } from "lucide-react";
+import { MoreVertical, Calendar, Eye, Pencil, X, ArrowUpDown } from "lucide-react";
 
 interface PayrollSettings {
   mileageRateCents: number;
@@ -26,12 +26,69 @@ interface StaffMember {
   payroll?: PayrollSettings;
 }
 
+interface PayrollVisibility {
+  yearsInService: boolean;
+  residentialRevenue: boolean;
+  commercialRevenue: boolean;
+  revenue: boolean;
+  distance: boolean;
+  overtimeHours: boolean;
+  vacationHours: boolean;
+  tips: boolean;
+  miscReimb: boolean;
+  nrOfJobs: boolean;
+  mileageRate: boolean;
+  basePercentage: boolean;
+  fixedRate: boolean;
+  workedHours: boolean;
+  additionalResidentialServicesRevenue: boolean;
+  additionalCommercialServicesRevenue: boolean;
+  revenueAdjustment: boolean;
+  regularHours: boolean;
+  holidayHours: boolean;
+  pto: boolean;
+  addlBonus: boolean;
+  deductions: boolean;
+  nrOfComplaints: boolean;
+  hourlyRate: boolean;
+  perYardRate: boolean;
+}
+
+const DEFAULT_VISIBILITY: PayrollVisibility = {
+  yearsInService: true,
+  residentialRevenue: true,
+  commercialRevenue: true,
+  revenue: true,
+  distance: true,
+  overtimeHours: true,
+  vacationHours: true,
+  tips: true,
+  miscReimb: true,
+  nrOfJobs: true,
+  mileageRate: true,
+  basePercentage: true,
+  fixedRate: true,
+  workedHours: true,
+  additionalResidentialServicesRevenue: true,
+  additionalCommercialServicesRevenue: true,
+  revenueAdjustment: true,
+  regularHours: true,
+  holidayHours: true,
+  pto: true,
+  addlBonus: true,
+  deductions: true,
+  nrOfComplaints: true,
+  hourlyRate: true,
+  perYardRate: true,
+};
+
 interface OrgSettings {
   payroll?: {
     payPeriod: "weekly" | "biweekly" | "monthly";
     payPeriodStartDay: number; // 0-6 for day of week
     showPayrollOnFieldTechApp: boolean;
     staffPayroll: Record<string, PayrollSettings>;
+    visibility?: PayrollVisibility;
   };
 }
 
@@ -63,6 +120,52 @@ function Toggle({
   );
 }
 
+// Visibility Checkbox Component
+function VisibilityCheckbox({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className="flex items-center gap-3 cursor-pointer">
+      <div className="relative">
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={(e) => onChange(e.target.checked)}
+          className="sr-only"
+        />
+        <div
+          className={`w-5 h-5 rounded flex items-center justify-center transition-colors ${
+            checked ? "bg-teal-600" : "bg-white border-2 border-gray-300"
+          }`}
+        >
+          {checked && (
+            <svg
+              className="w-3.5 h-3.5 text-white"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={3}
+                d="M5 13l4 4L19 7"
+              />
+            </svg>
+          )}
+        </div>
+      </div>
+      <span className="text-sm text-gray-700">{label}</span>
+    </label>
+  );
+}
+
 export default function PayrollSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [staff, setStaff] = useState<StaffMember[]>([]);
@@ -81,12 +184,14 @@ export default function PayrollSettingsPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showFieldTechModal, setShowFieldTechModal] = useState(false);
   const [showPayPeriodModal, setShowPayPeriodModal] = useState(false);
+  const [showVisibilityModal, setShowVisibilityModal] = useState(false);
   const [editingStaff, setEditingStaff] = useState<StaffMember | null>(null);
 
   // Modal form states
   const [tempShowPayroll, setTempShowPayroll] = useState(false);
   const [tempPayPeriod, setTempPayPeriod] = useState<"weekly" | "biweekly" | "monthly">("weekly");
   const [tempPayPeriodStartDay, setTempPayPeriodStartDay] = useState(1);
+  const [tempVisibility, setTempVisibility] = useState<PayrollVisibility>(DEFAULT_VISIBILITY);
   const [saving, setSaving] = useState(false);
 
   const fetchData = useCallback(async () => {
@@ -112,6 +217,7 @@ export default function PayrollSettingsPage() {
           payPeriodStartDay: payrollSettings.payPeriodStartDay ?? 1,
           showPayrollOnFieldTechApp: payrollSettings.showPayrollOnFieldTechApp ?? false,
           staffPayroll: payrollSettings.staffPayroll || {},
+          visibility: payrollSettings.visibility || DEFAULT_VISIBILITY,
         });
       }
     } catch (error) {
@@ -292,6 +398,46 @@ export default function PayrollSettingsPage() {
     setMenuOpen(false);
   };
 
+  // Open visibility modal
+  const openVisibilityModal = () => {
+    setTempVisibility(settings?.visibility || DEFAULT_VISIBILITY);
+    setShowVisibilityModal(true);
+    setMenuOpen(false);
+  };
+
+  // Save visibility settings
+  const saveVisibilitySettings = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch("/api/admin/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          settings: {
+            payroll: {
+              ...settings,
+              visibility: tempVisibility,
+            },
+          },
+        }),
+      });
+
+      if (res.ok) {
+        setSettings((prev) => prev ? { ...prev, visibility: tempVisibility } : prev);
+        setShowVisibilityModal(false);
+      }
+    } catch (error) {
+      console.error("Error saving visibility settings:", error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Reset visibility to default
+  const resetVisibilityToDefault = () => {
+    setTempVisibility(DEFAULT_VISIBILITY);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -331,14 +477,10 @@ export default function PayrollSettingsPage() {
                 <div className="fixed inset-0" onClick={() => setMenuOpen(false)} />
                 <div className="absolute right-0 mt-1 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10">
                   <button
-                    onClick={openFieldTechModal}
+                    onClick={openVisibilityModal}
                     className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
                   >
-                    {settings?.showPayrollOnFieldTechApp ? (
-                      <EyeOff className="w-4 h-4" />
-                    ) : (
-                      <Eye className="w-4 h-4" />
-                    )}
+                    <Eye className="w-4 h-4" />
                     Show/Hide Payroll Info
                   </button>
                   <button
@@ -618,6 +760,181 @@ export default function PayrollSettingsPage() {
                 >
                   {saving ? "SAVING..." : "SAVE"}
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Show/Hide Payroll Info Modal */}
+      {showVisibilityModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex min-h-full items-center justify-center p-4">
+            <div className="fixed inset-0 bg-black/50" onClick={() => setShowVisibilityModal(false)} />
+            <div className="relative bg-white rounded-lg shadow-xl w-full max-w-2xl">
+              <div className="p-6 pb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Show/Hide Payroll Info</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  Please hide information that you do not use. Your changes will be applied to all payroll views for all staff.
+                </p>
+              </div>
+              <div className="px-6 pb-6">
+                <div className="grid grid-cols-2 gap-x-8 gap-y-3">
+                  {/* Left Column */}
+                  <div className="space-y-3">
+                    <VisibilityCheckbox
+                      label="Years in Service"
+                      checked={tempVisibility.yearsInService}
+                      onChange={(checked) => setTempVisibility({ ...tempVisibility, yearsInService: checked })}
+                    />
+                    <VisibilityCheckbox
+                      label="Residential Revenue"
+                      checked={tempVisibility.residentialRevenue}
+                      onChange={(checked) => setTempVisibility({ ...tempVisibility, residentialRevenue: checked })}
+                    />
+                    <VisibilityCheckbox
+                      label="Commercial Revenue"
+                      checked={tempVisibility.commercialRevenue}
+                      onChange={(checked) => setTempVisibility({ ...tempVisibility, commercialRevenue: checked })}
+                    />
+                    <VisibilityCheckbox
+                      label="Revenue"
+                      checked={tempVisibility.revenue}
+                      onChange={(checked) => setTempVisibility({ ...tempVisibility, revenue: checked })}
+                    />
+                    <VisibilityCheckbox
+                      label="Distance"
+                      checked={tempVisibility.distance}
+                      onChange={(checked) => setTempVisibility({ ...tempVisibility, distance: checked })}
+                    />
+                    <VisibilityCheckbox
+                      label="Overtime Hours"
+                      checked={tempVisibility.overtimeHours}
+                      onChange={(checked) => setTempVisibility({ ...tempVisibility, overtimeHours: checked })}
+                    />
+                    <VisibilityCheckbox
+                      label="Vacation Hours"
+                      checked={tempVisibility.vacationHours}
+                      onChange={(checked) => setTempVisibility({ ...tempVisibility, vacationHours: checked })}
+                    />
+                    <VisibilityCheckbox
+                      label="Tips"
+                      checked={tempVisibility.tips}
+                      onChange={(checked) => setTempVisibility({ ...tempVisibility, tips: checked })}
+                    />
+                    <VisibilityCheckbox
+                      label="Msc Reimb"
+                      checked={tempVisibility.miscReimb}
+                      onChange={(checked) => setTempVisibility({ ...tempVisibility, miscReimb: checked })}
+                    />
+                    <VisibilityCheckbox
+                      label="Nr of Jobs"
+                      checked={tempVisibility.nrOfJobs}
+                      onChange={(checked) => setTempVisibility({ ...tempVisibility, nrOfJobs: checked })}
+                    />
+                    <VisibilityCheckbox
+                      label="Mileage Rate"
+                      checked={tempVisibility.mileageRate}
+                      onChange={(checked) => setTempVisibility({ ...tempVisibility, mileageRate: checked })}
+                    />
+                    <VisibilityCheckbox
+                      label="Base Percentage"
+                      checked={tempVisibility.basePercentage}
+                      onChange={(checked) => setTempVisibility({ ...tempVisibility, basePercentage: checked })}
+                    />
+                    <VisibilityCheckbox
+                      label="Fixed Rate"
+                      checked={tempVisibility.fixedRate}
+                      onChange={(checked) => setTempVisibility({ ...tempVisibility, fixedRate: checked })}
+                    />
+                  </div>
+                  {/* Right Column */}
+                  <div className="space-y-3">
+                    <VisibilityCheckbox
+                      label="Worked Hours"
+                      checked={tempVisibility.workedHours}
+                      onChange={(checked) => setTempVisibility({ ...tempVisibility, workedHours: checked })}
+                    />
+                    <VisibilityCheckbox
+                      label="Additional Residential Services Revenue"
+                      checked={tempVisibility.additionalResidentialServicesRevenue}
+                      onChange={(checked) => setTempVisibility({ ...tempVisibility, additionalResidentialServicesRevenue: checked })}
+                    />
+                    <VisibilityCheckbox
+                      label="Additional Commercial Services Revenue"
+                      checked={tempVisibility.additionalCommercialServicesRevenue}
+                      onChange={(checked) => setTempVisibility({ ...tempVisibility, additionalCommercialServicesRevenue: checked })}
+                    />
+                    <VisibilityCheckbox
+                      label="Revenue Adjustment"
+                      checked={tempVisibility.revenueAdjustment}
+                      onChange={(checked) => setTempVisibility({ ...tempVisibility, revenueAdjustment: checked })}
+                    />
+                    <VisibilityCheckbox
+                      label="Regular Hours"
+                      checked={tempVisibility.regularHours}
+                      onChange={(checked) => setTempVisibility({ ...tempVisibility, regularHours: checked })}
+                    />
+                    <VisibilityCheckbox
+                      label="Holiday Hours"
+                      checked={tempVisibility.holidayHours}
+                      onChange={(checked) => setTempVisibility({ ...tempVisibility, holidayHours: checked })}
+                    />
+                    <VisibilityCheckbox
+                      label="PTO"
+                      checked={tempVisibility.pto}
+                      onChange={(checked) => setTempVisibility({ ...tempVisibility, pto: checked })}
+                    />
+                    <VisibilityCheckbox
+                      label="Addl Bonus"
+                      checked={tempVisibility.addlBonus}
+                      onChange={(checked) => setTempVisibility({ ...tempVisibility, addlBonus: checked })}
+                    />
+                    <VisibilityCheckbox
+                      label="Deductions"
+                      checked={tempVisibility.deductions}
+                      onChange={(checked) => setTempVisibility({ ...tempVisibility, deductions: checked })}
+                    />
+                    <VisibilityCheckbox
+                      label="Nr of Complaints"
+                      checked={tempVisibility.nrOfComplaints}
+                      onChange={(checked) => setTempVisibility({ ...tempVisibility, nrOfComplaints: checked })}
+                    />
+                    <VisibilityCheckbox
+                      label="Hourly Rate"
+                      checked={tempVisibility.hourlyRate}
+                      onChange={(checked) => setTempVisibility({ ...tempVisibility, hourlyRate: checked })}
+                    />
+                    <VisibilityCheckbox
+                      label="Per Yard Rate"
+                      checked={tempVisibility.perYardRate}
+                      onChange={(checked) => setTempVisibility({ ...tempVisibility, perYardRate: checked })}
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center justify-between px-6 pb-6">
+                <button
+                  onClick={resetVisibilityToDefault}
+                  className="text-teal-600 hover:text-teal-700 text-sm font-medium"
+                >
+                  Reset To Default
+                </button>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowVisibilityModal(false)}
+                    className="px-4 py-2 text-gray-600 font-medium hover:text-gray-800"
+                  >
+                    CANCEL
+                  </button>
+                  <button
+                    onClick={saveVisibilitySettings}
+                    disabled={saving}
+                    className="px-4 py-2 bg-teal-600 text-white font-medium rounded-md hover:bg-teal-700 disabled:opacity-50"
+                  >
+                    {saving ? "SAVING..." : "SAVE"}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
