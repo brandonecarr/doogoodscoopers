@@ -37,7 +37,6 @@ export default function ResidentialCrossSellsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [editingCrossSell, setEditingCrossSell] = useState<CrossSell | null>(null);
   const [isCreating, setIsCreating] = useState(false);
-  const [viewingCrossSell, setViewingCrossSell] = useState<CrossSell | null>(null);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -229,13 +228,13 @@ export default function ResidentialCrossSellsPage() {
                     </td>
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-3">
-                        <button
-                          onClick={() => setViewingCrossSell(crossSell)}
+                        <Link
+                          href={`/app/office/settings/residential-cross-sells/${crossSell.id}`}
                           className="inline-flex items-center gap-1 text-teal-600 hover:text-teal-700 text-sm font-medium"
                         >
                           View
                           <Eye className="w-3 h-3" />
-                        </button>
+                        </Link>
                         <button
                           onClick={() => {
                             setEditingCrossSell(crossSell);
@@ -391,14 +390,6 @@ export default function ResidentialCrossSellsPage() {
             setIsCreating(false);
           }}
           onSave={handleSaveCrossSell}
-        />
-      )}
-
-      {/* View Modal */}
-      {viewingCrossSell && (
-        <CrossSellViewModal
-          crossSell={viewingCrossSell}
-          onClose={() => setViewingCrossSell(null)}
         />
       )}
     </div>
@@ -604,65 +595,3 @@ function CrossSellEditModal({
   );
 }
 
-interface CrossSellViewModalProps {
-  crossSell: CrossSell;
-  onClose: () => void;
-}
-
-function CrossSellViewModal({ crossSell, onClose }: CrossSellViewModalProps) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-gray-900">Cross-Sell Details</h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="px-6 py-4 space-y-4">
-          <div>
-            <label className="text-sm text-gray-500">Name</label>
-            <p className="text-gray-900">{crossSell.name}</p>
-          </div>
-          <div>
-            <label className="text-sm text-gray-500">Description</label>
-            <p className="text-gray-900">{crossSell.description || "—"}</p>
-          </div>
-          <div>
-            <label className="text-sm text-gray-500">Unit</label>
-            <p className="text-gray-900">{crossSell.unit}</p>
-          </div>
-          <div>
-            <label className="text-sm text-gray-500">Price per Unit</label>
-            <p className="text-gray-900">${(crossSell.pricePerUnit / 100).toFixed(2)}</p>
-          </div>
-          <div>
-            <label className="text-sm text-gray-500">Type</label>
-            <p className="text-gray-900">
-              {crossSell.type === "SERVICE" ? "Service" : "Product"}
-            </p>
-          </div>
-          <div>
-            <label className="text-sm text-gray-500">Taxable</label>
-            <p className="text-gray-900">{crossSell.taxable ? "Yes" : "No"}</p>
-          </div>
-        </div>
-
-        <div className="px-6 py-4 border-t border-gray-200 flex justify-end">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
-          >
-            CLOSE
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
