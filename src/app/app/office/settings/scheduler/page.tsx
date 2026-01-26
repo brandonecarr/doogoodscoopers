@@ -328,7 +328,7 @@ export default function SchedulerSettingsPage() {
       <SettingRow
         title="Location Distance Tolerance (ft)"
         value={`${settings.locationDistanceTolerance} ft`}
-        description='Set a safe radius around the client location that would not set off the alarm "Field tech started/completed job too far from the client location." Example: Location distance tolerance is 300 feet. If a job is done 300 feet or closer to the client\'s location, it will not trigger an alarm!'
+        description={`Set a safe radius around the client location that would not set off the alarm "Field tech started/completed job too far from the client location." Example: Location distance tolerance is 300 feet. If a job is done 300 feet or closer to the client's location, it will not trigger an alarm!`}
         onEdit={() => {
           setEditNumber(settings.locationDistanceTolerance);
           setEditModal("locationDistanceTolerance");
@@ -339,7 +339,7 @@ export default function SchedulerSettingsPage() {
       <SettingRow
         title="Cleanup Duration Tolerance (%)"
         value={`${settings.cleanupDurationTolerance}%`}
-        description='Set the expected cleanup duration tolerance so that it will not trigger the alarm: "Field tech recorded too little / too much time at client location". Example: Estimated Cleanup Time is 10 min and Cleanup Duration Tolerance is 40%. If your field tech completes the cleanup between 6 min and 14 min, an alert will not appear.'
+        description={`Set the expected cleanup duration tolerance so that it will not trigger the alarm: "Field tech recorded too little / too much time at client location". Example: Estimated Cleanup Time is 10 min and Cleanup Duration Tolerance is 40%. If your field tech completes the cleanup between 6 min and 14 min, an alert will not appear.`}
         onEdit={() => {
           setEditNumber(settings.cleanupDurationTolerance);
           setEditModal("cleanupDurationTolerance");
