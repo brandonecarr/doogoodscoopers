@@ -8,7 +8,6 @@ import {
   Mail,
   Phone,
   MapPin,
-  Dog,
   Calendar,
   DollarSign,
   Clock,
@@ -18,32 +17,32 @@ import {
   Pause,
   Ban,
   AlertTriangle,
-  Building,
-  Tag,
-  FileText,
-  Briefcase,
-  Shield,
-  ShieldAlert,
-  Key,
+  ChevronDown,
   Plus,
+  Eye,
+  RotateCcw,
+  Trash2,
+  Send,
+  RefreshCw,
+  FileText,
+  XCircle,
 } from "lucide-react";
 import type { ClientStatus, Frequency } from "@/lib/supabase/types";
 
+// Types
 interface Location {
   id: string;
-  addressLine1: string;
-  addressLine2: string | null;
+  address_line1: string;
+  address_line2: string | null;
   city: string;
   state: string;
-  zipCode: string;
-  fullAddress: string;
-  gateCode: string | null;
-  gateLocation: string | null;
-  accessNotes: string | null;
-  lotSize: string | null;
-  isPrimary: boolean;
-  isActive: boolean;
-  createdAt: string;
+  zip_code: string;
+  gate_code: string | null;
+  gate_location: string | null;
+  access_notes: string | null;
+  lot_size: string | null;
+  is_primary: boolean;
+  is_active: boolean;
 }
 
 interface DogInfo {
@@ -51,140 +50,73 @@ interface DogInfo {
   name: string;
   breed: string | null;
   size: string | null;
-  isSafe: boolean;
-  safetyNotes: string | null;
-  isActive: boolean;
-  createdAt: string;
+  is_safe: boolean;
+  safety_notes: string | null;
+  is_active: boolean;
 }
 
 interface Subscription {
   id: string;
   status: string;
   frequency: Frequency;
-  pricePerVisitCents: number;
-  nextServiceDate: string | null;
-  serviceDay: string | null;
-  assignedTechId: string | null;
-  createdAt: string;
-  canceledAt: string | null;
-  cancelReason: string | null;
+  price_per_visit_cents: number;
+  next_service_date: string | null;
+  service_day: string | null;
+  assigned_tech_id: string | null;
+  created_at: string;
+  canceled_at: string | null;
+  cancel_reason: string | null;
 }
 
 interface Job {
   id: string;
   status: string;
-  scheduledDate: string;
-  completedAt: string | null;
-  skippedAt: string | null;
-  skipReason: string | null;
+  scheduled_date: string;
+  completed_at: string | null;
+  skipped_at: string | null;
+  skip_reason: string | null;
   notes: string | null;
-  techNotes: string | null;
-  createdAt: string;
+  tech_notes: string | null;
 }
 
 interface Payment {
   id: string;
-  amountCents: number;
+  amount_cents: number;
   status: string;
-  paymentType: string;
-  invoiceNumber: string | null;
-  invoiceDate: string | null;
-  dueDate: string | null;
-  paidAt: string | null;
-  createdAt: string;
+  payment_type: string;
+  invoice_number: string | null;
+  invoice_date: string | null;
+  due_date: string | null;
+  paid_at: string | null;
+  created_at: string;
 }
 
 interface Client {
   id: string;
-  firstName: string;
-  lastName: string | null;
-  fullName: string;
-  companyName: string | null;
+  first_name: string;
+  last_name: string | null;
+  company_name: string | null;
   email: string | null;
   phone: string | null;
-  secondaryPhone: string | null;
-  clientType: "RESIDENTIAL" | "COMMERCIAL";
+  secondary_phone: string | null;
+  client_type: "RESIDENTIAL" | "COMMERCIAL";
   status: ClientStatus;
-  accountCreditCents: number;
+  account_credit_cents: number;
   tags: string[];
   notes: string | null;
-  referralSource: string | null;
-  hasStripeCustomer: boolean;
-  notificationPreferences: { email?: boolean; sms?: boolean } | null;
-  createdAt: string;
-  updatedAt: string;
+  referral_source: string | null;
+  stripe_customer_id: string | null;
+  notification_preferences: { email?: boolean; sms?: boolean } | null;
+  created_at: string;
+  updated_at: string;
   locations: Location[];
   dogs: DogInfo[];
   subscriptions: Subscription[];
-  assignedTech: {
-    id: string;
-    firstName: string;
-    lastName: string;
-    fullName: string;
-    email: string;
-  } | null;
   recentJobs: Job[];
   recentPayments: Payment[];
 }
 
-function getStatusIcon(status: ClientStatus) {
-  switch (status) {
-    case "ACTIVE":
-      return <CheckCircle className="w-4 h-4 text-green-500" />;
-    case "PAUSED":
-      return <Pause className="w-4 h-4 text-yellow-500" />;
-    case "CANCELED":
-      return <Ban className="w-4 h-4 text-gray-400" />;
-    case "DELINQUENT":
-      return <AlertTriangle className="w-4 h-4 text-red-500" />;
-  }
-}
-
-function getStatusColor(status: ClientStatus) {
-  switch (status) {
-    case "ACTIVE":
-      return "text-green-700 bg-green-100";
-    case "PAUSED":
-      return "text-yellow-700 bg-yellow-100";
-    case "CANCELED":
-      return "text-gray-700 bg-gray-100";
-    case "DELINQUENT":
-      return "text-red-700 bg-red-100";
-  }
-}
-
-function getJobStatusColor(status: string) {
-  switch (status) {
-    case "COMPLETED":
-      return "text-green-700 bg-green-100";
-    case "SKIPPED":
-      return "text-yellow-700 bg-yellow-100";
-    case "SCHEDULED":
-      return "text-blue-700 bg-blue-100";
-    case "IN_PROGRESS":
-      return "text-purple-700 bg-purple-100";
-    default:
-      return "text-gray-700 bg-gray-100";
-  }
-}
-
-function getPaymentStatusColor(status: string) {
-  switch (status) {
-    case "PAID":
-      return "text-green-700 bg-green-100";
-    case "PENDING":
-      return "text-yellow-700 bg-yellow-100";
-    case "FAILED":
-      return "text-red-700 bg-red-100";
-    case "OPEN":
-      return "text-blue-700 bg-blue-100";
-    case "DRAFT":
-      return "text-gray-700 bg-gray-100";
-    default:
-      return "text-gray-700 bg-gray-100";
-  }
-}
-
+// Helper functions
 function formatCurrency(cents: number) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -194,8 +126,8 @@ function formatCurrency(cents: number) {
 
 function formatFrequency(freq: Frequency) {
   const labels: Record<Frequency, string> = {
-    WEEKLY: "Weekly",
-    BIWEEKLY: "Bi-weekly",
+    WEEKLY: "Once A Week",
+    BIWEEKLY: "Every Two Weeks",
     MONTHLY: "Monthly",
     ONETIME: "One-time",
   };
@@ -204,20 +136,29 @@ function formatFrequency(freq: Frequency) {
 
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
     year: "numeric",
+    month: "short",
+    day: "2-digit",
   });
 }
 
-function formatDateTime(dateStr: string) {
-  return new Date(dateStr).toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
+function getStatusBadge(status: string) {
+  const colors: Record<string, string> = {
+    ACTIVE: "text-green-700 bg-green-100",
+    PAUSED: "text-yellow-700 bg-yellow-100",
+    CANCELED: "text-red-700 bg-red-100",
+    DELINQUENT: "text-orange-700 bg-orange-100",
+    PAID: "text-green-700 bg-green-100",
+    SUCCEEDED: "text-green-700 bg-green-100",
+    PENDING: "text-yellow-700 bg-yellow-100",
+    OPEN: "text-blue-700 bg-blue-100",
+    DRAFT: "text-gray-700 bg-gray-100",
+    FAILED: "text-red-700 bg-red-100",
+    DISPATCHED: "text-orange-700 bg-orange-100",
+    COMPLETED: "text-green-700 bg-green-100",
+    SCHEDULED: "text-blue-700 bg-blue-100",
+  };
+  return colors[status] || "text-gray-700 bg-gray-100";
 }
 
 interface PageProps {
@@ -229,6 +170,11 @@ export default function ClientDetailPage({ params }: PageProps) {
   const [loading, setLoading] = useState(true);
   const [client, setClient] = useState<Client | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showActions, setShowActions] = useState(false);
+  const [billingTab, setBillingTab] = useState<"subscriptions" | "invoices" | "payments" | "cards" | "giftcerts">("subscriptions");
+  const [scheduleTab, setScheduleTab] = useState<"recurring" | "initial" | "latest">("recurring");
+  const [notesTab, setNotesTab] = useState<"office" | "totech" | "fromtech" | "fromclient">("office");
+  const [activeDogTab, setActiveDogTab] = useState(0);
 
   useEffect(() => {
     async function fetchClient() {
@@ -268,7 +214,7 @@ export default function ClientDetailPage({ params }: PageProps) {
           className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900"
         >
           <ArrowLeft className="w-4 h-4" />
-          Back to Clients
+          Back
         </Link>
         <div className="bg-red-50 text-red-700 p-6 rounded-lg text-center">
           <AlertTriangle className="w-8 h-8 mx-auto mb-2" />
@@ -278,516 +224,861 @@ export default function ClientDetailPage({ params }: PageProps) {
     );
   }
 
-  const activeSubscription = client.subscriptions.find((s) => s.status === "ACTIVE");
-  const activeDogs = client.dogs.filter((d) => d.isActive);
-  const activeLocations = client.locations.filter((l) => l.isActive);
-  const primaryLocation = activeLocations.find((l) => l.isPrimary) || activeLocations[0];
+  const fullName = [client.first_name, client.last_name].filter(Boolean).join(" ") || client.company_name || "Unknown";
+  const initials = client.first_name?.[0]?.toUpperCase() || "?";
+  const activeDogs = client.dogs?.filter((d) => d.is_active) || [];
+  const activeLocations = client.locations?.filter((l) => l.is_active) || [];
+  const primaryLocation = activeLocations.find((l) => l.is_primary) || activeLocations[0];
+  const activeSubscriptions = client.subscriptions?.filter((s) => s.status === "ACTIVE") || [];
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link
-            href="/app/office/clients"
-            className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </Link>
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 bg-teal-600 rounded-full flex items-center justify-center text-white text-xl font-medium">
-              {client.firstName?.[0] || "?"}
-            </div>
-            <div>
-              <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-bold text-gray-900">{client.fullName}</h1>
-                <span
-                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${getStatusColor(client.status)}`}
-                >
-                  {getStatusIcon(client.status)}
-                  {client.status}
-                </span>
-              </div>
-              <div className="flex items-center gap-3 mt-1 text-sm text-gray-500">
-                <span className="flex items-center gap-1">
-                  {client.clientType === "COMMERCIAL" ? (
-                    <Building className="w-4 h-4" />
-                  ) : (
-                    <User className="w-4 h-4" />
-                  )}
-                  {client.clientType}
-                </span>
-                {client.companyName && (
-                  <span className="flex items-center gap-1">
-                    <Briefcase className="w-4 h-4" />
-                    {client.companyName}
-                  </span>
-                )}
-                <span className="flex items-center gap-1">
-                  <Calendar className="w-4 h-4" />
-                  Client since {formatDate(client.createdAt)}
-                </span>
-              </div>
-            </div>
-          </div>
+          <h1 className="text-xl font-semibold text-gray-900">Client Info</h1>
         </div>
         <Link
-          href={`/app/office/clients?edit=${client.id}`}
-          className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
+          href="/app/office/clients"
+          className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
         >
-          <Edit className="w-4 h-4" />
-          Edit Client
+          <ArrowLeft className="w-4 h-4" />
+          Back
         </Link>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column - Main Info */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Contact Info */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <User className="w-5 h-5 text-gray-400" />
-              Contact Information
-            </h2>
-            <div className="grid grid-cols-2 gap-4">
-              {client.email && (
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
-                    <Mail className="w-5 h-5 text-gray-500" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500">Email</p>
-                    <a href={`mailto:${client.email}`} className="text-teal-600 hover:underline">
-                      {client.email}
-                    </a>
-                  </div>
-                </div>
-              )}
-              {client.phone && (
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
-                    <Phone className="w-5 h-5 text-gray-500" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500">Phone</p>
-                    <a href={`tel:${client.phone}`} className="text-teal-600 hover:underline">
-                      {client.phone}
-                    </a>
-                  </div>
-                </div>
-              )}
-              {client.secondaryPhone && (
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
-                    <Phone className="w-5 h-5 text-gray-500" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500">Secondary Phone</p>
-                    <a href={`tel:${client.secondaryPhone}`} className="text-teal-600 hover:underline">
-                      {client.secondaryPhone}
-                    </a>
-                  </div>
-                </div>
-              )}
-              {client.referralSource && (
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
-                    <FileText className="w-5 h-5 text-gray-500" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500">Referral Source</p>
-                    <p className="text-gray-900">{client.referralSource}</p>
-                  </div>
-                </div>
-              )}
+      {/* Client Header Card */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 bg-teal-600 rounded-full flex items-center justify-center text-white text-xl font-medium">
+              {initials}
             </div>
-            {client.tags.length > 0 && (
-              <div className="mt-4 pt-4 border-t border-gray-100">
-                <p className="text-xs text-gray-500 mb-2 flex items-center gap-1">
-                  <Tag className="w-3 h-3" />
-                  Tags
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {client.tags.map((tag, i) => (
-                    <span
-                      key={i}
-                      className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-lg"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900">{fullName}</h2>
+              <span className={`inline-block mt-1 px-2 py-0.5 text-xs font-medium rounded ${client.client_type === "RESIDENTIAL" ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700"}`}>
+                {client.client_type}
+              </span>
+            </div>
           </div>
 
-          {/* Locations */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                <MapPin className="w-5 h-5 text-gray-400" />
-                Locations ({activeLocations.length})
-              </h2>
-              <button className="text-sm text-teal-600 hover:text-teal-700 flex items-center gap-1">
-                <Plus className="w-4 h-4" />
-                Add Location
+          <div className="flex items-center gap-6">
+            {/* Stats */}
+            <div className="flex items-center gap-6 text-sm">
+              <div className="text-center">
+                <p className="text-gray-500">Gift Cert.</p>
+                <p className="font-semibold text-gray-900">$0.00</p>
+              </div>
+              <div className="text-center border-l border-gray-200 pl-6">
+                <p className="text-gray-500">Open</p>
+                <p className="font-semibold text-gray-900">$0.00</p>
+              </div>
+              <div className="text-center border-l border-gray-200 pl-6">
+                <p className="text-gray-500">Overdue</p>
+                <p className="font-semibold text-red-600">$0.00</p>
+              </div>
+            </div>
+
+            {/* Actions Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setShowActions(!showActions)}
+                className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
+              >
+                ACTIONS
+                <ChevronDown className="w-4 h-4" />
               </button>
+              {showActions && (
+                <div className="absolute right-0 top-full mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-20">
+                  <button className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3">
+                    <Mail className="w-4 h-4 text-gray-400" />
+                    Resend Login Info
+                  </button>
+                  <button className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3">
+                    <RefreshCw className="w-4 h-4 text-gray-400" />
+                    Convert to {client.client_type === "RESIDENTIAL" ? "Commercial" : "Residential"} Client
+                  </button>
+                  <button className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-3">
+                    <XCircle className="w-4 h-4" />
+                    Cancel All Active Subscriptions
+                  </button>
+                  <button className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-3">
+                    <Ban className="w-4 h-4" />
+                    Disable Client
+                  </button>
+                </div>
+              )}
             </div>
-            {activeLocations.length === 0 ? (
-              <p className="text-gray-500 text-sm">No locations added</p>
-            ) : (
-              <div className="space-y-4">
-                {activeLocations.map((location) => (
-                  <div
-                    key={location.id}
-                    className={`p-4 rounded-lg border ${location.isPrimary ? "border-teal-200 bg-teal-50" : "border-gray-100 bg-gray-50"}`}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium text-gray-900">{location.addressLine1}</p>
-                          {location.isPrimary && (
-                            <span className="text-xs px-2 py-0.5 bg-teal-600 text-white rounded">
-                              Primary
-                            </span>
-                          )}
-                        </div>
-                        {location.addressLine2 && (
-                          <p className="text-gray-600">{location.addressLine2}</p>
-                        )}
-                        <p className="text-gray-600">
-                          {location.city}, {location.state} {location.zipCode}
-                        </p>
-                      </div>
-                      <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-white rounded">
-                        <Edit className="w-4 h-4" />
-                      </button>
-                    </div>
-                    {(location.gateCode || location.accessNotes) && (
-                      <div className="mt-3 pt-3 border-t border-gray-200 space-y-2">
-                        {location.gateCode && (
-                          <p className="text-sm text-gray-600 flex items-center gap-2">
-                            <Key className="w-4 h-4 text-gray-400" />
-                            Gate Code: <span className="font-mono font-medium">{location.gateCode}</span>
-                          </p>
-                        )}
-                        {location.accessNotes && (
-                          <p className="text-sm text-gray-600">{location.accessNotes}</p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Dogs */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                <Dog className="w-5 h-5 text-gray-400" />
-                Dogs ({activeDogs.length})
-              </h2>
-              <button className="text-sm text-teal-600 hover:text-teal-700 flex items-center gap-1">
-                <Plus className="w-4 h-4" />
-                Add Dog
-              </button>
-            </div>
-            {activeDogs.length === 0 ? (
-              <p className="text-gray-500 text-sm">No dogs added</p>
-            ) : (
-              <div className="grid grid-cols-2 gap-4">
-                {activeDogs.map((dog) => (
-                  <div key={dog.id} className="p-4 rounded-lg border border-gray-100 bg-gray-50">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
-                          <Dog className="w-5 h-5 text-amber-600" />
-                        </div>
-                        <div>
-                          <p className="font-medium text-gray-900">{dog.name}</p>
-                          <p className="text-sm text-gray-500">
-                            {[dog.breed, dog.size].filter(Boolean).join(" • ") || "No details"}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        {dog.isSafe ? (
-                          <span className="flex items-center gap-1 text-xs text-green-600">
-                            <Shield className="w-4 h-4" />
-                            Safe
-                          </span>
-                        ) : (
-                          <span className="flex items-center gap-1 text-xs text-red-600">
-                            <ShieldAlert className="w-4 h-4" />
-                            Caution
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    {dog.safetyNotes && (
-                      <p className="mt-2 text-sm text-gray-600 bg-white p-2 rounded">
-                        {dog.safetyNotes}
-                      </p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Recent Jobs */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-gray-400" />
-              Recent Jobs
-            </h2>
-            {client.recentJobs.length === 0 ? (
-              <p className="text-gray-500 text-sm">No jobs yet</p>
-            ) : (
-              <div className="space-y-2">
-                {client.recentJobs.slice(0, 10).map((job) => (
-                  <div
-                    key={job.id}
-                    className="flex items-center justify-between p-3 rounded-lg bg-gray-50 hover:bg-gray-100"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`px-2 py-1 rounded text-xs font-medium ${getJobStatusColor(job.status)}`}
-                      >
-                        {job.status}
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-900">
-                          {formatDate(job.scheduledDate)}
-                        </p>
-                        {job.notes && (
-                          <p className="text-xs text-gray-500 truncate max-w-[200px]">
-                            {job.notes}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    {job.completedAt && (
-                      <p className="text-xs text-gray-500">
-                        Completed {formatDateTime(job.completedAt)}
-                      </p>
-                    )}
-                    {job.skippedAt && (
-                      <p className="text-xs text-yellow-600">
-                        Skipped: {job.skipReason}
-                      </p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Recent Payments */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <CreditCard className="w-5 h-5 text-gray-400" />
-              Recent Invoices & Payments
-            </h2>
-            {client.recentPayments.length === 0 ? (
-              <p className="text-gray-500 text-sm">No payments yet</p>
-            ) : (
-              <div className="space-y-2">
-                {client.recentPayments.slice(0, 10).map((payment) => (
-                  <div
-                    key={payment.id}
-                    className="flex items-center justify-between p-3 rounded-lg bg-gray-50 hover:bg-gray-100"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`px-2 py-1 rounded text-xs font-medium ${getPaymentStatusColor(payment.status)}`}
-                      >
-                        {payment.status}
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">
-                          {formatCurrency(payment.amountCents)}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {payment.invoiceNumber || payment.paymentType}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right text-xs text-gray-500">
-                      {payment.paidAt ? (
-                        <p className="text-green-600">Paid {formatDate(payment.paidAt)}</p>
-                      ) : payment.dueDate ? (
-                        <p>Due {formatDate(payment.dueDate)}</p>
-                      ) : (
-                        <p>{formatDate(payment.createdAt)}</p>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         </div>
+      </div>
 
-        {/* Right Column - Sidebar */}
-        <div className="space-y-6">
-          {/* Subscription */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <Clock className="w-5 h-5 text-gray-400" />
-              Subscription
-            </h2>
-            {activeSubscription ? (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-600">Frequency</span>
-                  <span className="font-medium text-gray-900">
-                    {formatFrequency(activeSubscription.frequency)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-600">Rate</span>
-                  <span className="font-medium text-gray-900">
-                    {formatCurrency(activeSubscription.pricePerVisitCents)}/visit
-                  </span>
-                </div>
-                {activeSubscription.serviceDay && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-600">Service Day</span>
-                    <span className="font-medium text-gray-900 capitalize">
-                      {activeSubscription.serviceDay.toLowerCase()}
-                    </span>
-                  </div>
-                )}
-                {activeSubscription.nextServiceDate && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-600">Next Service</span>
-                    <span className="font-medium text-teal-600">
-                      {formatDate(activeSubscription.nextServiceDate)}
-                    </span>
-                  </div>
-                )}
-                {client.assignedTech && (
-                  <div className="pt-3 border-t border-gray-100">
-                    <p className="text-xs text-gray-500 mb-2">Assigned Technician</p>
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 text-sm font-medium">
-                        {client.assignedTech.firstName?.[0]}
-                      </div>
-                      <span className="text-gray-900">{client.assignedTech.fullName}</span>
-                    </div>
-                  </div>
-                )}
+      {/* Contact Info */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-100">
+        <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="font-semibold text-gray-900">Contact Info</h3>
+          <button className="text-sm text-teal-600 hover:text-teal-700">ADD NEW CONTACT</button>
+        </div>
+        <div className="p-4">
+          <div className="text-xs font-medium text-teal-600 mb-3">CONTACT INFO</div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex justify-between py-2 border-b border-gray-100">
+              <span className="text-sm text-gray-500">First name</span>
+              <span className="text-sm text-gray-900">{client.first_name || "No Data"}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b border-gray-100">
+              <span className="text-sm text-gray-500">Home Phone Number</span>
+              <span className="text-sm text-gray-900">{client.phone || "No Data"}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b border-gray-100">
+              <span className="text-sm text-gray-500">Middle Name</span>
+              <span className="text-sm text-gray-400">No Data</span>
+            </div>
+            <div className="flex justify-between py-2 border-b border-gray-100">
+              <span className="text-sm text-gray-500">Cell Phone Number</span>
+              <span className="text-sm text-gray-900">{client.secondary_phone || client.phone || "No Data"}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b border-gray-100">
+              <span className="text-sm text-gray-500">Last name</span>
+              <span className="text-sm text-gray-900">{client.last_name || "No Data"}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b border-gray-100">
+              <span className="text-sm text-gray-500">Tax Exempt</span>
+              <span className="text-sm text-gray-900">No</span>
+            </div>
+            <div className="flex justify-between py-2">
+              <span className="text-sm text-gray-500">Email</span>
+              <span className="text-sm text-gray-900">{client.email || "No Data"}</span>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 mt-4">
+            <button className="text-sm text-red-600 hover:text-red-700">REMOVE</button>
+            <button className="text-sm text-teal-600 hover:text-teal-700">EDIT</button>
+          </div>
+        </div>
+      </div>
+
+      {/* Location */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-100">
+        <div className="p-4 border-b border-gray-100">
+          <h3 className="font-semibold text-gray-900">Location</h3>
+        </div>
+        <div className="p-4">
+          {primaryLocation ? (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex justify-between py-2 border-b border-gray-100">
+                <span className="text-sm text-gray-500">Home Address</span>
+                <span className="text-sm text-gray-900">{primaryLocation.address_line1}</span>
               </div>
-            ) : (
-              <div className="text-center py-4">
-                <p className="text-gray-500 text-sm mb-3">No active subscription</p>
-                <button className="text-sm text-teal-600 hover:text-teal-700">
-                  + Create Subscription
+              <div className="flex justify-between py-2 border-b border-gray-100">
+                <span className="text-sm text-gray-500">Zip Code</span>
+                <span className="text-sm text-gray-900">{primaryLocation.zip_code}</span>
+              </div>
+              <div className="flex justify-between py-2 border-b border-gray-100">
+                <span className="text-sm text-gray-500">City</span>
+                <span className="text-sm text-gray-900">{primaryLocation.city}</span>
+              </div>
+              <div className="flex justify-between py-2 border-b border-gray-100">
+                <span className="text-sm text-gray-500">Country</span>
+                <span className="text-sm text-gray-900">United States</span>
+              </div>
+              <div className="flex justify-between py-2">
+                <span className="text-sm text-gray-500">State</span>
+                <span className="text-sm text-gray-900">{primaryLocation.state}</span>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-400">No location data</p>
+          )}
+          <div className="flex justify-end mt-4">
+            <button className="text-sm text-teal-600 hover:text-teal-700">EDIT</button>
+          </div>
+        </div>
+      </div>
+
+      {/* Billing */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-100">
+        <div className="p-4 border-b border-gray-100">
+          <h3 className="font-semibold text-gray-900">Billing</h3>
+        </div>
+        <div className="border-b border-gray-100">
+          <div className="flex gap-6 px-4">
+            {[
+              { key: "subscriptions", label: "SUBSCRIPTIONS" },
+              { key: "invoices", label: "INVOICES" },
+              { key: "payments", label: "PAYMENTS" },
+              { key: "cards", label: "CREDIT CARDS" },
+              { key: "giftcerts", label: "GIFT CERTIFICATES" },
+            ].map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setBillingTab(tab.key as typeof billingTab)}
+                className={`py-3 text-sm font-medium border-b-2 -mb-px ${billingTab === tab.key ? "text-teal-600 border-teal-600" : "text-gray-500 border-transparent hover:text-gray-700"}`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="p-4">
+          {billingTab === "subscriptions" && (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-gray-500">
+                      <th className="pb-3 font-medium">Name</th>
+                      <th className="pb-3 font-medium">Status</th>
+                      <th className="pb-3 font-medium">Amount</th>
+                      <th className="pb-3 font-medium">Billing Option</th>
+                      <th className="pb-3 font-medium">Billing Interval</th>
+                      <th className="pb-3 font-medium">Start Date</th>
+                      <th className="pb-3 font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {client.subscriptions?.length > 0 ? (
+                      client.subscriptions.map((sub) => (
+                        <tr key={sub.id}>
+                          <td className="py-3 text-teal-600">{sub.frequency}</td>
+                          <td className="py-3">
+                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusBadge(sub.status)}`}>
+                              {sub.status}
+                            </span>
+                          </td>
+                          <td className="py-3">{formatCurrency(sub.price_per_visit_cents)} {sub.frequency.toLowerCase()}</td>
+                          <td className="py-3">Prepaid Fixed</td>
+                          <td className="py-3">Monthly</td>
+                          <td className="py-3">{formatDate(sub.created_at)}</td>
+                          <td className="py-3">
+                            <div className="flex items-center gap-2">
+                              <button className="p-1 text-gray-400 hover:text-teal-600"><Eye className="w-4 h-4" /></button>
+                              <button className="p-1 text-gray-400 hover:text-teal-600"><RotateCcw className="w-4 h-4" /></button>
+                              <button className="p-1 text-gray-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={7} className="py-8 text-center text-gray-400">No subscriptions</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              <div className="flex justify-end mt-4">
+                <button className="text-sm text-teal-600 hover:text-teal-700">CREATE NEW SUBSCRIPTION</button>
+              </div>
+            </>
+          )}
+          {billingTab === "invoices" && (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-gray-500">
+                      <th className="pb-3 font-medium">Date Created</th>
+                      <th className="pb-3 font-medium">Invoice #</th>
+                      <th className="pb-3 font-medium">Type</th>
+                      <th className="pb-3 font-medium">Payment Method</th>
+                      <th className="pb-3 font-medium">Status</th>
+                      <th className="pb-3 font-medium">Invoice Total</th>
+                      <th className="pb-3 font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {client.recentPayments?.length > 0 ? (
+                      client.recentPayments.map((payment) => (
+                        <tr key={payment.id}>
+                          <td className="py-3">{formatDate(payment.created_at)}</td>
+                          <td className="py-3 text-teal-600">{payment.invoice_number || "N/A"}</td>
+                          <td className="py-3">{payment.payment_type}</td>
+                          <td className="py-3">Credit Card</td>
+                          <td className="py-3">
+                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusBadge(payment.status)}`}>
+                              {payment.status}
+                            </span>
+                          </td>
+                          <td className="py-3">{formatCurrency(payment.amount_cents)}</td>
+                          <td className="py-3">
+                            <div className="flex items-center gap-2">
+                              <button className="text-teal-600 hover:text-teal-700 text-sm">View</button>
+                              <button className="text-gray-400 hover:text-gray-600 text-sm">More...</button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={7} className="py-8 text-center text-gray-400">No invoices</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              <div className="flex justify-end mt-4">
+                <button className="text-sm text-teal-600 hover:text-teal-700">CREATE INVOICE DRAFT</button>
+              </div>
+            </>
+          )}
+          {billingTab === "payments" && (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-gray-500">
+                      <th className="pb-3 font-medium">Date Created</th>
+                      <th className="pb-3 font-medium">Amount</th>
+                      <th className="pb-3 font-medium">Tip</th>
+                      <th className="pb-3 font-medium">Status</th>
+                      <th className="pb-3 font-medium">Payment Method</th>
+                      <th className="pb-3 font-medium">Description</th>
+                      <th className="pb-3 font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {client.recentPayments?.length > 0 ? (
+                      client.recentPayments.map((payment) => (
+                        <tr key={payment.id}>
+                          <td className="py-3">{formatDate(payment.created_at)}</td>
+                          <td className="py-3">{formatCurrency(payment.amount_cents)}</td>
+                          <td className="py-3">$0.00</td>
+                          <td className="py-3">
+                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusBadge(payment.status)}`}>
+                              {payment.status}
+                            </span>
+                          </td>
+                          <td className="py-3">Credit Card</td>
+                          <td className="py-3 text-gray-500">Payment for invoice(s) {payment.invoice_number}</td>
+                          <td className="py-3">
+                            <div className="flex items-center gap-2">
+                              <button className="p-1 text-gray-400 hover:text-teal-600"><Eye className="w-4 h-4" /></button>
+                              <button className="p-1 text-gray-400 hover:text-gray-600"><RotateCcw className="w-4 h-4" /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={7} className="py-8 text-center text-gray-400">No payments</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              <div className="flex justify-end mt-4">
+                <button className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">
+                  <CreditCard className="w-4 h-4" />
+                  RECEIVE CHECK PAYMENT
                 </button>
               </div>
-            )}
-          </div>
+            </>
+          )}
+          {billingTab === "cards" && (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-gray-500">
+                      <th className="pb-3 font-medium">Credit Card Number</th>
+                      <th className="pb-3 font-medium">Name on Card</th>
+                      <th className="pb-3 font-medium">Expiration Date</th>
+                      <th className="pb-3 font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {client.stripe_customer_id ? (
+                      <tr>
+                        <td className="py-3">
+                          <span className="font-bold text-blue-600">VISA</span>
+                          <span className="ml-2">xxxx xxxx (Default)</span>
+                        </td>
+                        <td className="py-3">{fullName}</td>
+                        <td className="py-3">XX/XXXX</td>
+                        <td className="py-3">
+                          <div className="flex items-center gap-4">
+                            <button className="text-sm text-gray-500">Set Default</button>
+                            <button className="text-sm text-red-600">Delete</button>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      <tr>
+                        <td colSpan={4} className="py-8 text-center text-gray-400">No credit cards on file</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              <div className="flex justify-end gap-4 mt-4">
+                <button className="text-sm text-teal-600 hover:text-teal-700">CREATE CARD LINK</button>
+                <button className="text-sm text-teal-600 hover:text-teal-700">ADD CARD</button>
+              </div>
+            </>
+          )}
+          {billingTab === "giftcerts" && (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-gray-500">
+                      <th className="pb-3 font-medium">Amount</th>
+                      <th className="pb-3 font-medium">Amount Used</th>
+                      <th className="pb-3 font-medium">Expires</th>
+                      <th className="pb-3 font-medium">Purchaser Name</th>
+                      <th className="pb-3 font-medium">Reference Number</th>
+                      <th className="pb-3 font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td colSpan={6} className="py-8 text-center text-gray-400">No data available</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div className="flex justify-end mt-4">
+                <button className="text-sm text-teal-600 hover:text-teal-700">CREATE GIFT CERTIFICATE</button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
 
-          {/* Account Balance */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <DollarSign className="w-5 h-5 text-gray-400" />
-              Account
-            </h2>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-gray-600">Account Credit</span>
-                <span
-                  className={`font-medium ${client.accountCreditCents > 0 ? "text-green-600" : "text-gray-900"}`}
-                >
-                  {formatCurrency(client.accountCreditCents)}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-gray-600">Payment Method</span>
-                <span className="font-medium text-gray-900">
-                  {client.hasStripeCustomer ? (
-                    <span className="flex items-center gap-1 text-green-600">
-                      <CreditCard className="w-4 h-4" />
-                      On file
-                    </span>
-                  ) : (
-                    <span className="text-gray-400">Not set up</span>
-                  )}
-                </span>
-              </div>
-            </div>
+      {/* Cross-Sells */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-100">
+        <div className="p-4 border-b border-gray-100">
+          <h3 className="font-semibold text-gray-900">Cross-Sells</h3>
+        </div>
+        <div className="p-4">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-gray-500">
+                <th className="pb-3 font-medium">Name</th>
+                <th className="pb-3 font-medium">Description</th>
+                <th className="pb-3 font-medium">Unit</th>
+                <th className="pb-3 font-medium">Price per Unit</th>
+                <th className="pb-3 font-medium">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td colSpan={5} className="py-8 text-center text-gray-400">No data available</td>
+              </tr>
+            </tbody>
+          </table>
+          <div className="flex justify-end mt-4">
+            <button className="text-sm text-teal-600 hover:text-teal-700">ADD NEW</button>
           </div>
+        </div>
+      </div>
 
-          {/* Primary Location Quick View */}
-          {primaryLocation && (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <MapPin className="w-5 h-5 text-gray-400" />
-                Primary Location
-              </h2>
-              <div className="space-y-2">
-                <p className="text-gray-900">{primaryLocation.addressLine1}</p>
-                {primaryLocation.addressLine2 && (
-                  <p className="text-gray-600">{primaryLocation.addressLine2}</p>
-                )}
-                <p className="text-gray-600">
-                  {primaryLocation.city}, {primaryLocation.state} {primaryLocation.zipCode}
-                </p>
-                {primaryLocation.gateCode && (
-                  <p className="text-sm text-gray-500 pt-2">
-                    <span className="font-medium">Gate:</span>{" "}
-                    <span className="font-mono">{primaryLocation.gateCode}</span>
-                  </p>
-                )}
-              </div>
-              <a
-                href={`https://maps.google.com/?q=${encodeURIComponent(primaryLocation.fullAddress)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-4 block w-full text-center py-2 text-sm text-teal-600 hover:text-teal-700 bg-teal-50 rounded-lg"
+      {/* Schedule */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-100">
+        <div className="p-4 border-b border-gray-100 flex items-center gap-3">
+          <h3 className="font-semibold text-gray-900">Schedule</h3>
+          {activeSubscriptions.map((sub, i) => (
+            <span key={sub.id} className={`px-3 py-1 text-xs rounded ${i === 0 ? "bg-teal-600 text-white" : "bg-gray-200 text-gray-700"}`}>
+              {sub.frequency}
+            </span>
+          ))}
+        </div>
+        <div className="border-b border-gray-100">
+          <div className="flex gap-6 px-4">
+            {[
+              { key: "recurring", label: "RECURRING SERVICE" },
+              { key: "initial", label: "INITIAL/ONE-TIME SERVICE" },
+              { key: "latest", label: "LATEST SERVICES" },
+            ].map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setScheduleTab(tab.key as typeof scheduleTab)}
+                className={`py-3 text-sm font-medium border-b-2 -mb-px ${scheduleTab === tab.key ? "text-teal-600 border-teal-600" : "text-gray-500 border-transparent hover:text-gray-700"}`}
               >
-                Open in Maps
-              </a>
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="p-4">
+          {scheduleTab === "recurring" && (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex justify-between py-2 border-b border-gray-100">
+                <span className="text-sm text-gray-500">Cleanup Frequency</span>
+                <span className="text-sm text-gray-900">{activeSubscriptions[0] ? formatFrequency(activeSubscriptions[0].frequency) : "No Data"}</span>
+              </div>
+              <div className="flex justify-between py-2 border-b border-gray-100">
+                <span className="text-sm text-gray-500">Service Days</span>
+                <span className="text-sm text-gray-900">{activeSubscriptions[0]?.service_day || "No Data"}</span>
+              </div>
+              <div className="flex justify-between py-2 border-b border-gray-100">
+                <span className="text-sm text-gray-500">Regular Service Start Date</span>
+                <span className="text-sm text-gray-900">{activeSubscriptions[0]?.next_service_date ? formatDate(activeSubscriptions[0].next_service_date) : "No Data"}</span>
+              </div>
+              <div className="flex justify-between py-2 border-b border-gray-100">
+                <span className="text-sm text-gray-500">Next Recurring Cleanup Date</span>
+                <span className="text-sm text-gray-900">{activeSubscriptions[0]?.next_service_date ? formatDate(activeSubscriptions[0].next_service_date) : "No Data"}</span>
+              </div>
+              <div className="flex justify-between py-2">
+                <span className="text-sm text-gray-500">Field Tech</span>
+                <span className="text-sm text-gray-900">Not Assigned</span>
+              </div>
+              <div className="flex justify-between py-2">
+                <span className="text-sm text-gray-500">Estimated Time for Recurring Cleanup</span>
+                <span className="text-sm text-gray-900">30 min</span>
+              </div>
             </div>
           )}
-
-          {/* Notes */}
-          {client.notes && (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <FileText className="w-5 h-5 text-gray-400" />
-                Internal Notes
-              </h2>
-              <p className="text-gray-600 text-sm whitespace-pre-wrap">{client.notes}</p>
+          {scheduleTab === "latest" && (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-gray-500">
+                    <th className="pb-3 font-medium">Job ID</th>
+                    <th className="pb-3 font-medium">Status</th>
+                    <th className="pb-3 font-medium">Cleanup Assign To</th>
+                    <th className="pb-3 font-medium">Schedule Date</th>
+                    <th className="pb-3 font-medium">Service Name</th>
+                    <th className="pb-3 font-medium">Spent Time</th>
+                    <th className="pb-3 font-medium">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {client.recentJobs?.length > 0 ? (
+                    client.recentJobs.map((job) => (
+                      <tr key={job.id}>
+                        <td className="py-3 text-teal-600">{job.id.substring(0, 8)}</td>
+                        <td className="py-3">
+                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusBadge(job.status)}`}>
+                            {job.status}
+                          </span>
+                        </td>
+                        <td className="py-3">Not Assigned</td>
+                        <td className="py-3">{formatDate(job.scheduled_date)}</td>
+                        <td className="py-3">Regular Plan Cleanup</td>
+                        <td className="py-3 text-gray-400">No Data</td>
+                        <td className="py-3">
+                          <button className="p-1 text-gray-400 hover:text-teal-600"><Eye className="w-4 h-4" /></button>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={7} className="py-8 text-center text-gray-400">No jobs</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           )}
+          {scheduleTab === "initial" && (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex justify-between py-2 border-b border-gray-100">
+                <span className="text-sm text-gray-500">Initial Cleanup Date</span>
+                <span className="text-sm text-gray-900">{client.created_at ? formatDate(client.created_at) : "No Data"}</span>
+              </div>
+              <div />
+              <div className="flex justify-between py-2 border-b border-gray-100">
+                <span className="text-sm text-gray-500">Initial Cleanup Assign To</span>
+                <span className="text-sm text-gray-900">Not Assigned</span>
+              </div>
+              <div />
+              <div className="flex justify-between py-2">
+                <span className="text-sm text-gray-500">Estimated Time for Initial Cleanup</span>
+                <span className="text-sm text-gray-900">90 min</span>
+              </div>
+            </div>
+          )}
+          <div className="flex justify-end gap-4 mt-4">
+            <button className="text-sm text-teal-600 hover:text-teal-700">ADD JOB</button>
+            <button className="text-sm text-teal-600 hover:text-teal-700">ADD ONE-TIME ADD-ON SERVICE</button>
+          </div>
+        </div>
+      </div>
 
-          {/* Notification Preferences */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Notifications</h2>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-gray-600">Email</span>
-                <span
-                  className={`text-sm ${client.notificationPreferences?.email ? "text-green-600" : "text-gray-400"}`}
+      {/* Notes */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-100">
+        <div className="p-4 border-b border-gray-100">
+          <h3 className="font-semibold text-gray-900">Notes</h3>
+        </div>
+        <div className="border-b border-gray-100">
+          <div className="flex gap-6 px-4">
+            {[
+              { key: "office", label: "OFFICE NOTES" },
+              { key: "totech", label: "TO TECH" },
+              { key: "fromtech", label: "FROM TECH" },
+              { key: "fromclient", label: "FROM CLIENT" },
+            ].map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setNotesTab(tab.key as typeof notesTab)}
+                className={`py-3 text-sm font-medium border-b-2 -mb-px ${notesTab === tab.key ? "text-teal-600 border-teal-600" : "text-gray-500 border-transparent hover:text-gray-700"}`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="p-4">
+          {notesTab === "office" && (
+            <div className="text-center py-8 text-gray-400">
+              {client.notes || "No data available"}
+            </div>
+          )}
+          {notesTab === "fromclient" && (
+            <div className="space-y-3">
+              {client.referral_source && (
+                <div className="flex justify-between py-2 border-b border-gray-100">
+                  <span className="text-sm text-gray-500">How you heard about us</span>
+                  <span className="text-sm text-gray-900">{client.referral_source}</span>
+                </div>
+              )}
+            </div>
+          )}
+          {(notesTab === "totech" || notesTab === "fromtech") && (
+            <div className="text-center py-8 text-gray-400">No data available</div>
+          )}
+          <div className="flex justify-end mt-4">
+            <button className="text-sm text-teal-600 hover:text-teal-700">CREATE NOTE</button>
+          </div>
+        </div>
+      </div>
+
+      {/* Dog Info */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-100">
+        <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="font-semibold text-gray-900">Dog Info</h3>
+          <button className="text-sm text-teal-600 hover:text-teal-700">ADD NEW</button>
+        </div>
+        {activeDogs.length > 0 && (
+          <div className="border-b border-gray-100">
+            <div className="flex gap-4 px-4">
+              {activeDogs.map((dog, i) => (
+                <button
+                  key={dog.id}
+                  onClick={() => setActiveDogTab(i)}
+                  className={`py-3 text-sm font-medium border-b-2 -mb-px ${activeDogTab === i ? "text-teal-600 border-teal-600" : "text-gray-500 border-transparent hover:text-gray-700"}`}
                 >
-                  {client.notificationPreferences?.email ? "Enabled" : "Disabled"}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-gray-600">SMS</span>
-                <span
-                  className={`text-sm ${client.notificationPreferences?.sms ? "text-green-600" : "text-gray-400"}`}
-                >
-                  {client.notificationPreferences?.sms ? "Enabled" : "Disabled"}
-                </span>
-              </div>
+                  DOG #{i + 1}
+                </button>
+              ))}
             </div>
           </div>
+        )}
+        <div className="p-4">
+          {activeDogs.length > 0 ? (
+            <>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex justify-between py-2 border-b border-gray-100">
+                  <span className="text-sm text-gray-500">Name</span>
+                  <span className="text-sm text-gray-900">{activeDogs[activeDogTab]?.name || "No Data"}</span>
+                </div>
+                <div className="flex justify-between py-2 border-b border-gray-100">
+                  <span className="text-sm text-gray-500">Dangerous Dog</span>
+                  <span className="text-sm text-gray-900">{activeDogs[activeDogTab]?.is_safe === false ? "Yes" : "-"}</span>
+                </div>
+                <div className="flex justify-between py-2 border-b border-gray-100">
+                  <span className="text-sm text-gray-500">Gender</span>
+                  <span className="text-sm text-gray-400">No Gender</span>
+                </div>
+                <div className="flex justify-between py-2 border-b border-gray-100">
+                  <span className="text-sm text-gray-500">Breed</span>
+                  <span className="text-sm text-gray-900">{activeDogs[activeDogTab]?.breed || "No Data"}</span>
+                </div>
+                <div className="flex justify-between py-2 border-b border-gray-100">
+                  <span className="text-sm text-gray-500">Birthdate</span>
+                  <span className="text-sm text-gray-400">No Birth Date</span>
+                </div>
+                <div className="flex justify-between py-2 border-b border-gray-100">
+                  <span className="text-sm text-gray-500">Additional Comments about Dog</span>
+                  <span className="text-sm text-gray-900">{activeDogs[activeDogTab]?.safety_notes || "No Additional Comment"}</span>
+                </div>
+                <div className="flex justify-between py-2">
+                  <span className="text-sm text-gray-500">Dog Photo</span>
+                  <span className="text-sm text-gray-400">No data</span>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 mt-4">
+                <button className="text-sm text-red-600 hover:text-red-700">REMOVE</button>
+                <button className="text-sm text-teal-600 hover:text-teal-700">EDIT</button>
+              </div>
+            </>
+          ) : (
+            <div className="text-center py-8 text-gray-400">No dogs added</div>
+          )}
+        </div>
+      </div>
+
+      {/* Yard Info */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-100">
+        <div className="p-4 border-b border-gray-100">
+          <h3 className="font-semibold text-gray-900">Yard Info</h3>
+        </div>
+        <div className="p-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex justify-between py-2 border-b border-gray-100">
+              <span className="text-sm text-gray-500">Gate Location</span>
+              <span className="text-sm text-gray-900">{primaryLocation?.gate_location || "No Data"}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b border-gray-100">
+              <span className="text-sm text-gray-500">Yard Size</span>
+              <span className="text-sm text-gray-900">{primaryLocation?.lot_size || "No Data"}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b border-gray-100">
+              <span className="text-sm text-gray-500">Gate Code</span>
+              <span className="text-sm text-gray-900">{primaryLocation?.gate_code || "No Data"}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b border-gray-100">
+              <span className="text-sm text-gray-500">Gated Community</span>
+              <span className="text-sm text-gray-400">No Data</span>
+            </div>
+            <div className="flex justify-between py-2 border-b border-gray-100">
+              <span className="text-sm text-gray-500">Areas To Clean</span>
+              <span className="text-sm text-gray-400">No data</span>
+            </div>
+            <div className="flex justify-between py-2 border-b border-gray-100">
+              <span className="text-sm text-gray-500">Yard Photo</span>
+              <span className="text-sm text-gray-400">No data</span>
+            </div>
+            <div className="flex justify-between py-2 border-b border-gray-100">
+              <span className="text-sm text-gray-500">Doggie Door</span>
+              <span className="text-sm text-gray-400">No Data</span>
+            </div>
+            <div className="flex justify-between py-2 border-b border-gray-100">
+              <span className="text-sm text-gray-500">Garbage Can Location</span>
+              <span className="text-sm text-gray-400">No Data</span>
+            </div>
+            <div className="flex justify-between py-2 col-span-2">
+              <span className="text-sm text-gray-500">Additional Comments</span>
+              <span className="text-sm text-gray-900">{primaryLocation?.access_notes || "No Data"}</span>
+            </div>
+          </div>
+          <div className="flex justify-end mt-4">
+            <button className="text-sm text-teal-600 hover:text-teal-700">EDIT</button>
+          </div>
+        </div>
+      </div>
+
+      {/* Notification Preferences */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-100">
+        <div className="p-4 border-b border-gray-100">
+          <h3 className="font-semibold text-gray-900">Notification Preferences</h3>
+        </div>
+        <div className="p-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex justify-between py-2 border-b border-gray-100">
+              <span className="text-sm text-gray-500">Cleanup Notification Type</span>
+              <span className="text-sm text-gray-400">No Cleanup Notification Type</span>
+            </div>
+            <div />
+            <div className="flex justify-between py-2">
+              <span className="text-sm text-gray-500">Cleanup Notification Method</span>
+              <span className="text-sm text-gray-900">
+                {client.notification_preferences?.sms ? "Text + " : ""}
+                {client.notification_preferences?.email ? "Email + " : ""}
+                Web Portal
+              </span>
+            </div>
+          </div>
+          <div className="flex justify-end mt-4">
+            <button className="text-sm text-teal-600 hover:text-teal-700">EDIT</button>
+          </div>
+        </div>
+      </div>
+
+      {/* Net Terms */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-100">
+        <div className="p-4 border-b border-gray-100">
+          <h3 className="font-semibold text-gray-900">Net Terms</h3>
+        </div>
+        <div className="p-4">
+          <div className="flex justify-between py-2">
+            <span className="text-sm text-gray-500">NET</span>
+            <span className="text-sm text-gray-900">Organization Default</span>
+          </div>
+          <div className="flex justify-end mt-4">
+            <button className="text-sm text-teal-600 hover:text-teal-700">EDIT</button>
+          </div>
+        </div>
+      </div>
+
+      {/* Client Tax */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-100">
+        <div className="p-4 border-b border-gray-100">
+          <h3 className="font-semibold text-gray-900">Client Tax</h3>
+        </div>
+        <div className="p-4">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-gray-500">
+                <th className="pb-3 font-medium">Tax Name</th>
+                <th className="pb-3 font-medium">Service Percentage</th>
+                <th className="pb-3 font-medium">Product Percentage</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td className="py-2">SALES TAX TOTAL</td>
+                <td className="py-2">0.000%</td>
+                <td className="py-2">0.000%</td>
+              </tr>
+            </tbody>
+          </table>
+          <div className="flex justify-end mt-4">
+            <button className="text-sm text-teal-600 hover:text-teal-700">EDIT</button>
+          </div>
+        </div>
+      </div>
+
+      {/* Terms of Service */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-100">
+        <div className="p-4 border-b border-gray-100">
+          <h3 className="font-semibold text-gray-900">Terms of Service</h3>
+        </div>
+        <div className="p-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex justify-between py-2">
+              <span className="text-sm text-gray-500">Terms of Service</span>
+              <span className="text-sm text-gray-400">Not Accepted</span>
+            </div>
+            <div className="flex justify-between py-2">
+              <span className="text-sm text-gray-500">Accepted on</span>
+              <span className="text-sm text-gray-400">-</span>
+            </div>
+          </div>
+          <div className="flex justify-end mt-4">
+            <button className="text-sm text-teal-600 hover:text-teal-700">SEND TERMS OF SERVICE</button>
+          </div>
+        </div>
+      </div>
+
+      {/* Activity */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-100">
+        <div className="p-4 border-b border-gray-100">
+          <h3 className="font-semibold text-gray-900">Activity</h3>
+        </div>
+        <div className="p-4">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-gray-500">
+                <th className="pb-3 font-medium">Type</th>
+                <th className="pb-3 font-medium">Changed By</th>
+                <th className="pb-3 font-medium">Status</th>
+                <th className="pb-3 font-medium">Comment</th>
+                <th className="pb-3 font-medium">Created At</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              <tr>
+                <td className="py-3">Client Created</td>
+                <td className="py-3">System</td>
+                <td className="py-3">Approved</td>
+                <td className="py-3 text-gray-400">No Data</td>
+                <td className="py-3">{formatDate(client.created_at)}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
