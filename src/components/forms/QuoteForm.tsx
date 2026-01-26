@@ -206,7 +206,7 @@ const defaultOnboardingSettings: OnboardingSettings = {
   requestLastNameBeforeQuote: { enabled: false },
   homePhoneNumber: { enabled: false },
   cellPhoneNumber: { enabled: true, required: true },
-  requestCellPhoneBeforeQuote: { enabled: false },
+  requestCellPhoneBeforeQuote: { enabled: true },
   requestEmailBeforeQuote: { enabled: false },
   dogNames: { enabled: true, required: true },
   isDogSafe: { enabled: true },
