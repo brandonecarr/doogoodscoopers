@@ -1,7 +1,6 @@
 import { requireFieldAccess } from "@/lib/auth-supabase";
-import { FieldHeader } from "@/components/portals/field/FieldHeader";
-import { FieldBottomNav } from "@/components/portals/field/FieldBottomNav";
 import { PWAProvider } from "@/components/portals/field/PWAProvider";
+import { FieldLayoutClient } from "@/components/portals/field/FieldLayoutClient";
 
 export default async function FieldLayout({
   children,
@@ -12,11 +11,9 @@ export default async function FieldLayout({
 
   return (
     <PWAProvider>
-      <div className="min-h-screen bg-gray-100 pb-16">
-        <FieldHeader user={user} />
-        <main className="px-4 py-4">{children}</main>
-        <FieldBottomNav />
-      </div>
+      <FieldLayoutClient user={user}>
+        {children}
+      </FieldLayoutClient>
     </PWAProvider>
   );
 }
