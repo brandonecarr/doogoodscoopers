@@ -5,7 +5,7 @@
  * Settings are stored in the organization's settings JSONB column.
  *
  * GET - Returns current onboarding settings
- * POST - Updates onboarding settings
+ * POST/PUT - Updates onboarding settings
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
  * POST /api/admin/onboarding-settings
  * Update onboarding settings for the organization
  *
- * Body: { onboarding?, calloutDisclaimers?, thankYouPages?, emailSettings?, termsOfService?, privacyPolicy? }
+ * Body: { onboarding?, calloutDisclaimers?, thankYouPages?, emailSettings?, termsOfService?, privacyPolicy?, servicePlans?, residentialCrossSells? }
  */
 export async function POST(request: NextRequest) {
   const auth = await authenticateWithPermission(request, "settings:write");
@@ -67,10 +67,10 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { onboarding, calloutDisclaimers, thankYouPages, emailSettings, termsOfService, privacyPolicy } = body;
+    const { onboarding, calloutDisclaimers, thankYouPages, emailSettings, termsOfService, privacyPolicy, servicePlans, residentialCrossSells } = body;
 
     // At least one settings type must be provided
-    if (!onboarding && !calloutDisclaimers && !thankYouPages && !emailSettings && !termsOfService && !privacyPolicy) {
+    if (!onboarding && !calloutDisclaimers && !thankYouPages && !emailSettings && !termsOfService && !privacyPolicy && !servicePlans && !residentialCrossSells) {
       return NextResponse.json(
         { error: "Missing settings data" },
         { status: 400 }
@@ -122,6 +122,14 @@ export async function POST(request: NextRequest) {
       updatedSettings.privacyPolicy = privacyPolicy;
     }
 
+    if (servicePlans) {
+      updatedSettings.servicePlans = servicePlans;
+    }
+
+    if (residentialCrossSells) {
+      updatedSettings.residentialCrossSells = residentialCrossSells;
+    }
+
     // Update organization settings
     const { error: updateError } = await supabase
       .from("organizations")
@@ -148,4 +156,12 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   }
+}
+
+/**
+ * PUT /api/admin/onboarding-settings
+ * Alias for POST - Update onboarding settings for the organization
+ */
+export async function PUT(request: NextRequest) {
+  return POST(request);
 }
