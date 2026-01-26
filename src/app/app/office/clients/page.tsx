@@ -66,6 +66,36 @@ interface ClientStats {
 const CLIENT_STATUSES: ClientStatus[] = ["ACTIVE", "PAUSED", "CANCELED", "DELINQUENT"];
 const CLIENT_TYPES = ["RESIDENTIAL", "COMMERCIAL"] as const;
 
+const REFERRAL_SOURCES = [
+  "Google Search",
+  "Facebook",
+  "Instagram",
+  "Nextdoor",
+  "Yelp",
+  "Friend/Family Referral",
+  "Customer Referral",
+  "Yard Sign",
+  "Door Hanger",
+  "Mailer",
+  "Website",
+  "Other",
+] as const;
+
+const FREQUENCIES: { value: Frequency; label: string }[] = [
+  { value: "WEEKLY", label: "Weekly" },
+  { value: "BIWEEKLY", label: "Bi-Weekly" },
+  { value: "MONTHLY", label: "Monthly" },
+  { value: "ONETIME", label: "One-Time" },
+];
+
+const US_STATES = [
+  "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
+  "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
+  "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ",
+  "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC",
+  "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY",
+] as const;
+
 function getStatusIcon(status: ClientStatus) {
   switch (status) {
     case "ACTIVE":
@@ -131,17 +161,18 @@ export default function ClientsPage() {
 
   // Form state
   const [form, setForm] = useState({
+    // Contact Info
     firstName: "",
     lastName: "",
     companyName: "",
     email: "",
-    phone: "",
-    secondaryPhone: "",
+    homePhone: "",
+    cellPhone: "",
     clientType: "RESIDENTIAL" as "RESIDENTIAL" | "COMMERCIAL",
     status: "ACTIVE" as ClientStatus,
-    referralSource: "",
     notes: "",
     tags: [] as string[],
+    // Location
     location: {
       addressLine1: "",
       addressLine2: "",
@@ -151,6 +182,18 @@ export default function ClientsPage() {
       gateCode: "",
       accessNotes: "",
     },
+    addZipToServiceArea: false,
+    // Service Info
+    numberOfDogs: 1,
+    frequency: "WEEKLY" as Frequency,
+    billingOption: "auto" as "auto" | "manual",
+    billingInterval: "per-service" as "per-service" | "monthly",
+    couponCode: "",
+    referralSource: "",
+    initialCleanupRequired: false,
+    requestTosApproval: false,
+    taxExempt: false,
+    // Dogs (for detailed dog info)
     dogs: [{ name: "", breed: "", size: "", isSafe: true }],
   });
 
@@ -199,11 +242,10 @@ export default function ClientsPage() {
       lastName: "",
       companyName: "",
       email: "",
-      phone: "",
-      secondaryPhone: "",
+      homePhone: "",
+      cellPhone: "",
       clientType: "RESIDENTIAL",
       status: "ACTIVE",
-      referralSource: "",
       notes: "",
       tags: [],
       location: {
@@ -215,6 +257,16 @@ export default function ClientsPage() {
         gateCode: "",
         accessNotes: "",
       },
+      addZipToServiceArea: false,
+      numberOfDogs: 1,
+      frequency: "WEEKLY",
+      billingOption: "auto",
+      billingInterval: "per-service",
+      couponCode: "",
+      referralSource: "",
+      initialCleanupRequired: false,
+      requestTosApproval: false,
+      taxExempt: false,
       dogs: [{ name: "", breed: "", size: "", isSafe: true }],
     });
     setShowModal(true);
@@ -228,8 +280,8 @@ export default function ClientsPage() {
       lastName: client.lastName || "",
       companyName: client.companyName || "",
       email: client.email || "",
-      phone: client.phone || "",
-      secondaryPhone: "",
+      homePhone: client.phone || "",
+      cellPhone: "",
       clientType: client.clientType,
       status: client.status,
       referralSource: client.referralSource || "",
@@ -244,6 +296,15 @@ export default function ClientsPage() {
         gateCode: "",
         accessNotes: "",
       },
+      addZipToServiceArea: false,
+      numberOfDogs: 1,
+      frequency: "WEEKLY",
+      billingOption: "auto",
+      billingInterval: "per-service",
+      couponCode: "",
+      initialCleanupRequired: false,
+      requestTosApproval: false,
+      taxExempt: false,
       dogs: [{ name: "", breed: "", size: "", isSafe: true }],
     });
     setShowModal(true);
@@ -264,8 +325,8 @@ export default function ClientsPage() {
             lastName: form.lastName,
             companyName: form.companyName || null,
             email: form.email || null,
-            phone: form.phone || null,
-            secondaryPhone: form.secondaryPhone || null,
+            phone: form.homePhone || null,
+            secondaryPhone: form.cellPhone || null,
             clientType: form.clientType,
             status: form.status,
             referralSource: form.referralSource || null,
@@ -277,14 +338,24 @@ export default function ClientsPage() {
             lastName: form.lastName,
             companyName: form.companyName || null,
             email: form.email || null,
-            phone: form.phone || null,
-            secondaryPhone: form.secondaryPhone || null,
+            phone: form.homePhone || null,
+            secondaryPhone: form.cellPhone || null,
             clientType: form.clientType,
             referralSource: form.referralSource || null,
             notes: form.notes || null,
             tags: form.tags,
             location: form.location.addressLine1 ? form.location : undefined,
             dogs: form.dogs.filter((d) => d.name),
+            // Service info for subscription creation
+            frequency: form.frequency,
+            numberOfDogs: form.numberOfDogs,
+            billingOption: form.billingOption,
+            billingInterval: form.billingInterval,
+            couponCode: form.couponCode || null,
+            initialCleanupRequired: form.initialCleanupRequired,
+            requestTosApproval: form.requestTosApproval,
+            taxExempt: form.taxExempt,
+            addZipToServiceArea: form.addZipToServiceArea,
           };
 
       const res = await fetch("/api/admin/clients", {
@@ -721,56 +792,47 @@ export default function ClientsPage() {
                 </div>
               )}
 
-              {/* Basic Info */}
-              <div>
-                <h3 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
-                  <Users className="w-4 h-4" />
-                  Basic Information
+              {/* Contact Info Section */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                  <Users className="w-4 h-4 text-teal-600" />
+                  Contact Info
                 </h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      First Name *
+                      First Name <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
                       value={form.firstName}
                       onChange={(e) => setForm({ ...form, firstName: e.target.value })}
                       required
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Last Name
+                      Last Name <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
                       value={form.lastName}
                       onChange={(e) => setForm({ ...form, lastName: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                      required
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Email
+                      Email <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="email"
                       value={form.email}
                       onChange={(e) => setForm({ ...form, email: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Phone
-                    </label>
-                    <input
-                      type="tel"
-                      value={form.phone}
-                      onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                      required
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white"
                     />
                   </div>
                   <div>
@@ -782,14 +844,38 @@ export default function ClientsPage() {
                       onChange={(e) =>
                         setForm({ ...form, clientType: e.target.value as "RESIDENTIAL" | "COMMERCIAL" })
                       }
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white"
                     >
                       <option value="RESIDENTIAL">Residential</option>
                       <option value="COMMERCIAL">Commercial</option>
                     </select>
                   </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Home Phone
+                    </label>
+                    <input
+                      type="tel"
+                      value={form.homePhone}
+                      onChange={(e) => setForm({ ...form, homePhone: e.target.value })}
+                      placeholder="(555) 555-5555"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Cell Phone
+                    </label>
+                    <input
+                      type="tel"
+                      value={form.cellPhone}
+                      onChange={(e) => setForm({ ...form, cellPhone: e.target.value })}
+                      placeholder="(555) 555-5555"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white"
+                    />
+                  </div>
                   {form.clientType === "COMMERCIAL" && (
-                    <div>
+                    <div className="col-span-2">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Company Name
                       </label>
@@ -797,7 +883,7 @@ export default function ClientsPage() {
                         type="text"
                         value={form.companyName}
                         onChange={(e) => setForm({ ...form, companyName: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white"
                       />
                     </div>
                   )}
@@ -806,12 +892,12 @@ export default function ClientsPage() {
 
               {/* Status (edit only) */}
               {editingClient && (
-                <div>
-                  <h3 className="text-sm font-medium text-gray-700 mb-3">Status</h3>
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h3 className="text-sm font-semibold text-gray-800 mb-4">Status</h3>
                   <select
                     value={form.status}
                     onChange={(e) => setForm({ ...form, status: e.target.value as ClientStatus })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white"
                   >
                     {CLIENT_STATUSES.map((status) => (
                       <option key={status} value={status}>
@@ -822,17 +908,17 @@ export default function ClientsPage() {
                 </div>
               )}
 
-              {/* Location (create only) */}
+              {/* Location Section (create only) */}
               {!editingClient && (
-                <div>
-                  <h3 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
-                    <MapPin className="w-4 h-4" />
-                    Service Location
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h3 className="text-sm font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-teal-600" />
+                    Location
                   </h3>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="col-span-2">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Street Address
+                        Home Address <span className="text-red-500">*</span>
                       </label>
                       <input
                         type="text"
@@ -843,12 +929,14 @@ export default function ClientsPage() {
                             location: { ...form.location, addressLine1: e.target.value },
                           })
                         }
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                        required
+                        placeholder="Start typing address..."
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white"
                       />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        City
+                        City <span className="text-red-500">*</span>
                       </label>
                       <input
                         type="text"
@@ -859,16 +947,16 @@ export default function ClientsPage() {
                             location: { ...form.location, city: e.target.value },
                           })
                         }
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                        required
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white"
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          State
+                          State <span className="text-red-500">*</span>
                         </label>
-                        <input
-                          type="text"
+                        <select
                           value={form.location.state}
                           onChange={(e) =>
                             setForm({
@@ -876,12 +964,19 @@ export default function ClientsPage() {
                               location: { ...form.location, state: e.target.value },
                             })
                           }
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                        />
+                          required
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white"
+                        >
+                          {US_STATES.map((state) => (
+                            <option key={state} value={state}>
+                              {state}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          ZIP Code
+                          ZIP Code <span className="text-red-500">*</span>
                         </label>
                         <input
                           type="text"
@@ -892,9 +987,21 @@ export default function ClientsPage() {
                               location: { ...form.location, zipCode: e.target.value },
                             })
                           }
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                          required
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white"
                         />
                       </div>
+                    </div>
+                    <div className="col-span-2">
+                      <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={form.addZipToServiceArea}
+                          onChange={(e) => setForm({ ...form, addZipToServiceArea: e.target.checked })}
+                          className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                        />
+                        Add ZIP Code to Service Area
+                      </label>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -909,15 +1016,16 @@ export default function ClientsPage() {
                             location: { ...form.location, gateCode: e.target.value },
                           })
                         }
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
                         placeholder="Optional"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white"
                       />
                     </div>
-                    <div className="col-span-2">
+                    <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Access Notes
                       </label>
-                      <textarea
+                      <input
+                        type="text"
                         value={form.location.accessNotes}
                         onChange={(e) =>
                           setForm({
@@ -925,53 +1033,193 @@ export default function ClientsPage() {
                             location: { ...form.location, accessNotes: e.target.value },
                           })
                         }
-                        rows={2}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                        placeholder="Gate location, key code, special instructions..."
+                        placeholder="Gate location, special instructions..."
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white"
                       />
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* Dogs (create only) */}
+              {/* Service Info Section (create only) */}
               {!editingClient && (
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                      <Dog className="w-4 h-4" />
-                      Dogs
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h3 className="text-sm font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                    <Dog className="w-4 h-4 text-teal-600" />
+                    Service Info
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Number of Dogs <span className="text-red-500">*</span>
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setForm({ ...form, numberOfDogs: Math.max(1, form.numberOfDogs - 1) })}
+                          className="w-10 h-10 flex items-center justify-center border border-gray-300 rounded-lg hover:bg-gray-100 bg-white"
+                        >
+                          -
+                        </button>
+                        <input
+                          type="number"
+                          min="1"
+                          value={form.numberOfDogs}
+                          onChange={(e) => setForm({ ...form, numberOfDogs: Math.max(1, parseInt(e.target.value) || 1) })}
+                          className="w-16 px-3 py-2 border border-gray-300 rounded-lg text-center focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setForm({ ...form, numberOfDogs: form.numberOfDogs + 1 })}
+                          className="w-10 h-10 flex items-center justify-center border border-gray-300 rounded-lg hover:bg-gray-100 bg-white"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Cleanup Frequency <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={form.frequency}
+                        onChange={(e) => setForm({ ...form, frequency: e.target.value as Frequency })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white"
+                      >
+                        {FREQUENCIES.map((freq) => (
+                          <option key={freq.value} value={freq.value}>
+                            {freq.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Billing Option
+                      </label>
+                      <select
+                        value={form.billingOption}
+                        onChange={(e) => setForm({ ...form, billingOption: e.target.value as "auto" | "manual" })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white"
+                      >
+                        <option value="auto">Auto-charge (Recommended)</option>
+                        <option value="manual">Send Invoice</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Billing Interval
+                      </label>
+                      <select
+                        value={form.billingInterval}
+                        onChange={(e) => setForm({ ...form, billingInterval: e.target.value as "per-service" | "monthly" })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white"
+                      >
+                        <option value="per-service">Per Service</option>
+                        <option value="monthly">Monthly</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Coupon Code
+                      </label>
+                      <input
+                        type="text"
+                        value={form.couponCode}
+                        onChange={(e) => setForm({ ...form, couponCode: e.target.value })}
+                        placeholder="Enter coupon code"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Referral Source <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={form.referralSource}
+                        onChange={(e) => setForm({ ...form, referralSource: e.target.value })}
+                        required
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white"
+                      >
+                        <option value="">Select source...</option>
+                        {REFERRAL_SOURCES.map((source) => (
+                          <option key={source} value={source}>
+                            {source}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="col-span-2 space-y-3 pt-2">
+                      <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={form.initialCleanupRequired}
+                          onChange={(e) => setForm({ ...form, initialCleanupRequired: e.target.checked })}
+                          className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                        />
+                        Initial Cleanup Required
+                      </label>
+                      <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={form.requestTosApproval}
+                          onChange={(e) => setForm({ ...form, requestTosApproval: e.target.checked })}
+                          className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                        />
+                        Request Terms of Service Approval
+                      </label>
+                      <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={form.taxExempt}
+                          onChange={(e) => setForm({ ...form, taxExempt: e.target.checked })}
+                          className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                        />
+                        Tax exempt
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Dogs Section (create only - for detailed dog info) */}
+              {!editingClient && (
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                      <Dog className="w-4 h-4 text-teal-600" />
+                      Dog Details (Optional)
                     </h3>
                     <button
                       type="button"
                       onClick={addDog}
-                      className="text-sm text-teal-600 hover:text-teal-700"
+                      className="text-sm text-teal-600 hover:text-teal-700 font-medium"
                     >
                       + Add Dog
                     </button>
                   </div>
                   <div className="space-y-3">
                     {form.dogs.map((dog, index) => (
-                      <div key={index} className="flex gap-3 items-start p-3 bg-gray-50 rounded-lg">
+                      <div key={index} className="flex gap-3 items-start p-3 bg-white rounded-lg border border-gray-200">
                         <div className="flex-1 grid grid-cols-3 gap-3">
                           <input
                             type="text"
                             value={dog.name}
                             onChange={(e) => updateDog(index, "name", e.target.value)}
                             placeholder="Dog name"
-                            className="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white"
                           />
                           <input
                             type="text"
                             value={dog.breed}
                             onChange={(e) => updateDog(index, "breed", e.target.value)}
-                            placeholder="Breed (optional)"
-                            className="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                            placeholder="Breed"
+                            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white"
                           />
                           <select
                             value={dog.size}
                             onChange={(e) => updateDog(index, "size", e.target.value)}
-                            className="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white"
                           >
                             <option value="">Size</option>
                             <option value="SMALL">Small</option>
@@ -1004,49 +1252,52 @@ export default function ClientsPage() {
                 </div>
               )}
 
-              {/* Notes */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Internal Notes
-                </label>
+              {/* Notes Section */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-gray-800 mb-4">Internal Notes</h3>
                 <textarea
                   value={form.notes}
                   onChange={(e) => setForm({ ...form, notes: e.target.value })}
                   rows={3}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white"
                   placeholder="Notes about this client (not visible to client)..."
                 />
               </div>
 
-              {/* Referral Source */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Referral Source
-                </label>
-                <input
-                  type="text"
-                  value={form.referralSource}
-                  onChange={(e) => setForm({ ...form, referralSource: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                  placeholder="How did they hear about us?"
-                />
-              </div>
+              {/* Info Box (create only) */}
+              {!editingClient && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex gap-3">
+                    <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                    <div className="text-sm text-blue-800">
+                      <p className="font-medium mb-1">What happens next?</p>
+                      <ul className="list-disc list-inside space-y-1 text-blue-700">
+                        <li>Client profile will be created with the information provided</li>
+                        <li>A subscription will be set up based on the frequency selected</li>
+                        {form.requestTosApproval && <li>Terms of Service approval request will be sent</li>}
+                        {form.initialCleanupRequired && <li>An initial cleanup job will be scheduled</li>}
+                        <li>You can add payment methods and schedule services from the client profile</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Actions */}
-              <div className="flex gap-3 pt-4 border-t border-gray-100">
+              <div className="flex gap-3 pt-4 border-t border-gray-200">
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+                  className="flex-1 px-4 py-2.5 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 font-medium"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={saving || !form.firstName}
-                  className="flex-1 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50"
+                  disabled={saving || !form.firstName || !form.lastName || (!editingClient && !form.email)}
+                  className="flex-1 px-4 py-2.5 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 font-medium"
                 >
-                  {saving ? "Saving..." : editingClient ? "Save Changes" : "Add Client"}
+                  {saving ? "Saving..." : editingClient ? "Save Changes" : "Create Client"}
                 </button>
               </div>
             </form>
