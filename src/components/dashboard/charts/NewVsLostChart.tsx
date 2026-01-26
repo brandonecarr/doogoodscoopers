@@ -50,11 +50,12 @@ export function NewVsLostChart({ data, summary }: NewVsLostChartProps) {
             width={40}
           />
           <Tooltip
-            formatter={(value: number, name: string) => {
-              if (name === "lost") return [Math.abs(value), "Lost"];
-              return [value, name.charAt(0).toUpperCase() + name.slice(1)];
+            formatter={(value, name) => {
+              const numValue = Number(value);
+              if (name === "lost") return [Math.abs(numValue), "Lost"];
+              return [numValue, String(name).charAt(0).toUpperCase() + String(name).slice(1)];
             }}
-            labelFormatter={(label) => `Day ${label}`}
+            labelFormatter={(labelValue) => `Day ${labelValue}`}
             contentStyle={{
               backgroundColor: "white",
               border: "1px solid #e5e7eb",

@@ -69,7 +69,7 @@ export function ReferralSourcesChart({ data }: ReferralSourcesChartProps) {
               width={120}
             />
             <Tooltip
-              formatter={(value: number) => [value, "Count"]}
+              formatter={(value) => [value, "Count"]}
               contentStyle={{
                 backgroundColor: "white",
                 border: "1px solid #e5e7eb",

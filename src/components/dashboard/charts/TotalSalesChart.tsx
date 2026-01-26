@@ -50,8 +50,8 @@ export function TotalSalesChart({ data }: TotalSalesChartProps) {
             width={50}
           />
           <Tooltip
-            formatter={(value: number) => [`$${value.toFixed(2)}`, ""]}
-            labelFormatter={(label) => `Day ${label}`}
+            formatter={(value) => [`$${Number(value).toFixed(2)}`, ""]}
+            labelFormatter={(labelValue) => `Day ${labelValue}`}
             contentStyle={{
               backgroundColor: "white",
               border: "1px solid #e5e7eb",

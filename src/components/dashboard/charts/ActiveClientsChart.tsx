@@ -50,8 +50,8 @@ export function ActiveClientsChart({ data, label, color = "#14b8a6" }: ActiveCli
             width={40}
           />
           <Tooltip
-            formatter={(value: number) => [value, label]}
-            labelFormatter={(label) => `Day ${label}`}
+            formatter={(value) => [value, label]}
+            labelFormatter={(labelValue) => `Day ${labelValue}`}
             contentStyle={{
               backgroundColor: "white",
               border: "1px solid #e5e7eb",
