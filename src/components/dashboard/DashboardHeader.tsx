@@ -4,9 +4,9 @@ export function DashboardHeader() {
   return (
     <div className="flex items-center justify-between">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Welcome to Sweep&Go</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
         <p className="text-sm text-gray-500">
-          The 1st Software App Dedicated Exclusively to Pooper Scoopers.
+          Overview of your business metrics and activity.
         </p>
       </div>
       {/* Decorative chart graphic */}

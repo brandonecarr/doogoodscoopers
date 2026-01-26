@@ -7,7 +7,6 @@ import { StatusCardSmall } from "./StatusCardSmall";
 import { ChartContainer } from "./ChartContainer";
 import { MetricCard } from "./MetricCard";
 import { ShortcutsSection } from "./ShortcutsSection";
-import { AssistanceSection } from "./AssistanceSection";
 import {
   TotalSalesChart,
   ActiveClientsChart,
@@ -485,9 +484,6 @@ export function DashboardClient({ user }: DashboardClientProps) {
 
       {/* Shortcuts Section */}
       <ShortcutsSection settings={settings.shortcuts} />
-
-      {/* Assistance Section */}
-      <AssistanceSection settings={settings.assistance} />
     </div>
   );
 }
