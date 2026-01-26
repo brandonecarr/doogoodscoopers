@@ -159,7 +159,24 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       details: { clientId, firstName, lastName },
     });
 
-    return NextResponse.json({ contact: newContact }, { status: 201 });
+    // Format response to camelCase
+    const formattedContact = {
+      id: newContact.id,
+      firstName: newContact.first_name,
+      middleName: newContact.middle_name,
+      lastName: newContact.last_name,
+      email: newContact.email,
+      homePhone: newContact.home_phone,
+      cellPhone: newContact.cell_phone,
+      relationship: newContact.relationship,
+      isPrimary: newContact.is_primary,
+      canAuthorize: newContact.can_authorize,
+      receiveJobNotifications: newContact.receive_job_notifications,
+      receiveInvoicesEmail: newContact.receive_invoices_email,
+      createdAt: newContact.created_at,
+    };
+
+    return NextResponse.json({ contact: formattedContact }, { status: 201 });
   } catch (error) {
     console.error("Error creating contact:", error);
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });

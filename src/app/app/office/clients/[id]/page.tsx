@@ -198,6 +198,7 @@ export default function ClientDetailPage({ params }: PageProps) {
   const [scheduleTab, setScheduleTab] = useState<"recurring" | "initial" | "latest">("recurring");
   const [notesTab, setNotesTab] = useState<"office" | "totech" | "fromtech" | "fromclient">("office");
   const [activeDogTab, setActiveDogTab] = useState(0);
+  const [activeContactTab, setActiveContactTab] = useState<string>("primary");
   const [showContactModal, setShowContactModal] = useState(false);
   const [contactForm, setContactForm] = useState({
     firstName: "",
@@ -268,6 +269,8 @@ export default function ClientDetailPage({ params }: PageProps) {
             contacts: [...(client.contacts || []), data.contact],
           });
         }
+        // Switch to the new contact's tab
+        setActiveContactTab(data.contact.id);
         setShowContactModal(false);
         resetContactForm();
       } else {
@@ -299,6 +302,10 @@ export default function ClientDetailPage({ params }: PageProps) {
             ...client,
             contacts: client.contacts.filter((c) => c.id !== contactId),
           });
+        }
+        // Switch to primary tab if the deleted contact was active
+        if (activeContactTab === contactId) {
+          setActiveContactTab("primary");
         }
       } else {
         const data = await res.json();
@@ -436,93 +443,122 @@ export default function ClientDetailPage({ params }: PageProps) {
             ADD NEW CONTACT
           </button>
         </div>
-        {/* Primary contact (client info) */}
-        <div className="p-4 border-b border-gray-100">
-          <div className="text-xs font-medium text-teal-600 mb-3">PRIMARY CONTACT</div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="flex justify-between py-2 border-b border-gray-100">
-              <span className="text-sm text-gray-500">First name</span>
-              <span className="text-sm text-gray-900">{client.firstName || "No Data"}</span>
-            </div>
-            <div className="flex justify-between py-2 border-b border-gray-100">
-              <span className="text-sm text-gray-500">Home Phone Number</span>
-              <span className="text-sm text-gray-900">{client.phone || "No Data"}</span>
-            </div>
-            <div className="flex justify-between py-2 border-b border-gray-100">
-              <span className="text-sm text-gray-500">Middle Name</span>
-              <span className="text-sm text-gray-400">No Data</span>
-            </div>
-            <div className="flex justify-between py-2 border-b border-gray-100">
-              <span className="text-sm text-gray-500">Cell Phone Number</span>
-              <span className="text-sm text-gray-900">{client.secondaryPhone || "No Data"}</span>
-            </div>
-            <div className="flex justify-between py-2 border-b border-gray-100">
-              <span className="text-sm text-gray-500">Last name</span>
-              <span className="text-sm text-gray-900">{client.lastName || "No Data"}</span>
-            </div>
-            <div className="flex justify-between py-2 border-b border-gray-100">
-              <span className="text-sm text-gray-500">Tax Exempt</span>
-              <span className="text-sm text-gray-900">No</span>
-            </div>
-            <div className="flex justify-between py-2">
-              <span className="text-sm text-gray-500">Email</span>
-              <span className="text-sm text-gray-900">{client.email || "No Data"}</span>
-            </div>
-          </div>
-          <div className="flex justify-end gap-2 mt-4">
-            <button className="text-sm text-red-600 hover:text-red-700">REMOVE</button>
-            <button className="text-sm text-teal-600 hover:text-teal-700">EDIT</button>
+        {/* Contact Tabs */}
+        <div className="border-b border-gray-100">
+          <div className="flex gap-6 px-4">
+            <button
+              onClick={() => setActiveContactTab("primary")}
+              className={`py-3 text-sm font-medium border-b-2 transition-colors ${
+                activeContactTab === "primary"
+                  ? "text-teal-600 border-teal-600"
+                  : "text-gray-500 border-transparent hover:text-gray-700"
+              }`}
+            >
+              PRIMARY
+            </button>
+            {client.contacts?.map((contact, index) => (
+              <button
+                key={contact.id}
+                onClick={() => setActiveContactTab(contact.id)}
+                className={`py-3 text-sm font-medium border-b-2 transition-colors ${
+                  activeContactTab === contact.id
+                    ? "text-teal-600 border-teal-600"
+                    : "text-gray-500 border-transparent hover:text-gray-700"
+                }`}
+              >
+                {contact.firstName?.toUpperCase() || `CONTACT ${index + 2}`}
+              </button>
+            ))}
           </div>
         </div>
-        {/* Additional contacts */}
-        {client.contacts?.map((contact) => (
-          <div key={contact.id} className="p-4 border-b border-gray-100">
-            <div className="text-xs font-medium text-teal-600 mb-3">
-              {contact.isPrimary ? "PRIMARY CONTACT" : "ADDITIONAL CONTACT"}
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex justify-between py-2 border-b border-gray-100">
-                <span className="text-sm text-gray-500">First name</span>
-                <span className="text-sm text-gray-900">{contact.firstName || "No Data"}</span>
+        {/* Contact Content */}
+        <div className="p-4">
+          {activeContactTab === "primary" && (
+            <>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex justify-between py-2 border-b border-gray-100">
+                  <span className="text-sm text-gray-500">First name</span>
+                  <span className="text-sm text-gray-900">{client.firstName || "No Data"}</span>
+                </div>
+                <div className="flex justify-between py-2 border-b border-gray-100">
+                  <span className="text-sm text-gray-500">Home Phone Number</span>
+                  <span className="text-sm text-gray-900">{client.phone || "No Data"}</span>
+                </div>
+                <div className="flex justify-between py-2 border-b border-gray-100">
+                  <span className="text-sm text-gray-500">Middle Name</span>
+                  <span className="text-sm text-gray-400">No Data</span>
+                </div>
+                <div className="flex justify-between py-2 border-b border-gray-100">
+                  <span className="text-sm text-gray-500">Cell Phone Number</span>
+                  <span className="text-sm text-gray-900">{client.secondaryPhone || "No Data"}</span>
+                </div>
+                <div className="flex justify-between py-2 border-b border-gray-100">
+                  <span className="text-sm text-gray-500">Last name</span>
+                  <span className="text-sm text-gray-900">{client.lastName || "No Data"}</span>
+                </div>
+                <div className="flex justify-between py-2 border-b border-gray-100">
+                  <span className="text-sm text-gray-500">Tax Exempt</span>
+                  <span className="text-sm text-gray-900">No</span>
+                </div>
+                <div className="flex justify-between py-2">
+                  <span className="text-sm text-gray-500">Email</span>
+                  <span className="text-sm text-gray-900">{client.email || "No Data"}</span>
+                </div>
               </div>
-              <div className="flex justify-between py-2 border-b border-gray-100">
-                <span className="text-sm text-gray-500">Home Phone Number</span>
-                <span className="text-sm text-gray-900">{contact.homePhone || "No Data"}</span>
+              <div className="flex justify-end gap-2 mt-4">
+                <button className="text-sm text-red-600 hover:text-red-700">REMOVE</button>
+                <button className="text-sm text-teal-600 hover:text-teal-700">EDIT</button>
               </div>
-              <div className="flex justify-between py-2 border-b border-gray-100">
-                <span className="text-sm text-gray-500">Middle Name</span>
-                <span className={`text-sm ${contact.middleName ? "text-gray-900" : "text-gray-400"}`}>
-                  {contact.middleName || "No Data"}
-                </span>
+            </>
+          )}
+          {client.contacts?.map((contact) => (
+            activeContactTab === contact.id && (
+              <div key={contact.id}>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex justify-between py-2 border-b border-gray-100">
+                    <span className="text-sm text-gray-500">First name</span>
+                    <span className="text-sm text-gray-900">{contact.firstName || "No Data"}</span>
+                  </div>
+                  <div className="flex justify-between py-2 border-b border-gray-100">
+                    <span className="text-sm text-gray-500">Home Phone Number</span>
+                    <span className="text-sm text-gray-900">{contact.homePhone || "No Data"}</span>
+                  </div>
+                  <div className="flex justify-between py-2 border-b border-gray-100">
+                    <span className="text-sm text-gray-500">Middle Name</span>
+                    <span className={`text-sm ${contact.middleName ? "text-gray-900" : "text-gray-400"}`}>
+                      {contact.middleName || "No Data"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between py-2 border-b border-gray-100">
+                    <span className="text-sm text-gray-500">Cell Phone Number</span>
+                    <span className="text-sm text-gray-900">{contact.cellPhone || "No Data"}</span>
+                  </div>
+                  <div className="flex justify-between py-2 border-b border-gray-100">
+                    <span className="text-sm text-gray-500">Last name</span>
+                    <span className="text-sm text-gray-900">{contact.lastName || "No Data"}</span>
+                  </div>
+                  <div className="flex justify-between py-2 border-b border-gray-100">
+                    <span className="text-sm text-gray-500">Tax Exempt</span>
+                    <span className="text-sm text-gray-900">No</span>
+                  </div>
+                  <div className="flex justify-between py-2">
+                    <span className="text-sm text-gray-500">Email</span>
+                    <span className="text-sm text-gray-900">{contact.email || "No Data"}</span>
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2 mt-4">
+                  <button
+                    onClick={() => handleDeleteContact(contact.id)}
+                    className="text-sm text-red-600 hover:text-red-700"
+                  >
+                    REMOVE
+                  </button>
+                  <button className="text-sm text-teal-600 hover:text-teal-700">EDIT</button>
+                </div>
               </div>
-              <div className="flex justify-between py-2 border-b border-gray-100">
-                <span className="text-sm text-gray-500">Cell Phone Number</span>
-                <span className="text-sm text-gray-900">{contact.cellPhone || "No Data"}</span>
-              </div>
-              <div className="flex justify-between py-2 border-b border-gray-100">
-                <span className="text-sm text-gray-500">Last name</span>
-                <span className="text-sm text-gray-900">{contact.lastName || "No Data"}</span>
-              </div>
-              <div className="flex justify-between py-2 border-b border-gray-100">
-                <span className="text-sm text-gray-500">Tax Exempt</span>
-                <span className="text-sm text-gray-900">No</span>
-              </div>
-              <div className="flex justify-between py-2">
-                <span className="text-sm text-gray-500">Email</span>
-                <span className="text-sm text-gray-900">{contact.email || "No Data"}</span>
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 mt-4">
-              <button
-                onClick={() => handleDeleteContact(contact.id)}
-                className="text-sm text-red-600 hover:text-red-700"
-              >
-                REMOVE
-              </button>
-              <button className="text-sm text-teal-600 hover:text-teal-700">EDIT</button>
-            </div>
-          </div>
-        ))}
+            )
+          ))}
+        </div>
       </div>
 
       {/* Location */}
