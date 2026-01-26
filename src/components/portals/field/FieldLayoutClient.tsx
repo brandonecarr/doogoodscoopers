@@ -33,7 +33,6 @@ export const useFieldLayout = () => useContext(FieldLayoutContext);
 
 // Page title mapping
 const pageTitles: Record<string, string> = {
-  "/app/field": "Home",
   "/app/field/route": "Job List",
   "/app/field/shift": "Shift",
   "/app/field/shift/start": "Start Shift",

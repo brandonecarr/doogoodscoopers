@@ -1,8 +1,5 @@
-import { requireFieldAccess } from "@/lib/auth-supabase";
-import { FieldDashboardClient } from "@/components/portals/field/FieldDashboardClient";
+import { redirect } from "next/navigation";
 
-export default async function FieldDashboard() {
-  const user = await requireFieldAccess();
-
-  return <FieldDashboardClient user={user} />;
+export default function FieldHome() {
+  redirect("/app/field/shift/start");
 }
