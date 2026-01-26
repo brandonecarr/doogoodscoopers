@@ -44,6 +44,44 @@ function getLast30Days(): string[] {
   return dates;
 }
 
+// Type definitions for Supabase join results
+interface PaymentWithClient {
+  id: string;
+  amount_cents: number;
+  status: string;
+  created_at: string;
+  clients: { client_type: string } | null;
+}
+
+interface SubscriptionWithClient {
+  id: string;
+  status: string;
+  client_id: string;
+  cancel_reason: string | null;
+  canceled_at: string | null;
+  created_at: string;
+  clients: { client_type: string } | null;
+}
+
+interface JobWithClient {
+  id: string;
+  status: string;
+  scheduled_date: string;
+  duration_minutes: number | null;
+  assigned_to: string | null;
+  route_id: string | null;
+  clients: { client_type: string } | null;
+}
+
+// Helper to get client_type from joined data
+function getClientType(clients: { client_type: string } | { client_type: string }[] | null): string | null {
+  if (!clients) return null;
+  if (Array.isArray(clients)) {
+    return clients[0]?.client_type || null;
+  }
+  return clients.client_type;
+}
+
 // Cancellation reason colors
 const CANCEL_REASON_COLORS: Record<string, string> = {
   "No response": "#94a3b8",
@@ -263,19 +301,19 @@ export async function GET(request: NextRequest) {
     }).length;
 
     // Process chart data
-    const payments = paymentsResult.data || [];
+    const payments = (paymentsResult.data || []) as PaymentWithClient[];
     const clients = clientsResult.data || [];
-    const subscriptions = subscriptionsResult.data || [];
-    const jobs = jobsResult.data || [];
+    const subscriptions = (subscriptionsResult.data || []) as SubscriptionWithClient[];
+    const jobs = (jobsResult.data || []) as JobWithClient[];
 
     // Total Sales Chart (daily for last 30 days)
     const totalSalesChart = last30Days.map(date => {
       const dayPayments = payments.filter(p => p.created_at?.startsWith(date));
       const residential = dayPayments
-        .filter(p => (p.clients as { client_type: string })?.client_type === "RESIDENTIAL")
+        .filter(p => getClientType(p.clients) === "RESIDENTIAL")
         .reduce((sum, p) => sum + (p.amount_cents || 0), 0) / 100;
       const commercial = dayPayments
-        .filter(p => (p.clients as { client_type: string })?.client_type === "COMMERCIAL")
+        .filter(p => getClientType(p.clients) === "COMMERCIAL")
         .reduce((sum, p) => sum + (p.amount_cents || 0), 0) / 100;
       return {
         date,
@@ -333,27 +371,27 @@ export async function GET(request: NextRequest) {
     const avgResClientValueChart = last30Days.map(date => {
       const dayPayments = payments.filter(p =>
         p.created_at?.startsWith(date) &&
-        (p.clients as { client_type: string })?.client_type === "RESIDENTIAL"
+        getClientType(p.clients) === "RESIDENTIAL"
       );
       const totalValue = dayPayments.reduce((sum, p) => sum + (p.amount_cents || 0), 0);
-      const clientCount = new Set(dayPayments.map(p => (p.clients as { id?: string })?.id)).size;
-      return { date, value: clientCount > 0 ? totalValue / clientCount / 100 : 0 };
+      const uniqueClients = dayPayments.length;
+      return { date, value: uniqueClients > 0 ? totalValue / uniqueClients / 100 : 0 };
     });
 
     const avgCommClientValueChart = last30Days.map(date => {
       const dayPayments = payments.filter(p =>
         p.created_at?.startsWith(date) &&
-        (p.clients as { client_type: string })?.client_type === "COMMERCIAL"
+        getClientType(p.clients) === "COMMERCIAL"
       );
       const totalValue = dayPayments.reduce((sum, p) => sum + (p.amount_cents || 0), 0);
-      const clientCount = new Set(dayPayments.map(p => (p.clients as { id?: string })?.id)).size;
-      return { date, value: clientCount > 0 ? totalValue / clientCount / 100 : 0 };
+      const uniqueClients = dayPayments.length;
+      return { date, value: uniqueClients > 0 ? totalValue / uniqueClients / 100 : 0 };
     });
 
     // Cancellation Reasons
     const canceledResSubs = subscriptions.filter(s =>
       s.status === "CANCELED" &&
-      (s.clients as { client_type: string })?.client_type === "RESIDENTIAL" &&
+      getClientType(s.clients) === "RESIDENTIAL" &&
       s.cancel_reason
     );
     const resCancelReasonCounts: Record<string, number> = {};
@@ -369,7 +407,7 @@ export async function GET(request: NextRequest) {
 
     const canceledCommSubs = subscriptions.filter(s =>
       s.status === "CANCELED" &&
-      (s.clients as { client_type: string })?.client_type === "COMMERCIAL" &&
+      getClientType(s.clients) === "COMMERCIAL" &&
       s.cancel_reason
     );
     const commCancelReasonCounts: Record<string, number> = {};
@@ -414,10 +452,10 @@ export async function GET(request: NextRequest) {
 
     // Monthly totals
     const monthResPayments = payments.filter(p =>
-      (p.clients as { client_type: string })?.client_type === "RESIDENTIAL"
+      getClientType(p.clients) === "RESIDENTIAL"
     );
     const monthCommPayments = payments.filter(p =>
-      (p.clients as { client_type: string })?.client_type === "COMMERCIAL"
+      getClientType(p.clients) === "COMMERCIAL"
     );
     const totalSalesResidential = monthResPayments.reduce((sum, p) => sum + (p.amount_cents || 0), 0) / 100;
     const totalSalesCommercial = monthCommPayments.reduce((sum, p) => sum + (p.amount_cents || 0), 0) / 100;
@@ -449,8 +487,8 @@ export async function GET(request: NextRequest) {
       : null;
 
     // Performance metrics
-    const resJobs = completedJobs.filter(j => (j.clients as { client_type: string })?.client_type === "RESIDENTIAL");
-    const commJobs = completedJobs.filter(j => (j.clients as { client_type: string })?.client_type === "COMMERCIAL");
+    const resJobs = completedJobs.filter(j => getClientType(j.clients) === "RESIDENTIAL");
+    const commJobs = completedJobs.filter(j => getClientType(j.clients) === "COMMERCIAL");
     const totalResMinutes = resJobs.reduce((sum, j) => sum + (j.duration_minutes || 0), 0);
     const totalCommMinutes = commJobs.reduce((sum, j) => sum + (j.duration_minutes || 0), 0);
 
