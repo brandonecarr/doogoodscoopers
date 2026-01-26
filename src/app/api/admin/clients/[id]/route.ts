@@ -52,72 +52,22 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "Access denied" }, { status: 403 });
   }
 
-  // Fetch client with all related data
+  // Fetch client with all related data - use * for related tables to get all available columns
   const { data: client, error } = await supabase
     .from("clients")
     .select(
       `
-      id,
-      first_name,
-      last_name,
-      company_name,
-      email,
-      phone,
-      secondary_phone,
-      client_type,
-      status,
-      account_credit_cents,
-      tags,
-      notes,
-      referral_source,
-      stripe_customer_id,
-      notification_preferences,
-      created_at,
-      updated_at,
-      locations (
-        id,
-        address_line1,
-        address_line2,
-        city,
-        state,
-        zip_code,
-        gate_code,
-        gate_location,
-        access_notes,
-        lot_size,
-        is_primary,
-        is_active,
-        created_at
-      ),
-      dogs (
-        id,
-        name,
-        breed,
-        size,
-        is_safe,
-        safety_notes,
-        is_active,
-        created_at
-      ),
-      subscriptions (
-        id,
-        status,
-        frequency,
-        price_per_visit_cents,
-        next_service_date,
-        assigned_tech_id,
-        service_day,
-        created_at,
-        canceled_at,
-        cancel_reason
-      )
+      *,
+      locations (*),
+      dogs (*),
+      subscriptions (*)
     `
     )
     .eq("id", id)
     .single();
 
   if (error || !client) {
-    console.error("Error fetching client details:", error);
+    console.error("Error fetching client details:", error?.message, error?.details, error?.hint);
     return NextResponse.json({ error: "Failed to fetch client details" }, { status: 500 });
   }
 
