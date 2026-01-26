@@ -30,20 +30,22 @@ import {
 } from "lucide-react";
 import type { ClientStatus, Frequency } from "@/lib/supabase/types";
 
-// Types
+// Types - API returns camelCase format
 interface Location {
   id: string;
-  address_line1: string;
-  address_line2: string | null;
+  addressLine1: string;
+  addressLine2: string | null;
   city: string;
   state: string;
-  zip_code: string;
-  gate_code: string | null;
-  gate_location: string | null;
-  access_notes: string | null;
-  lot_size: string | null;
-  is_primary: boolean;
-  is_active: boolean;
+  zipCode: string;
+  fullAddress: string;
+  gateCode: string | null;
+  gateLocation: string | null;
+  accessNotes: string | null;
+  lotSize: string | null;
+  isPrimary: boolean;
+  isActive: boolean;
+  createdAt: string;
 }
 
 interface DogInfo {
@@ -51,45 +53,47 @@ interface DogInfo {
   name: string;
   breed: string | null;
   size: string | null;
-  is_safe: boolean;
-  safety_notes: string | null;
-  is_active: boolean;
+  isSafe: boolean;
+  safetyNotes: string | null;
+  isActive: boolean;
+  createdAt: string;
 }
 
 interface Subscription {
   id: string;
   status: string;
   frequency: Frequency;
-  price_per_visit_cents: number;
-  next_service_date: string | null;
-  service_day: string | null;
-  assigned_tech_id: string | null;
-  created_at: string;
-  canceled_at: string | null;
-  cancel_reason: string | null;
+  pricePerVisitCents: number;
+  nextServiceDate: string | null;
+  serviceDay: string | null;
+  assignedTechId: string | null;
+  createdAt: string;
+  canceledAt: string | null;
+  cancelReason: string | null;
 }
 
 interface Job {
   id: string;
   status: string;
-  scheduled_date: string;
-  completed_at: string | null;
-  skipped_at: string | null;
-  skip_reason: string | null;
+  scheduledDate: string;
+  completedAt: string | null;
+  skippedAt: string | null;
+  skipReason: string | null;
   notes: string | null;
-  tech_notes: string | null;
+  techNotes: string | null;
+  createdAt: string;
 }
 
 interface Payment {
   id: string;
-  amount_cents: number;
+  amountCents: number;
   status: string;
-  payment_type: string;
-  invoice_number: string | null;
-  invoice_date: string | null;
-  due_date: string | null;
-  paid_at: string | null;
-  created_at: string;
+  paymentType: string;
+  invoiceNumber: string | null;
+  invoiceDate: string | null;
+  dueDate: string | null;
+  paidAt: string | null;
+  createdAt: string;
 }
 
 interface Contact {
@@ -110,22 +114,23 @@ interface Contact {
 
 interface Client {
   id: string;
-  first_name: string;
-  last_name: string | null;
-  company_name: string | null;
+  firstName: string;
+  lastName: string | null;
+  fullName: string;
+  companyName: string | null;
   email: string | null;
   phone: string | null;
-  secondary_phone: string | null;
-  client_type: "RESIDENTIAL" | "COMMERCIAL";
+  secondaryPhone: string | null;
+  clientType: "RESIDENTIAL" | "COMMERCIAL";
   status: ClientStatus;
-  account_credit_cents: number;
+  accountCreditCents: number;
   tags: string[];
   notes: string | null;
-  referral_source: string | null;
-  stripe_customer_id: string | null;
-  notification_preferences: { email?: boolean; sms?: boolean } | null;
-  created_at: string;
-  updated_at: string;
+  referralSource: string | null;
+  hasStripeCustomer: boolean;
+  notificationPreferences: { email?: boolean; sms?: boolean } | null;
+  createdAt: string;
+  updatedAt: string;
   locations: Location[];
   dogs: DogInfo[];
   subscriptions: Subscription[];
@@ -331,11 +336,11 @@ export default function ClientDetailPage({ params }: PageProps) {
     );
   }
 
-  const fullName = [client.first_name, client.last_name].filter(Boolean).join(" ") || client.company_name || "Unknown";
-  const initials = client.first_name?.[0]?.toUpperCase() || "?";
-  const activeDogs = client.dogs?.filter((d) => d.is_active) || [];
-  const activeLocations = client.locations?.filter((l) => l.is_active) || [];
-  const primaryLocation = activeLocations.find((l) => l.is_primary) || activeLocations[0];
+  const fullName = client.fullName || "Unknown";
+  const initials = client.firstName?.[0]?.toUpperCase() || "?";
+  const activeDogs = client.dogs?.filter((d) => d.isActive) || [];
+  const activeLocations = client.locations?.filter((l) => l.isActive) || [];
+  const primaryLocation = activeLocations.find((l) => l.isPrimary) || activeLocations[0];
   const activeSubscriptions = client.subscriptions?.filter((s) => s.status === "ACTIVE") || [];
 
   return (
@@ -363,8 +368,8 @@ export default function ClientDetailPage({ params }: PageProps) {
             </div>
             <div>
               <h2 className="text-xl font-semibold text-gray-900">{fullName}</h2>
-              <span className={`inline-block mt-1 px-2 py-0.5 text-xs font-medium rounded ${client.client_type === "RESIDENTIAL" ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700"}`}>
-                {client.client_type}
+              <span className={`inline-block mt-1 px-2 py-0.5 text-xs font-medium rounded ${client.clientType === "RESIDENTIAL" ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700"}`}>
+                {client.clientType}
               </span>
             </div>
           </div>
@@ -403,7 +408,7 @@ export default function ClientDetailPage({ params }: PageProps) {
                   </button>
                   <button className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3">
                     <RefreshCw className="w-4 h-4 text-gray-400" />
-                    Convert to {client.client_type === "RESIDENTIAL" ? "Commercial" : "Residential"} Client
+                    Convert to {client.clientType === "RESIDENTIAL" ? "Commercial" : "Residential"} Client
                   </button>
                   <button className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-3">
                     <XCircle className="w-4 h-4" />
@@ -437,7 +442,7 @@ export default function ClientDetailPage({ params }: PageProps) {
           <div className="grid grid-cols-2 gap-4">
             <div className="flex justify-between py-2 border-b border-gray-100">
               <span className="text-sm text-gray-500">First name</span>
-              <span className="text-sm text-gray-900">{client.first_name || "No Data"}</span>
+              <span className="text-sm text-gray-900">{client.firstName || "No Data"}</span>
             </div>
             <div className="flex justify-between py-2 border-b border-gray-100">
               <span className="text-sm text-gray-500">Home Phone Number</span>
@@ -449,11 +454,11 @@ export default function ClientDetailPage({ params }: PageProps) {
             </div>
             <div className="flex justify-between py-2 border-b border-gray-100">
               <span className="text-sm text-gray-500">Cell Phone Number</span>
-              <span className="text-sm text-gray-900">{client.secondary_phone || "No Data"}</span>
+              <span className="text-sm text-gray-900">{client.secondaryPhone || "No Data"}</span>
             </div>
             <div className="flex justify-between py-2 border-b border-gray-100">
               <span className="text-sm text-gray-500">Last name</span>
-              <span className="text-sm text-gray-900">{client.last_name || "No Data"}</span>
+              <span className="text-sm text-gray-900">{client.lastName || "No Data"}</span>
             </div>
             <div className="flex justify-between py-2 border-b border-gray-100">
               <span className="text-sm text-gray-500">Tax Exempt</span>
@@ -530,11 +535,11 @@ export default function ClientDetailPage({ params }: PageProps) {
             <div className="grid grid-cols-2 gap-4">
               <div className="flex justify-between py-2 border-b border-gray-100">
                 <span className="text-sm text-gray-500">Home Address</span>
-                <span className="text-sm text-gray-900">{primaryLocation.address_line1}</span>
+                <span className="text-sm text-gray-900">{primaryLocation.addressLine1}</span>
               </div>
               <div className="flex justify-between py-2 border-b border-gray-100">
                 <span className="text-sm text-gray-500">Zip Code</span>
-                <span className="text-sm text-gray-900">{primaryLocation.zip_code}</span>
+                <span className="text-sm text-gray-900">{primaryLocation.zipCode}</span>
               </div>
               <div className="flex justify-between py-2 border-b border-gray-100">
                 <span className="text-sm text-gray-500">City</span>
@@ -608,10 +613,10 @@ export default function ClientDetailPage({ params }: PageProps) {
                               {sub.status}
                             </span>
                           </td>
-                          <td className="py-3">{formatCurrency(sub.price_per_visit_cents)} {sub.frequency.toLowerCase()}</td>
+                          <td className="py-3">{formatCurrency(sub.pricePerVisitCents)} {sub.frequency.toLowerCase()}</td>
                           <td className="py-3">Prepaid Fixed</td>
                           <td className="py-3">Monthly</td>
-                          <td className="py-3">{formatDate(sub.created_at)}</td>
+                          <td className="py-3">{formatDate(sub.createdAt)}</td>
                           <td className="py-3">
                             <div className="flex items-center gap-2">
                               <button className="p-1 text-gray-400 hover:text-teal-600"><Eye className="w-4 h-4" /></button>
@@ -653,16 +658,16 @@ export default function ClientDetailPage({ params }: PageProps) {
                     {client.recentPayments?.length > 0 ? (
                       client.recentPayments.map((payment) => (
                         <tr key={payment.id}>
-                          <td className="py-3">{formatDate(payment.created_at)}</td>
-                          <td className="py-3 text-teal-600">{payment.invoice_number || "N/A"}</td>
-                          <td className="py-3">{payment.payment_type}</td>
+                          <td className="py-3">{formatDate(payment.createdAt)}</td>
+                          <td className="py-3 text-teal-600">{payment.invoiceNumber || "N/A"}</td>
+                          <td className="py-3">{payment.paymentType}</td>
                           <td className="py-3">Credit Card</td>
                           <td className="py-3">
                             <span className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusBadge(payment.status)}`}>
                               {payment.status}
                             </span>
                           </td>
-                          <td className="py-3">{formatCurrency(payment.amount_cents)}</td>
+                          <td className="py-3">{formatCurrency(payment.amountCents)}</td>
                           <td className="py-3">
                             <div className="flex items-center gap-2">
                               <button className="text-teal-600 hover:text-teal-700 text-sm">View</button>
@@ -703,8 +708,8 @@ export default function ClientDetailPage({ params }: PageProps) {
                     {client.recentPayments?.length > 0 ? (
                       client.recentPayments.map((payment) => (
                         <tr key={payment.id}>
-                          <td className="py-3">{formatDate(payment.created_at)}</td>
-                          <td className="py-3">{formatCurrency(payment.amount_cents)}</td>
+                          <td className="py-3">{formatDate(payment.createdAt)}</td>
+                          <td className="py-3">{formatCurrency(payment.amountCents)}</td>
                           <td className="py-3">$0.00</td>
                           <td className="py-3">
                             <span className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusBadge(payment.status)}`}>
@@ -712,7 +717,7 @@ export default function ClientDetailPage({ params }: PageProps) {
                             </span>
                           </td>
                           <td className="py-3">Credit Card</td>
-                          <td className="py-3 text-gray-500">Payment for invoice(s) {payment.invoice_number}</td>
+                          <td className="py-3 text-gray-500">Payment for invoice(s) {payment.invoiceNumber}</td>
                           <td className="py-3">
                             <div className="flex items-center gap-2">
                               <button className="p-1 text-gray-400 hover:text-teal-600"><Eye className="w-4 h-4" /></button>
@@ -750,7 +755,7 @@ export default function ClientDetailPage({ params }: PageProps) {
                     </tr>
                   </thead>
                   <tbody>
-                    {client.stripe_customer_id ? (
+                    {client.hasStripeCustomer ? (
                       <tr>
                         <td className="py-3">
                           <span className="font-bold text-blue-600">VISA</span>
@@ -872,15 +877,15 @@ export default function ClientDetailPage({ params }: PageProps) {
               </div>
               <div className="flex justify-between py-2 border-b border-gray-100">
                 <span className="text-sm text-gray-500">Service Days</span>
-                <span className="text-sm text-gray-900">{activeSubscriptions[0]?.service_day || "No Data"}</span>
+                <span className="text-sm text-gray-900">{activeSubscriptions[0]?.serviceDay || "No Data"}</span>
               </div>
               <div className="flex justify-between py-2 border-b border-gray-100">
                 <span className="text-sm text-gray-500">Regular Service Start Date</span>
-                <span className="text-sm text-gray-900">{activeSubscriptions[0]?.next_service_date ? formatDate(activeSubscriptions[0].next_service_date) : "No Data"}</span>
+                <span className="text-sm text-gray-900">{activeSubscriptions[0]?.nextServiceDate ? formatDate(activeSubscriptions[0].nextServiceDate) : "No Data"}</span>
               </div>
               <div className="flex justify-between py-2 border-b border-gray-100">
                 <span className="text-sm text-gray-500">Next Recurring Cleanup Date</span>
-                <span className="text-sm text-gray-900">{activeSubscriptions[0]?.next_service_date ? formatDate(activeSubscriptions[0].next_service_date) : "No Data"}</span>
+                <span className="text-sm text-gray-900">{activeSubscriptions[0]?.nextServiceDate ? formatDate(activeSubscriptions[0].nextServiceDate) : "No Data"}</span>
               </div>
               <div className="flex justify-between py-2">
                 <span className="text-sm text-gray-500">Field Tech</span>
@@ -917,7 +922,7 @@ export default function ClientDetailPage({ params }: PageProps) {
                           </span>
                         </td>
                         <td className="py-3">Not Assigned</td>
-                        <td className="py-3">{formatDate(job.scheduled_date)}</td>
+                        <td className="py-3">{formatDate(job.scheduledDate)}</td>
                         <td className="py-3">Regular Plan Cleanup</td>
                         <td className="py-3 text-gray-400">No Data</td>
                         <td className="py-3">
@@ -938,7 +943,7 @@ export default function ClientDetailPage({ params }: PageProps) {
             <div className="grid grid-cols-2 gap-4">
               <div className="flex justify-between py-2 border-b border-gray-100">
                 <span className="text-sm text-gray-500">Initial Cleanup Date</span>
-                <span className="text-sm text-gray-900">{client.created_at ? formatDate(client.created_at) : "No Data"}</span>
+                <span className="text-sm text-gray-900">{client.createdAt ? formatDate(client.createdAt) : "No Data"}</span>
               </div>
               <div />
               <div className="flex justify-between py-2 border-b border-gray-100">
@@ -990,10 +995,10 @@ export default function ClientDetailPage({ params }: PageProps) {
           )}
           {notesTab === "fromclient" && (
             <div className="space-y-3">
-              {client.referral_source && (
+              {client.referralSource && (
                 <div className="flex justify-between py-2 border-b border-gray-100">
                   <span className="text-sm text-gray-500">How you heard about us</span>
-                  <span className="text-sm text-gray-900">{client.referral_source}</span>
+                  <span className="text-sm text-gray-900">{client.referralSource}</span>
                 </div>
               )}
             </div>
@@ -1038,7 +1043,7 @@ export default function ClientDetailPage({ params }: PageProps) {
                 </div>
                 <div className="flex justify-between py-2 border-b border-gray-100">
                   <span className="text-sm text-gray-500">Dangerous Dog</span>
-                  <span className="text-sm text-gray-900">{activeDogs[activeDogTab]?.is_safe === false ? "Yes" : "-"}</span>
+                  <span className="text-sm text-gray-900">{activeDogs[activeDogTab]?.isSafe === false ? "Yes" : "-"}</span>
                 </div>
                 <div className="flex justify-between py-2 border-b border-gray-100">
                   <span className="text-sm text-gray-500">Gender</span>
@@ -1054,7 +1059,7 @@ export default function ClientDetailPage({ params }: PageProps) {
                 </div>
                 <div className="flex justify-between py-2 border-b border-gray-100">
                   <span className="text-sm text-gray-500">Additional Comments about Dog</span>
-                  <span className="text-sm text-gray-900">{activeDogs[activeDogTab]?.safety_notes || "No Additional Comment"}</span>
+                  <span className="text-sm text-gray-900">{activeDogs[activeDogTab]?.safetyNotes || "No Additional Comment"}</span>
                 </div>
                 <div className="flex justify-between py-2">
                   <span className="text-sm text-gray-500">Dog Photo</span>
@@ -1081,15 +1086,15 @@ export default function ClientDetailPage({ params }: PageProps) {
           <div className="grid grid-cols-2 gap-4">
             <div className="flex justify-between py-2 border-b border-gray-100">
               <span className="text-sm text-gray-500">Gate Location</span>
-              <span className="text-sm text-gray-900">{primaryLocation?.gate_location || "No Data"}</span>
+              <span className="text-sm text-gray-900">{primaryLocation?.gateLocation || "No Data"}</span>
             </div>
             <div className="flex justify-between py-2 border-b border-gray-100">
               <span className="text-sm text-gray-500">Yard Size</span>
-              <span className="text-sm text-gray-900">{primaryLocation?.lot_size || "No Data"}</span>
+              <span className="text-sm text-gray-900">{primaryLocation?.lotSize || "No Data"}</span>
             </div>
             <div className="flex justify-between py-2 border-b border-gray-100">
               <span className="text-sm text-gray-500">Gate Code</span>
-              <span className="text-sm text-gray-900">{primaryLocation?.gate_code || "No Data"}</span>
+              <span className="text-sm text-gray-900">{primaryLocation?.gateCode || "No Data"}</span>
             </div>
             <div className="flex justify-between py-2 border-b border-gray-100">
               <span className="text-sm text-gray-500">Gated Community</span>
@@ -1113,7 +1118,7 @@ export default function ClientDetailPage({ params }: PageProps) {
             </div>
             <div className="flex justify-between py-2 col-span-2">
               <span className="text-sm text-gray-500">Additional Comments</span>
-              <span className="text-sm text-gray-900">{primaryLocation?.access_notes || "No Data"}</span>
+              <span className="text-sm text-gray-900">{primaryLocation?.accessNotes || "No Data"}</span>
             </div>
           </div>
           <div className="flex justify-end mt-4">
@@ -1137,8 +1142,8 @@ export default function ClientDetailPage({ params }: PageProps) {
             <div className="flex justify-between py-2">
               <span className="text-sm text-gray-500">Cleanup Notification Method</span>
               <span className="text-sm text-gray-900">
-                {client.notification_preferences?.sms ? "Text + " : ""}
-                {client.notification_preferences?.email ? "Email + " : ""}
+                {client.notificationPreferences?.sms ? "Text + " : ""}
+                {client.notificationPreferences?.email ? "Email + " : ""}
                 Web Portal
               </span>
             </div>
@@ -1237,7 +1242,7 @@ export default function ClientDetailPage({ params }: PageProps) {
                 <td className="py-3">System</td>
                 <td className="py-3">Approved</td>
                 <td className="py-3 text-gray-400">No Data</td>
-                <td className="py-3">{formatDate(client.created_at)}</td>
+                <td className="py-3">{formatDate(client.createdAt)}</td>
               </tr>
             </tbody>
           </table>
