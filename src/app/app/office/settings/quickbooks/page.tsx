@@ -36,18 +36,18 @@ export default function QuickbooksIntegrationPage() {
       {/* Integration Card */}
       <section className="bg-white rounded-lg border border-gray-200">
         <div className="flex flex-col items-center justify-center py-16 px-8">
-          {/* Puzzle Piece Icons */}
+          {/* QuickBooks Integration Icon */}
           <div className="flex items-center justify-center mb-8">
-            <svg width="120" height="80" viewBox="0 0 120 80" fill="none" xmlns="http://www.w3.org/2000/svg">
-              {/* Blue puzzle piece (left) */}
+            <svg width="100" height="60" viewBox="0 0 100 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+              {/* Blue/teal connector piece (left) */}
               <path
-                d="M10 20C10 14.477 14.477 10 20 10H45V25C45 27.761 47.239 30 50 30C52.761 30 55 27.761 55 25V10H55C60.523 10 65 14.477 65 20V45H50C47.239 45 45 47.239 45 50C45 52.761 47.239 55 50 55H65V60C65 65.523 60.523 70 55 70H20C14.477 70 10 65.523 10 60V20Z"
+                d="M0 8C0 3.58172 3.58172 0 8 0H38V0C38 0 38 12 38 18C38 20 40 22 42 22H50V38H42C40 38 38 40 38 42C38 48 38 60 38 60H8C3.58172 60 0 56.4183 0 52V8Z"
                 fill="#0097A7"
               />
-              {/* Green puzzle piece (right) */}
+              {/* Green connector piece (right) */}
               <path
-                d="M55 20C55 14.477 59.477 10 65 10H90V25C90 27.761 92.239 30 95 30C97.761 30 100 27.761 100 25V10H100C105.523 10 110 14.477 110 20V45H95C92.239 45 90 47.239 90 50C90 52.761 92.239 55 95 55H110V60C110 65.523 105.523 70 100 70H65C59.477 70 55 65.523 55 60V55H70C72.761 55 75 52.761 75 50C75 47.239 72.761 45 70 45H55V20Z"
-                fill="#7DB643"
+                d="M50 22H58C60 22 62 20 62 18C62 12 62 0 62 0H92C96.4183 0 100 3.58172 100 8V52C100 56.4183 96.4183 60 92 60H62V60C62 60 62 48 62 42C62 40 60 38 58 38H50V22Z"
+                fill="#7AB648"
               />
             </svg>
           </div>
