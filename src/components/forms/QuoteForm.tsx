@@ -51,10 +51,12 @@ const formatPhoneNumber = (value: string): string => {
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "");
 
 // Schema for service details step (includes basic contact for quote notification)
+// Fields are optional here because they may be hidden by admin settings
+// Required fields are collected again in the contact step
 const serviceSchema = z.object({
-  firstName: z.string().min(2, "First name is required"),
+  firstName: z.string().optional().or(z.literal("")), // Optional, shown when requestFirstNameBeforeQuote is enabled
   lastName: z.string().optional(), // Optional, shown when requestLastNameBeforeQuote is enabled
-  phone: z.string().min(10, "Please enter a valid phone number"),
+  phone: z.string().optional().or(z.literal("")), // Optional, shown when requestCellPhoneBeforeQuote is enabled
   email: z.string().email("Please enter a valid email").optional().or(z.literal("")), // Optional, shown when requestEmailBeforeQuote is enabled
   numberOfDogs: z.string().min(1, "Please select number of dogs"),
   frequency: z.string().min(1, "Please select a frequency"),
