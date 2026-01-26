@@ -1,0 +1,497 @@
+/**
+ * Dashboard Metrics API
+ *
+ * Aggregates all dashboard metrics for the office dashboard.
+ * Requires reports:read permission.
+ *
+ * GET /api/admin/dashboard - Get all dashboard metrics
+ */
+
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+import { authenticateWithPermission, errorResponse } from "@/lib/api-auth";
+import type { DashboardMetrics, StatusCardCounts, ChartData, MetricValues } from "@/lib/dashboard/types";
+
+function getSupabase() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceKey) {
+    throw new Error("Supabase environment variables not configured");
+  }
+  return createClient(url, serviceKey);
+}
+
+// Get date range for current month
+function getCurrentMonthRange() {
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  return {
+    start: startOfMonth.toISOString().split("T")[0],
+    end: endOfMonth.toISOString().split("T")[0],
+  };
+}
+
+// Get last 30 days as array of dates
+function getLast30Days(): string[] {
+  const dates: string[] = [];
+  const now = new Date();
+  for (let i = 29; i >= 0; i--) {
+    const date = new Date(now);
+    date.setDate(date.getDate() - i);
+    dates.push(date.toISOString().split("T")[0]);
+  }
+  return dates;
+}
+
+// Cancellation reason colors
+const CANCEL_REASON_COLORS: Record<string, string> = {
+  "No response": "#94a3b8",
+  "Moved": "#f59e0b",
+  "Dog deceased": "#ef4444",
+  "Got a fence/yard job done": "#10b981",
+  "DIY attitude paid off": "#3b82f6",
+  "Expensive": "#8b5cf6",
+  "Inactive": "#6b7280",
+  "Gift certificate used up": "#ec4899",
+  "Miss payment": "#dc2626",
+  "Slow Service Rolled": "#f97316",
+  "Client Fired by Vendor": "#be123c",
+  "Started With Competitor": "#7c3aed",
+  "Other": "#64748b",
+};
+
+/**
+ * GET /api/admin/dashboard
+ * Get all dashboard metrics
+ */
+export async function GET(request: NextRequest) {
+  const auth = await authenticateWithPermission(request, "reports:read");
+  if (!auth.user) {
+    return errorResponse(auth.error!, auth.status);
+  }
+
+  const supabase = getSupabase();
+  const orgId = auth.user.orgId;
+  const today = new Date().toISOString().split("T")[0];
+  const { start: monthStart, end: monthEnd } = getCurrentMonthRange();
+  const last30Days = getLast30Days();
+
+  try {
+    // Fetch all data in parallel
+    const [
+      // Status card counts
+      unassignedLocationsResult,
+      openOneTimeInvoicesResult,
+      openRecurringInvoicesResult,
+      overdueOneTimeInvoicesResult,
+      overdueRecurringInvoicesResult,
+      failedOneTimeInvoicesResult,
+      failedRecurringInvoicesResult,
+      openJobsResult,
+      recurringInvoiceDraftsResult,
+      oneTimeInvoiceDraftsResult,
+      unoptimizedRoutesResult,
+      shiftsResult,
+      staffResult,
+      // Chart data
+      paymentsResult,
+      clientsResult,
+      subscriptionsResult,
+      jobsResult,
+    ] = await Promise.all([
+      // Unassigned locations (locations without a route assignment)
+      supabase
+        .from("locations")
+        .select("id", { count: "exact", head: true })
+        .eq("org_id", orgId)
+        .eq("is_active", true)
+        .is("default_route_id", null),
+
+      // Open one-time invoices (no subscription_id)
+      supabase
+        .from("invoices")
+        .select("id", { count: "exact", head: true })
+        .eq("org_id", orgId)
+        .eq("status", "OPEN")
+        .is("subscription_id", null),
+
+      // Open recurring invoices (has subscription_id)
+      supabase
+        .from("invoices")
+        .select("id", { count: "exact", head: true })
+        .eq("org_id", orgId)
+        .eq("status", "OPEN")
+        .not("subscription_id", "is", null),
+
+      // Overdue one-time invoices
+      supabase
+        .from("invoices")
+        .select("id", { count: "exact", head: true })
+        .eq("org_id", orgId)
+        .eq("status", "OVERDUE")
+        .is("subscription_id", null),
+
+      // Overdue recurring invoices
+      supabase
+        .from("invoices")
+        .select("id", { count: "exact", head: true })
+        .eq("org_id", orgId)
+        .eq("status", "OVERDUE")
+        .not("subscription_id", "is", null),
+
+      // Failed one-time invoices
+      supabase
+        .from("invoices")
+        .select("id", { count: "exact", head: true })
+        .eq("org_id", orgId)
+        .eq("status", "UNCOLLECTIBLE")
+        .is("subscription_id", null),
+
+      // Failed recurring invoices
+      supabase
+        .from("invoices")
+        .select("id", { count: "exact", head: true })
+        .eq("org_id", orgId)
+        .eq("status", "UNCOLLECTIBLE")
+        .not("subscription_id", "is", null),
+
+      // Open jobs (today)
+      supabase
+        .from("jobs")
+        .select("id", { count: "exact", head: true })
+        .eq("org_id", orgId)
+        .eq("scheduled_date", today)
+        .in("status", ["SCHEDULED", "EN_ROUTE", "IN_PROGRESS"]),
+
+      // Recurring invoice drafts
+      supabase
+        .from("invoices")
+        .select("id", { count: "exact", head: true })
+        .eq("org_id", orgId)
+        .eq("status", "DRAFT")
+        .not("subscription_id", "is", null),
+
+      // One-time invoice drafts
+      supabase
+        .from("invoices")
+        .select("id", { count: "exact", head: true })
+        .eq("org_id", orgId)
+        .eq("status", "DRAFT")
+        .is("subscription_id", null),
+
+      // Unoptimized routes (routes without optimization)
+      supabase
+        .from("routes")
+        .select("id", { count: "exact", head: true })
+        .eq("org_id", orgId)
+        .eq("route_date", today)
+        .is("optimized_at", null),
+
+      // Shifts data for today
+      supabase
+        .from("shifts")
+        .select("id, status, user_id, start_time, end_time, breaks")
+        .eq("org_id", orgId)
+        .eq("shift_date", today),
+
+      // Staff data
+      supabase
+        .from("users")
+        .select("id, is_active")
+        .eq("org_id", orgId)
+        .in("role", ["FIELD_TECH", "CREW_LEAD"]),
+
+      // Payments for chart data (last 30 days)
+      supabase
+        .from("payments")
+        .select("id, amount_cents, status, created_at, clients!inner(client_type)")
+        .eq("org_id", orgId)
+        .eq("status", "SUCCEEDED")
+        .gte("created_at", last30Days[0])
+        .lte("created_at", `${last30Days[29]}T23:59:59`),
+
+      // Clients for chart data
+      supabase
+        .from("clients")
+        .select("id, status, client_type, referral_source, created_at, canceled_at")
+        .eq("org_id", orgId),
+
+      // Subscriptions for chart and churn data
+      supabase
+        .from("subscriptions")
+        .select("id, status, client_id, cancel_reason, canceled_at, created_at, clients!inner(client_type)")
+        .eq("org_id", orgId),
+
+      // Jobs for performance metrics
+      supabase
+        .from("jobs")
+        .select("id, status, scheduled_date, duration_minutes, assigned_to, route_id, clients!inner(client_type)")
+        .eq("org_id", orgId)
+        .gte("scheduled_date", monthStart)
+        .lte("scheduled_date", monthEnd),
+    ]);
+
+    // Process status card counts
+    const counts: StatusCardCounts = {
+      unassignedLocations: unassignedLocationsResult.count || 0,
+      changeRequests: 0, // TODO: Implement change requests table
+      openOneTimeInvoices: openOneTimeInvoicesResult.count || 0,
+      openRecurringInvoices: openRecurringInvoicesResult.count || 0,
+      overdueOneTimeInvoices: overdueOneTimeInvoicesResult.count || 0,
+      overdueRecurringInvoices: overdueRecurringInvoicesResult.count || 0,
+      failedOneTimeInvoices: failedOneTimeInvoicesResult.count || 0,
+      failedRecurringInvoices: failedRecurringInvoicesResult.count || 0,
+      openJobs: openJobsResult.count || 0,
+      recurringInvoiceDrafts: recurringInvoiceDraftsResult.count || 0,
+      oneTimeInvoiceDrafts: oneTimeInvoiceDraftsResult.count || 0,
+      unoptimizedRoutes: unoptimizedRoutesResult.count || 0,
+      openShifts: 0,
+      incompleteShifts: 0,
+      clockedInStaff: 0,
+      staffOnBreak: 0,
+    };
+
+    // Process shifts data
+    const shifts = shiftsResult.data || [];
+    counts.openShifts = shifts.filter(s => s.status === "SCHEDULED").length;
+    counts.incompleteShifts = shifts.filter(s => s.status === "IN_PROGRESS" && !s.end_time).length;
+    counts.clockedInStaff = shifts.filter(s => s.status === "IN_PROGRESS" && s.start_time).length;
+    counts.staffOnBreak = shifts.filter(s => {
+      if (!s.breaks || !Array.isArray(s.breaks)) return false;
+      return s.breaks.some((b: { end_time?: string }) => !b.end_time);
+    }).length;
+
+    // Process chart data
+    const payments = paymentsResult.data || [];
+    const clients = clientsResult.data || [];
+    const subscriptions = subscriptionsResult.data || [];
+    const jobs = jobsResult.data || [];
+
+    // Total Sales Chart (daily for last 30 days)
+    const totalSalesChart = last30Days.map(date => {
+      const dayPayments = payments.filter(p => p.created_at?.startsWith(date));
+      const residential = dayPayments
+        .filter(p => (p.clients as { client_type: string })?.client_type === "RESIDENTIAL")
+        .reduce((sum, p) => sum + (p.amount_cents || 0), 0) / 100;
+      const commercial = dayPayments
+        .filter(p => (p.clients as { client_type: string })?.client_type === "COMMERCIAL")
+        .reduce((sum, p) => sum + (p.amount_cents || 0), 0) / 100;
+      return {
+        date,
+        residential,
+        commercial,
+        total: residential + commercial,
+      };
+    });
+
+    // Active Clients Charts (daily for last 30 days)
+    const activeResClientsChart = last30Days.map(date => ({
+      date,
+      value: clients.filter(c =>
+        c.client_type === "RESIDENTIAL" &&
+        c.status === "ACTIVE" &&
+        new Date(c.created_at) <= new Date(date)
+      ).length,
+    }));
+
+    const activeCommClientsChart = last30Days.map(date => ({
+      date,
+      value: clients.filter(c =>
+        c.client_type === "COMMERCIAL" &&
+        c.status === "ACTIVE" &&
+        new Date(c.created_at) <= new Date(date)
+      ).length,
+    }));
+
+    // New vs Lost Clients Charts
+    const newVsLostResChart = last30Days.map(date => {
+      const newCount = clients.filter(c =>
+        c.client_type === "RESIDENTIAL" &&
+        c.created_at?.startsWith(date)
+      ).length;
+      const lostCount = clients.filter(c =>
+        c.client_type === "RESIDENTIAL" &&
+        c.canceled_at?.startsWith(date)
+      ).length;
+      return { date, new: newCount, lost: lostCount, net: newCount - lostCount };
+    });
+
+    const newVsLostCommChart = last30Days.map(date => {
+      const newCount = clients.filter(c =>
+        c.client_type === "COMMERCIAL" &&
+        c.created_at?.startsWith(date)
+      ).length;
+      const lostCount = clients.filter(c =>
+        c.client_type === "COMMERCIAL" &&
+        c.canceled_at?.startsWith(date)
+      ).length;
+      return { date, new: newCount, lost: lostCount, net: newCount - lostCount };
+    });
+
+    // Average Client Value Charts
+    const avgResClientValueChart = last30Days.map(date => {
+      const dayPayments = payments.filter(p =>
+        p.created_at?.startsWith(date) &&
+        (p.clients as { client_type: string })?.client_type === "RESIDENTIAL"
+      );
+      const totalValue = dayPayments.reduce((sum, p) => sum + (p.amount_cents || 0), 0);
+      const clientCount = new Set(dayPayments.map(p => (p.clients as { id?: string })?.id)).size;
+      return { date, value: clientCount > 0 ? totalValue / clientCount / 100 : 0 };
+    });
+
+    const avgCommClientValueChart = last30Days.map(date => {
+      const dayPayments = payments.filter(p =>
+        p.created_at?.startsWith(date) &&
+        (p.clients as { client_type: string })?.client_type === "COMMERCIAL"
+      );
+      const totalValue = dayPayments.reduce((sum, p) => sum + (p.amount_cents || 0), 0);
+      const clientCount = new Set(dayPayments.map(p => (p.clients as { id?: string })?.id)).size;
+      return { date, value: clientCount > 0 ? totalValue / clientCount / 100 : 0 };
+    });
+
+    // Cancellation Reasons
+    const canceledResSubs = subscriptions.filter(s =>
+      s.status === "CANCELED" &&
+      (s.clients as { client_type: string })?.client_type === "RESIDENTIAL" &&
+      s.cancel_reason
+    );
+    const resCancelReasonCounts: Record<string, number> = {};
+    canceledResSubs.forEach(s => {
+      const reason = s.cancel_reason || "Other";
+      resCancelReasonCounts[reason] = (resCancelReasonCounts[reason] || 0) + 1;
+    });
+    const resCancelationReasons = Object.entries(resCancelReasonCounts).map(([reason, count]) => ({
+      reason,
+      count,
+      color: CANCEL_REASON_COLORS[reason] || "#64748b",
+    }));
+
+    const canceledCommSubs = subscriptions.filter(s =>
+      s.status === "CANCELED" &&
+      (s.clients as { client_type: string })?.client_type === "COMMERCIAL" &&
+      s.cancel_reason
+    );
+    const commCancelReasonCounts: Record<string, number> = {};
+    canceledCommSubs.forEach(s => {
+      const reason = s.cancel_reason || "Other";
+      commCancelReasonCounts[reason] = (commCancelReasonCounts[reason] || 0) + 1;
+    });
+    const commCancelationReasons = Object.entries(commCancelReasonCounts).map(([reason, count]) => ({
+      reason,
+      count,
+      color: CANCEL_REASON_COLORS[reason] || "#64748b",
+    }));
+
+    // Referral Sources
+    const referralCounts: Record<string, number> = {};
+    clients.filter(c => c.referral_source).forEach(c => {
+      referralCounts[c.referral_source!] = (referralCounts[c.referral_source!] || 0) + 1;
+    });
+    const referralSources = Object.entries(referralCounts)
+      .map(([source, count]) => ({ source, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+
+    const charts: ChartData = {
+      totalSales: totalSalesChart,
+      activeResClients: activeResClientsChart,
+      activeCommClients: activeCommClientsChart,
+      newVsLostRes: newVsLostResChart,
+      newVsLostComm: newVsLostCommChart,
+      avgResClientValue: avgResClientValueChart,
+      avgCommClientValue: avgCommClientValueChart,
+      resCancelationReasons,
+      commCancelationReasons,
+      referralSources,
+    };
+
+    // Calculate metric values
+    const activeResClients = clients.filter(c => c.client_type === "RESIDENTIAL" && c.status === "ACTIVE");
+    const activeCommClients = clients.filter(c => c.client_type === "COMMERCIAL" && c.status === "ACTIVE");
+    const activeStaff = (staffResult.data || []).filter(s => s.is_active);
+    const completedJobs = jobs.filter(j => j.status === "COMPLETED");
+
+    // Monthly totals
+    const monthResPayments = payments.filter(p =>
+      (p.clients as { client_type: string })?.client_type === "RESIDENTIAL"
+    );
+    const monthCommPayments = payments.filter(p =>
+      (p.clients as { client_type: string })?.client_type === "COMMERCIAL"
+    );
+    const totalSalesResidential = monthResPayments.reduce((sum, p) => sum + (p.amount_cents || 0), 0) / 100;
+    const totalSalesCommercial = monthCommPayments.reduce((sum, p) => sum + (p.amount_cents || 0), 0) / 100;
+
+    // New/Lost clients this month
+    const newResThisMonth = clients.filter(c =>
+      c.client_type === "RESIDENTIAL" &&
+      c.created_at >= monthStart
+    ).length;
+    const lostResThisMonth = clients.filter(c =>
+      c.client_type === "RESIDENTIAL" &&
+      c.canceled_at && c.canceled_at >= monthStart
+    ).length;
+    const newCommThisMonth = clients.filter(c =>
+      c.client_type === "COMMERCIAL" &&
+      c.created_at >= monthStart
+    ).length;
+    const lostCommThisMonth = clients.filter(c =>
+      c.client_type === "COMMERCIAL" &&
+      c.canceled_at && c.canceled_at >= monthStart
+    ).length;
+
+    // Churn rate calculation (lost / (active + lost) * 100)
+    const resChurnRate = activeResClients.length + lostResThisMonth > 0
+      ? (lostResThisMonth / (activeResClients.length + lostResThisMonth)) * 100
+      : null;
+    const commChurnRate = activeCommClients.length + lostCommThisMonth > 0
+      ? (lostCommThisMonth / (activeCommClients.length + lostCommThisMonth)) * 100
+      : null;
+
+    // Performance metrics
+    const resJobs = completedJobs.filter(j => (j.clients as { client_type: string })?.client_type === "RESIDENTIAL");
+    const commJobs = completedJobs.filter(j => (j.clients as { client_type: string })?.client_type === "COMMERCIAL");
+    const totalResMinutes = resJobs.reduce((sum, j) => sum + (j.duration_minutes || 0), 0);
+    const totalCommMinutes = commJobs.reduce((sum, j) => sum + (j.duration_minutes || 0), 0);
+
+    // Unique routes with jobs
+    const uniqueResRoutes = new Set(resJobs.filter(j => j.route_id).map(j => j.route_id)).size;
+    const uniqueCommRoutes = new Set(commJobs.filter(j => j.route_id).map(j => j.route_id)).size;
+
+    const metrics: MetricValues = {
+      totalSalesResidential,
+      totalSalesCommercial,
+      totalSalesTotal: totalSalesResidential + totalSalesCommercial,
+      activeResidentialClients: activeResClients.length,
+      activeCommercialClients: activeCommClients.length,
+      newResClients: newResThisMonth,
+      lostResClients: lostResThisMonth,
+      netResClients: newResThisMonth - lostResThisMonth,
+      newCommClients: newCommThisMonth,
+      lostCommClients: lostCommThisMonth,
+      netCommClients: newCommThisMonth - lostCommThisMonth,
+      avgResClientValue: activeResClients.length > 0 ? totalSalesResidential / activeResClients.length : 0,
+      avgCommClientValue: activeCommClients.length > 0 ? totalSalesCommercial / activeCommClients.length : 0,
+      avgResClientsPerTech: activeStaff.length > 0 ? activeResClients.length / activeStaff.length : 0,
+      avgCommClientsPerTech: activeStaff.length > 0 ? activeCommClients.length / activeStaff.length : 0,
+      avgResYardsPerHour: totalResMinutes > 0 ? (resJobs.length / (totalResMinutes / 60)) : 0,
+      avgCommYardsPerHour: totalCommMinutes > 0 ? (commJobs.length / (totalCommMinutes / 60)) : 0,
+      avgResYardsPerRoute: uniqueResRoutes > 0 ? resJobs.length / uniqueResRoutes : 0,
+      avgCommYardsPerRoute: uniqueCommRoutes > 0 ? commJobs.length / uniqueCommRoutes : 0,
+      resChurnRate,
+      commChurnRate,
+      clientLifetimeValue: null, // TODO: Calculate LTV based on historical data
+    };
+
+    const dashboardMetrics: DashboardMetrics = {
+      counts,
+      charts,
+      metrics,
+    };
+
+    return NextResponse.json(dashboardMetrics);
+  } catch (error) {
+    console.error("Dashboard API error:", error);
+    return errorResponse("Failed to fetch dashboard data", 500);
+  }
+}
