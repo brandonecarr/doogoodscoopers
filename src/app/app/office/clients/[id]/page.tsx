@@ -478,31 +478,31 @@ export default function ClientDetailPage({ params }: PageProps) {
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex justify-between py-2 border-b border-gray-100">
                   <span className="text-sm text-gray-500">First name</span>
-                  <span className="text-sm text-gray-900">{client.firstName || "No Data"}</span>
+                  <span className="text-sm font-semibold text-gray-900">{client.firstName || "No Data"}</span>
                 </div>
                 <div className="flex justify-between py-2 border-b border-gray-100">
                   <span className="text-sm text-gray-500">Home Phone Number</span>
-                  <span className="text-sm text-gray-900">{client.phone || "No Data"}</span>
+                  <span className="text-sm font-semibold text-gray-900">{client.phone || "No Data"}</span>
                 </div>
                 <div className="flex justify-between py-2 border-b border-gray-100">
                   <span className="text-sm text-gray-500">Middle Name</span>
-                  <span className="text-sm text-gray-400">No Data</span>
+                  <span className="text-sm font-semibold text-gray-400">No Data</span>
                 </div>
                 <div className="flex justify-between py-2 border-b border-gray-100">
                   <span className="text-sm text-gray-500">Cell Phone Number</span>
-                  <span className="text-sm text-gray-900">{client.secondaryPhone || "No Data"}</span>
+                  <span className="text-sm font-semibold text-gray-900">{client.secondaryPhone || "No Data"}</span>
                 </div>
                 <div className="flex justify-between py-2 border-b border-gray-100">
                   <span className="text-sm text-gray-500">Last name</span>
-                  <span className="text-sm text-gray-900">{client.lastName || "No Data"}</span>
+                  <span className="text-sm font-semibold text-gray-900">{client.lastName || "No Data"}</span>
                 </div>
                 <div className="flex justify-between py-2 border-b border-gray-100">
                   <span className="text-sm text-gray-500">Tax Exempt</span>
-                  <span className="text-sm text-gray-900">No</span>
+                  <span className="text-sm font-semibold text-gray-900">No</span>
                 </div>
                 <div className="flex justify-between py-2">
                   <span className="text-sm text-gray-500">Email</span>
-                  <span className="text-sm text-gray-900">{client.email || "No Data"}</span>
+                  <span className="text-sm font-semibold text-gray-900">{client.email || "No Data"}</span>
                 </div>
               </div>
               <div className="flex justify-end gap-2 mt-4">
@@ -517,33 +517,33 @@ export default function ClientDetailPage({ params }: PageProps) {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="flex justify-between py-2 border-b border-gray-100">
                     <span className="text-sm text-gray-500">First name</span>
-                    <span className="text-sm text-gray-900">{contact.firstName || "No Data"}</span>
+                    <span className="text-sm font-semibold text-gray-900">{contact.firstName || "No Data"}</span>
                   </div>
                   <div className="flex justify-between py-2 border-b border-gray-100">
                     <span className="text-sm text-gray-500">Home Phone Number</span>
-                    <span className="text-sm text-gray-900">{contact.homePhone || "No Data"}</span>
+                    <span className="text-sm font-semibold text-gray-900">{contact.homePhone || "No Data"}</span>
                   </div>
                   <div className="flex justify-between py-2 border-b border-gray-100">
                     <span className="text-sm text-gray-500">Middle Name</span>
-                    <span className={`text-sm ${contact.middleName ? "text-gray-900" : "text-gray-400"}`}>
+                    <span className={`text-sm font-semibold ${contact.middleName ? "text-gray-900" : "text-gray-400"}`}>
                       {contact.middleName || "No Data"}
                     </span>
                   </div>
                   <div className="flex justify-between py-2 border-b border-gray-100">
                     <span className="text-sm text-gray-500">Cell Phone Number</span>
-                    <span className="text-sm text-gray-900">{contact.cellPhone || "No Data"}</span>
+                    <span className="text-sm font-semibold text-gray-900">{contact.cellPhone || "No Data"}</span>
                   </div>
                   <div className="flex justify-between py-2 border-b border-gray-100">
                     <span className="text-sm text-gray-500">Last name</span>
-                    <span className="text-sm text-gray-900">{contact.lastName || "No Data"}</span>
+                    <span className="text-sm font-semibold text-gray-900">{contact.lastName || "No Data"}</span>
                   </div>
                   <div className="flex justify-between py-2 border-b border-gray-100">
                     <span className="text-sm text-gray-500">Tax Exempt</span>
-                    <span className="text-sm text-gray-900">No</span>
+                    <span className="text-sm font-semibold text-gray-900">No</span>
                   </div>
                   <div className="flex justify-between py-2">
                     <span className="text-sm text-gray-500">Email</span>
-                    <span className="text-sm text-gray-900">{contact.email || "No Data"}</span>
+                    <span className="text-sm font-semibold text-gray-900">{contact.email || "No Data"}</span>
                   </div>
                 </div>
                 <div className="flex justify-end gap-2 mt-4">
@@ -571,23 +571,23 @@ export default function ClientDetailPage({ params }: PageProps) {
             <div className="grid grid-cols-2 gap-4">
               <div className="flex justify-between py-2 border-b border-gray-100">
                 <span className="text-sm text-gray-500">Home Address</span>
-                <span className="text-sm text-gray-900">{primaryLocation.addressLine1}</span>
+                <span className="text-sm font-semibold text-gray-900">{primaryLocation.addressLine1}</span>
               </div>
               <div className="flex justify-between py-2 border-b border-gray-100">
                 <span className="text-sm text-gray-500">Zip Code</span>
-                <span className="text-sm text-gray-900">{primaryLocation.zipCode}</span>
+                <span className="text-sm font-semibold text-gray-900">{primaryLocation.zipCode}</span>
               </div>
               <div className="flex justify-between py-2 border-b border-gray-100">
                 <span className="text-sm text-gray-500">City</span>
-                <span className="text-sm text-gray-900">{primaryLocation.city}</span>
+                <span className="text-sm font-semibold text-gray-900">{primaryLocation.city}</span>
               </div>
               <div className="flex justify-between py-2 border-b border-gray-100">
                 <span className="text-sm text-gray-500">Country</span>
-                <span className="text-sm text-gray-900">United States</span>
+                <span className="text-sm font-semibold text-gray-900">United States</span>
               </div>
               <div className="flex justify-between py-2">
                 <span className="text-sm text-gray-500">State</span>
-                <span className="text-sm text-gray-900">{primaryLocation.state}</span>
+                <span className="text-sm font-semibold text-gray-900">{primaryLocation.state}</span>
               </div>
             </div>
           ) : (
@@ -643,16 +643,16 @@ export default function ClientDetailPage({ params }: PageProps) {
                     {client.subscriptions?.length > 0 ? (
                       client.subscriptions.map((sub) => (
                         <tr key={sub.id}>
-                          <td className="py-3 text-teal-600">{sub.frequency}</td>
+                          <td className="py-3 font-semibold text-teal-600">{sub.frequency}</td>
                           <td className="py-3">
                             <span className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusBadge(sub.status)}`}>
                               {sub.status}
                             </span>
                           </td>
-                          <td className="py-3">{formatCurrency(sub.pricePerVisitCents)} {sub.frequency.toLowerCase()}</td>
-                          <td className="py-3">Prepaid Fixed</td>
-                          <td className="py-3">Monthly</td>
-                          <td className="py-3">{formatDate(sub.createdAt)}</td>
+                          <td className="py-3 font-semibold">{formatCurrency(sub.pricePerVisitCents)} {sub.frequency.toLowerCase()}</td>
+                          <td className="py-3 font-semibold">Prepaid Fixed</td>
+                          <td className="py-3 font-semibold">Monthly</td>
+                          <td className="py-3 font-semibold">{formatDate(sub.createdAt)}</td>
                           <td className="py-3">
                             <div className="flex items-center gap-2">
                               <button className="p-1 text-gray-400 hover:text-teal-600"><Eye className="w-4 h-4" /></button>
@@ -694,16 +694,16 @@ export default function ClientDetailPage({ params }: PageProps) {
                     {client.recentPayments?.length > 0 ? (
                       client.recentPayments.map((payment) => (
                         <tr key={payment.id}>
-                          <td className="py-3">{formatDate(payment.createdAt)}</td>
-                          <td className="py-3 text-teal-600">{payment.invoiceNumber || "N/A"}</td>
-                          <td className="py-3">{payment.paymentType}</td>
-                          <td className="py-3">Credit Card</td>
+                          <td className="py-3 font-semibold">{formatDate(payment.createdAt)}</td>
+                          <td className="py-3 font-semibold text-teal-600">{payment.invoiceNumber || "N/A"}</td>
+                          <td className="py-3 font-semibold">{payment.paymentType}</td>
+                          <td className="py-3 font-semibold">Credit Card</td>
                           <td className="py-3">
                             <span className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusBadge(payment.status)}`}>
                               {payment.status}
                             </span>
                           </td>
-                          <td className="py-3">{formatCurrency(payment.amountCents)}</td>
+                          <td className="py-3 font-semibold">{formatCurrency(payment.amountCents)}</td>
                           <td className="py-3">
                             <div className="flex items-center gap-2">
                               <button className="text-teal-600 hover:text-teal-700 text-sm">View</button>
@@ -744,16 +744,16 @@ export default function ClientDetailPage({ params }: PageProps) {
                     {client.recentPayments?.length > 0 ? (
                       client.recentPayments.map((payment) => (
                         <tr key={payment.id}>
-                          <td className="py-3">{formatDate(payment.createdAt)}</td>
-                          <td className="py-3">{formatCurrency(payment.amountCents)}</td>
-                          <td className="py-3">$0.00</td>
+                          <td className="py-3 font-semibold">{formatDate(payment.createdAt)}</td>
+                          <td className="py-3 font-semibold">{formatCurrency(payment.amountCents)}</td>
+                          <td className="py-3 font-semibold">$0.00</td>
                           <td className="py-3">
                             <span className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusBadge(payment.status)}`}>
                               {payment.status}
                             </span>
                           </td>
-                          <td className="py-3">Credit Card</td>
-                          <td className="py-3 text-gray-500">Payment for invoice(s) {payment.invoiceNumber}</td>
+                          <td className="py-3 font-semibold">Credit Card</td>
+                          <td className="py-3 font-semibold text-gray-500">Payment for invoice(s) {payment.invoiceNumber}</td>
                           <td className="py-3">
                             <div className="flex items-center gap-2">
                               <button className="p-1 text-gray-400 hover:text-teal-600"><Eye className="w-4 h-4" /></button>
@@ -793,12 +793,12 @@ export default function ClientDetailPage({ params }: PageProps) {
                   <tbody>
                     {client.hasStripeCustomer ? (
                       <tr>
-                        <td className="py-3">
+                        <td className="py-3 font-semibold">
                           <span className="font-bold text-blue-600">VISA</span>
                           <span className="ml-2">xxxx xxxx (Default)</span>
                         </td>
-                        <td className="py-3">{fullName}</td>
-                        <td className="py-3">XX/XXXX</td>
+                        <td className="py-3 font-semibold">{fullName}</td>
+                        <td className="py-3 font-semibold">XX/XXXX</td>
                         <td className="py-3">
                           <div className="flex items-center gap-4">
                             <button className="text-sm text-gray-500">Set Default</button>
@@ -909,27 +909,27 @@ export default function ClientDetailPage({ params }: PageProps) {
             <div className="grid grid-cols-2 gap-4">
               <div className="flex justify-between py-2 border-b border-gray-100">
                 <span className="text-sm text-gray-500">Cleanup Frequency</span>
-                <span className="text-sm text-gray-900">{activeSubscriptions[0] ? formatFrequency(activeSubscriptions[0].frequency) : "No Data"}</span>
+                <span className="text-sm font-semibold text-gray-900">{activeSubscriptions[0] ? formatFrequency(activeSubscriptions[0].frequency) : "No Data"}</span>
               </div>
               <div className="flex justify-between py-2 border-b border-gray-100">
                 <span className="text-sm text-gray-500">Service Days</span>
-                <span className="text-sm text-gray-900">{activeSubscriptions[0]?.serviceDay || "No Data"}</span>
+                <span className="text-sm font-semibold text-gray-900">{activeSubscriptions[0]?.serviceDay || "No Data"}</span>
               </div>
               <div className="flex justify-between py-2 border-b border-gray-100">
                 <span className="text-sm text-gray-500">Regular Service Start Date</span>
-                <span className="text-sm text-gray-900">{activeSubscriptions[0]?.nextServiceDate ? formatDate(activeSubscriptions[0].nextServiceDate) : "No Data"}</span>
+                <span className="text-sm font-semibold text-gray-900">{activeSubscriptions[0]?.nextServiceDate ? formatDate(activeSubscriptions[0].nextServiceDate) : "No Data"}</span>
               </div>
               <div className="flex justify-between py-2 border-b border-gray-100">
                 <span className="text-sm text-gray-500">Next Recurring Cleanup Date</span>
-                <span className="text-sm text-gray-900">{activeSubscriptions[0]?.nextServiceDate ? formatDate(activeSubscriptions[0].nextServiceDate) : "No Data"}</span>
+                <span className="text-sm font-semibold text-gray-900">{activeSubscriptions[0]?.nextServiceDate ? formatDate(activeSubscriptions[0].nextServiceDate) : "No Data"}</span>
               </div>
               <div className="flex justify-between py-2">
                 <span className="text-sm text-gray-500">Field Tech</span>
-                <span className="text-sm text-gray-900">Not Assigned</span>
+                <span className="text-sm font-semibold text-gray-900">Not Assigned</span>
               </div>
               <div className="flex justify-between py-2">
                 <span className="text-sm text-gray-500">Estimated Time for Recurring Cleanup</span>
-                <span className="text-sm text-gray-900">30 min</span>
+                <span className="text-sm font-semibold text-gray-900">30 min</span>
               </div>
             </div>
           )}
@@ -951,16 +951,16 @@ export default function ClientDetailPage({ params }: PageProps) {
                   {client.recentJobs?.length > 0 ? (
                     client.recentJobs.map((job) => (
                       <tr key={job.id}>
-                        <td className="py-3 text-teal-600">{job.id.substring(0, 8)}</td>
+                        <td className="py-3 font-semibold text-teal-600">{job.id.substring(0, 8)}</td>
                         <td className="py-3">
                           <span className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusBadge(job.status)}`}>
                             {job.status}
                           </span>
                         </td>
-                        <td className="py-3">Not Assigned</td>
-                        <td className="py-3">{formatDate(job.scheduledDate)}</td>
-                        <td className="py-3">Regular Plan Cleanup</td>
-                        <td className="py-3 text-gray-400">No Data</td>
+                        <td className="py-3 font-semibold">Not Assigned</td>
+                        <td className="py-3 font-semibold">{formatDate(job.scheduledDate)}</td>
+                        <td className="py-3 font-semibold">Regular Plan Cleanup</td>
+                        <td className="py-3 font-semibold text-gray-400">No Data</td>
                         <td className="py-3">
                           <button className="p-1 text-gray-400 hover:text-teal-600"><Eye className="w-4 h-4" /></button>
                         </td>
@@ -979,17 +979,17 @@ export default function ClientDetailPage({ params }: PageProps) {
             <div className="grid grid-cols-2 gap-4">
               <div className="flex justify-between py-2 border-b border-gray-100">
                 <span className="text-sm text-gray-500">Initial Cleanup Date</span>
-                <span className="text-sm text-gray-900">{client.createdAt ? formatDate(client.createdAt) : "No Data"}</span>
+                <span className="text-sm font-semibold text-gray-900">{client.createdAt ? formatDate(client.createdAt) : "No Data"}</span>
               </div>
               <div />
               <div className="flex justify-between py-2 border-b border-gray-100">
                 <span className="text-sm text-gray-500">Initial Cleanup Assign To</span>
-                <span className="text-sm text-gray-900">Not Assigned</span>
+                <span className="text-sm font-semibold text-gray-900">Not Assigned</span>
               </div>
               <div />
               <div className="flex justify-between py-2">
                 <span className="text-sm text-gray-500">Estimated Time for Initial Cleanup</span>
-                <span className="text-sm text-gray-900">90 min</span>
+                <span className="text-sm font-semibold text-gray-900">90 min</span>
               </div>
             </div>
           )}
@@ -1034,7 +1034,7 @@ export default function ClientDetailPage({ params }: PageProps) {
               {client.referralSource && (
                 <div className="flex justify-between py-2 border-b border-gray-100">
                   <span className="text-sm text-gray-500">How you heard about us</span>
-                  <span className="text-sm text-gray-900">{client.referralSource}</span>
+                  <span className="text-sm font-semibold text-gray-900">{client.referralSource}</span>
                 </div>
               )}
             </div>
@@ -1075,31 +1075,31 @@ export default function ClientDetailPage({ params }: PageProps) {
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex justify-between py-2 border-b border-gray-100">
                   <span className="text-sm text-gray-500">Name</span>
-                  <span className="text-sm text-gray-900">{activeDogs[activeDogTab]?.name || "No Data"}</span>
+                  <span className="text-sm font-semibold text-gray-900">{activeDogs[activeDogTab]?.name || "No Data"}</span>
                 </div>
                 <div className="flex justify-between py-2 border-b border-gray-100">
                   <span className="text-sm text-gray-500">Dangerous Dog</span>
-                  <span className="text-sm text-gray-900">{activeDogs[activeDogTab]?.isSafe === false ? "Yes" : "-"}</span>
+                  <span className="text-sm font-semibold text-gray-900">{activeDogs[activeDogTab]?.isSafe === false ? "Yes" : "-"}</span>
                 </div>
                 <div className="flex justify-between py-2 border-b border-gray-100">
                   <span className="text-sm text-gray-500">Gender</span>
-                  <span className="text-sm text-gray-400">No Gender</span>
+                  <span className="text-sm font-semibold text-gray-400">No Gender</span>
                 </div>
                 <div className="flex justify-between py-2 border-b border-gray-100">
                   <span className="text-sm text-gray-500">Breed</span>
-                  <span className="text-sm text-gray-900">{activeDogs[activeDogTab]?.breed || "No Data"}</span>
+                  <span className="text-sm font-semibold text-gray-900">{activeDogs[activeDogTab]?.breed || "No Data"}</span>
                 </div>
                 <div className="flex justify-between py-2 border-b border-gray-100">
                   <span className="text-sm text-gray-500">Birthdate</span>
-                  <span className="text-sm text-gray-400">No Birth Date</span>
+                  <span className="text-sm font-semibold text-gray-400">No Birth Date</span>
                 </div>
                 <div className="flex justify-between py-2 border-b border-gray-100">
                   <span className="text-sm text-gray-500">Additional Comments about Dog</span>
-                  <span className="text-sm text-gray-900">{activeDogs[activeDogTab]?.safetyNotes || "No Additional Comment"}</span>
+                  <span className="text-sm font-semibold text-gray-900">{activeDogs[activeDogTab]?.safetyNotes || "No Additional Comment"}</span>
                 </div>
                 <div className="flex justify-between py-2">
                   <span className="text-sm text-gray-500">Dog Photo</span>
-                  <span className="text-sm text-gray-400">No data</span>
+                  <span className="text-sm font-semibold text-gray-400">No data</span>
                 </div>
               </div>
               <div className="flex justify-end gap-2 mt-4">
@@ -1122,39 +1122,39 @@ export default function ClientDetailPage({ params }: PageProps) {
           <div className="grid grid-cols-2 gap-4">
             <div className="flex justify-between py-2 border-b border-gray-100">
               <span className="text-sm text-gray-500">Gate Location</span>
-              <span className="text-sm text-gray-900">{primaryLocation?.gateLocation || "No Data"}</span>
+              <span className="text-sm font-semibold text-gray-900">{primaryLocation?.gateLocation || "No Data"}</span>
             </div>
             <div className="flex justify-between py-2 border-b border-gray-100">
               <span className="text-sm text-gray-500">Yard Size</span>
-              <span className="text-sm text-gray-900">{primaryLocation?.lotSize || "No Data"}</span>
+              <span className="text-sm font-semibold text-gray-900">{primaryLocation?.lotSize || "No Data"}</span>
             </div>
             <div className="flex justify-between py-2 border-b border-gray-100">
               <span className="text-sm text-gray-500">Gate Code</span>
-              <span className="text-sm text-gray-900">{primaryLocation?.gateCode || "No Data"}</span>
+              <span className="text-sm font-semibold text-gray-900">{primaryLocation?.gateCode || "No Data"}</span>
             </div>
             <div className="flex justify-between py-2 border-b border-gray-100">
               <span className="text-sm text-gray-500">Gated Community</span>
-              <span className="text-sm text-gray-400">No Data</span>
+              <span className="text-sm font-semibold text-gray-400">No Data</span>
             </div>
             <div className="flex justify-between py-2 border-b border-gray-100">
               <span className="text-sm text-gray-500">Areas To Clean</span>
-              <span className="text-sm text-gray-400">No data</span>
+              <span className="text-sm font-semibold text-gray-400">No data</span>
             </div>
             <div className="flex justify-between py-2 border-b border-gray-100">
               <span className="text-sm text-gray-500">Yard Photo</span>
-              <span className="text-sm text-gray-400">No data</span>
+              <span className="text-sm font-semibold text-gray-400">No data</span>
             </div>
             <div className="flex justify-between py-2 border-b border-gray-100">
               <span className="text-sm text-gray-500">Doggie Door</span>
-              <span className="text-sm text-gray-400">No Data</span>
+              <span className="text-sm font-semibold text-gray-400">No Data</span>
             </div>
             <div className="flex justify-between py-2 border-b border-gray-100">
               <span className="text-sm text-gray-500">Garbage Can Location</span>
-              <span className="text-sm text-gray-400">No Data</span>
+              <span className="text-sm font-semibold text-gray-400">No Data</span>
             </div>
             <div className="flex justify-between py-2 col-span-2">
               <span className="text-sm text-gray-500">Additional Comments</span>
-              <span className="text-sm text-gray-900">{primaryLocation?.accessNotes || "No Data"}</span>
+              <span className="text-sm font-semibold text-gray-900">{primaryLocation?.accessNotes || "No Data"}</span>
             </div>
           </div>
           <div className="flex justify-end mt-4">
@@ -1172,12 +1172,12 @@ export default function ClientDetailPage({ params }: PageProps) {
           <div className="grid grid-cols-2 gap-4">
             <div className="flex justify-between py-2 border-b border-gray-100">
               <span className="text-sm text-gray-500">Cleanup Notification Type</span>
-              <span className="text-sm text-gray-400">No Cleanup Notification Type</span>
+              <span className="text-sm font-semibold text-gray-400">No Cleanup Notification Type</span>
             </div>
             <div />
             <div className="flex justify-between py-2">
               <span className="text-sm text-gray-500">Cleanup Notification Method</span>
-              <span className="text-sm text-gray-900">
+              <span className="text-sm font-semibold text-gray-900">
                 {client.notificationPreferences?.sms ? "Text + " : ""}
                 {client.notificationPreferences?.email ? "Email + " : ""}
                 Web Portal
@@ -1198,7 +1198,7 @@ export default function ClientDetailPage({ params }: PageProps) {
         <div className="p-4">
           <div className="flex justify-between py-2">
             <span className="text-sm text-gray-500">NET</span>
-            <span className="text-sm text-gray-900">Organization Default</span>
+            <span className="text-sm font-semibold text-gray-900">Organization Default</span>
           </div>
           <div className="flex justify-end mt-4">
             <button className="text-sm text-teal-600 hover:text-teal-700">EDIT</button>
@@ -1222,9 +1222,9 @@ export default function ClientDetailPage({ params }: PageProps) {
             </thead>
             <tbody>
               <tr>
-                <td className="py-2">SALES TAX TOTAL</td>
-                <td className="py-2">0.000%</td>
-                <td className="py-2">0.000%</td>
+                <td className="py-2 font-semibold">SALES TAX TOTAL</td>
+                <td className="py-2 font-semibold">0.000%</td>
+                <td className="py-2 font-semibold">0.000%</td>
               </tr>
             </tbody>
           </table>
@@ -1243,11 +1243,11 @@ export default function ClientDetailPage({ params }: PageProps) {
           <div className="grid grid-cols-2 gap-4">
             <div className="flex justify-between py-2">
               <span className="text-sm text-gray-500">Terms of Service</span>
-              <span className="text-sm text-gray-400">Not Accepted</span>
+              <span className="text-sm font-semibold text-gray-400">Not Accepted</span>
             </div>
             <div className="flex justify-between py-2">
               <span className="text-sm text-gray-500">Accepted on</span>
-              <span className="text-sm text-gray-400">-</span>
+              <span className="text-sm font-semibold text-gray-400">-</span>
             </div>
           </div>
           <div className="flex justify-end mt-4">
@@ -1274,11 +1274,11 @@ export default function ClientDetailPage({ params }: PageProps) {
             </thead>
             <tbody className="divide-y divide-gray-100">
               <tr>
-                <td className="py-3">Client Created</td>
-                <td className="py-3">System</td>
-                <td className="py-3">Approved</td>
-                <td className="py-3 text-gray-400">No Data</td>
-                <td className="py-3">{formatDate(client.createdAt)}</td>
+                <td className="py-3 font-semibold">Client Created</td>
+                <td className="py-3 font-semibold">System</td>
+                <td className="py-3 font-semibold">Approved</td>
+                <td className="py-3 font-semibold text-gray-400">No Data</td>
+                <td className="py-3 font-semibold">{formatDate(client.createdAt)}</td>
               </tr>
             </tbody>
           </table>
