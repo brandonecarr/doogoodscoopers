@@ -50,7 +50,7 @@ interface PaymentWithClient {
   amount_cents: number;
   status: string;
   created_at: string;
-  clients: { client_type: string } | null;
+  clients: { client_type: string }[];
 }
 
 interface SubscriptionWithClient {
@@ -60,7 +60,7 @@ interface SubscriptionWithClient {
   cancel_reason: string | null;
   canceled_at: string | null;
   created_at: string;
-  clients: { client_type: string } | null;
+  clients: { client_type: string }[];
 }
 
 interface JobWithClient {
@@ -70,16 +70,13 @@ interface JobWithClient {
   duration_minutes: number | null;
   assigned_to: string | null;
   route_id: string | null;
-  clients: { client_type: string } | null;
+  clients: { client_type: string }[];
 }
 
 // Helper to get client_type from joined data
-function getClientType(clients: { client_type: string } | { client_type: string }[] | null): string | null {
-  if (!clients) return null;
-  if (Array.isArray(clients)) {
-    return clients[0]?.client_type || null;
-  }
-  return clients.client_type;
+function getClientType(clients: { client_type: string }[] | null | undefined): string | null {
+  if (!clients || clients.length === 0) return null;
+  return clients[0]?.client_type || null;
 }
 
 // Cancellation reason colors
