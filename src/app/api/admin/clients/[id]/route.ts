@@ -34,6 +34,24 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   const { id } = await params;
   const supabase = getSupabase();
 
+  // First, check if client exists at all (for better error message)
+  const { data: clientCheck, error: checkError } = await supabase
+    .from("clients")
+    .select("id, org_id")
+    .eq("id", id)
+    .single();
+
+  if (checkError || !clientCheck) {
+    console.error("Client lookup failed:", checkError?.message || "No client found with ID", id);
+    return NextResponse.json({ error: "Client not found" }, { status: 404 });
+  }
+
+  // Check if client belongs to user's org
+  if (clientCheck.org_id !== auth.user.orgId) {
+    console.error(`Access denied: Client ${id} belongs to org ${clientCheck.org_id}, user is in org ${auth.user.orgId}`);
+    return NextResponse.json({ error: "Access denied" }, { status: 403 });
+  }
+
   // Fetch client with all related data
   const { data: client, error } = await supabase
     .from("clients")
@@ -96,11 +114,11 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     `
     )
     .eq("id", id)
-    .eq("org_id", auth.user.orgId)
     .single();
 
   if (error || !client) {
-    return NextResponse.json({ error: "Client not found" }, { status: 404 });
+    console.error("Error fetching client details:", error);
+    return NextResponse.json({ error: "Failed to fetch client details" }, { status: 500 });
   }
 
   // Fetch recent jobs
