@@ -112,6 +112,14 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     .order("created_at", { ascending: false })
     .limit(20);
 
+  // Fetch client contacts
+  const { data: contacts } = await supabase
+    .from("client_contacts")
+    .select("*")
+    .eq("client_id", id)
+    .order("is_primary", { ascending: false })
+    .order("created_at", { ascending: true });
+
   // Fetch assigned tech info if subscription has one
   let assignedTech = null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -225,6 +233,22 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       dueDate: p.due_date,
       paidAt: p.paid_at,
       createdAt: p.created_at,
+    })) || [],
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    contacts: (contacts as any[] | null)?.map((c) => ({
+      id: c.id,
+      firstName: c.first_name,
+      middleName: c.middle_name,
+      lastName: c.last_name,
+      email: c.email,
+      homePhone: c.home_phone,
+      cellPhone: c.cell_phone,
+      relationship: c.relationship,
+      isPrimary: c.is_primary,
+      canAuthorize: c.can_authorize,
+      receiveJobNotifications: c.receive_job_notifications,
+      receiveInvoicesEmail: c.receive_invoices_email,
+      createdAt: c.created_at,
     })) || [],
   };
 

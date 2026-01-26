@@ -26,6 +26,7 @@ import {
   RefreshCw,
   FileText,
   XCircle,
+  X,
 } from "lucide-react";
 import type { ClientStatus, Frequency } from "@/lib/supabase/types";
 
@@ -91,6 +92,22 @@ interface Payment {
   created_at: string;
 }
 
+interface Contact {
+  id: string;
+  firstName: string;
+  middleName: string | null;
+  lastName: string | null;
+  email: string | null;
+  homePhone: string | null;
+  cellPhone: string | null;
+  relationship: string | null;
+  isPrimary: boolean;
+  canAuthorize: boolean;
+  receiveJobNotifications: boolean;
+  receiveInvoicesEmail: boolean;
+  createdAt: string;
+}
+
 interface Client {
   id: string;
   first_name: string;
@@ -114,6 +131,7 @@ interface Client {
   subscriptions: Subscription[];
   recentJobs: Job[];
   recentPayments: Payment[];
+  contacts: Contact[];
 }
 
 // Helper functions
@@ -175,6 +193,18 @@ export default function ClientDetailPage({ params }: PageProps) {
   const [scheduleTab, setScheduleTab] = useState<"recurring" | "initial" | "latest">("recurring");
   const [notesTab, setNotesTab] = useState<"office" | "totech" | "fromtech" | "fromclient">("office");
   const [activeDogTab, setActiveDogTab] = useState(0);
+  const [showContactModal, setShowContactModal] = useState(false);
+  const [contactForm, setContactForm] = useState({
+    firstName: "",
+    middleName: "",
+    lastName: "",
+    email: "",
+    homePhone: "",
+    cellPhone: "",
+    receiveJobNotifications: false,
+    receiveInvoicesEmail: false,
+  });
+  const [savingContact, setSavingContact] = useState(false);
 
   useEffect(() => {
     async function fetchClient() {
@@ -197,6 +227,83 @@ export default function ClientDetailPage({ params }: PageProps) {
 
     fetchClient();
   }, [id]);
+
+  const resetContactForm = () => {
+    setContactForm({
+      firstName: "",
+      middleName: "",
+      lastName: "",
+      email: "",
+      homePhone: "",
+      cellPhone: "",
+      receiveJobNotifications: false,
+      receiveInvoicesEmail: false,
+    });
+  };
+
+  const handleSaveContact = async () => {
+    if (!contactForm.firstName || !contactForm.lastName) {
+      return;
+    }
+
+    setSavingContact(true);
+    try {
+      const res = await fetch(`/api/admin/clients/${id}/contacts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(contactForm),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        // Update client with new contact
+        if (client) {
+          setClient({
+            ...client,
+            contacts: [...(client.contacts || []), data.contact],
+          });
+        }
+        setShowContactModal(false);
+        resetContactForm();
+      } else {
+        const data = await res.json();
+        alert(data.error || "Failed to save contact");
+      }
+    } catch (err) {
+      console.error("Error saving contact:", err);
+      alert("Failed to save contact");
+    } finally {
+      setSavingContact(false);
+    }
+  };
+
+  const handleDeleteContact = async (contactId: string) => {
+    if (!confirm("Are you sure you want to remove this contact?")) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/admin/clients/${id}/contacts?contactId=${contactId}`, {
+        method: "DELETE",
+      });
+
+      if (res.ok) {
+        // Update client by removing the contact
+        if (client) {
+          setClient({
+            ...client,
+            contacts: client.contacts.filter((c) => c.id !== contactId),
+          });
+        }
+      } else {
+        const data = await res.json();
+        alert(data.error || "Failed to remove contact");
+      }
+    } catch (err) {
+      console.error("Error deleting contact:", err);
+      alert("Failed to remove contact");
+    }
+  };
 
   if (loading) {
     return (
@@ -317,10 +424,16 @@ export default function ClientDetailPage({ params }: PageProps) {
       <div className="bg-white rounded-lg shadow-sm border border-gray-100">
         <div className="p-4 border-b border-gray-100 flex items-center justify-between">
           <h3 className="font-semibold text-gray-900">Contact Info</h3>
-          <button className="text-sm text-teal-600 hover:text-teal-700">ADD NEW CONTACT</button>
+          <button
+            onClick={() => setShowContactModal(true)}
+            className="text-sm text-teal-600 hover:text-teal-700"
+          >
+            ADD NEW CONTACT
+          </button>
         </div>
-        <div className="p-4">
-          <div className="text-xs font-medium text-teal-600 mb-3">CONTACT INFO</div>
+        {/* Primary contact (client info) */}
+        <div className="p-4 border-b border-gray-100">
+          <div className="text-xs font-medium text-teal-600 mb-3">PRIMARY CONTACT</div>
           <div className="grid grid-cols-2 gap-4">
             <div className="flex justify-between py-2 border-b border-gray-100">
               <span className="text-sm text-gray-500">First name</span>
@@ -336,7 +449,7 @@ export default function ClientDetailPage({ params }: PageProps) {
             </div>
             <div className="flex justify-between py-2 border-b border-gray-100">
               <span className="text-sm text-gray-500">Cell Phone Number</span>
-              <span className="text-sm text-gray-900">{client.secondary_phone || client.phone || "No Data"}</span>
+              <span className="text-sm text-gray-900">{client.secondary_phone || "No Data"}</span>
             </div>
             <div className="flex justify-between py-2 border-b border-gray-100">
               <span className="text-sm text-gray-500">Last name</span>
@@ -356,6 +469,55 @@ export default function ClientDetailPage({ params }: PageProps) {
             <button className="text-sm text-teal-600 hover:text-teal-700">EDIT</button>
           </div>
         </div>
+        {/* Additional contacts */}
+        {client.contacts?.map((contact) => (
+          <div key={contact.id} className="p-4 border-b border-gray-100">
+            <div className="text-xs font-medium text-teal-600 mb-3">
+              {contact.isPrimary ? "PRIMARY CONTACT" : "ADDITIONAL CONTACT"}
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex justify-between py-2 border-b border-gray-100">
+                <span className="text-sm text-gray-500">First name</span>
+                <span className="text-sm text-gray-900">{contact.firstName || "No Data"}</span>
+              </div>
+              <div className="flex justify-between py-2 border-b border-gray-100">
+                <span className="text-sm text-gray-500">Home Phone Number</span>
+                <span className="text-sm text-gray-900">{contact.homePhone || "No Data"}</span>
+              </div>
+              <div className="flex justify-between py-2 border-b border-gray-100">
+                <span className="text-sm text-gray-500">Middle Name</span>
+                <span className={`text-sm ${contact.middleName ? "text-gray-900" : "text-gray-400"}`}>
+                  {contact.middleName || "No Data"}
+                </span>
+              </div>
+              <div className="flex justify-between py-2 border-b border-gray-100">
+                <span className="text-sm text-gray-500">Cell Phone Number</span>
+                <span className="text-sm text-gray-900">{contact.cellPhone || "No Data"}</span>
+              </div>
+              <div className="flex justify-between py-2 border-b border-gray-100">
+                <span className="text-sm text-gray-500">Last name</span>
+                <span className="text-sm text-gray-900">{contact.lastName || "No Data"}</span>
+              </div>
+              <div className="flex justify-between py-2 border-b border-gray-100">
+                <span className="text-sm text-gray-500">Tax Exempt</span>
+                <span className="text-sm text-gray-900">No</span>
+              </div>
+              <div className="flex justify-between py-2">
+                <span className="text-sm text-gray-500">Email</span>
+                <span className="text-sm text-gray-900">{contact.email || "No Data"}</span>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                onClick={() => handleDeleteContact(contact.id)}
+                className="text-sm text-red-600 hover:text-red-700"
+              >
+                REMOVE
+              </button>
+              <button className="text-sm text-teal-600 hover:text-teal-700">EDIT</button>
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Location */}
@@ -1081,6 +1243,120 @@ export default function ClientDetailPage({ params }: PageProps) {
           </table>
         </div>
       </div>
+
+      {/* Add New Contact Modal */}
+      {showContactModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4">
+            <div className="p-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-6">Add New Contact</h2>
+
+              <div className="space-y-4">
+                <div>
+                  <input
+                    type="text"
+                    placeholder="First Name *"
+                    value={contactForm.firstName}
+                    onChange={(e) => setContactForm({ ...contactForm, firstName: e.target.value })}
+                    className="w-full px-0 py-2 border-0 border-b border-gray-300 focus:border-teal-500 focus:ring-0 text-sm placeholder-gray-400"
+                  />
+                </div>
+
+                <div>
+                  <input
+                    type="text"
+                    placeholder="Middle Name"
+                    value={contactForm.middleName}
+                    onChange={(e) => setContactForm({ ...contactForm, middleName: e.target.value })}
+                    className="w-full px-0 py-2 border-0 border-b border-gray-300 focus:border-teal-500 focus:ring-0 text-sm placeholder-gray-400"
+                  />
+                </div>
+
+                <div>
+                  <input
+                    type="text"
+                    placeholder="Last Name *"
+                    value={contactForm.lastName}
+                    onChange={(e) => setContactForm({ ...contactForm, lastName: e.target.value })}
+                    className="w-full px-0 py-2 border-0 border-b border-gray-300 focus:border-teal-500 focus:ring-0 text-sm placeholder-gray-400"
+                  />
+                </div>
+
+                <div>
+                  <input
+                    type="email"
+                    placeholder="Email"
+                    value={contactForm.email}
+                    onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
+                    className="w-full px-0 py-2 border-0 border-b border-gray-300 focus:border-teal-500 focus:ring-0 text-sm placeholder-gray-400"
+                  />
+                </div>
+
+                <div>
+                  <input
+                    type="tel"
+                    placeholder="Home Phone Number"
+                    value={contactForm.homePhone}
+                    onChange={(e) => setContactForm({ ...contactForm, homePhone: e.target.value })}
+                    className="w-full px-0 py-2 border-0 border-b border-gray-300 focus:border-teal-500 focus:ring-0 text-sm placeholder-gray-400"
+                  />
+                </div>
+
+                <div>
+                  <input
+                    type="tel"
+                    placeholder="Cell Phone Number"
+                    value={contactForm.cellPhone}
+                    onChange={(e) => setContactForm({ ...contactForm, cellPhone: e.target.value })}
+                    className="w-full px-0 py-2 border-0 border-b border-gray-300 focus:border-teal-500 focus:ring-0 text-sm placeholder-gray-400"
+                  />
+                </div>
+
+                <div className="pt-4 space-y-3">
+                  <label className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      checked={contactForm.receiveJobNotifications}
+                      onChange={(e) => setContactForm({ ...contactForm, receiveJobNotifications: e.target.checked })}
+                      className="w-4 h-4 border-gray-300 rounded text-teal-600 focus:ring-teal-500"
+                    />
+                    <span className="text-sm text-gray-700">Receive job notifications</span>
+                  </label>
+
+                  <label className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      checked={contactForm.receiveInvoicesEmail}
+                      onChange={(e) => setContactForm({ ...contactForm, receiveInvoicesEmail: e.target.checked })}
+                      className="w-4 h-4 border-gray-300 rounded text-teal-600 focus:ring-teal-500"
+                    />
+                    <span className="text-sm text-gray-700">Receive invoices via email</span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="flex justify-center gap-3 mt-8">
+                <button
+                  onClick={() => {
+                    setShowContactModal(false);
+                    resetContactForm();
+                  }}
+                  className="px-6 py-2 text-sm font-medium text-teal-600 hover:text-teal-700"
+                >
+                  CANCEL
+                </button>
+                <button
+                  onClick={handleSaveContact}
+                  disabled={savingContact || !contactForm.firstName || !contactForm.lastName}
+                  className="px-6 py-2 text-sm font-medium text-white bg-teal-600 rounded hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {savingContact ? "SAVING..." : "SAVE"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -192,6 +192,65 @@ export interface Database {
           updated_at?: string;
         };
       };
+      client_contacts: {
+        Row: {
+          id: string;
+          org_id: string;
+          client_id: string;
+          first_name: string;
+          middle_name: string | null;
+          last_name: string | null;
+          email: string | null;
+          home_phone: string | null;
+          cell_phone: string | null;
+          relationship: string | null;
+          is_primary: boolean;
+          can_authorize: boolean;
+          receive_job_notifications: boolean;
+          receive_invoices_email: boolean;
+          notification_preferences: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          client_id: string;
+          first_name: string;
+          middle_name?: string | null;
+          last_name?: string | null;
+          email?: string | null;
+          home_phone?: string | null;
+          cell_phone?: string | null;
+          relationship?: string | null;
+          is_primary?: boolean;
+          can_authorize?: boolean;
+          receive_job_notifications?: boolean;
+          receive_invoices_email?: boolean;
+          notification_preferences?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          client_id?: string;
+          first_name?: string;
+          middle_name?: string | null;
+          last_name?: string | null;
+          email?: string | null;
+          home_phone?: string | null;
+          cell_phone?: string | null;
+          relationship?: string | null;
+          is_primary?: boolean;
+          can_authorize?: boolean;
+          receive_job_notifications?: boolean;
+          receive_invoices_email?: boolean;
+          notification_preferences?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
       locations: {
         Row: {
           id: string;
