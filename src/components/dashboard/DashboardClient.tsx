@@ -20,8 +20,43 @@ interface DashboardClientProps {
   user: DashboardUser;
 }
 
+// Default widget visibility - new widgets should be true by default
+const DEFAULT_WIDGETS: Record<string, boolean> = {
+  unassignedLocations: true,
+  changeRequests: true,
+  openOneTimeInvoices: true,
+  openRecurringInvoices: true,
+  overdueOneTimeInvoices: true,
+  overdueRecurringInvoices: true,
+  failedOneTimeInvoices: true,
+  failedRecurringInvoices: true,
+  openJobs: true,
+  recurringInvoiceDrafts: true,
+  oneTimeInvoiceDrafts: true,
+  unoptimizedRoutes: true,
+  openShifts: true,
+  incompleteShifts: true,
+  clockedInStaff: true,
+  staffOnBreak: true,
+  totalSales: true,
+  activeResidentialClients: true,
+  activeCommercialClients: true,
+  newVsLostResidentialClients: true,
+  newVsLostCommercialClients: true,
+  averageResidentialClientValue: true,
+  averageCommercialClientValue: true,
+  residentialCancelationReasons: true,
+  commercialCancelationReasons: true,
+  referralSources: true,
+  averageClientsPerTech: true,
+  averageYardsPerHour: true,
+  averageYardsPerRoute: true,
+  churnRate: true,
+  clientLifetimeValue: true,
+};
+
 const DEFAULT_SETTINGS: DashboardSettings = {
-  widgets: {},
+  widgets: DEFAULT_WIDGETS,
   shortcuts: {},
   assistance: {},
 };
@@ -45,7 +80,13 @@ export function DashboardClient({ user }: DashboardClientProps) {
 
       if (settingsRes.ok) {
         const settingsData = await settingsRes.json();
-        setSettings(settingsData.settings?.dashboard || DEFAULT_SETTINGS);
+        const dashboardSettings = settingsData.settings?.dashboard || {};
+        // Merge saved settings with defaults so new widgets show by default
+        setSettings({
+          widgets: { ...DEFAULT_WIDGETS, ...dashboardSettings.widgets },
+          shortcuts: { ...dashboardSettings.shortcuts },
+          assistance: { ...dashboardSettings.assistance },
+        });
       }
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
