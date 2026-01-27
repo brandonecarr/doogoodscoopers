@@ -35,14 +35,6 @@ const settingsCards: SettingsCard[][] = [
       href: "/app/office/settings/scheduler",
     },
   ],
-  // Row 2b - Route Planning
-  [
-    {
-      title: "Route Optimization",
-      description: "Configure AI-powered route optimization settings, days off, and continuous monitoring preferences.",
-      href: "/app/office/settings/route-optimization",
-    },
-  ],
   // Row 3
   [
     {
@@ -103,22 +95,9 @@ const settingsCards: SettingsCard[][] = [
       href: "/app/office/settings/ratings-tipping",
     },
     {
-      title: "Open API",
-      description: "Let your web developer use our API and webhooks to integrate your account with 3rd party applications.",
-      href: "/app/office/settings/api",
-    },
-  ],
-  // Row 8
-  [
-    {
-      title: "Directory Listing",
-      description: "Manage your gotpooperscooper.com directory listing.",
-      href: "/app/office/settings/directory",
-    },
-    {
-      title: "Subscription Details",
-      description: "Manage your subscription details, add a different credit card on file and view transaction history.",
-      href: "/app/office/settings/subscription",
+      title: "Route Optimization",
+      description: "Configure AI-powered route optimization settings, days off, and continuous monitoring preferences.",
+      href: "/app/office/settings/route-optimization",
     },
   ],
 ];
