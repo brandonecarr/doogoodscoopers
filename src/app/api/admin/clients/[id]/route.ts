@@ -32,6 +32,40 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   }
 
   const { id } = await params;
+
+  // Handle "new" as a special case - return empty template for new client form
+  if (id === "new") {
+    return NextResponse.json({
+      client: {
+        id: null,
+        firstName: "",
+        lastName: "",
+        fullName: "",
+        companyName: "",
+        email: "",
+        phone: "",
+        secondaryPhone: "",
+        clientType: "RESIDENTIAL",
+        status: "ACTIVE",
+        accountCreditCents: 0,
+        tags: [],
+        notes: "",
+        referralSource: "",
+        hasStripeCustomer: false,
+        notificationPreferences: { sms: true, email: true },
+        createdAt: null,
+        updatedAt: null,
+        locations: [],
+        dogs: [],
+        subscriptions: [],
+        assignedTech: null,
+        recentJobs: [],
+        recentPayments: [],
+        contacts: [],
+      },
+    });
+  }
+
   const supabase = getSupabase();
 
   // First, check if client exists at all (for better error message)
