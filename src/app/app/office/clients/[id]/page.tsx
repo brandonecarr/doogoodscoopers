@@ -27,6 +27,7 @@ import {
   FileText,
   XCircle,
   X,
+  Info,
 } from "lucide-react";
 import type { ClientStatus, Frequency } from "@/lib/supabase/types";
 
@@ -59,17 +60,41 @@ interface DogInfo {
   createdAt: string;
 }
 
+interface ServicePlan {
+  id: string;
+  name: string;
+  frequency: Frequency;
+  description: string | null;
+  is_active: boolean;
+}
+
 interface Subscription {
   id: string;
   status: string;
   frequency: Frequency;
   pricePerVisitCents: number;
   nextServiceDate: string | null;
-  serviceDay: string | null;
-  assignedTechId: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  serviceDay?: string | null;
+  preferredDay?: string | null;
+  assignedTechId?: string | null;
+  initialCleanupRequired?: boolean;
+  initialCleanupCompleted?: boolean;
   createdAt: string;
-  canceledAt: string | null;
-  cancelReason: string | null;
+  canceledAt?: string | null;
+  cancelReason?: string | null;
+  plan?: {
+    id: string;
+    name: string;
+    frequency: Frequency;
+    description: string | null;
+  } | null;
+  location?: {
+    id: string;
+    streetAddress: string;
+    city: string;
+  } | null;
 }
 
 interface Job {
@@ -149,6 +174,7 @@ function formatCurrency(cents: number) {
 
 function formatFrequency(freq: Frequency) {
   const labels: Record<Frequency, string> = {
+    TWICE_WEEKLY: "Twice A Week",
     WEEKLY: "Once A Week",
     BIWEEKLY: "Every Two Weeks",
     MONTHLY: "Monthly",
@@ -211,6 +237,100 @@ export default function ClientDetailPage({ params }: PageProps) {
     receiveInvoicesEmail: false,
   });
   const [savingContact, setSavingContact] = useState(false);
+
+  // Subscription modal state
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+  const [subscriptionForm, setSubscriptionForm] = useState({
+    servicePlan: "",
+    startDate: "",
+    endDate: "",
+    billingOption: "prepaid-fixed",
+    billingInterval: "monthly",
+    couponCode: "",
+    initialCleanupRequired: false,
+  });
+  const [savingSubscription, setSavingSubscription] = useState(false);
+  const [servicePlans, setServicePlans] = useState<ServicePlan[]>([]);
+  const [loadingServicePlans, setLoadingServicePlans] = useState(false);
+
+  const resetSubscriptionForm = () => {
+    setSubscriptionForm({
+      servicePlan: "",
+      startDate: "",
+      endDate: "",
+      billingOption: "prepaid-fixed",
+      billingInterval: "monthly",
+      couponCode: "",
+      initialCleanupRequired: false,
+    });
+  };
+
+  const fetchServicePlans = async () => {
+    setLoadingServicePlans(true);
+    try {
+      const res = await fetch("/api/admin/service-plans");
+      if (res.ok) {
+        const data = await res.json();
+        // Only show active plans
+        setServicePlans(data.plans?.filter((p: ServicePlan) => p.is_active) || []);
+      }
+    } catch (err) {
+      console.error("Error fetching service plans:", err);
+    } finally {
+      setLoadingServicePlans(false);
+    }
+  };
+
+  const handleSaveSubscription = async () => {
+    if (!subscriptionForm.servicePlan || !subscriptionForm.startDate) {
+      return;
+    }
+
+    setSavingSubscription(true);
+    try {
+      const res = await fetch(`/api/admin/clients/${id}/subscriptions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          planId: subscriptionForm.servicePlan,
+          startDate: subscriptionForm.startDate,
+          endDate: subscriptionForm.endDate || null,
+          billingOption: subscriptionForm.billingOption,
+          billingInterval: subscriptionForm.billingInterval,
+          couponCode: subscriptionForm.couponCode || null,
+          initialCleanupRequired: subscriptionForm.initialCleanupRequired,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        // Update client with new subscription
+        if (client) {
+          setClient({
+            ...client,
+            subscriptions: [data.subscription, ...(client.subscriptions || [])],
+          });
+        }
+        setShowSubscriptionModal(false);
+        resetSubscriptionForm();
+      } else {
+        const data = await res.json();
+        alert(data.error || "Failed to create subscription");
+      }
+    } catch (err) {
+      console.error("Error creating subscription:", err);
+      alert("Failed to create subscription");
+    } finally {
+      setSavingSubscription(false);
+    }
+  };
+
+  // Fetch service plans when modal opens
+  useEffect(() => {
+    if (showSubscriptionModal && servicePlans.length === 0) {
+      fetchServicePlans();
+    }
+  }, [showSubscriptionModal]);
 
   useEffect(() => {
     async function fetchClient() {
@@ -630,11 +750,10 @@ export default function ClientDetailPage({ params }: PageProps) {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-left text-gray-500">
-                      <th className="pb-3 font-medium">Name</th>
+                      <th className="pb-3 font-medium">Plan</th>
                       <th className="pb-3 font-medium">Status</th>
+                      <th className="pb-3 font-medium">Frequency</th>
                       <th className="pb-3 font-medium">Amount</th>
-                      <th className="pb-3 font-medium">Billing Option</th>
-                      <th className="pb-3 font-medium">Billing Interval</th>
                       <th className="pb-3 font-medium">Start Date</th>
                       <th className="pb-3 font-medium">Actions</th>
                     </tr>
@@ -643,16 +762,19 @@ export default function ClientDetailPage({ params }: PageProps) {
                     {client.subscriptions?.length > 0 ? (
                       client.subscriptions.map((sub) => (
                         <tr key={sub.id}>
-                          <td className="py-3 font-semibold text-teal-600">{sub.frequency}</td>
+                          <td className="py-3 font-semibold text-teal-600">
+                            {sub.plan?.name || formatFrequency(sub.frequency)}
+                          </td>
                           <td className="py-3">
                             <span className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusBadge(sub.status)}`}>
                               {sub.status}
                             </span>
                           </td>
-                          <td className="py-3 font-semibold">{formatCurrency(sub.pricePerVisitCents)} {sub.frequency.toLowerCase()}</td>
-                          <td className="py-3 font-semibold">Prepaid Fixed</td>
-                          <td className="py-3 font-semibold">Monthly</td>
-                          <td className="py-3 font-semibold">{formatDate(sub.createdAt)}</td>
+                          <td className="py-3 font-semibold">{formatFrequency(sub.frequency)}</td>
+                          <td className="py-3 font-semibold">{formatCurrency(sub.pricePerVisitCents)}/visit</td>
+                          <td className="py-3 font-semibold">
+                            {sub.startDate ? formatDate(sub.startDate) : formatDate(sub.createdAt)}
+                          </td>
                           <td className="py-3">
                             <div className="flex items-center gap-2">
                               <button className="p-1 text-gray-400 hover:text-teal-600"><Eye className="w-4 h-4" /></button>
@@ -664,14 +786,19 @@ export default function ClientDetailPage({ params }: PageProps) {
                       ))
                     ) : (
                       <tr>
-                        <td colSpan={7} className="py-8 text-center text-gray-400">No subscriptions</td>
+                        <td colSpan={6} className="py-8 text-center text-gray-400">No subscriptions</td>
                       </tr>
                     )}
                   </tbody>
                 </table>
               </div>
               <div className="flex justify-end mt-4">
-                <button className="text-sm text-teal-600 hover:text-teal-700">CREATE NEW SUBSCRIPTION</button>
+                <button
+                  onClick={() => setShowSubscriptionModal(true)}
+                  className="text-sm text-teal-600 hover:text-teal-700"
+                >
+                  CREATE NEW SUBSCRIPTION
+                </button>
               </div>
             </>
           )}
@@ -1392,6 +1519,164 @@ export default function ClientDetailPage({ params }: PageProps) {
                   className="px-6 py-2 text-sm font-medium text-white bg-teal-600 rounded hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {savingContact ? "SAVING..." : "SAVE"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create New Subscription Modal */}
+      {showSubscriptionModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-6">
+                Create New Subscription For {client?.fullName}
+              </h2>
+
+              <div className="space-y-5">
+                {/* Service Plan */}
+                <div>
+                  <label className="block text-sm font-medium text-teal-600 mb-1">
+                    Service Plan
+                  </label>
+                  <select
+                    value={subscriptionForm.servicePlan}
+                    onChange={(e) => setSubscriptionForm({ ...subscriptionForm, servicePlan: e.target.value })}
+                    className="w-full px-3 py-2 border-b border-gray-300 focus:border-teal-500 focus:ring-0 text-sm bg-white"
+                    disabled={loadingServicePlans}
+                  >
+                    <option value="">
+                      {loadingServicePlans ? "Loading..." : "Please Select"}
+                    </option>
+                    {servicePlans.map((plan) => (
+                      <option key={plan.id} value={plan.id}>
+                        {plan.name} ({formatFrequency(plan.frequency)})
+                      </option>
+                    ))}
+                  </select>
+                  {!subscriptionForm.servicePlan && (
+                    <p className="text-xs text-red-500 mt-1">This field is required</p>
+                  )}
+                </div>
+
+                {/* Start Date */}
+                <div>
+                  <div className="flex items-center gap-3">
+                    <Calendar className="w-5 h-5 text-gray-400" />
+                    <input
+                      type="date"
+                      value={subscriptionForm.startDate}
+                      onChange={(e) => setSubscriptionForm({ ...subscriptionForm, startDate: e.target.value })}
+                      placeholder="Start Date"
+                      className="flex-1 px-0 py-2 border-0 border-b border-gray-300 focus:border-teal-500 focus:ring-0 text-sm"
+                    />
+                  </div>
+                  {!subscriptionForm.startDate && (
+                    <p className="text-xs text-red-500 mt-1 ml-8">This field is required</p>
+                  )}
+                </div>
+
+                {/* End Date */}
+                <div className="flex items-center gap-3">
+                  <Calendar className="w-5 h-5 text-gray-400" />
+                  <input
+                    type="date"
+                    value={subscriptionForm.endDate}
+                    onChange={(e) => setSubscriptionForm({ ...subscriptionForm, endDate: e.target.value })}
+                    placeholder="End Date"
+                    className="flex-1 px-0 py-2 border-0 border-b border-gray-300 focus:border-teal-500 focus:ring-0 text-sm"
+                  />
+                </div>
+
+                {/* Info Box */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex gap-3">
+                  <Info className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-gray-700">
+                    Please keep the &quot;End Date&quot; field blank unless the client is seasonal. For example, if a client lives in Maine but visits Florida over the winter months, set the End Date to March 30. Most recurring clients do not have an End Date, so please leave the field blank.
+                  </p>
+                </div>
+
+                {/* Billing Option */}
+                <div>
+                  <label className="block text-sm font-medium text-teal-600 mb-1">
+                    Billing Option
+                  </label>
+                  <select
+                    value={subscriptionForm.billingOption}
+                    onChange={(e) => setSubscriptionForm({ ...subscriptionForm, billingOption: e.target.value })}
+                    className="w-full px-3 py-2 border-b border-gray-300 focus:border-teal-500 focus:ring-0 text-sm bg-white"
+                  >
+                    <option value="postpaid-fixed">Postpaid Fixed</option>
+                    <option value="prepaid-fixed">Prepaid Fixed (Default)</option>
+                    <option value="postpaid-per-cleanup">Postpaid Per Cleanup</option>
+                  </select>
+                </div>
+
+                {/* Billing Interval */}
+                <div>
+                  <label className="block text-sm font-medium text-teal-600 mb-1">
+                    Billing Interval
+                  </label>
+                  <select
+                    value={subscriptionForm.billingInterval}
+                    onChange={(e) => setSubscriptionForm({ ...subscriptionForm, billingInterval: e.target.value })}
+                    className="w-full px-3 py-2 border-b border-gray-300 focus:border-teal-500 focus:ring-0 text-sm bg-white"
+                  >
+                    <option value="annually">Annually</option>
+                    <option value="semi-annually">Semi-Annually</option>
+                    <option value="every-four-months">Every Four Months</option>
+                    <option value="quarterly">Quarterly</option>
+                    <option value="every-two-months">Every Two Months</option>
+                    <option value="monthly">Monthly (Default)</option>
+                  </select>
+                </div>
+
+                {/* Coupon Code */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Coupon Code
+                  </label>
+                  <input
+                    type="text"
+                    value={subscriptionForm.couponCode}
+                    onChange={(e) => setSubscriptionForm({ ...subscriptionForm, couponCode: e.target.value })}
+                    className="w-full px-0 py-2 border-0 border-b border-gray-300 focus:border-teal-500 focus:ring-0 text-sm"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">(Optional)</p>
+                </div>
+
+                {/* Initial Cleanup Required */}
+                <div className="pt-2">
+                  <label className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      checked={subscriptionForm.initialCleanupRequired}
+                      onChange={(e) => setSubscriptionForm({ ...subscriptionForm, initialCleanupRequired: e.target.checked })}
+                      className="w-4 h-4 border-gray-300 rounded text-teal-600 focus:ring-teal-500"
+                    />
+                    <span className="text-sm text-gray-700">Initial Cleanup Required</span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 mt-8">
+                <button
+                  onClick={() => {
+                    setShowSubscriptionModal(false);
+                    resetSubscriptionForm();
+                  }}
+                  className="px-6 py-2 text-sm font-medium text-teal-600 hover:text-teal-700"
+                >
+                  CANCEL
+                </button>
+                <button
+                  onClick={handleSaveSubscription}
+                  disabled={savingSubscription || !subscriptionForm.servicePlan || !subscriptionForm.startDate}
+                  className="px-6 py-2 text-sm font-medium text-white bg-teal-600 rounded hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {savingSubscription ? "SAVING..." : "SAVE"}
                 </button>
               </div>
             </div>

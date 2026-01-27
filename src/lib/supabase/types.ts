@@ -20,7 +20,7 @@ export type SubscriptionStatus = "ACTIVE" | "PAUSED" | "CANCELED" | "PAST_DUE";
 export type JobStatus = "SCHEDULED" | "EN_ROUTE" | "IN_PROGRESS" | "COMPLETED" | "SKIPPED" | "CANCELED";
 export type LeadStatus = "NEW" | "CONTACTED" | "QUALIFIED" | "CONVERTED" | "LOST";
 export type LeadSource = "QUOTE_FORM" | "OUT_OF_AREA" | "COMMERCIAL" | "AD_LEAD" | "REFERRAL" | "OTHER";
-export type Frequency = "WEEKLY" | "BIWEEKLY" | "MONTHLY" | "ONETIME";
+export type Frequency = "TWICE_WEEKLY" | "WEEKLY" | "BIWEEKLY" | "MONTHLY" | "ONETIME";
 export type NotificationType = "ON_THE_WAY" | "DAY_AHEAD" | "COMPLETED" | "SKIPPED" | "OFF_SCHEDULE" | "PAYMENT_FAILED" | "WELCOME" | "REMARKETING_SMS" | "REMARKETING_EMAIL";
 export type Channel = "SMS" | "EMAIL";
 

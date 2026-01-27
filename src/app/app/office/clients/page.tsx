@@ -131,6 +131,7 @@ function formatCurrency(cents: number) {
 
 function formatFrequency(freq: Frequency) {
   const labels: Record<Frequency, string> = {
+    TWICE_WEEKLY: "Twice Weekly",
     WEEKLY: "Weekly",
     BIWEEKLY: "Bi-weekly",
     MONTHLY: "Monthly",
