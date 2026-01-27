@@ -248,10 +248,15 @@ export default function ClientDetailPage({ params }: PageProps) {
     billingInterval: "monthly",
     couponCode: "",
     initialCleanupRequired: false,
+    // No Dogs mode fields
+    service: "",
+    pricePerUnit: "",
+    serviceFrequency: "",
   });
   const [savingSubscription, setSavingSubscription] = useState(false);
   const [servicePlans, setServicePlans] = useState<ServicePlan[]>([]);
   const [loadingServicePlans, setLoadingServicePlans] = useState(false);
+  const [cleanupFrequencies, setCleanupFrequencies] = useState<string[]>([]);
 
   const resetSubscriptionForm = () => {
     setSubscriptionForm({
@@ -262,17 +267,69 @@ export default function ClientDetailPage({ params }: PageProps) {
       billingInterval: "monthly",
       couponCode: "",
       initialCleanupRequired: false,
+      service: "",
+      pricePerUnit: "",
+      serviceFrequency: "",
     });
+  };
+
+  // Frequency labels for display
+  const FREQUENCY_LABELS: Record<string, string> = {
+    SEVEN_TIMES_A_WEEK: "7x Week",
+    SIX_TIMES_A_WEEK: "6x Week",
+    FIVE_TIMES_A_WEEK: "5x Week",
+    FOUR_TIMES_A_WEEK: "4x Week",
+    THREE_TIMES_A_WEEK: "3x Week",
+    TWO_TIMES_A_WEEK: "2x Week",
+    ONCE_A_WEEK: "1x Week",
+    BI_WEEKLY: "Bi-Weekly",
+    TWICE_PER_MONTH: "2x Month",
+    EVERY_THREE_WEEKS: "Every 3 Weeks",
+    EVERY_FOUR_WEEKS: "Every 4 Weeks",
+    ONCE_A_MONTH: "1x Month",
+    ONE_TIME: "One-Time",
+  };
+
+  // Generate dynamic service plan options based on dog count and enabled frequencies
+  const generateServicePlanOptions = () => {
+    const activeDogCount = client?.dogs?.filter((d) => d.isActive).length || 0;
+    const options: { value: string; label: string }[] = [];
+
+    // Add "No Dogs" option first
+    options.push({ value: "NO_DOGS", label: "No Dogs" });
+
+    // Generate options based on dog count and enabled frequencies
+    if (activeDogCount > 0 && cleanupFrequencies.length > 0) {
+      cleanupFrequencies.forEach((freq) => {
+        const freqLabel = FREQUENCY_LABELS[freq] || freq;
+        options.push({
+          value: `${activeDogCount}_DOGS_${freq}`,
+          label: `${activeDogCount} Dog${activeDogCount > 1 ? "s" : ""} ${freqLabel}`,
+        });
+      });
+    }
+
+    return options;
   };
 
   const fetchServicePlans = async () => {
     setLoadingServicePlans(true);
     try {
-      const res = await fetch("/api/admin/service-plans");
-      if (res.ok) {
-        const data = await res.json();
-        // Only show active plans
+      // Fetch both service plans and onboarding settings in parallel
+      const [plansRes, settingsRes] = await Promise.all([
+        fetch("/api/admin/service-plans"),
+        fetch("/api/admin/onboarding-settings"),
+      ]);
+
+      if (plansRes.ok) {
+        const data = await plansRes.json();
         setServicePlans(data.plans?.filter((p: ServicePlan) => p.is_active) || []);
+      }
+
+      if (settingsRes.ok) {
+        const settingsData = await settingsRes.json();
+        const frequencies = settingsData.settings?.onboarding?.cleanupFrequencies || [];
+        setCleanupFrequencies(frequencies);
       }
     } catch (err) {
       console.error("Error fetching service plans:", err);
@@ -286,20 +343,63 @@ export default function ClientDetailPage({ params }: PageProps) {
       return;
     }
 
+    // Validate No Dogs mode fields
+    if (subscriptionForm.servicePlan === "NO_DOGS") {
+      if (!subscriptionForm.service || !subscriptionForm.pricePerUnit || !subscriptionForm.serviceFrequency) {
+        return;
+      }
+    }
+
     setSavingSubscription(true);
     try {
+      // Build request body based on mode
+      const isNoDogs = subscriptionForm.servicePlan === "NO_DOGS";
+
+      // Parse the service plan value for dog-based subscriptions
+      // Format: "{dogCount}_DOGS_{frequency}" e.g., "2_DOGS_ONCE_A_WEEK"
+      let frequency = subscriptionForm.billingInterval === "weekly" ? "WEEKLY" :
+                      subscriptionForm.billingInterval === "biweekly" ? "BIWEEKLY" : "MONTHLY";
+      let dogCount = 0;
+
+      if (!isNoDogs && subscriptionForm.servicePlan) {
+        const parts = subscriptionForm.servicePlan.split("_DOGS_");
+        if (parts.length === 2) {
+          dogCount = parseInt(parts[0], 10);
+          frequency = parts[1]; // e.g., "ONCE_A_WEEK", "BI_WEEKLY"
+        }
+      }
+
+      const requestBody = isNoDogs
+        ? {
+            // No Dogs mode - custom service
+            isNoDogs: true,
+            service: subscriptionForm.service,
+            priceOverrideCents: Math.round(parseFloat(subscriptionForm.pricePerUnit) * 100),
+            frequency: subscriptionForm.serviceFrequency,
+            startDate: subscriptionForm.startDate,
+            endDate: subscriptionForm.endDate || null,
+            billingOption: subscriptionForm.billingOption,
+            billingInterval: subscriptionForm.billingInterval,
+            couponCode: subscriptionForm.couponCode || null,
+            initialCleanupRequired: subscriptionForm.initialCleanupRequired,
+          }
+        : {
+            // Dog-based subscription
+            servicePlanValue: subscriptionForm.servicePlan,
+            dogCount,
+            frequency,
+            startDate: subscriptionForm.startDate,
+            endDate: subscriptionForm.endDate || null,
+            billingOption: subscriptionForm.billingOption,
+            billingInterval: subscriptionForm.billingInterval,
+            couponCode: subscriptionForm.couponCode || null,
+            initialCleanupRequired: subscriptionForm.initialCleanupRequired,
+          };
+
       const res = await fetch(`/api/admin/clients/${id}/subscriptions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          planId: subscriptionForm.servicePlan,
-          startDate: subscriptionForm.startDate,
-          endDate: subscriptionForm.endDate || null,
-          billingOption: subscriptionForm.billingOption,
-          billingInterval: subscriptionForm.billingInterval,
-          couponCode: subscriptionForm.couponCode || null,
-          initialCleanupRequired: subscriptionForm.initialCleanupRequired,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (res.ok) {
@@ -1550,9 +1650,9 @@ export default function ClientDetailPage({ params }: PageProps) {
                     <option value="">
                       {loadingServicePlans ? "Loading..." : "Please Select"}
                     </option>
-                    {servicePlans.map((plan) => (
-                      <option key={plan.id} value={plan.id}>
-                        {plan.name} ({formatFrequency(plan.frequency)})
+                    {generateServicePlanOptions().map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
                       </option>
                     ))}
                   </select>
@@ -1560,6 +1660,75 @@ export default function ClientDetailPage({ params }: PageProps) {
                     <p className="text-xs text-red-500 mt-1">This field is required</p>
                   )}
                 </div>
+
+                {/* No Dogs Mode - Additional Fields */}
+                {subscriptionForm.servicePlan === "NO_DOGS" && (
+                  <>
+                    {/* Service */}
+                    <div>
+                      <label className="block text-sm font-medium text-teal-600 mb-1">
+                        Service
+                      </label>
+                      <select
+                        value={subscriptionForm.service}
+                        onChange={(e) => setSubscriptionForm({ ...subscriptionForm, service: e.target.value })}
+                        className="w-full px-3 py-2 border-b border-gray-300 focus:border-teal-500 focus:ring-0 text-sm bg-white"
+                      >
+                        <option value="">Please Select</option>
+                        <option value="deodorizing">Deodorizing</option>
+                        <option value="sanitizing">Sanitizing</option>
+                        <option value="lawn-treatment">Lawn Treatment</option>
+                        <option value="other">Other</option>
+                      </select>
+                      {subscriptionForm.servicePlan === "NO_DOGS" && !subscriptionForm.service && (
+                        <p className="text-xs text-red-500 mt-1">This field is required</p>
+                      )}
+                    </div>
+
+                    {/* Price per Unit */}
+                    <div>
+                      <label className="block text-sm font-medium text-teal-600 mb-1">
+                        Price per Unit
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-0 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={subscriptionForm.pricePerUnit}
+                          onChange={(e) => setSubscriptionForm({ ...subscriptionForm, pricePerUnit: e.target.value })}
+                          className="w-full pl-4 px-0 py-2 border-0 border-b border-gray-300 focus:border-teal-500 focus:ring-0 text-sm"
+                          placeholder="0.00"
+                        />
+                      </div>
+                      {subscriptionForm.servicePlan === "NO_DOGS" && !subscriptionForm.pricePerUnit && (
+                        <p className="text-xs text-red-500 mt-1">This field is required</p>
+                      )}
+                    </div>
+
+                    {/* Service Frequency */}
+                    <div>
+                      <label className="block text-sm font-medium text-teal-600 mb-1">
+                        Service Frequency
+                      </label>
+                      <select
+                        value={subscriptionForm.serviceFrequency}
+                        onChange={(e) => setSubscriptionForm({ ...subscriptionForm, serviceFrequency: e.target.value })}
+                        className="w-full px-3 py-2 border-b border-gray-300 focus:border-teal-500 focus:ring-0 text-sm bg-white"
+                      >
+                        <option value="">Please Select</option>
+                        <option value="WEEKLY">Weekly</option>
+                        <option value="BIWEEKLY">Bi-Weekly</option>
+                        <option value="MONTHLY">Monthly</option>
+                        <option value="ONETIME">One-Time</option>
+                      </select>
+                      {subscriptionForm.servicePlan === "NO_DOGS" && !subscriptionForm.serviceFrequency && (
+                        <p className="text-xs text-red-500 mt-1">This field is required</p>
+                      )}
+                    </div>
+                  </>
+                )}
 
                 {/* Start Date */}
                 <div>
@@ -1673,7 +1842,13 @@ export default function ClientDetailPage({ params }: PageProps) {
                 </button>
                 <button
                   onClick={handleSaveSubscription}
-                  disabled={savingSubscription || !subscriptionForm.servicePlan || !subscriptionForm.startDate}
+                  disabled={
+                    savingSubscription ||
+                    !subscriptionForm.servicePlan ||
+                    !subscriptionForm.startDate ||
+                    (subscriptionForm.servicePlan === "NO_DOGS" &&
+                      (!subscriptionForm.service || !subscriptionForm.pricePerUnit || !subscriptionForm.serviceFrequency))
+                  }
                   className="px-6 py-2 text-sm font-medium text-white bg-teal-600 rounded hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {savingSubscription ? "SAVING..." : "SAVE"}

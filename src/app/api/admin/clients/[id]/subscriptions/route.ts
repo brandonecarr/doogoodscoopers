@@ -93,9 +93,54 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   return NextResponse.json({ subscriptions: formattedSubscriptions });
 }
 
+// Frequency display labels for generating plan names
+const FREQUENCY_LABELS: Record<string, string> = {
+  SEVEN_TIMES_A_WEEK: "7x Week",
+  SIX_TIMES_A_WEEK: "6x Week",
+  FIVE_TIMES_A_WEEK: "5x Week",
+  FOUR_TIMES_A_WEEK: "4x Week",
+  THREE_TIMES_A_WEEK: "3x Week",
+  TWO_TIMES_A_WEEK: "2x Week",
+  ONCE_A_WEEK: "1x Week",
+  BI_WEEKLY: "Bi-Weekly",
+  TWICE_PER_MONTH: "2x Month",
+  EVERY_THREE_WEEKS: "Every 3 Weeks",
+  EVERY_FOUR_WEEKS: "Every 4 Weeks",
+  ONCE_A_MONTH: "1x Month",
+  ONE_TIME: "One-Time",
+  WEEKLY: "Weekly",
+  BIWEEKLY: "Bi-Weekly",
+  MONTHLY: "Monthly",
+  ONETIME: "One-Time",
+};
+
+// Map onboarding frequencies to subscription frequencies
+const mapToSubscriptionFrequency = (freq: string): string => {
+  const mapping: Record<string, string> = {
+    SEVEN_TIMES_A_WEEK: "WEEKLY",
+    SIX_TIMES_A_WEEK: "WEEKLY",
+    FIVE_TIMES_A_WEEK: "WEEKLY",
+    FOUR_TIMES_A_WEEK: "WEEKLY",
+    THREE_TIMES_A_WEEK: "WEEKLY",
+    TWO_TIMES_A_WEEK: "WEEKLY",
+    ONCE_A_WEEK: "WEEKLY",
+    BI_WEEKLY: "BIWEEKLY",
+    TWICE_PER_MONTH: "BIWEEKLY",
+    EVERY_THREE_WEEKS: "BIWEEKLY",
+    EVERY_FOUR_WEEKS: "MONTHLY",
+    ONCE_A_MONTH: "MONTHLY",
+    ONE_TIME: "ONETIME",
+  };
+  return mapping[freq] || freq;
+};
+
 /**
  * POST /api/admin/clients/[id]/subscriptions
  * Create a new subscription
+ *
+ * Supports two modes:
+ * 1. Dog-based subscription: servicePlanValue, dogCount, frequency
+ * 2. No Dogs mode: isNoDogs, service, priceOverrideCents, frequency
  */
 export async function POST(request: NextRequest, { params }: RouteParams) {
   const auth = await authenticateWithPermission(request, "clients:write");
@@ -120,7 +165,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const body = await request.json();
     const {
-      planId,
+      // Common fields
       locationId,
       startDate,
       endDate,
@@ -128,29 +173,19 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       billingInterval,
       couponCode,
       initialCleanupRequired,
+      // No Dogs mode fields
+      isNoDogs,
+      service,
       priceOverrideCents,
+      // Dog-based mode fields
+      servicePlanValue,
+      dogCount,
+      frequency: requestFrequency,
     } = body;
 
     // Validate required fields
-    if (!planId) {
-      return NextResponse.json({ error: "Service plan is required" }, { status: 400 });
-    }
-
     if (!startDate) {
       return NextResponse.json({ error: "Start date is required" }, { status: 400 });
-    }
-
-    // Get the service plan
-    const { data: plan, error: planError } = await supabase
-      .from("service_plans")
-      .select("*")
-      .eq("id", planId)
-      .eq("org_id", auth.user.orgId)
-      .eq("is_active", true)
-      .single();
-
-    if (planError || !plan) {
-      return NextResponse.json({ error: "Service plan not found" }, { status: 404 });
     }
 
     // Get location - use provided locationId or get client's primary location
@@ -181,32 +216,49 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    // Determine price - use override if provided, otherwise could be from plan or default
-    // For now, we'll use a default price structure
-    const pricePerVisitCents = priceOverrideCents || 3500; // Default $35 per visit
+    let subscriptionData: {
+      org_id: string;
+      client_id: string;
+      location_id: string;
+      plan_id: string | null;
+      status: string;
+      frequency: string;
+      price_per_visit_cents: number;
+      start_date: string;
+      end_date: string | null;
+      next_service_date: string;
+      initial_cleanup_required: boolean;
+      initial_cleanup_completed: boolean;
+      metadata: Record<string, unknown>;
+    };
+    let planName: string;
 
-    // Map billing interval to frequency if different from plan
-    let frequency = plan.frequency;
-    if (billingInterval) {
-      const intervalMap: Record<string, string> = {
-        weekly: "WEEKLY",
-        biweekly: "BIWEEKLY",
-        monthly: "MONTHLY",
+    if (isNoDogs) {
+      // No Dogs mode - custom service
+      if (!service || !priceOverrideCents || !requestFrequency) {
+        return NextResponse.json(
+          { error: "Service, price, and frequency are required for No Dogs subscriptions" },
+          { status: 400 }
+        );
+      }
+
+      // Format service name
+      const serviceLabels: Record<string, string> = {
+        deodorizing: "Deodorizing",
+        sanitizing: "Sanitizing",
+        "lawn-treatment": "Lawn Treatment",
+        other: "Other Service",
       };
-      frequency = intervalMap[billingInterval] || plan.frequency;
-    }
+      planName = serviceLabels[service] || service;
 
-    // Create subscription
-    const { data: subscription, error: subError } = await supabase
-      .from("subscriptions")
-      .insert({
+      subscriptionData = {
         org_id: auth.user.orgId,
         client_id: clientId,
         location_id: location.id,
-        plan_id: planId,
+        plan_id: null, // No service plan for No Dogs mode
         status: "ACTIVE",
-        frequency,
-        price_per_visit_cents: pricePerVisitCents,
+        frequency: requestFrequency,
+        price_per_visit_cents: priceOverrideCents,
         start_date: startDate,
         end_date: endDate || null,
         next_service_date: startDate,
@@ -216,12 +268,61 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           billing_option: billingOption || "prepaid-fixed",
           coupon_code: couponCode || null,
           created_by: auth.user.id,
+          is_no_dogs: true,
+          service_type: service,
         },
-      })
-      .select(`
-        *,
-        plan:service_plans(id, name, frequency, description)
-      `)
+      };
+    } else {
+      // Dog-based subscription
+      if (!servicePlanValue || !requestFrequency) {
+        return NextResponse.json(
+          { error: "Service plan and frequency are required" },
+          { status: 400 }
+        );
+      }
+
+      // Generate plan name from dog count and frequency
+      const freqLabel = FREQUENCY_LABELS[requestFrequency] || requestFrequency;
+      planName = dogCount > 0
+        ? `${dogCount} Dog${dogCount > 1 ? "s" : ""} ${freqLabel}`
+        : freqLabel;
+
+      // Map the onboarding frequency to subscription frequency
+      const subscriptionFrequency = mapToSubscriptionFrequency(requestFrequency);
+
+      // Calculate price based on dog count (default $35/dog/visit)
+      const pricePerDog = 3500; // $35 in cents
+      const calculatedPrice = (dogCount || 1) * pricePerDog;
+
+      subscriptionData = {
+        org_id: auth.user.orgId,
+        client_id: clientId,
+        location_id: location.id,
+        plan_id: null, // Dynamic plans don't have a plan_id
+        status: "ACTIVE",
+        frequency: subscriptionFrequency,
+        price_per_visit_cents: priceOverrideCents || calculatedPrice,
+        start_date: startDate,
+        end_date: endDate || null,
+        next_service_date: startDate,
+        initial_cleanup_required: initialCleanupRequired || false,
+        initial_cleanup_completed: false,
+        metadata: {
+          billing_option: billingOption || "prepaid-fixed",
+          coupon_code: couponCode || null,
+          created_by: auth.user.id,
+          dog_count: dogCount,
+          cleanup_frequency: requestFrequency,
+          service_plan_value: servicePlanValue,
+        },
+      };
+    }
+
+    // Create subscription
+    const { data: subscription, error: subError } = await supabase
+      .from("subscriptions")
+      .insert(subscriptionData)
+      .select("*")
       .single();
 
     if (subError) {
@@ -255,11 +356,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       entity_id: subscription.id,
       details: {
         clientId,
-        planId,
-        planName: plan.name,
-        frequency,
+        planName,
+        frequency: subscription.frequency,
         startDate,
         jobsGenerated,
+        isNoDogs: isNoDogs || false,
       },
     });
 
@@ -277,12 +378,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       initialCleanupRequired: subscription.initial_cleanup_required,
       initialCleanupCompleted: subscription.initial_cleanup_completed,
       createdAt: subscription.created_at,
-      plan: subscription.plan ? {
-        id: subscription.plan.id,
-        name: subscription.plan.name,
-        frequency: subscription.plan.frequency,
-        description: subscription.plan.description,
-      } : null,
+      plan: {
+        id: null,
+        name: planName,
+        frequency: subscription.frequency,
+        description: null,
+      },
       jobsGenerated,
     };
 
