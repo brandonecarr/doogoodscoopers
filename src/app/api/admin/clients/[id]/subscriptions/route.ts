@@ -242,14 +242,16 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         );
       }
 
-      // Format service name
-      const serviceLabels: Record<string, string> = {
-        deodorizing: "Deodorizing",
-        sanitizing: "Sanitizing",
-        "lawn-treatment": "Lawn Treatment",
-        other: "Other Service",
-      };
-      planName = serviceLabels[service] || service;
+      // Look up cross-sell name from organization settings
+      const { data: org } = await supabase
+        .from("organizations")
+        .select("settings")
+        .eq("id", auth.user.orgId)
+        .single();
+
+      const crossSells = org?.settings?.residentialCrossSells?.items || [];
+      const crossSell = crossSells.find((cs: { id: string; name: string }) => cs.id === service);
+      planName = crossSell?.name || service;
 
       subscriptionData = {
         org_id: auth.user.orgId,

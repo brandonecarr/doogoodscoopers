@@ -68,6 +68,16 @@ interface ServicePlan {
   is_active: boolean;
 }
 
+interface CrossSellItem {
+  id: string;
+  name: string;
+  description: string;
+  unit: string;
+  pricePerUnit: number;
+  type: string;
+  taxable: boolean;
+}
+
 interface Subscription {
   id: string;
   status: string;
@@ -257,6 +267,7 @@ export default function ClientDetailPage({ params }: PageProps) {
   const [servicePlans, setServicePlans] = useState<ServicePlan[]>([]);
   const [loadingServicePlans, setLoadingServicePlans] = useState(false);
   const [cleanupFrequencies, setCleanupFrequencies] = useState<string[]>([]);
+  const [residentialCrossSells, setResidentialCrossSells] = useState<CrossSellItem[]>([]);
 
   const resetSubscriptionForm = () => {
     setSubscriptionForm({
@@ -330,6 +341,8 @@ export default function ClientDetailPage({ params }: PageProps) {
         const settingsData = await settingsRes.json();
         const frequencies = settingsData.settings?.onboarding?.cleanupFrequencies || [];
         setCleanupFrequencies(frequencies);
+        const crossSells = settingsData.settings?.residentialCrossSells?.items || [];
+        setResidentialCrossSells(crossSells);
       }
     } catch (err) {
       console.error("Error fetching service plans:", err);
@@ -1671,14 +1684,22 @@ export default function ClientDetailPage({ params }: PageProps) {
                       </label>
                       <select
                         value={subscriptionForm.service}
-                        onChange={(e) => setSubscriptionForm({ ...subscriptionForm, service: e.target.value })}
+                        onChange={(e) => {
+                          const selectedCrossSell = residentialCrossSells.find((cs) => cs.id === e.target.value);
+                          setSubscriptionForm({
+                            ...subscriptionForm,
+                            service: e.target.value,
+                            pricePerUnit: selectedCrossSell ? String(selectedCrossSell.pricePerUnit) : subscriptionForm.pricePerUnit,
+                          });
+                        }}
                         className="w-full px-3 py-2 border-b border-gray-300 focus:border-teal-500 focus:ring-0 text-sm bg-white"
                       >
                         <option value="">Please Select</option>
-                        <option value="deodorizing">Deodorizing</option>
-                        <option value="sanitizing">Sanitizing</option>
-                        <option value="lawn-treatment">Lawn Treatment</option>
-                        <option value="other">Other</option>
+                        {residentialCrossSells.map((crossSell) => (
+                          <option key={crossSell.id} value={crossSell.id}>
+                            {crossSell.name}
+                          </option>
+                        ))}
                       </select>
                       {subscriptionForm.servicePlan === "NO_DOGS" && !subscriptionForm.service && (
                         <p className="text-xs text-red-500 mt-1">This field is required</p>
