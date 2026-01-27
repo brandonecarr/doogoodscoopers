@@ -264,6 +264,21 @@ export default function RoutePlannerPage() {
         )}
       </div>
 
+      {/* AI Recommendation Panel - shown above map */}
+      {aiRecommendation && (
+        <AiRecommendationPanel
+          recommendation={aiRecommendation}
+          techs={techs}
+          onAccept={() => {
+            // Navigate to assignment or show confirmation
+            alert(`Recommendation accepted: ${aiRecommendation.suggestedDay} with ${aiRecommendation.suggestedTechName}`);
+          }}
+          onChooseDifferent={() => {
+            setAiRecommendation(null);
+          }}
+        />
+      )}
+
       {/* Filters */}
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-2">
@@ -342,21 +357,6 @@ export default function RoutePlannerPage() {
           />
         )}
       </div>
-
-      {/* AI Recommendation Panel */}
-      {aiRecommendation && (
-        <AiRecommendationPanel
-          recommendation={aiRecommendation}
-          techs={techs}
-          onAccept={() => {
-            // Navigate to assignment or show confirmation
-            alert(`Recommendation accepted: ${aiRecommendation.suggestedDay} with ${aiRecommendation.suggestedTechName}`);
-          }}
-          onChooseDifferent={() => {
-            setAiRecommendation(null);
-          }}
-        />
-      )}
 
       {/* Legend */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-4">
