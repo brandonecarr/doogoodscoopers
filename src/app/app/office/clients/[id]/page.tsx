@@ -1756,9 +1756,11 @@ export default function ClientDetailPage({ params }: PageProps) {
                   <div className="flex items-center gap-3">
                     <Calendar className="w-5 h-5 text-gray-400" />
                     <input
-                      type="date"
+                      type={subscriptionForm.startDate ? "date" : "text"}
                       value={subscriptionForm.startDate}
                       onChange={(e) => setSubscriptionForm({ ...subscriptionForm, startDate: e.target.value })}
+                      onFocus={(e) => (e.target.type = "date")}
+                      onBlur={(e) => { if (!subscriptionForm.startDate) e.target.type = "text"; }}
                       placeholder="Start Date"
                       className="flex-1 px-0 py-2 border-0 border-b border-gray-300 focus:border-teal-500 focus:ring-0 text-sm"
                     />
@@ -1772,9 +1774,11 @@ export default function ClientDetailPage({ params }: PageProps) {
                 <div className="flex items-center gap-3">
                   <Calendar className="w-5 h-5 text-gray-400" />
                   <input
-                    type="date"
+                    type={subscriptionForm.endDate ? "date" : "text"}
                     value={subscriptionForm.endDate}
                     onChange={(e) => setSubscriptionForm({ ...subscriptionForm, endDate: e.target.value })}
+                    onFocus={(e) => (e.target.type = "date")}
+                    onBlur={(e) => { if (!subscriptionForm.endDate) e.target.type = "text"; }}
                     placeholder="End Date"
                     className="flex-1 px-0 py-2 border-0 border-b border-gray-300 focus:border-teal-500 focus:ring-0 text-sm"
                   />
