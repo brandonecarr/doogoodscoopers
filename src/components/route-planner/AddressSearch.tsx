@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
-import { useJsApiLoader, Autocomplete } from "@react-google-maps/api";
+import { useState, useRef, useCallback } from "react";
+import { Autocomplete } from "@react-google-maps/api";
 import { Search, MapPin, Loader2, X } from "lucide-react";
+import { useGoogleMaps } from "./GoogleMapsProvider";
 
 interface AddressResult {
   address: string;
@@ -22,9 +23,6 @@ interface AddressSearchProps {
   defaultValue?: string;
 }
 
-// Libraries needed for Places Autocomplete
-const libraries: ("places")[] = ["places"];
-
 export function AddressSearch({
   onAddressSelect,
   onClear,
@@ -37,11 +35,7 @@ export function AddressSearch({
     useState<google.maps.places.Autocomplete | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const { isLoaded, loadError } = useJsApiLoader({
-    id: "google-map-script",
-    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "",
-    libraries,
-  });
+  const { isLoaded, loadError } = useGoogleMaps();
 
   const onLoad = useCallback((autocomplete: google.maps.places.Autocomplete) => {
     setAutocomplete(autocomplete);

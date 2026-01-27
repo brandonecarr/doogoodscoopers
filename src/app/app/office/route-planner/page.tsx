@@ -15,6 +15,7 @@ import {
 import { RoutePlannerMap } from "@/components/route-planner/RoutePlannerMap";
 import { AddressSearch } from "@/components/route-planner/AddressSearch";
 import { AiRecommendationPanel } from "@/components/route-planner/AiRecommendationPanel";
+import { GoogleMapsProvider } from "@/components/route-planner/GoogleMapsProvider";
 
 interface MapClient {
   id: string;
@@ -199,6 +200,7 @@ export default function RoutePlannerPage() {
   };
 
   return (
+    <GoogleMapsProvider>
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -385,5 +387,6 @@ export default function RoutePlannerPage() {
         </div>
       </div>
     </div>
+    </GoogleMapsProvider>
   );
 }

@@ -3,11 +3,11 @@
 import { useState, useCallback, useMemo } from "react";
 import {
   GoogleMap,
-  useJsApiLoader,
   Marker,
   InfoWindow,
 } from "@react-google-maps/api";
 import { MapPin, User, Calendar, Clock, Navigation } from "lucide-react";
+import { useGoogleMaps } from "./GoogleMapsProvider";
 import { formatDistance, calculateAirDistance } from "@/lib/distance-utils";
 
 interface MapClient {
@@ -110,10 +110,7 @@ export function RoutePlannerMap({
   const [selectedClient, setSelectedClient] = useState<MapClient | null>(null);
   const [showNewClientInfo, setShowNewClientInfo] = useState(false);
 
-  const { isLoaded, loadError } = useJsApiLoader({
-    id: "google-map-script",
-    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "",
-  });
+  const { isLoaded, loadError } = useGoogleMaps();
 
   // Build tech color map
   const techColorMap = useMemo(() => {
