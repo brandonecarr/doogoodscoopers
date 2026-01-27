@@ -91,7 +91,7 @@ export function DashboardClient({ user }: DashboardClientProps) {
             count={counts.unassignedLocations}
             title="Unassigned Locations"
             subtitle="Assign Tech & Service Day"
-            href="/app/office/clients?filter=unassigned"
+            href="/app/office/unassigned"
           />
         )}
         {isVisible("changeRequests") && (

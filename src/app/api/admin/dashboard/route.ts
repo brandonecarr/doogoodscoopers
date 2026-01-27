@@ -116,7 +116,8 @@ export async function GET(request: NextRequest) {
     // Fetch all data in parallel
     const [
       // Status card counts
-      unassignedLocationsResult,
+      activeSubscriptionsResult,
+      unassignedJobsResult,
       openOneTimeInvoicesResult,
       openRecurringInvoicesResult,
       overdueOneTimeInvoicesResult,
@@ -135,13 +136,22 @@ export async function GET(request: NextRequest) {
       subscriptionsResult,
       jobsResult,
     ] = await Promise.all([
-      // Unassigned locations (locations without a route assignment)
+      // Active subscriptions for unassigned count
       supabase
-        .from("locations")
-        .select("id", { count: "exact", head: true })
+        .from("subscriptions")
+        .select("id, initial_cleanup_required, initial_cleanup_completed")
         .eq("org_id", orgId)
-        .eq("is_active", true)
-        .is("default_route_id", null),
+        .eq("status", "ACTIVE"),
+
+      // Jobs without route assignment (for unassigned calculation)
+      supabase
+        .from("jobs")
+        .select("subscription_id")
+        .eq("org_id", orgId)
+        .eq("status", "SCHEDULED")
+        .gte("scheduled_date", today)
+        .is("route_id", null)
+        .not("subscription_id", "is", null),
 
       // Open one-time invoices (no subscription_id)
       supabase
@@ -267,9 +277,26 @@ export async function GET(request: NextRequest) {
         .lte("scheduled_date", monthEnd),
     ]);
 
+    // Calculate unassigned subscriptions count
+    const activeSubscriptions = activeSubscriptionsResult.data || [];
+    const unassignedJobSubscriptionIds = new Set(
+      (unassignedJobsResult.data || []).map((j: { subscription_id: string }) => j.subscription_id)
+    );
+    const unassignedSubscriptionsCount = activeSubscriptions.filter(sub => {
+      // Needs initial cleanup scheduled?
+      if (sub.initial_cleanup_required && !sub.initial_cleanup_completed) {
+        return true;
+      }
+      // Has jobs without route assignment?
+      if (unassignedJobSubscriptionIds.has(sub.id)) {
+        return true;
+      }
+      return false;
+    }).length;
+
     // Process status card counts
     const counts: StatusCardCounts = {
-      unassignedLocations: unassignedLocationsResult.count || 0,
+      unassignedLocations: unassignedSubscriptionsCount,
       changeRequests: 0, // TODO: Implement change requests table
       openOneTimeInvoices: openOneTimeInvoicesResult.count || 0,
       openRecurringInvoices: openRecurringInvoicesResult.count || 0,
