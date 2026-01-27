@@ -295,9 +295,6 @@ export default function ClientDetailPage({ params }: PageProps) {
     const activeDogCount = client?.dogs?.filter((d) => d.isActive).length || 0;
     const options: { value: string; label: string }[] = [];
 
-    // Add "No Dogs" option first
-    options.push({ value: "NO_DOGS", label: "No Dogs" });
-
     // Generate options based on dog count and enabled frequencies
     if (activeDogCount > 0 && cleanupFrequencies.length > 0) {
       cleanupFrequencies.forEach((freq) => {
@@ -308,6 +305,9 @@ export default function ClientDetailPage({ params }: PageProps) {
         });
       });
     }
+
+    // Add "No Dogs" option at the bottom
+    options.push({ value: "NO_DOGS", label: "No Dogs" });
 
     return options;
   };
@@ -658,7 +658,7 @@ export default function ClientDetailPage({ params }: PageProps) {
           <h3 className="font-semibold text-gray-900">Contact Info</h3>
           <button
             onClick={() => setShowContactModal(true)}
-            className="text-sm text-teal-600 hover:text-teal-700"
+            className="text-sm font-medium text-teal-600 hover:text-teal-700"
           >
             ADD NEW CONTACT
           </button>
@@ -726,8 +726,8 @@ export default function ClientDetailPage({ params }: PageProps) {
                 </div>
               </div>
               <div className="flex justify-end gap-2 mt-4">
-                <button className="text-sm text-red-600 hover:text-red-700">REMOVE</button>
-                <button className="text-sm text-teal-600 hover:text-teal-700">EDIT</button>
+                <button className="text-sm font-medium text-red-600 hover:text-red-700">REMOVE</button>
+                <button className="text-sm font-medium text-teal-600 hover:text-teal-700">EDIT</button>
               </div>
             </>
           )}
@@ -769,11 +769,11 @@ export default function ClientDetailPage({ params }: PageProps) {
                 <div className="flex justify-end gap-2 mt-4">
                   <button
                     onClick={() => handleDeleteContact(contact.id)}
-                    className="text-sm text-red-600 hover:text-red-700"
+                    className="text-sm font-medium text-red-600 hover:text-red-700"
                   >
                     REMOVE
                   </button>
-                  <button className="text-sm text-teal-600 hover:text-teal-700">EDIT</button>
+                  <button className="text-sm font-medium text-teal-600 hover:text-teal-700">EDIT</button>
                 </div>
               </div>
             )
@@ -814,7 +814,7 @@ export default function ClientDetailPage({ params }: PageProps) {
             <p className="text-sm text-gray-400">No location data</p>
           )}
           <div className="flex justify-end mt-4">
-            <button className="text-sm text-teal-600 hover:text-teal-700">EDIT</button>
+            <button className="text-sm font-medium text-teal-600 hover:text-teal-700">EDIT</button>
           </div>
         </div>
       </div>
@@ -895,7 +895,7 @@ export default function ClientDetailPage({ params }: PageProps) {
               <div className="flex justify-end mt-4">
                 <button
                   onClick={() => setShowSubscriptionModal(true)}
-                  className="text-sm text-teal-600 hover:text-teal-700"
+                  className="text-sm font-medium text-teal-600 hover:text-teal-700"
                 >
                   CREATE NEW SUBSCRIPTION
                 </button>
@@ -948,7 +948,7 @@ export default function ClientDetailPage({ params }: PageProps) {
                 </table>
               </div>
               <div className="flex justify-end mt-4">
-                <button className="text-sm text-teal-600 hover:text-teal-700">CREATE INVOICE DRAFT</button>
+                <button className="text-sm font-medium text-teal-600 hover:text-teal-700">CREATE INVOICE DRAFT</button>
               </div>
             </>
           )}
@@ -1042,8 +1042,8 @@ export default function ClientDetailPage({ params }: PageProps) {
                 </table>
               </div>
               <div className="flex justify-end gap-4 mt-4">
-                <button className="text-sm text-teal-600 hover:text-teal-700">CREATE CARD LINK</button>
-                <button className="text-sm text-teal-600 hover:text-teal-700">ADD CARD</button>
+                <button className="text-sm font-medium text-teal-600 hover:text-teal-700">CREATE CARD LINK</button>
+                <button className="text-sm font-medium text-teal-600 hover:text-teal-700">ADD CARD</button>
               </div>
             </>
           )}
@@ -1069,7 +1069,7 @@ export default function ClientDetailPage({ params }: PageProps) {
                 </table>
               </div>
               <div className="flex justify-end mt-4">
-                <button className="text-sm text-teal-600 hover:text-teal-700">CREATE GIFT CERTIFICATE</button>
+                <button className="text-sm font-medium text-teal-600 hover:text-teal-700">CREATE GIFT CERTIFICATE</button>
               </div>
             </>
           )}
@@ -1099,7 +1099,7 @@ export default function ClientDetailPage({ params }: PageProps) {
             </tbody>
           </table>
           <div className="flex justify-end mt-4">
-            <button className="text-sm text-teal-600 hover:text-teal-700">ADD NEW</button>
+            <button className="text-sm font-medium text-teal-600 hover:text-teal-700">ADD NEW</button>
           </div>
         </div>
       </div>
@@ -1221,8 +1221,8 @@ export default function ClientDetailPage({ params }: PageProps) {
             </div>
           )}
           <div className="flex justify-end gap-4 mt-4">
-            <button className="text-sm text-teal-600 hover:text-teal-700">ADD JOB</button>
-            <button className="text-sm text-teal-600 hover:text-teal-700">ADD ONE-TIME ADD-ON SERVICE</button>
+            <button className="text-sm font-medium text-teal-600 hover:text-teal-700">ADD JOB</button>
+            <button className="text-sm font-medium text-teal-600 hover:text-teal-700">ADD ONE-TIME ADD-ON SERVICE</button>
           </div>
         </div>
       </div>
@@ -1270,7 +1270,7 @@ export default function ClientDetailPage({ params }: PageProps) {
             <div className="text-center py-8 text-gray-400">No data available</div>
           )}
           <div className="flex justify-end mt-4">
-            <button className="text-sm text-teal-600 hover:text-teal-700">CREATE NOTE</button>
+            <button className="text-sm font-medium text-teal-600 hover:text-teal-700">CREATE NOTE</button>
           </div>
         </div>
       </div>
@@ -1279,7 +1279,7 @@ export default function ClientDetailPage({ params }: PageProps) {
       <div className="bg-white rounded-lg shadow-sm border border-gray-100">
         <div className="p-4 border-b border-gray-100 flex items-center justify-between">
           <h3 className="font-semibold text-gray-900">Dog Info</h3>
-          <button className="text-sm text-teal-600 hover:text-teal-700">ADD NEW</button>
+          <button className="text-sm font-medium text-teal-600 hover:text-teal-700">ADD NEW</button>
         </div>
         {activeDogs.length > 0 && (
           <div className="border-b border-gray-100">
@@ -1330,8 +1330,8 @@ export default function ClientDetailPage({ params }: PageProps) {
                 </div>
               </div>
               <div className="flex justify-end gap-2 mt-4">
-                <button className="text-sm text-red-600 hover:text-red-700">REMOVE</button>
-                <button className="text-sm text-teal-600 hover:text-teal-700">EDIT</button>
+                <button className="text-sm font-medium text-red-600 hover:text-red-700">REMOVE</button>
+                <button className="text-sm font-medium text-teal-600 hover:text-teal-700">EDIT</button>
               </div>
             </>
           ) : (
@@ -1385,7 +1385,7 @@ export default function ClientDetailPage({ params }: PageProps) {
             </div>
           </div>
           <div className="flex justify-end mt-4">
-            <button className="text-sm text-teal-600 hover:text-teal-700">EDIT</button>
+            <button className="text-sm font-medium text-teal-600 hover:text-teal-700">EDIT</button>
           </div>
         </div>
       </div>
@@ -1412,7 +1412,7 @@ export default function ClientDetailPage({ params }: PageProps) {
             </div>
           </div>
           <div className="flex justify-end mt-4">
-            <button className="text-sm text-teal-600 hover:text-teal-700">EDIT</button>
+            <button className="text-sm font-medium text-teal-600 hover:text-teal-700">EDIT</button>
           </div>
         </div>
       </div>
@@ -1428,7 +1428,7 @@ export default function ClientDetailPage({ params }: PageProps) {
             <span className="text-sm font-semibold text-gray-900">Organization Default</span>
           </div>
           <div className="flex justify-end mt-4">
-            <button className="text-sm text-teal-600 hover:text-teal-700">EDIT</button>
+            <button className="text-sm font-medium text-teal-600 hover:text-teal-700">EDIT</button>
           </div>
         </div>
       </div>
@@ -1456,7 +1456,7 @@ export default function ClientDetailPage({ params }: PageProps) {
             </tbody>
           </table>
           <div className="flex justify-end mt-4">
-            <button className="text-sm text-teal-600 hover:text-teal-700">EDIT</button>
+            <button className="text-sm font-medium text-teal-600 hover:text-teal-700">EDIT</button>
           </div>
         </div>
       </div>
@@ -1478,7 +1478,7 @@ export default function ClientDetailPage({ params }: PageProps) {
             </div>
           </div>
           <div className="flex justify-end mt-4">
-            <button className="text-sm text-teal-600 hover:text-teal-700">SEND TERMS OF SERVICE</button>
+            <button className="text-sm font-medium text-teal-600 hover:text-teal-700">SEND TERMS OF SERVICE</button>
           </div>
         </div>
       </div>
