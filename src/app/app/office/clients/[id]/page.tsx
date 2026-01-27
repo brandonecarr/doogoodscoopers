@@ -1689,7 +1689,7 @@ export default function ClientDetailPage({ params }: PageProps) {
                           setSubscriptionForm({
                             ...subscriptionForm,
                             service: e.target.value,
-                            pricePerUnit: selectedCrossSell ? String(selectedCrossSell.pricePerUnit) : subscriptionForm.pricePerUnit,
+                            pricePerUnit: selectedCrossSell ? String(selectedCrossSell.pricePerUnit / 100) : subscriptionForm.pricePerUnit,
                           });
                         }}
                         className="w-full px-3 py-2 border-b border-gray-300 focus:border-teal-500 focus:ring-0 text-sm bg-white"

@@ -86,7 +86,10 @@ export function OfficeSidebar({ user }: OfficeSidebarProps) {
           <nav className="flex flex-1 flex-col">
             <ul role="list" className="flex flex-1 flex-col gap-y-1">
               {filteredNav.map((item) => {
-                const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+                // Dashboard (root path) should only be active on exact match
+                const isActive = item.href === "/app/office"
+                  ? pathname === item.href
+                  : pathname === item.href || pathname.startsWith(item.href + "/");
                 return (
                   <li key={item.name}>
                     <Link
@@ -133,7 +136,10 @@ export function OfficeSidebar({ user }: OfficeSidebarProps) {
       <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-navy-900 border-t border-navy-700">
         <nav className="flex justify-around py-2">
           {filteredNav.slice(0, 5).map((item) => {
-            const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+            // Dashboard (root path) should only be active on exact match
+            const isActive = item.href === "/app/office"
+              ? pathname === item.href
+              : pathname === item.href || pathname.startsWith(item.href + "/");
             return (
               <Link
                 key={item.name}
