@@ -475,33 +475,33 @@ export default function ClientDetailPage({ params }: PageProps) {
         <div className="p-4">
           {activeContactTab === "primary" && (
             <>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="flex justify-between py-2 border-b border-gray-100">
-                  <span className="text-sm text-gray-500">First name</span>
+              <div className="grid grid-cols-2 gap-x-8 gap-y-0">
+                <div className="flex gap-4 py-2 border-b border-gray-100">
+                  <span className="text-sm text-gray-500 min-w-[140px]">First name</span>
                   <span className="text-sm font-semibold text-gray-900">{client.firstName || "No Data"}</span>
                 </div>
-                <div className="flex justify-between py-2 border-b border-gray-100">
-                  <span className="text-sm text-gray-500">Home Phone Number</span>
+                <div className="flex gap-4 py-2 border-b border-gray-100">
+                  <span className="text-sm text-gray-500 min-w-[140px]">Home Phone Number</span>
                   <span className="text-sm font-semibold text-gray-900">{client.phone || "No Data"}</span>
                 </div>
-                <div className="flex justify-between py-2 border-b border-gray-100">
-                  <span className="text-sm text-gray-500">Middle Name</span>
+                <div className="flex gap-4 py-2 border-b border-gray-100">
+                  <span className="text-sm text-gray-500 min-w-[140px]">Middle Name</span>
                   <span className="text-sm font-semibold text-gray-400">No Data</span>
                 </div>
-                <div className="flex justify-between py-2 border-b border-gray-100">
-                  <span className="text-sm text-gray-500">Cell Phone Number</span>
+                <div className="flex gap-4 py-2 border-b border-gray-100">
+                  <span className="text-sm text-gray-500 min-w-[140px]">Cell Phone Number</span>
                   <span className="text-sm font-semibold text-gray-900">{client.secondaryPhone || "No Data"}</span>
                 </div>
-                <div className="flex justify-between py-2 border-b border-gray-100">
-                  <span className="text-sm text-gray-500">Last name</span>
+                <div className="flex gap-4 py-2 border-b border-gray-100">
+                  <span className="text-sm text-gray-500 min-w-[140px]">Last name</span>
                   <span className="text-sm font-semibold text-gray-900">{client.lastName || "No Data"}</span>
                 </div>
-                <div className="flex justify-between py-2 border-b border-gray-100">
-                  <span className="text-sm text-gray-500">Tax Exempt</span>
+                <div className="flex gap-4 py-2 border-b border-gray-100">
+                  <span className="text-sm text-gray-500 min-w-[140px]">Tax Exempt</span>
                   <span className="text-sm font-semibold text-gray-900">No</span>
                 </div>
-                <div className="flex justify-between py-2">
-                  <span className="text-sm text-gray-500">Email</span>
+                <div className="flex gap-4 py-2">
+                  <span className="text-sm text-gray-500 min-w-[140px]">Email</span>
                   <span className="text-sm font-semibold text-gray-900">{client.email || "No Data"}</span>
                 </div>
               </div>
@@ -514,35 +514,35 @@ export default function ClientDetailPage({ params }: PageProps) {
           {client.contacts?.map((contact) => (
             activeContactTab === contact.id && (
               <div key={contact.id}>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="flex justify-between py-2 border-b border-gray-100">
-                    <span className="text-sm text-gray-500">First name</span>
+                <div className="grid grid-cols-2 gap-x-8 gap-y-0">
+                  <div className="flex gap-4 py-2 border-b border-gray-100">
+                    <span className="text-sm text-gray-500 min-w-[140px]">First name</span>
                     <span className="text-sm font-semibold text-gray-900">{contact.firstName || "No Data"}</span>
                   </div>
-                  <div className="flex justify-between py-2 border-b border-gray-100">
-                    <span className="text-sm text-gray-500">Home Phone Number</span>
+                  <div className="flex gap-4 py-2 border-b border-gray-100">
+                    <span className="text-sm text-gray-500 min-w-[140px]">Home Phone Number</span>
                     <span className="text-sm font-semibold text-gray-900">{contact.homePhone || "No Data"}</span>
                   </div>
-                  <div className="flex justify-between py-2 border-b border-gray-100">
-                    <span className="text-sm text-gray-500">Middle Name</span>
+                  <div className="flex gap-4 py-2 border-b border-gray-100">
+                    <span className="text-sm text-gray-500 min-w-[140px]">Middle Name</span>
                     <span className={`text-sm font-semibold ${contact.middleName ? "text-gray-900" : "text-gray-400"}`}>
                       {contact.middleName || "No Data"}
                     </span>
                   </div>
-                  <div className="flex justify-between py-2 border-b border-gray-100">
-                    <span className="text-sm text-gray-500">Cell Phone Number</span>
+                  <div className="flex gap-4 py-2 border-b border-gray-100">
+                    <span className="text-sm text-gray-500 min-w-[140px]">Cell Phone Number</span>
                     <span className="text-sm font-semibold text-gray-900">{contact.cellPhone || "No Data"}</span>
                   </div>
-                  <div className="flex justify-between py-2 border-b border-gray-100">
-                    <span className="text-sm text-gray-500">Last name</span>
+                  <div className="flex gap-4 py-2 border-b border-gray-100">
+                    <span className="text-sm text-gray-500 min-w-[140px]">Last name</span>
                     <span className="text-sm font-semibold text-gray-900">{contact.lastName || "No Data"}</span>
                   </div>
-                  <div className="flex justify-between py-2 border-b border-gray-100">
-                    <span className="text-sm text-gray-500">Tax Exempt</span>
+                  <div className="flex gap-4 py-2 border-b border-gray-100">
+                    <span className="text-sm text-gray-500 min-w-[140px]">Tax Exempt</span>
                     <span className="text-sm font-semibold text-gray-900">No</span>
                   </div>
-                  <div className="flex justify-between py-2">
-                    <span className="text-sm text-gray-500">Email</span>
+                  <div className="flex gap-4 py-2">
+                    <span className="text-sm text-gray-500 min-w-[140px]">Email</span>
                     <span className="text-sm font-semibold text-gray-900">{contact.email || "No Data"}</span>
                   </div>
                 </div>
@@ -568,25 +568,25 @@ export default function ClientDetailPage({ params }: PageProps) {
         </div>
         <div className="p-4">
           {primaryLocation ? (
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex justify-between py-2 border-b border-gray-100">
-                <span className="text-sm text-gray-500">Home Address</span>
+            <div className="grid grid-cols-2 gap-x-8 gap-y-0">
+              <div className="flex gap-4 py-2 border-b border-gray-100">
+                <span className="text-sm text-gray-500 min-w-[140px]">Home Address</span>
                 <span className="text-sm font-semibold text-gray-900">{primaryLocation.addressLine1}</span>
               </div>
-              <div className="flex justify-between py-2 border-b border-gray-100">
-                <span className="text-sm text-gray-500">Zip Code</span>
+              <div className="flex gap-4 py-2 border-b border-gray-100">
+                <span className="text-sm text-gray-500 min-w-[140px]">Zip Code</span>
                 <span className="text-sm font-semibold text-gray-900">{primaryLocation.zipCode}</span>
               </div>
-              <div className="flex justify-between py-2 border-b border-gray-100">
-                <span className="text-sm text-gray-500">City</span>
+              <div className="flex gap-4 py-2 border-b border-gray-100">
+                <span className="text-sm text-gray-500 min-w-[140px]">City</span>
                 <span className="text-sm font-semibold text-gray-900">{primaryLocation.city}</span>
               </div>
-              <div className="flex justify-between py-2 border-b border-gray-100">
-                <span className="text-sm text-gray-500">Country</span>
+              <div className="flex gap-4 py-2 border-b border-gray-100">
+                <span className="text-sm text-gray-500 min-w-[140px]">Country</span>
                 <span className="text-sm font-semibold text-gray-900">United States</span>
               </div>
-              <div className="flex justify-between py-2">
-                <span className="text-sm text-gray-500">State</span>
+              <div className="flex gap-4 py-2">
+                <span className="text-sm text-gray-500 min-w-[140px]">State</span>
                 <span className="text-sm font-semibold text-gray-900">{primaryLocation.state}</span>
               </div>
             </div>
@@ -906,29 +906,29 @@ export default function ClientDetailPage({ params }: PageProps) {
         </div>
         <div className="p-4">
           {scheduleTab === "recurring" && (
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex justify-between py-2 border-b border-gray-100">
-                <span className="text-sm text-gray-500">Cleanup Frequency</span>
+            <div className="grid grid-cols-2 gap-x-8 gap-y-0">
+              <div className="flex gap-4 py-2 border-b border-gray-100">
+                <span className="text-sm text-gray-500 min-w-[200px]">Cleanup Frequency</span>
                 <span className="text-sm font-semibold text-gray-900">{activeSubscriptions[0] ? formatFrequency(activeSubscriptions[0].frequency) : "No Data"}</span>
               </div>
-              <div className="flex justify-between py-2 border-b border-gray-100">
-                <span className="text-sm text-gray-500">Service Days</span>
+              <div className="flex gap-4 py-2 border-b border-gray-100">
+                <span className="text-sm text-gray-500 min-w-[200px]">Service Days</span>
                 <span className="text-sm font-semibold text-gray-900">{activeSubscriptions[0]?.serviceDay || "No Data"}</span>
               </div>
-              <div className="flex justify-between py-2 border-b border-gray-100">
-                <span className="text-sm text-gray-500">Regular Service Start Date</span>
+              <div className="flex gap-4 py-2 border-b border-gray-100">
+                <span className="text-sm text-gray-500 min-w-[200px]">Regular Service Start Date</span>
                 <span className="text-sm font-semibold text-gray-900">{activeSubscriptions[0]?.nextServiceDate ? formatDate(activeSubscriptions[0].nextServiceDate) : "No Data"}</span>
               </div>
-              <div className="flex justify-between py-2 border-b border-gray-100">
-                <span className="text-sm text-gray-500">Next Recurring Cleanup Date</span>
+              <div className="flex gap-4 py-2 border-b border-gray-100">
+                <span className="text-sm text-gray-500 min-w-[200px]">Next Recurring Cleanup Date</span>
                 <span className="text-sm font-semibold text-gray-900">{activeSubscriptions[0]?.nextServiceDate ? formatDate(activeSubscriptions[0].nextServiceDate) : "No Data"}</span>
               </div>
-              <div className="flex justify-between py-2">
-                <span className="text-sm text-gray-500">Field Tech</span>
+              <div className="flex gap-4 py-2">
+                <span className="text-sm text-gray-500 min-w-[200px]">Field Tech</span>
                 <span className="text-sm font-semibold text-gray-900">Not Assigned</span>
               </div>
-              <div className="flex justify-between py-2">
-                <span className="text-sm text-gray-500">Estimated Time for Recurring Cleanup</span>
+              <div className="flex gap-4 py-2">
+                <span className="text-sm text-gray-500 min-w-[200px]">Estimated Time for Recurring Cleanup</span>
                 <span className="text-sm font-semibold text-gray-900">30 min</span>
               </div>
             </div>
@@ -976,19 +976,19 @@ export default function ClientDetailPage({ params }: PageProps) {
             </div>
           )}
           {scheduleTab === "initial" && (
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex justify-between py-2 border-b border-gray-100">
-                <span className="text-sm text-gray-500">Initial Cleanup Date</span>
+            <div className="grid grid-cols-2 gap-x-8 gap-y-0">
+              <div className="flex gap-4 py-2 border-b border-gray-100">
+                <span className="text-sm text-gray-500 min-w-[200px]">Initial Cleanup Date</span>
                 <span className="text-sm font-semibold text-gray-900">{client.createdAt ? formatDate(client.createdAt) : "No Data"}</span>
               </div>
               <div />
-              <div className="flex justify-between py-2 border-b border-gray-100">
-                <span className="text-sm text-gray-500">Initial Cleanup Assign To</span>
+              <div className="flex gap-4 py-2 border-b border-gray-100">
+                <span className="text-sm text-gray-500 min-w-[200px]">Initial Cleanup Assign To</span>
                 <span className="text-sm font-semibold text-gray-900">Not Assigned</span>
               </div>
               <div />
-              <div className="flex justify-between py-2">
-                <span className="text-sm text-gray-500">Estimated Time for Initial Cleanup</span>
+              <div className="flex gap-4 py-2">
+                <span className="text-sm text-gray-500 min-w-[200px]">Estimated Time for Initial Cleanup</span>
                 <span className="text-sm font-semibold text-gray-900">90 min</span>
               </div>
             </div>
@@ -1032,8 +1032,8 @@ export default function ClientDetailPage({ params }: PageProps) {
           {notesTab === "fromclient" && (
             <div className="space-y-3">
               {client.referralSource && (
-                <div className="flex justify-between py-2 border-b border-gray-100">
-                  <span className="text-sm text-gray-500">How you heard about us</span>
+                <div className="flex gap-4 py-2 border-b border-gray-100">
+                  <span className="text-sm text-gray-500 min-w-[180px]">How you heard about us</span>
                   <span className="text-sm font-semibold text-gray-900">{client.referralSource}</span>
                 </div>
               )}
@@ -1072,33 +1072,33 @@ export default function ClientDetailPage({ params }: PageProps) {
         <div className="p-4">
           {activeDogs.length > 0 ? (
             <>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="flex justify-between py-2 border-b border-gray-100">
-                  <span className="text-sm text-gray-500">Name</span>
+              <div className="grid grid-cols-2 gap-x-8 gap-y-0">
+                <div className="flex gap-4 py-2 border-b border-gray-100">
+                  <span className="text-sm text-gray-500 min-w-[200px]">Name</span>
                   <span className="text-sm font-semibold text-gray-900">{activeDogs[activeDogTab]?.name || "No Data"}</span>
                 </div>
-                <div className="flex justify-between py-2 border-b border-gray-100">
-                  <span className="text-sm text-gray-500">Dangerous Dog</span>
+                <div className="flex gap-4 py-2 border-b border-gray-100">
+                  <span className="text-sm text-gray-500 min-w-[200px]">Dangerous Dog</span>
                   <span className="text-sm font-semibold text-gray-900">{activeDogs[activeDogTab]?.isSafe === false ? "Yes" : "-"}</span>
                 </div>
-                <div className="flex justify-between py-2 border-b border-gray-100">
-                  <span className="text-sm text-gray-500">Gender</span>
+                <div className="flex gap-4 py-2 border-b border-gray-100">
+                  <span className="text-sm text-gray-500 min-w-[200px]">Gender</span>
                   <span className="text-sm font-semibold text-gray-400">No Gender</span>
                 </div>
-                <div className="flex justify-between py-2 border-b border-gray-100">
-                  <span className="text-sm text-gray-500">Breed</span>
+                <div className="flex gap-4 py-2 border-b border-gray-100">
+                  <span className="text-sm text-gray-500 min-w-[200px]">Breed</span>
                   <span className="text-sm font-semibold text-gray-900">{activeDogs[activeDogTab]?.breed || "No Data"}</span>
                 </div>
-                <div className="flex justify-between py-2 border-b border-gray-100">
-                  <span className="text-sm text-gray-500">Birthdate</span>
+                <div className="flex gap-4 py-2 border-b border-gray-100">
+                  <span className="text-sm text-gray-500 min-w-[200px]">Birthdate</span>
                   <span className="text-sm font-semibold text-gray-400">No Birth Date</span>
                 </div>
-                <div className="flex justify-between py-2 border-b border-gray-100">
-                  <span className="text-sm text-gray-500">Additional Comments about Dog</span>
+                <div className="flex gap-4 py-2 border-b border-gray-100">
+                  <span className="text-sm text-gray-500 min-w-[200px]">Additional Comments about Dog</span>
                   <span className="text-sm font-semibold text-gray-900">{activeDogs[activeDogTab]?.safetyNotes || "No Additional Comment"}</span>
                 </div>
-                <div className="flex justify-between py-2">
-                  <span className="text-sm text-gray-500">Dog Photo</span>
+                <div className="flex gap-4 py-2">
+                  <span className="text-sm text-gray-500 min-w-[200px]">Dog Photo</span>
                   <span className="text-sm font-semibold text-gray-400">No data</span>
                 </div>
               </div>
@@ -1119,41 +1119,41 @@ export default function ClientDetailPage({ params }: PageProps) {
           <h3 className="font-semibold text-gray-900">Yard Info</h3>
         </div>
         <div className="p-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="flex justify-between py-2 border-b border-gray-100">
-              <span className="text-sm text-gray-500">Gate Location</span>
+          <div className="grid grid-cols-2 gap-x-8 gap-y-0">
+            <div className="flex gap-4 py-2 border-b border-gray-100">
+              <span className="text-sm text-gray-500 min-w-[160px]">Gate Location</span>
               <span className="text-sm font-semibold text-gray-900">{primaryLocation?.gateLocation || "No Data"}</span>
             </div>
-            <div className="flex justify-between py-2 border-b border-gray-100">
-              <span className="text-sm text-gray-500">Yard Size</span>
+            <div className="flex gap-4 py-2 border-b border-gray-100">
+              <span className="text-sm text-gray-500 min-w-[160px]">Yard Size</span>
               <span className="text-sm font-semibold text-gray-900">{primaryLocation?.lotSize || "No Data"}</span>
             </div>
-            <div className="flex justify-between py-2 border-b border-gray-100">
-              <span className="text-sm text-gray-500">Gate Code</span>
+            <div className="flex gap-4 py-2 border-b border-gray-100">
+              <span className="text-sm text-gray-500 min-w-[160px]">Gate Code</span>
               <span className="text-sm font-semibold text-gray-900">{primaryLocation?.gateCode || "No Data"}</span>
             </div>
-            <div className="flex justify-between py-2 border-b border-gray-100">
-              <span className="text-sm text-gray-500">Gated Community</span>
+            <div className="flex gap-4 py-2 border-b border-gray-100">
+              <span className="text-sm text-gray-500 min-w-[160px]">Gated Community</span>
               <span className="text-sm font-semibold text-gray-400">No Data</span>
             </div>
-            <div className="flex justify-between py-2 border-b border-gray-100">
-              <span className="text-sm text-gray-500">Areas To Clean</span>
+            <div className="flex gap-4 py-2 border-b border-gray-100">
+              <span className="text-sm text-gray-500 min-w-[160px]">Areas To Clean</span>
               <span className="text-sm font-semibold text-gray-400">No data</span>
             </div>
-            <div className="flex justify-between py-2 border-b border-gray-100">
-              <span className="text-sm text-gray-500">Yard Photo</span>
+            <div className="flex gap-4 py-2 border-b border-gray-100">
+              <span className="text-sm text-gray-500 min-w-[160px]">Yard Photo</span>
               <span className="text-sm font-semibold text-gray-400">No data</span>
             </div>
-            <div className="flex justify-between py-2 border-b border-gray-100">
-              <span className="text-sm text-gray-500">Doggie Door</span>
+            <div className="flex gap-4 py-2 border-b border-gray-100">
+              <span className="text-sm text-gray-500 min-w-[160px]">Doggie Door</span>
               <span className="text-sm font-semibold text-gray-400">No Data</span>
             </div>
-            <div className="flex justify-between py-2 border-b border-gray-100">
-              <span className="text-sm text-gray-500">Garbage Can Location</span>
+            <div className="flex gap-4 py-2 border-b border-gray-100">
+              <span className="text-sm text-gray-500 min-w-[160px]">Garbage Can Location</span>
               <span className="text-sm font-semibold text-gray-400">No Data</span>
             </div>
-            <div className="flex justify-between py-2 col-span-2">
-              <span className="text-sm text-gray-500">Additional Comments</span>
+            <div className="flex gap-4 py-2 col-span-2">
+              <span className="text-sm text-gray-500 min-w-[160px]">Additional Comments</span>
               <span className="text-sm font-semibold text-gray-900">{primaryLocation?.accessNotes || "No Data"}</span>
             </div>
           </div>
@@ -1169,14 +1169,14 @@ export default function ClientDetailPage({ params }: PageProps) {
           <h3 className="font-semibold text-gray-900">Notification Preferences</h3>
         </div>
         <div className="p-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="flex justify-between py-2 border-b border-gray-100">
-              <span className="text-sm text-gray-500">Cleanup Notification Type</span>
+          <div className="grid grid-cols-2 gap-x-8 gap-y-0">
+            <div className="flex gap-4 py-2 border-b border-gray-100">
+              <span className="text-sm text-gray-500 min-w-[200px]">Cleanup Notification Type</span>
               <span className="text-sm font-semibold text-gray-400">No Cleanup Notification Type</span>
             </div>
             <div />
-            <div className="flex justify-between py-2">
-              <span className="text-sm text-gray-500">Cleanup Notification Method</span>
+            <div className="flex gap-4 py-2">
+              <span className="text-sm text-gray-500 min-w-[200px]">Cleanup Notification Method</span>
               <span className="text-sm font-semibold text-gray-900">
                 {client.notificationPreferences?.sms ? "Text + " : ""}
                 {client.notificationPreferences?.email ? "Email + " : ""}
@@ -1196,8 +1196,8 @@ export default function ClientDetailPage({ params }: PageProps) {
           <h3 className="font-semibold text-gray-900">Net Terms</h3>
         </div>
         <div className="p-4">
-          <div className="flex justify-between py-2">
-            <span className="text-sm text-gray-500">NET</span>
+          <div className="flex gap-4 py-2">
+            <span className="text-sm text-gray-500 min-w-[140px]">NET</span>
             <span className="text-sm font-semibold text-gray-900">Organization Default</span>
           </div>
           <div className="flex justify-end mt-4">
@@ -1240,13 +1240,13 @@ export default function ClientDetailPage({ params }: PageProps) {
           <h3 className="font-semibold text-gray-900">Terms of Service</h3>
         </div>
         <div className="p-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="flex justify-between py-2">
-              <span className="text-sm text-gray-500">Terms of Service</span>
+          <div className="grid grid-cols-2 gap-x-8 gap-y-0">
+            <div className="flex gap-4 py-2">
+              <span className="text-sm text-gray-500 min-w-[140px]">Terms of Service</span>
               <span className="text-sm font-semibold text-gray-400">Not Accepted</span>
             </div>
-            <div className="flex justify-between py-2">
-              <span className="text-sm text-gray-500">Accepted on</span>
+            <div className="flex gap-4 py-2">
+              <span className="text-sm text-gray-500 min-w-[140px]">Accepted on</span>
               <span className="text-sm font-semibold text-gray-400">-</span>
             </div>
           </div>
