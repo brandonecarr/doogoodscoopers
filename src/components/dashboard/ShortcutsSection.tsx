@@ -32,7 +32,7 @@ const SHORTCUTS: ShortcutItem[] = [
     title: "New Client Planner",
     subtitle: "Service Days and Techs",
     icon: <CalendarPlus className="w-5 h-5 text-teal-600" />,
-    href: "/app/office/clients/new",
+    href: "/app/office/route-planner",
   },
 ];
 
