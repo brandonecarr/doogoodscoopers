@@ -35,6 +35,14 @@ const settingsCards: SettingsCard[][] = [
       href: "/app/office/settings/scheduler",
     },
   ],
+  // Row 2b - Route Planning
+  [
+    {
+      title: "Route Optimization",
+      description: "Configure AI-powered route optimization settings, days off, and continuous monitoring preferences.",
+      href: "/app/office/settings/route-optimization",
+    },
+  ],
   // Row 3
   [
     {
