@@ -4,7 +4,7 @@
 -- Store AI-generated route suggestions
 CREATE TABLE route_optimization_suggestions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+  org_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
   subscription_id uuid REFERENCES subscriptions(id) ON DELETE SET NULL,
   suggestion_type text NOT NULL, -- 'new_client_placement', 'move_day', 'full_reorg'
   current_state jsonb,           -- Current day/tech/route info
@@ -21,7 +21,7 @@ CREATE TABLE route_optimization_suggestions (
 -- Track AI analysis runs
 CREATE TABLE route_analysis_runs (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+  org_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
   run_type text NOT NULL CHECK (run_type IN ('continuous_check', 'full_reorg', 'new_client')),
   started_at timestamptz DEFAULT now(),
   completed_at timestamptz,
