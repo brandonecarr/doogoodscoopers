@@ -56,7 +56,7 @@ export function Footer() {
           <motion.div variants={itemVariants} className="space-y-6">
             <Link href="/" className="inline-block">
               <Image
-                src="/logo.webp"
+                src="/logo-dark.webp"
                 alt="DooGoodScoopers"
                 width={180}
                 height={60}
