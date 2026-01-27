@@ -80,20 +80,44 @@ function formatServiceDays(days: string[]): string {
   return days.map((d) => dayAbbrev[d] || d).join(", ");
 }
 
-// Create numbered marker icon URL
-function createNumberedMarkerUrl(
+// Create numbered marker icon as SVG data URI
+function createNumberedMarkerIcon(
   number: number | string,
   color: string
-): string {
-  // Use Google Charts API for custom numbered markers
-  const bgColor = color.replace("#", "");
-  return `https://chart.googleapis.com/chart?chst=d_map_pin_letter&chld=${number}|${bgColor}|FFFFFF`;
+): google.maps.Icon {
+  const text = String(number);
+  const fontSize = text.length > 2 ? 10 : text.length > 1 ? 12 : 14;
+
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="42" viewBox="0 0 32 42">
+      <path fill="${color}" stroke="#ffffff" stroke-width="1" d="M16 0C7.163 0 0 7.163 0 16c0 8.837 16 26 16 26s16-17.163 16-26C32 7.163 24.837 0 16 0z"/>
+      <circle fill="#ffffff" cx="16" cy="14" r="10"/>
+      <text x="16" y="18" text-anchor="middle" font-family="Arial, sans-serif" font-size="${fontSize}" font-weight="bold" fill="${color}">${text}</text>
+    </svg>
+  `;
+
+  return {
+    url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
+    scaledSize: new google.maps.Size(32, 42),
+    anchor: new google.maps.Point(16, 42),
+  };
 }
 
-// Create "NC" marker for new client
-function createNewClientMarkerUrl(): string {
-  // Bright red/orange for new client
-  return `https://chart.googleapis.com/chart?chst=d_map_pin_letter&chld=NC|FF5722|FFFFFF`;
+// Create "NC" marker for new client as SVG data URI
+function createNewClientMarkerIcon(): google.maps.Icon {
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="38" height="48" viewBox="0 0 38 48">
+      <path fill="#FF5722" stroke="#ffffff" stroke-width="2" d="M19 0C8.507 0 0 8.507 0 19c0 10.493 19 29 19 29s19-18.507 19-29C38 8.507 29.493 0 19 0z"/>
+      <circle fill="#ffffff" cx="19" cy="17" r="12"/>
+      <text x="19" y="21" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#FF5722">NC</text>
+    </svg>
+  `;
+
+  return {
+    url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
+    scaledSize: new google.maps.Size(38, 48),
+    anchor: new google.maps.Point(19, 48),
+  };
 }
 
 export function RoutePlannerMap({
@@ -242,10 +266,7 @@ export function RoutePlannerMap({
             <Marker
               key={client.subscriptionId}
               position={{ lat: client.latitude, lng: client.longitude }}
-              icon={{
-                url: createNumberedMarkerUrl(client.pinNumber, markerColor),
-                scaledSize: new google.maps.Size(32, 38),
-              }}
+              icon={createNumberedMarkerIcon(client.pinNumber, markerColor)}
               onClick={() => handleMarkerClick(client)}
               title={client.clientName}
             />
@@ -259,10 +280,7 @@ export function RoutePlannerMap({
               lat: newClientLocation.latitude,
               lng: newClientLocation.longitude,
             }}
-            icon={{
-              url: createNewClientMarkerUrl(),
-              scaledSize: new google.maps.Size(38, 44),
-            }}
+            icon={createNewClientMarkerIcon()}
             onClick={handleNewClientMarkerClick}
             title="New Client Location"
             zIndex={1000} // Show above other markers
