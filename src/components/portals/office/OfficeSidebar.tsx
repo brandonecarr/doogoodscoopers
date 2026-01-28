@@ -167,9 +167,28 @@ export function OfficeSidebar({ user }: OfficeSidebarProps) {
     return false;
   };
 
-  const isSubItemActive = (href: string): boolean => {
+  const isSubItemActive = (href: string, siblings: NavSubItem[] = []): boolean => {
     const basePath = href.split("?")[0];
-    return pathname === basePath || pathname.startsWith(basePath + "/");
+
+    // Check if this path matches at all
+    const isMatch = pathname === basePath || pathname.startsWith(basePath + "/");
+
+    if (!isMatch) return false;
+
+    // If exact match, definitely active
+    if (pathname === basePath) return true;
+
+    // If starts with this path, check if a sibling is a better (more specific) match
+    const hasBetterSiblingMatch = siblings.some((sibling) => {
+      const siblingBase = sibling.href.split("?")[0];
+      if (siblingBase === basePath) return false; // Same path, skip
+
+      // Check if sibling is a more specific match (longer path that also matches)
+      return (pathname === siblingBase || pathname.startsWith(siblingBase + "/")) &&
+             siblingBase.length > basePath.length;
+    });
+
+    return !hasBetterSiblingMatch;
   };
 
   return (
@@ -228,7 +247,7 @@ export function OfficeSidebar({ user }: OfficeSidebarProps) {
                         {isExpanded && (
                           <ul className="mt-1 space-y-1">
                             {item.children?.map((child) => {
-                              const childActive = isSubItemActive(child.href);
+                              const childActive = isSubItemActive(child.href, item.children);
                               return (
                                 <li key={child.href}>
                                   <Link
