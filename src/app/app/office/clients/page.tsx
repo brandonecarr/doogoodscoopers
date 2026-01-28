@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   Users,
   Plus,
@@ -20,7 +21,7 @@ import {
   Pause,
   AlertTriangle,
   ChevronDown,
-  ExternalLink,
+  Eye,
 } from "lucide-react";
 import type { ClientStatus, Frequency } from "@/lib/supabase/types";
 
@@ -141,6 +142,7 @@ function formatFrequency(freq: Frequency) {
 }
 
 export default function ClientsPage() {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [clients, setClients] = useState<Client[]>([]);
   const [stats, setStats] = useState<ClientStats>({
@@ -617,7 +619,11 @@ export default function ClientsPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {filteredClients.map((client) => (
-                    <tr key={client.id} className="hover:bg-gray-50">
+                    <tr
+                      key={client.id}
+                      className="hover:bg-gray-50 cursor-pointer"
+                      onClick={() => router.push(`/app/office/clients/${client.id}`)}
+                    >
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 bg-teal-600 rounded-full flex items-center justify-center text-white font-medium">
@@ -690,7 +696,7 @@ export default function ClientsPage() {
                           <span className="text-sm text-gray-400">No subscription</span>
                         )}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                         <div className="relative group">
                           <button className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${getStatusColor(client.status)}`}>
                             {getStatusIcon(client.status)}
@@ -717,7 +723,7 @@ export default function ClientsPage() {
                           </p>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1">
                           <button
                             onClick={() => openEditModal(client)}
@@ -727,11 +733,11 @@ export default function ClientsPage() {
                             <Edit className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => window.open(`/app/office/clients/${client.id}`, "_blank")}
+                            onClick={() => router.push(`/app/office/clients/${client.id}`)}
                             className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
                             title="View Details"
                           >
-                            <ExternalLink className="w-4 h-4" />
+                            <Eye className="w-4 h-4" />
                           </button>
                         </div>
                       </td>

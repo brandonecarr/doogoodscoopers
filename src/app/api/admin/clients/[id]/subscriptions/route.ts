@@ -332,6 +332,75 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: "Failed to create subscription" }, { status: 500 });
     }
 
+    // Generate draft invoice for the subscription
+    try {
+      // Get the total invoice count for generating invoice number
+      const { count: invoiceCount } = await supabase
+        .from("invoices")
+        .select("*", { count: "exact", head: true })
+        .eq("org_id", auth.user.orgId);
+
+      const invoiceNumber = `INV-${String((invoiceCount || 0) + 1).padStart(5, "0")}`;
+
+      // Create the draft invoice
+      const { data: invoice, error: invoiceError } = await supabase
+        .from("invoices")
+        .insert({
+          org_id: auth.user.orgId,
+          client_id: clientId,
+          subscription_id: subscription.id,
+          invoice_number: invoiceNumber,
+          status: "DRAFT",
+          subtotal_cents: subscriptionData.price_per_visit_cents,
+          discount_cents: 0,
+          tax_cents: 0,
+          total_cents: subscriptionData.price_per_visit_cents,
+          amount_paid_cents: 0,
+          amount_due_cents: subscriptionData.price_per_visit_cents,
+          tip_cents: 0,
+          billing_option: subscriptionData.metadata.billing_option === "prepaid-fixed" ? "PREPAID_FIXED" :
+                         subscriptionData.metadata.billing_option === "prepaid-variable" ? "PREPAID_VARIABLE" : "POSTPAID",
+          billing_interval: subscriptionData.frequency === "WEEKLY" ? "WEEKLY" :
+                           subscriptionData.frequency === "BIWEEKLY" ? "BIWEEKLY" : "MONTHLY",
+          due_date: startDate,
+          notes: `Auto-generated invoice for subscription: ${planName}`,
+        })
+        .select()
+        .single();
+
+      if (invoiceError) {
+        console.warn("Error creating draft invoice:", invoiceError);
+      } else if (invoice) {
+        // Create invoice item
+        await supabase.from("invoice_items").insert({
+          org_id: auth.user.orgId,
+          invoice_id: invoice.id,
+          description: planName,
+          quantity: 1,
+          unit_price_cents: subscriptionData.price_per_visit_cents,
+          total_cents: subscriptionData.price_per_visit_cents,
+        });
+
+        // Log invoice creation
+        await supabase.from("activity_logs").insert({
+          org_id: auth.user.orgId,
+          user_id: auth.user.id,
+          action: "INVOICE_CREATED",
+          entity_type: "INVOICE",
+          entity_id: invoice.id,
+          details: {
+            invoiceNumber,
+            subscriptionId: subscription.id,
+            status: "DRAFT",
+            totalCents: subscriptionData.price_per_visit_cents,
+          },
+        });
+      }
+    } catch (invoiceErr) {
+      console.warn("Error generating invoice for subscription:", invoiceErr);
+      // Don't fail the subscription creation if invoice fails
+    }
+
     // Generate jobs for the subscription
     const jobsGenerated = await regenerateJobsForSubscription(
       supabase,

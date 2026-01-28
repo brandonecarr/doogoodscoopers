@@ -308,6 +308,48 @@ async function submitInServiceAreaQuote(data: QuoteSubmission) {
       // Don't fail - subscription can be created later
     }
 
+    // 7a. Create draft invoice for the new subscription
+    if (subscription && pricePerVisitCents > 0) {
+      try {
+        // Generate invoice number
+        const invoiceNumber = `INV-${Date.now().toString(36).toUpperCase()}-SUB`;
+
+        // Determine billing interval based on frequency
+        const billingIntervalMap: Record<string, string> = {
+          WEEKLY: "WEEKLY",
+          BIWEEKLY: "BIWEEKLY",
+          MONTHLY: "MONTHLY",
+          ONETIME: "MONTHLY",
+        };
+
+        // Create draft invoice in local database
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (supabase as any).from("invoices").insert({
+          org_id: org.id,
+          client_id: client.id,
+          subscription_id: subscription.id,
+          invoice_number: invoiceNumber,
+          status: "DRAFT",
+          subtotal_cents: pricePerVisitCents,
+          discount_cents: 0,
+          tax_cents: 0,
+          total_cents: pricePerVisitCents,
+          amount_paid_cents: 0,
+          amount_due_cents: pricePerVisitCents,
+          tip_cents: 0,
+          billing_option: "PREPAID_FIXED",
+          billing_interval: billingIntervalMap[dbFrequency] || "MONTHLY",
+          due_date: getNextServiceDate(),
+          notes: `Auto-generated draft invoice for subscription`,
+        });
+
+        console.log(`Created draft invoice ${invoiceNumber} for subscription ${subscription.id}`);
+      } catch (draftInvoiceError) {
+        console.error("Failed to create draft invoice:", draftInvoiceError);
+        // Don't fail the registration for invoice issues
+      }
+    }
+
     // 7b. Create Stripe Subscription for recurring billing
     let stripeSubscriptionId: string | null = null;
     if (subscription && pricePerVisitCents > 0 && dbFrequency !== "ONETIME") {
