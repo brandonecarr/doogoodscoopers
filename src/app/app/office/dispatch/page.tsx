@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Calendar,
   RefreshCw,
@@ -100,6 +100,11 @@ export default function DispatchBoardPage() {
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
   const [typeDropdownOpen, setTypeDropdownOpen] = useState(false);
   const [actionsDropdownOpen, setActionsDropdownOpen] = useState(false);
+
+  // Dropdown refs for click outside detection
+  const statusDropdownRef = useRef<HTMLDivElement>(null);
+  const typeDropdownRef = useRef<HTMLDivElement>(null);
+  const actionsDropdownRef = useRef<HTMLDivElement>(null);
 
   // Selection
   const [selectedJobs, setSelectedJobs] = useState<string[]>([]);
@@ -781,10 +786,17 @@ export default function DispatchBoardPage() {
 
   // Close dropdowns when clicking outside
   useEffect(() => {
-    const handleClickOutside = () => {
-      setStatusDropdownOpen(false);
-      setTypeDropdownOpen(false);
-      setActionsDropdownOpen(false);
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (statusDropdownRef.current && !statusDropdownRef.current.contains(target)) {
+        setStatusDropdownOpen(false);
+      }
+      if (typeDropdownRef.current && !typeDropdownRef.current.contains(target)) {
+        setTypeDropdownOpen(false);
+      }
+      if (actionsDropdownRef.current && !actionsDropdownRef.current.contains(target)) {
+        setActionsDropdownOpen(false);
+      }
     };
     document.addEventListener("click", handleClickOutside);
     return () => document.removeEventListener("click", handleClickOutside);
@@ -851,12 +863,11 @@ export default function DispatchBoardPage() {
           </div>
 
           {/* Status Dropdown */}
-          <div>
+          <div ref={statusDropdownRef}>
             <label className="block text-xs text-gray-500 mb-1">Job Status</label>
             <div className="relative">
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
+                onClick={() => {
                   setStatusDropdownOpen(!statusDropdownOpen);
                   setTypeDropdownOpen(false);
                 }}
@@ -887,12 +898,11 @@ export default function DispatchBoardPage() {
           </div>
 
           {/* Type Dropdown */}
-          <div>
+          <div ref={typeDropdownRef}>
             <label className="block text-xs text-gray-500 mb-1">Job Type</label>
             <div className="relative">
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
+                onClick={() => {
                   setTypeDropdownOpen(!typeDropdownOpen);
                   setStatusDropdownOpen(false);
                 }}
@@ -971,12 +981,9 @@ export default function DispatchBoardPage() {
           </div>
 
           {/* Actions Dropdown */}
-          <div className="pt-5 relative">
+          <div className="pt-5 relative" ref={actionsDropdownRef}>
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setActionsDropdownOpen(!actionsDropdownOpen);
-              }}
+              onClick={() => setActionsDropdownOpen(!actionsDropdownOpen)}
               className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
             >
               ACTIONS
