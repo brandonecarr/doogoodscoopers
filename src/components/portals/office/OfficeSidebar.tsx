@@ -72,7 +72,6 @@ const navigation: NavItem[] = [
       { name: "Dispatch Board", href: "/app/office/dispatch" },
       { name: "Route Manager", href: "/app/office/routes" },
       { name: "Schedule", href: "/app/office/schedule" },
-      { name: "Scheduling", href: "/app/office/scheduling" },
       { name: "Unassigned", href: "/app/office/unassigned" },
     ],
   },
