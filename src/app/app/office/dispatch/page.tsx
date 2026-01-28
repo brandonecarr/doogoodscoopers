@@ -1203,7 +1203,7 @@ export default function DispatchBoardPage() {
                       <td className="px-4 py-3 align-top">
                         <div className="flex items-center gap-1 text-sm">
                           <Link
-                            href={`/app/office/jobs/${job.id}`}
+                            href={`/app/office/dispatch/${job.id}`}
                             className="text-teal-600 hover:text-teal-700 flex items-center gap-1"
                           >
                             View
