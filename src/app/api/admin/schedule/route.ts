@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
           is_active
         )
       ),
-      assigned_user:assigned_to (
+      assigned_user:users!assigned_to (
         id,
         first_name,
         last_name
