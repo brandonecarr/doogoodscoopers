@@ -127,6 +127,57 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  // Get unassigned jobs for this date (jobs not assigned to any route)
+  const { data: unassignedJobs, error: unassignedError } = await supabase
+    .from("jobs")
+    .select(`
+      id,
+      status,
+      scheduled_date,
+      price_cents,
+      notes,
+      internal_notes,
+      client:client_id (
+        id,
+        first_name,
+        last_name,
+        phone,
+        email
+      ),
+      location:location_id (
+        id,
+        address_line1,
+        address_line2,
+        city,
+        state,
+        zip_code,
+        gate_code,
+        gate_location,
+        access_notes,
+        latitude,
+        longitude,
+        dogs (
+          id,
+          name,
+          is_active
+        )
+      ),
+      subscription:subscription_id (
+        id,
+        frequency,
+        price_per_visit_cents
+      )
+    `)
+    .eq("org_id", auth.user.orgId)
+    .eq("scheduled_date", date)
+    .is("route_id", null)
+    .in("status", ["SCHEDULED", "EN_ROUTE", "IN_PROGRESS"]) // Only show active jobs
+    .order("created_at", { ascending: true });
+
+  if (unassignedError) {
+    console.error("Error fetching unassigned jobs:", unassignedError);
+  }
+
   // Get field techs for the dropdown
   const { data: techs } = await supabase
     .from("users")
@@ -268,6 +319,61 @@ export async function GET(request: NextRequest) {
     color: techColors[index % techColors.length],
   }));
 
+  // Format unassigned jobs
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const formattedUnassignedJobs = (unassignedJobs || []).map((job: any) => {
+    const lat = job.location?.latitude;
+    const lng = job.location?.longitude;
+
+    // Update bounds with unassigned job locations too
+    if (lat && lng) {
+      hasCoordinates = true;
+      if (lat < minLat) minLat = lat;
+      if (lat > maxLat) maxLat = lat;
+      if (lng < minLng) minLng = lng;
+      if (lng > maxLng) maxLng = lng;
+    }
+
+    const activeDogs = job.location?.dogs?.filter((d: { is_active: boolean }) => d.is_active) || [];
+
+    return {
+      id: job.id,
+      status: job.status,
+      scheduledDate: job.scheduled_date,
+      priceCents: job.price_cents,
+      notes: job.notes,
+      internalNotes: job.internal_notes,
+      client: job.client ? {
+        id: job.client.id,
+        firstName: job.client.first_name,
+        lastName: job.client.last_name,
+        fullName: `${job.client.first_name || ""} ${job.client.last_name || ""}`.trim(),
+        phone: job.client.phone,
+        email: job.client.email,
+      } : null,
+      location: job.location ? {
+        id: job.location.id,
+        addressLine1: job.location.address_line1,
+        addressLine2: job.location.address_line2,
+        city: job.location.city,
+        state: job.location.state,
+        zipCode: job.location.zip_code,
+        gateCode: job.location.gate_code,
+        gateLocation: job.location.gate_location,
+        accessNotes: job.location.access_notes,
+        latitude: job.location.latitude,
+        longitude: job.location.longitude,
+      } : null,
+      subscription: job.subscription ? {
+        id: job.subscription.id,
+        frequency: job.subscription.frequency,
+        pricePerVisitCents: job.subscription.price_per_visit_cents,
+      } : null,
+      dogCount: activeDogs.length,
+      dogNames: activeDogs.map((d: { name: string }) => d.name),
+    };
+  });
+
   // Calculate bounds with padding
   const bounds = hasCoordinates ? {
     north: maxLat + 0.01,
@@ -278,12 +384,14 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     routes: formattedRoutes,
+    unassignedJobs: formattedUnassignedJobs,
     techs: formattedTechs,
     bounds,
     summary: {
       totalRoutes: formattedRoutes.length,
       totalStops: formattedRoutes.reduce((sum, r) => sum + r.stops.length, 0),
       completedStops: formattedRoutes.reduce((sum, r) => sum + r.progress.completed, 0),
+      unassignedJobs: formattedUnassignedJobs.length,
     },
   });
 }

@@ -15,6 +15,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Sparkles,
+  Plus,
+  AlertTriangle,
 } from "lucide-react";
 import { GoogleMapsProvider } from "@/components/route-planner/GoogleMapsProvider";
 import {
@@ -36,6 +38,41 @@ interface RouteSummary {
   totalRoutes: number;
   totalStops: number;
   completedStops: number;
+  unassignedJobs: number;
+}
+
+interface UnassignedJob {
+  id: string;
+  status: string;
+  scheduledDate: string;
+  priceCents: number | null;
+  notes: string | null;
+  internalNotes: string | null;
+  client: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    fullName: string;
+    phone: string | null;
+    email: string | null;
+  } | null;
+  location: {
+    id: string;
+    addressLine1: string;
+    addressLine2: string | null;
+    city: string;
+    state: string;
+    zipCode: string;
+    latitude: number | null;
+    longitude: number | null;
+  } | null;
+  subscription: {
+    id: string;
+    frequency: string;
+    pricePerVisitCents: number;
+  } | null;
+  dogCount: number;
+  dogNames: string[];
 }
 
 function RouteManagerContent() {
@@ -62,7 +99,9 @@ function RouteManagerContent() {
     totalRoutes: 0,
     totalStops: 0,
     completedStops: 0,
+    unassignedJobs: 0,
   });
+  const [unassignedJobs, setUnassignedJobs] = useState<UnassignedJob[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -74,6 +113,10 @@ function RouteManagerContent() {
   const [mapType, setMapType] = useState<"roadmap" | "satellite">("roadmap");
   const [stopMenuOpen, setStopMenuOpen] = useState<string | null>(null);
   const stopMenuRef = useRef<HTMLDivElement>(null);
+  const [showCreateRouteModal, setShowCreateRouteModal] = useState(false);
+  const [newRouteName, setNewRouteName] = useState("");
+  const [creatingRoute, setCreatingRoute] = useState(false);
+  const [viewMode, setViewMode] = useState<"routes" | "unassigned">("routes");
 
   // Fetch route data
   const fetchRoutes = useCallback(async () => {
@@ -94,13 +137,16 @@ function RouteManagerContent() {
 
       const data = await response.json();
       setRoutes(data.routes || []);
+      setUnassignedJobs(data.unassignedJobs || []);
       setTechs(data.techs || []);
       setBounds(data.bounds);
-      setSummary(data.summary || { totalRoutes: 0, totalStops: 0, completedStops: 0 });
+      setSummary(data.summary || { totalRoutes: 0, totalStops: 0, completedStops: 0, unassignedJobs: 0 });
 
-      // Auto-select first route if none selected
+      // Auto-select first route if none selected, or show unassigned if no routes
       if (data.routes?.length > 0 && !selectedRouteId) {
         setSelectedRouteId(data.routes[0].id);
+      } else if (data.routes?.length === 0 && data.unassignedJobs?.length > 0) {
+        setSelectedRouteId(null); // Show unassigned jobs panel
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
@@ -185,6 +231,55 @@ function RouteManagerContent() {
     });
   };
 
+  // Create a new route
+  const createRoute = async () => {
+    setCreatingRoute(true);
+    try {
+      const response = await fetch("/api/admin/routes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          route_date: selectedDate,
+          name: newRouteName || null,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to create route");
+      }
+
+      const data = await response.json();
+      setShowCreateRouteModal(false);
+      setNewRouteName("");
+      fetchRoutes();
+      setSelectedRouteId(data.route?.id);
+      setViewMode("routes");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to create route");
+    } finally {
+      setCreatingRoute(false);
+    }
+  };
+
+  // Assign job to route
+  const assignJobToRoute = async (jobId: string, routeId: string) => {
+    try {
+      const response = await fetch(`/api/admin/routes/${routeId}/stops`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ job_id: jobId }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to assign job");
+      }
+
+      fetchRoutes();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to assign job");
+    }
+  };
+
   return (
     <GoogleMapsProvider>
       <div className="h-[calc(100vh-140px)] flex flex-col">
@@ -248,6 +343,11 @@ function RouteManagerContent() {
           <p className="text-sm text-gray-500">
             {summary.totalRoutes} route{summary.totalRoutes !== 1 ? "s" : ""} &bull;{" "}
             {summary.completedStops}/{summary.totalStops} stops completed
+            {summary.unassignedJobs > 0 && (
+              <span className="text-orange-600 font-medium">
+                {" "}&bull; {summary.unassignedJobs} unassigned job{summary.unassignedJobs !== 1 ? "s" : ""}
+              </span>
+            )}
           </p>
         </div>
 
@@ -331,174 +431,338 @@ function RouteManagerContent() {
               </div>
             </div>
 
-            {/* Right Panel - Stop List */}
+            {/* Right Panel - Stop List / Unassigned Jobs */}
             <div className="w-96 bg-white rounded-lg shadow-sm border border-gray-100 flex flex-col min-h-0">
-              {/* Tech/Route Selector */}
-              <div className="px-4 py-3 border-b border-gray-100">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Field Tech
-                </label>
-                <select
-                  value={selectedTechId || ""}
-                  onChange={(e) => handleTechSelect(e.target.value || null)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-sm"
+              {/* Header with Create Route button */}
+              <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Field Tech
+                  </label>
+                  <select
+                    value={selectedTechId || ""}
+                    onChange={(e) => handleTechSelect(e.target.value || null)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-sm"
+                  >
+                    <option value="">All Techs</option>
+                    {techs.map((tech) => (
+                      <option key={tech.id} value={tech.id}>
+                        {tech.fullName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  onClick={() => setShowCreateRouteModal(true)}
+                  className="ml-2 p-2 text-teal-600 hover:text-teal-700 hover:bg-teal-50 rounded-lg"
+                  title="Create new route"
                 >
-                  <option value="">All Techs</option>
-                  {techs.map((tech) => (
-                    <option key={tech.id} value={tech.id}>
-                      {tech.fullName}
-                    </option>
-                  ))}
-                </select>
+                  <Plus className="w-5 h-5" />
+                </button>
               </div>
 
-              {/* Route Tabs */}
-              {routes.length > 0 && (
-                <div className="flex border-b border-gray-100 overflow-x-auto">
-                  {routes.map((route) => (
-                    <button
-                      key={route.id}
-                      onClick={() => setSelectedRouteId(route.id)}
-                      className={`flex-shrink-0 px-4 py-2 text-sm font-medium border-b-2 ${
-                        selectedRouteId === route.id
-                          ? "border-teal-500 text-teal-600"
-                          : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="w-2 h-2 rounded-full"
-                          style={{ backgroundColor: route.color }}
-                        />
-                        {route.assignedUser?.firstName || route.name}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {/* Progress Bar */}
-              {selectedRoute && (
-                <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
-                  <div className="flex items-center justify-between mb-1">
-                    <div className="flex items-center gap-2">
-                      <User className="w-4 h-4 text-gray-400" />
-                      <span className="text-sm font-medium text-gray-700">
-                        {selectedRoute.assignedUser?.fullName || "Unassigned"}
+              {/* View Mode Tabs */}
+              <div className="flex border-b border-gray-100">
+                <button
+                  onClick={() => setViewMode("routes")}
+                  className={`flex-1 px-4 py-2 text-sm font-medium border-b-2 ${
+                    viewMode === "routes"
+                      ? "border-teal-500 text-teal-600"
+                      : "border-transparent text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  Routes ({routes.length})
+                </button>
+                <button
+                  onClick={() => setViewMode("unassigned")}
+                  className={`flex-1 px-4 py-2 text-sm font-medium border-b-2 ${
+                    viewMode === "unassigned"
+                      ? "border-teal-500 text-teal-600"
+                      : "border-transparent text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  <span className="flex items-center justify-center gap-1">
+                    Unassigned
+                    {unassignedJobs.length > 0 && (
+                      <span className="bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full text-xs font-medium">
+                        {unassignedJobs.length}
                       </span>
+                    )}
+                  </span>
+                </button>
+              </div>
+
+              {/* Routes View */}
+              {viewMode === "routes" && (
+                <>
+                  {/* Route Tabs */}
+                  {routes.length > 0 && (
+                    <div className="flex border-b border-gray-100 overflow-x-auto">
+                      {routes.map((route) => (
+                        <button
+                          key={route.id}
+                          onClick={() => setSelectedRouteId(route.id)}
+                          className={`flex-shrink-0 px-4 py-2 text-sm font-medium border-b-2 ${
+                            selectedRouteId === route.id
+                              ? "border-teal-500 text-teal-600"
+                              : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span
+                              className="w-2 h-2 rounded-full"
+                              style={{ backgroundColor: route.color }}
+                            />
+                            {route.assignedUser?.firstName || route.name}
+                          </div>
+                        </button>
+                      ))}
                     </div>
-                    <span className="text-sm text-gray-500">
-                      {selectedRoute.progress.completed}/{selectedRoute.progress.total} completed
-                    </span>
+                  )}
+
+                  {/* Progress Bar */}
+                  {selectedRoute && (
+                    <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                          <User className="w-4 h-4 text-gray-400" />
+                          <span className="text-sm font-medium text-gray-700">
+                            {selectedRoute.assignedUser?.fullName || "Unassigned"}
+                          </span>
+                        </div>
+                        <span className="text-sm text-gray-500">
+                          {selectedRoute.progress.completed}/{selectedRoute.progress.total} completed
+                        </span>
+                      </div>
+                      <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-teal-500 transition-all duration-300"
+                          style={{ width: `${selectedRoute.progress.percentage}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Stop List */}
+                  <div className="flex-1 overflow-y-auto">
+                    {selectedRoute ? (
+                      selectedRoute.stops.length > 0 ? (
+                        <div className="divide-y divide-gray-100">
+                          {selectedRoute.stops.map((stop) => (
+                            <div
+                              key={stop.id}
+                              className={`px-4 py-3 hover:bg-gray-50 cursor-pointer ${
+                                selectedStopId === stop.id ? "bg-teal-50" : ""
+                              }`}
+                              onClick={() => setSelectedStopId(stop.id)}
+                            >
+                              <div className="flex items-start gap-3">
+                                {/* Stop Number */}
+                                <span
+                                  className="w-7 h-7 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
+                                  style={{
+                                    backgroundColor:
+                                      stop.job?.status === "COMPLETED"
+                                        ? "#9CA3AF"
+                                        : selectedRoute.color,
+                                  }}
+                                >
+                                  {stop.stopNumber}
+                                </span>
+
+                                {/* Stop Details */}
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <h4 className="font-medium text-gray-900 truncate">
+                                      {stop.client?.fullName || "Unknown"}
+                                    </h4>
+                                    {stop.job?.status === "COMPLETED" && (
+                                      <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+                                    )}
+                                    {stop.job?.status === "IN_PROGRESS" && (
+                                      <Clock className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                                    )}
+                                  </div>
+                                  <p className="text-sm text-gray-500 truncate">
+                                    {stop.location?.addressLine1}
+                                  </p>
+                                  <p className="text-xs text-gray-400">
+                                    {stop.location?.city}, {stop.location?.state} {stop.location?.zipCode}
+                                  </p>
+                                </div>
+
+                                {/* Three-dot Menu */}
+                                <div className="relative" ref={stopMenuOpen === stop.id ? stopMenuRef : null}>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setStopMenuOpen(stopMenuOpen === stop.id ? null : stop.id);
+                                    }}
+                                    className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg"
+                                  >
+                                    <MoreVertical className="w-4 h-4" />
+                                  </button>
+
+                                  {stopMenuOpen === stop.id && (
+                                    <div className="absolute right-0 top-8 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleStopAction("reclean", stop, selectedRoute);
+                                        }}
+                                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                                      >
+                                        Reclean Job
+                                      </button>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleStopAction("reschedule", stop, selectedRoute);
+                                        }}
+                                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                                      >
+                                        Change Schedule
+                                      </button>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleStopAction("view", stop, selectedRoute);
+                                        }}
+                                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                                      >
+                                        View Job Details
+                                      </button>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleStopAction("geolocation", stop, selectedRoute);
+                                        }}
+                                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                                      >
+                                        View Geolocation Details
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center h-full text-center px-4">
+                          <MapPin className="w-10 h-10 text-gray-300 mb-2" />
+                          <p className="text-gray-500">No stops on this route</p>
+                          {unassignedJobs.length > 0 && (
+                            <button
+                              onClick={() => setViewMode("unassigned")}
+                              className="mt-2 text-sm text-teal-600 hover:text-teal-700"
+                            >
+                              View {unassignedJobs.length} unassigned job{unassignedJobs.length !== 1 ? "s" : ""}
+                            </button>
+                          )}
+                        </div>
+                      )
+                    ) : routes.length > 0 ? (
+                      <div className="flex flex-col items-center justify-center h-full text-center px-4">
+                        <User className="w-10 h-10 text-gray-300 mb-2" />
+                        <p className="text-gray-500">Select a route to view stops</p>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center h-full text-center px-4">
+                        <Calendar className="w-10 h-10 text-gray-300 mb-2" />
+                        <p className="text-gray-500">No routes for this date</p>
+                        <button
+                          onClick={() => setShowCreateRouteModal(true)}
+                          className="mt-2 inline-flex items-center gap-1 text-sm text-teal-600 hover:text-teal-700"
+                        >
+                          <Plus className="w-4 h-4" />
+                          Create a route
+                        </button>
+                        {unassignedJobs.length > 0 && (
+                          <p className="mt-2 text-sm text-orange-600">
+                            {unassignedJobs.length} job{unassignedJobs.length !== 1 ? "s" : ""} waiting to be assigned
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-teal-500 transition-all duration-300"
-                      style={{ width: `${selectedRoute.progress.percentage}%` }}
-                    />
-                  </div>
-                </div>
+
+                  {/* Footer with Route Stats */}
+                  {selectedRoute && selectedRoute.stops.length > 0 && (
+                    <div className="px-4 py-3 border-t border-gray-100 bg-gray-50">
+                      <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-4">
+                          <span className="text-gray-500">
+                            {selectedRoute.stops.reduce((sum, s) => sum + s.dogCount, 0)} total dogs
+                          </span>
+                          <span className="text-gray-500">
+                            $
+                            {(selectedRoute.stops
+                              .reduce(
+                                (sum, s) => sum + (s.subscription?.pricePerVisitCents || 0),
+                                0
+                              ) / 100).toFixed(2)}
+                            {" "}revenue
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
 
-              {/* Stop List */}
-              <div className="flex-1 overflow-y-auto">
-                {selectedRoute ? (
-                  selectedRoute.stops.length > 0 ? (
+              {/* Unassigned Jobs View */}
+              {viewMode === "unassigned" && (
+                <div className="flex-1 overflow-y-auto">
+                  {unassignedJobs.length > 0 ? (
                     <div className="divide-y divide-gray-100">
-                      {selectedRoute.stops.map((stop) => (
-                        <div
-                          key={stop.id}
-                          className={`px-4 py-3 hover:bg-gray-50 cursor-pointer ${
-                            selectedStopId === stop.id ? "bg-teal-50" : ""
-                          }`}
-                          onClick={() => setSelectedStopId(stop.id)}
-                        >
+                      {unassignedJobs.map((job) => (
+                        <div key={job.id} className="px-4 py-3 hover:bg-gray-50">
                           <div className="flex items-start gap-3">
-                            {/* Stop Number */}
-                            <span
-                              className="w-7 h-7 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
-                              style={{
-                                backgroundColor:
-                                  stop.job?.status === "COMPLETED"
-                                    ? "#9CA3AF"
-                                    : selectedRoute.color,
-                              }}
-                            >
-                              {stop.stopNumber}
+                            {/* Warning Icon */}
+                            <span className="w-7 h-7 rounded-full flex items-center justify-center bg-orange-100 text-orange-600 flex-shrink-0">
+                              <AlertTriangle className="w-4 h-4" />
                             </span>
 
-                            {/* Stop Details */}
+                            {/* Job Details */}
                             <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <h4 className="font-medium text-gray-900 truncate">
-                                  {stop.client?.fullName || "Unknown"}
-                                </h4>
-                                {stop.job?.status === "COMPLETED" && (
-                                  <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
-                                )}
-                                {stop.job?.status === "IN_PROGRESS" && (
-                                  <Clock className="w-4 h-4 text-blue-500 flex-shrink-0" />
-                                )}
-                              </div>
+                              <h4 className="font-medium text-gray-900 truncate">
+                                {job.client?.fullName || "Unknown"}
+                              </h4>
                               <p className="text-sm text-gray-500 truncate">
-                                {stop.location?.addressLine1}
+                                {job.location?.addressLine1}
                               </p>
                               <p className="text-xs text-gray-400">
-                                {stop.location?.city}, {stop.location?.state} {stop.location?.zipCode}
+                                {job.location?.city}, {job.location?.state} {job.location?.zipCode}
                               </p>
-                            </div>
+                              {job.dogCount > 0 && (
+                                <p className="text-xs text-gray-400 mt-1">
+                                  {job.dogCount} dog{job.dogCount !== 1 ? "s" : ""}
+                                  {job.subscription && (
+                                    <span> &bull; ${(job.subscription.pricePerVisitCents / 100).toFixed(2)}</span>
+                                  )}
+                                </p>
+                              )}
 
-                            {/* Three-dot Menu */}
-                            <div className="relative" ref={stopMenuOpen === stop.id ? stopMenuRef : null}>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setStopMenuOpen(stopMenuOpen === stop.id ? null : stop.id);
-                                }}
-                                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg"
-                              >
-                                <MoreVertical className="w-4 h-4" />
-                              </button>
-
-                              {stopMenuOpen === stop.id && (
-                                <div className="absolute right-0 top-8 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleStopAction("reclean", stop, selectedRoute);
-                                    }}
-                                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
-                                  >
-                                    Reclean Job
-                                  </button>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleStopAction("reschedule", stop, selectedRoute);
-                                    }}
-                                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
-                                  >
-                                    Change Schedule
-                                  </button>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleStopAction("view", stop, selectedRoute);
-                                    }}
-                                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
-                                  >
-                                    View Job Details
-                                  </button>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleStopAction("geolocation", stop, selectedRoute);
-                                    }}
-                                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
-                                  >
-                                    View Geolocation Details
-                                  </button>
-                                </div>
+                              {/* Assign to Route Dropdown */}
+                              {routes.length > 0 && (
+                                <select
+                                  className="mt-2 w-full text-xs border border-gray-300 rounded px-2 py-1 focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                                  defaultValue=""
+                                  onChange={(e) => {
+                                    if (e.target.value) {
+                                      assignJobToRoute(job.id, e.target.value);
+                                      e.target.value = "";
+                                    }
+                                  }}
+                                >
+                                  <option value="">Assign to route...</option>
+                                  {routes.map((route) => (
+                                    <option key={route.id} value={route.id}>
+                                      {route.assignedUser?.fullName || route.name}
+                                    </option>
+                                  ))}
+                                </select>
                               )}
                             </div>
                           </div>
@@ -507,51 +771,80 @@ function RouteManagerContent() {
                     </div>
                   ) : (
                     <div className="flex flex-col items-center justify-center h-full text-center px-4">
-                      <MapPin className="w-10 h-10 text-gray-300 mb-2" />
-                      <p className="text-gray-500">No stops on this route</p>
+                      <CheckCircle className="w-10 h-10 text-green-300 mb-2" />
+                      <p className="text-gray-500">All jobs are assigned!</p>
+                      <p className="text-sm text-gray-400 mt-1">
+                        No unassigned jobs for this date
+                      </p>
                     </div>
-                  )
-                ) : routes.length > 0 ? (
-                  <div className="flex flex-col items-center justify-center h-full text-center px-4">
-                    <User className="w-10 h-10 text-gray-300 mb-2" />
-                    <p className="text-gray-500">Select a route to view stops</p>
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center h-full text-center px-4">
-                    <Calendar className="w-10 h-10 text-gray-300 mb-2" />
-                    <p className="text-gray-500">No routes for this date</p>
-                    <p className="text-sm text-gray-400 mt-1">
-                      Select a different date or create a new route
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {/* Footer with Route Stats */}
-              {selectedRoute && selectedRoute.stops.length > 0 && (
-                <div className="px-4 py-3 border-t border-gray-100 bg-gray-50">
-                  <div className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-4">
-                      <span className="text-gray-500">
-                        {selectedRoute.stops.reduce((sum, s) => sum + s.dogCount, 0)} total dogs
-                      </span>
-                      <span className="text-gray-500">
-                        $
-                        {selectedRoute.stops
-                          .reduce(
-                            (sum, s) => sum + (s.subscription?.pricePerVisitCents || 0),
-                            0
-                          ) / 100}
-                        {" "}revenue
-                      </span>
-                    </div>
-                  </div>
+                  )}
                 </div>
               )}
             </div>
           </div>
         )}
       </div>
+
+      {/* Create Route Modal */}
+      {showCreateRouteModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen px-4">
+            <div
+              className="fixed inset-0 bg-black/30"
+              onClick={() => setShowCreateRouteModal(false)}
+            />
+            <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                Create New Route
+              </h3>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Route Name (optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={newRouteName}
+                    onChange={(e) => setNewRouteName(e.target.value)}
+                    placeholder="e.g., North Zone Morning"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Date
+                  </label>
+                  <input
+                    type="date"
+                    value={selectedDate}
+                    disabled
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-6 flex justify-end gap-3">
+                <button
+                  onClick={() => setShowCreateRouteModal(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                  disabled={creatingRoute}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={createRoute}
+                  disabled={creatingRoute}
+                  className="px-4 py-2 text-sm font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700 disabled:opacity-50"
+                >
+                  {creatingRoute ? "Creating..." : "Create Route"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </GoogleMapsProvider>
   );
 }
