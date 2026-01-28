@@ -128,26 +128,23 @@ const navigation: NavItem[] = [
 
 export function OfficeSidebar({ user }: OfficeSidebarProps) {
   const pathname = usePathname();
-  const [expandedItems, setExpandedItems] = useState<string[]>(() => {
+  const [expandedItem, setExpandedItem] = useState<string | null>(() => {
     // Auto-expand the section that contains the current path
-    const expanded: string[] = [];
-    navigation.forEach((item) => {
+    for (const item of navigation) {
       if (item.children) {
         const isChildActive = item.children.some(
           (child) => pathname === child.href || pathname.startsWith(child.href.split("?")[0] + "/")
         );
         if (isChildActive) {
-          expanded.push(item.name);
+          return item.name;
         }
       }
-    });
-    return expanded;
+    }
+    return null;
   });
 
   const toggleExpand = (name: string) => {
-    setExpandedItems((prev) =>
-      prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]
-    );
+    setExpandedItem((prev) => (prev === name ? null : name));
   };
 
   // Filter navigation items based on user permissions
@@ -179,15 +176,15 @@ export function OfficeSidebar({ user }: OfficeSidebarProps) {
     <>
       {/* Desktop Sidebar */}
       <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-64 lg:flex-col">
-        <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-white border-r border-gray-200 px-4 pb-4">
+        <div className="flex grow flex-col gap-y-5 overflow-y-auto border-r border-gray-200 px-4 pb-4" style={{ backgroundColor: '#9CD5CF' }}>
           {/* Logo */}
           <div className="flex h-16 shrink-0 items-center gap-3 px-2">
-            <div className="w-10 h-10 bg-teal-500 rounded-full flex items-center justify-center">
+            <div className="w-10 h-10 bg-teal-700 rounded-full flex items-center justify-center">
               <Dog className="w-6 h-6 text-white" />
             </div>
             <div>
               <span className="text-gray-900 font-bold">DooGoodScoopers</span>
-              <p className="text-xs text-gray-500">Office Portal</p>
+              <p className="text-xs text-gray-700">Office Portal</p>
             </div>
           </div>
 
@@ -196,7 +193,7 @@ export function OfficeSidebar({ user }: OfficeSidebarProps) {
             <ul role="list" className="flex flex-1 flex-col gap-y-1">
               {filteredNav.map((item) => {
                 const isActive = isItemActive(item);
-                const isExpanded = expandedItems.includes(item.name);
+                const isExpanded = expandedItem === item.name;
                 const hasChildren = item.children && item.children.length > 0;
 
                 return (
@@ -208,22 +205,22 @@ export function OfficeSidebar({ user }: OfficeSidebarProps) {
                           className={cn(
                             "w-full group flex items-center justify-between rounded-md p-2 text-sm font-medium leading-6 transition-colors",
                             isActive
-                              ? "bg-teal-50 text-teal-700"
-                              : "text-gray-700 hover:bg-gray-50"
+                              ? "bg-white/50 text-gray-900"
+                              : "text-gray-700 hover:bg-white/30"
                           )}
                         >
                           <div className="flex items-center gap-x-3">
                             <item.icon
                               className={cn(
                                 "h-5 w-5 shrink-0",
-                                isActive ? "text-teal-600" : "text-gray-400"
+                                isActive ? "text-teal-700" : "text-gray-600"
                               )}
                             />
                             {item.name}
                           </div>
                           <ChevronDown
                             className={cn(
-                              "h-4 w-4 text-gray-400 transition-transform",
+                              "h-4 w-4 text-gray-600 transition-transform",
                               isExpanded && "rotate-180"
                             )}
                           />
@@ -239,8 +236,8 @@ export function OfficeSidebar({ user }: OfficeSidebarProps) {
                                     className={cn(
                                       "block rounded-md py-2 pl-11 pr-2 text-sm leading-6 transition-colors",
                                       childActive
-                                        ? "bg-teal-50 text-teal-700 font-medium"
-                                        : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                                        ? "bg-white/50 text-gray-900 font-medium"
+                                        : "text-gray-700 hover:bg-white/30 hover:text-gray-900"
                                     )}
                                   >
                                     {child.name}
@@ -257,14 +254,14 @@ export function OfficeSidebar({ user }: OfficeSidebarProps) {
                         className={cn(
                           "group flex items-center gap-x-3 rounded-md p-2 text-sm font-medium leading-6 transition-colors",
                           isActive
-                            ? "bg-teal-50 text-teal-700"
-                            : "text-gray-700 hover:bg-gray-50"
+                            ? "bg-white/50 text-gray-900"
+                            : "text-gray-700 hover:bg-white/30"
                         )}
                       >
                         <item.icon
                           className={cn(
                             "h-5 w-5 shrink-0",
-                            isActive ? "text-teal-600" : "text-gray-400"
+                            isActive ? "text-teal-700" : "text-gray-600"
                           )}
                         />
                         {item.name}
@@ -277,16 +274,16 @@ export function OfficeSidebar({ user }: OfficeSidebarProps) {
           </nav>
 
           {/* User Info */}
-          <div className="border-t border-gray-200 pt-4">
+          <div className="border-t border-white/30 pt-4">
             <div className="flex items-center gap-x-3 p-2">
-              <div className="w-8 h-8 bg-teal-600 rounded-full flex items-center justify-center text-white text-sm font-medium">
+              <div className="w-8 h-8 bg-teal-700 rounded-full flex items-center justify-center text-white text-sm font-medium">
                 {user.firstName?.[0] || user.email[0].toUpperCase()}
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-gray-900 truncate">
                   {user.firstName || user.email}
                 </p>
-                <p className="text-xs text-gray-500 truncate">{user.role}</p>
+                <p className="text-xs text-gray-700 truncate">{user.role}</p>
               </div>
             </div>
           </div>
