@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Megaphone, Search, Filter, ChevronRight } from "lucide-react";
+import { Megaphone, Search, Filter } from "lucide-react";
 import prisma from "@/lib/prisma";
 import type { LeadStatus, AdLead } from "@/types/leads";
 
@@ -178,19 +178,22 @@ export default async function AdLeadsPage({ searchParams }: PageProps) {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Date
                 </th>
-                <th className="px-6 py-3"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {leads.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
                     No ad leads yet. Configure your Privyr webhook to start receiving leads.
                   </td>
                 </tr>
               ) : (
                 (leads as AdLead[]).map((lead) => (
-                  <tr key={lead.id} className="hover:bg-gray-50 transition-colors">
+                  <Link
+                    key={lead.id}
+                    href={`/admin/ad-leads/${lead.id}`}
+                    className="table-row hover:bg-gray-50 transition-colors cursor-pointer"
+                  >
                     <td className="px-6 py-4">
                       <div className="font-medium text-navy-900">
                         {getDisplayName(lead)}
@@ -215,15 +218,7 @@ export default async function AdLeadsPage({ searchParams }: PageProps) {
                     <td className="px-6 py-4 text-sm text-gray-500">
                       {formatDate(lead.createdAt)}
                     </td>
-                    <td className="px-6 py-4">
-                      <Link
-                        href={`/admin/ad-leads/${lead.id}`}
-                        className="text-teal-600 hover:text-teal-700"
-                      >
-                        <ChevronRight className="w-5 h-5" />
-                      </Link>
-                    </td>
-                  </tr>
+                  </Link>
                 ))
               )}
             </tbody>

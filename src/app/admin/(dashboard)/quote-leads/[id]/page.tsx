@@ -6,6 +6,7 @@ import type { LeadStatus } from "@/types/leads";
 import StatusUpdateForm from "@/components/admin/StatusUpdateForm";
 import { LeadUpdates } from "@/components/admin/LeadUpdates";
 import { LeadActions } from "@/components/admin/LeadActions";
+import { FollowupGrade } from "@/components/admin/FollowupGrade";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -107,6 +108,24 @@ function getStatusBadge(status: LeadStatus) {
   );
 }
 
+function getGradeBadge(grade: string | null) {
+  if (!grade) return null;
+
+  const styles: Record<string, string> = {
+    A: "bg-green-100 text-green-800 border-green-300",
+    B: "bg-teal-100 text-teal-800 border-teal-300",
+    C: "bg-yellow-100 text-yellow-800 border-yellow-300",
+    D: "bg-orange-100 text-orange-800 border-orange-300",
+    F: "bg-red-100 text-red-800 border-red-300",
+  };
+
+  return (
+    <span className={`px-3 py-1 text-sm font-bold rounded-full border ${styles[grade] || "bg-gray-100"}`}>
+      Grade: {grade}
+    </span>
+  );
+}
+
 export default async function QuoteLeadDetailPage({ params }: PageProps) {
   const { id } = await params;
   const [lead, updates] = await Promise.all([
@@ -150,6 +169,7 @@ export default async function QuoteLeadDetailPage({ params }: PageProps) {
           <p className="text-navy-600 mt-1">Quote Lead</p>
         </div>
         <div className="flex items-center gap-3">
+          {getGradeBadge(lead.grade)}
           {getStatusBadge(lead.status)}
           <Link
             href={`/admin/quote-leads/${lead.id}/edit`}
@@ -302,6 +322,14 @@ export default async function QuoteLeadDetailPage({ params }: PageProps) {
             leadType="quote"
             currentStatus={lead.status}
             notes={lead.notes}
+          />
+
+          {/* Followup & Grade */}
+          <FollowupGrade
+            leadId={lead.id}
+            leadType="quote"
+            currentFollowupDate={lead.followupDate?.toISOString()}
+            currentGrade={lead.grade}
           />
 
           {/* Timeline */}

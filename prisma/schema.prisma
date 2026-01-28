@@ -41,6 +41,10 @@ model QuoteLead {
   archived        Boolean     @default(false)
   notes           String?     @db.Text
 
+  // Followup and grading
+  followupDate    DateTime?
+  grade           String?     // A, B, C, D, F
+
   // Contact info
   firstName       String
   lastName        String?
@@ -71,6 +75,7 @@ model QuoteLead {
   @@index([archived])
   @@index([createdAt])
   @@index([zipCode])
+  @@index([followupDate])
 }
 
 // =====================
@@ -84,7 +89,12 @@ model OutOfAreaLead {
 
   // Status tracking
   status          LeadStatus  @default(NEW)
+  archived        Boolean     @default(false)
   notes           String?     @db.Text
+
+  // Followup and grading
+  followupDate    DateTime?
+  grade           String?     // A, B, C, D, F
 
   // Contact info
   firstName       String
@@ -94,8 +104,10 @@ model OutOfAreaLead {
   zipCode         String
 
   @@index([status])
+  @@index([archived])
   @@index([createdAt])
   @@index([zipCode])
+  @@index([followupDate])
 }
 
 // =====================
@@ -108,7 +120,12 @@ model CareerApplication {
 
   // Status tracking
   status          LeadStatus  @default(NEW)
+  archived        Boolean     @default(false)
   notes           String?     @db.Text
+
+  // Followup and grading
+  followupDate    DateTime?
+  grade           String?     // A, B, C, D, F
 
   // Personal info
   firstName       String
@@ -138,7 +155,9 @@ model CareerApplication {
   whyWorkHere     String?     @db.Text
 
   @@index([status])
+  @@index([archived])
   @@index([createdAt])
+  @@index([followupDate])
 }
 
 // =====================
@@ -151,7 +170,12 @@ model CommercialLead {
 
   // Status tracking
   status          LeadStatus  @default(NEW)
+  archived        Boolean     @default(false)
   notes           String?     @db.Text
+
+  // Followup and grading
+  followupDate    DateTime?
+  grade           String?     // A, B, C, D, F
 
   // Contact info
   contactName     String
@@ -168,7 +192,9 @@ model CommercialLead {
   inquiry         String?     @db.Text
 
   @@index([status])
+  @@index([archived])
   @@index([createdAt])
+  @@index([followupDate])
 }
 
 // =====================
@@ -181,7 +207,12 @@ model AdLead {
 
   // Status tracking
   status          LeadStatus  @default(NEW)
+  archived        Boolean     @default(false)
   notes           String?     @db.Text
+
+  // Followup and grading
+  followupDate    DateTime?
+  grade           String?     // A, B, C, D, F
 
   // Contact info from ad form
   firstName       String?
@@ -212,9 +243,11 @@ model AdLead {
   rawPayload      Json?
 
   @@index([status])
+  @@index([archived])
   @@index([createdAt])
   @@index([adSource])
   @@index([privyrLeadId])
+  @@index([followupDate])
 }
 
 // =====================

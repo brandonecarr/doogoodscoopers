@@ -1,17 +1,19 @@
 import Link from "next/link";
-import { Building2, Search, Filter, ChevronRight } from "lucide-react";
+import { Building2, Search, Filter, Archive } from "lucide-react";
 import prisma from "@/lib/prisma";
 import type { LeadStatus, CommercialLead } from "@/types/leads";
 
 interface PageProps {
-  searchParams: Promise<{ status?: string; search?: string; page?: string }>;
+  searchParams: Promise<{ status?: string; search?: string; page?: string; archived?: string }>;
 }
 
-async function getCommercialLeads(status?: string, search?: string, page: number = 1) {
+async function getCommercialLeads(status?: string, search?: string, page: number = 1, showArchived: boolean = false) {
   const pageSize = 20;
   const skip = (page - 1) * pageSize;
 
-  const where: Record<string, unknown> = {};
+  const where: Record<string, unknown> = {
+    archived: showArchived,
+  };
 
   if (status && status !== "all") {
     where.status = status as LeadStatus;
@@ -68,10 +70,12 @@ function getStatusBadge(status: LeadStatus) {
 
 export default async function CommercialPage({ searchParams }: PageProps) {
   const params = await searchParams;
+  const showArchived = params.archived === "true";
   const { leads, total, pageSize, currentPage } = await getCommercialLeads(
     params.status,
     params.search,
-    params.page ? parseInt(params.page) : 1
+    params.page ? parseInt(params.page) : 1,
+    showArchived
   );
 
   const totalPages = Math.ceil(total / pageSize);
@@ -81,11 +85,26 @@ export default async function CommercialPage({ searchParams }: PageProps) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-navy-900">Commercial Inquiries</h1>
-          <p className="text-navy-600 mt-1">{total} total inquiries</p>
+          <h1 className="text-2xl font-bold text-navy-900">
+            {showArchived ? "Archived Inquiries" : "Commercial Inquiries"}
+          </h1>
+          <p className="text-navy-600 mt-1">{total} {showArchived ? "archived" : "total"} inquiries</p>
         </div>
-        <div className="w-12 h-12 rounded-xl bg-teal-50 flex items-center justify-center">
-          <Building2 className="w-6 h-6 text-teal-600" />
+        <div className="flex items-center gap-3">
+          <Link
+            href={showArchived ? "/admin/commercial" : "/admin/commercial?archived=true"}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+              showArchived
+                ? "bg-teal-600 text-white hover:bg-teal-700"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+            }`}
+          >
+            <Archive className="w-4 h-4" />
+            {showArchived ? "View Active" : "View Archived"}
+          </Link>
+          <div className="w-12 h-12 rounded-xl bg-teal-50 flex items-center justify-center">
+            <Building2 className="w-6 h-6 text-teal-600" />
+          </div>
         </div>
       </div>
 
@@ -151,19 +170,22 @@ export default async function CommercialPage({ searchParams }: PageProps) {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Date
                 </th>
-                <th className="px-6 py-3"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {leads.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
                     No inquiries found
                   </td>
                 </tr>
               ) : (
                 (leads as CommercialLead[]).map((lead) => (
-                  <tr key={lead.id} className="hover:bg-gray-50 transition-colors">
+                  <Link
+                    key={lead.id}
+                    href={`/admin/commercial/${lead.id}`}
+                    className="table-row hover:bg-gray-50 transition-colors cursor-pointer"
+                  >
                     <td className="px-6 py-4">
                       <div className="font-medium text-navy-900">
                         {lead.propertyName}
@@ -184,15 +206,7 @@ export default async function CommercialPage({ searchParams }: PageProps) {
                     <td className="px-6 py-4 text-sm text-gray-500">
                       {formatDate(lead.createdAt)}
                     </td>
-                    <td className="px-6 py-4">
-                      <Link
-                        href={`/admin/commercial/${lead.id}`}
-                        className="text-teal-600 hover:text-teal-700"
-                      >
-                        <ChevronRight className="w-5 h-5" />
-                      </Link>
-                    </td>
-                  </tr>
+                  </Link>
                 ))
               )}
             </tbody>
@@ -209,7 +223,7 @@ export default async function CommercialPage({ searchParams }: PageProps) {
             <div className="flex gap-2">
               {currentPage > 1 && (
                 <Link
-                  href={`/admin/commercial?page=${currentPage - 1}${params.status ? `&status=${params.status}` : ""}${params.search ? `&search=${params.search}` : ""}`}
+                  href={`/admin/commercial?page=${currentPage - 1}${params.status ? `&status=${params.status}` : ""}${params.search ? `&search=${params.search}` : ""}${showArchived ? "&archived=true" : ""}`}
                   className="px-3 py-1 border border-gray-200 rounded-lg hover:bg-gray-50"
                 >
                   Previous
@@ -217,7 +231,7 @@ export default async function CommercialPage({ searchParams }: PageProps) {
               )}
               {currentPage < totalPages && (
                 <Link
-                  href={`/admin/commercial?page=${currentPage + 1}${params.status ? `&status=${params.status}` : ""}${params.search ? `&search=${params.search}` : ""}`}
+                  href={`/admin/commercial?page=${currentPage + 1}${params.status ? `&status=${params.status}` : ""}${params.search ? `&search=${params.search}` : ""}${showArchived ? "&archived=true" : ""}`}
                   className="px-3 py-1 border border-gray-200 rounded-lg hover:bg-gray-50"
                 >
                   Next

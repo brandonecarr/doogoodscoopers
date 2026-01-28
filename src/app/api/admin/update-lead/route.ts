@@ -6,8 +6,10 @@ import type { LeadStatus } from "@/types/leads";
 interface UpdateLeadData {
   leadId: string;
   leadType: "quote" | "outofarea" | "career" | "commercial" | "adlead";
-  status: LeadStatus;
+  status?: LeadStatus;
   notes?: string;
+  followupDate?: string | null;
+  grade?: string | null;
 }
 
 export async function POST(request: Request) {
@@ -22,51 +24,68 @@ export async function POST(request: Request) {
     }
 
     const data: UpdateLeadData = await request.json();
-    const { leadId, leadType, status, notes } = data;
+    const { leadId, leadType, status, notes, followupDate, grade } = data;
 
-    // Validate status
-    const validStatuses: LeadStatus[] = ["NEW", "CONTACTED", "QUALIFIED", "CONVERTED", "LOST"];
-    if (!validStatuses.includes(status)) {
+    // Validate status if provided
+    if (status) {
+      const validStatuses: LeadStatus[] = ["NEW", "CONTACTED", "QUALIFIED", "CONVERTED", "LOST"];
+      if (!validStatuses.includes(status)) {
+        return NextResponse.json(
+          { success: false, message: "Invalid status" },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Validate grade if provided
+    if (grade && !["A", "B", "C", "D", "F"].includes(grade)) {
       return NextResponse.json(
-        { success: false, message: "Invalid status" },
+        { success: false, message: "Invalid grade. Must be A, B, C, D, or F" },
         { status: 400 }
       );
     }
+
+    // Build update data - only include fields that were provided
+    const updateData: Record<string, unknown> = {};
+    if (status !== undefined) updateData.status = status;
+    if (notes !== undefined) updateData.notes = notes;
+    if (followupDate !== undefined) updateData.followupDate = followupDate ? new Date(followupDate) : null;
+    if (grade !== undefined) updateData.grade = grade;
 
     // Update the appropriate lead type
     switch (leadType) {
       case "quote":
         await prisma.quoteLead.update({
           where: { id: leadId },
-          data: { status, notes },
+          data: updateData,
         });
         break;
 
       case "outofarea":
         await prisma.outOfAreaLead.update({
           where: { id: leadId },
-          data: { status, notes },
+          data: updateData,
         });
         break;
 
       case "career":
         await prisma.careerApplication.update({
           where: { id: leadId },
-          data: { status, notes },
+          data: updateData,
         });
         break;
 
       case "commercial":
         await prisma.commercialLead.update({
           where: { id: leadId },
-          data: { status, notes },
+          data: updateData,
         });
         break;
 
       case "adlead":
         await prisma.adLead.update({
           where: { id: leadId },
-          data: { status, notes },
+          data: updateData,
         });
         break;
 
@@ -86,13 +105,19 @@ export async function POST(request: Request) {
       adlead: "AD_LEAD",
     };
 
+    // Determine action type based on what was updated
+    let action = "LEAD_UPDATE";
+    if (status !== undefined) action = "STATUS_UPDATE";
+    else if (followupDate !== undefined) action = "FOLLOWUP_SET";
+    else if (grade !== undefined) action = "GRADE_SET";
+
     // Log the activity
     await prisma.activityLog.create({
       data: {
-        action: "STATUS_UPDATE",
+        action,
         leadType: leadTypeMap[leadType],
         leadId: leadId,
-        details: { status, notes },
+        details: { status, notes, followupDate, grade },
         adminEmail: session.email,
       },
     });

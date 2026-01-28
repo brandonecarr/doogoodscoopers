@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Briefcase, Search, Filter, ChevronRight } from "lucide-react";
+import { Briefcase, Search, Filter } from "lucide-react";
 import prisma from "@/lib/prisma";
 import type { LeadStatus, CareerApplication } from "@/types/leads";
 
@@ -154,19 +154,22 @@ export default async function CareersPage({ searchParams }: PageProps) {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Date
                 </th>
-                <th className="px-6 py-3"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {applications.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
                     No applications found
                   </td>
                 </tr>
               ) : (
                 (applications as CareerApplication[]).map((app) => (
-                  <tr key={app.id} className="hover:bg-gray-50 transition-colors">
+                  <Link
+                    key={app.id}
+                    href={`/admin/careers/${app.id}`}
+                    className="table-row hover:bg-gray-50 transition-colors cursor-pointer"
+                  >
                     <td className="px-6 py-4">
                       <div className="font-medium text-navy-900">
                         {app.firstName} {app.lastName}
@@ -194,15 +197,7 @@ export default async function CareersPage({ searchParams }: PageProps) {
                     <td className="px-6 py-4 text-sm text-gray-500">
                       {formatDate(app.createdAt)}
                     </td>
-                    <td className="px-6 py-4">
-                      <Link
-                        href={`/admin/careers/${app.id}`}
-                        className="text-teal-600 hover:text-teal-700"
-                      >
-                        <ChevronRight className="w-5 h-5" />
-                      </Link>
-                    </td>
-                  </tr>
+                  </Link>
                 ))
               )}
             </tbody>

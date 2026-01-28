@@ -1,9 +1,12 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Phone, Mail, MapPin, Building2, Calendar, Clock, MessageSquare } from "lucide-react";
+import { ArrowLeft, Phone, Mail, MapPin, Building2, Calendar, Clock, MessageSquare, Archive } from "lucide-react";
 import prisma from "@/lib/prisma";
 import type { LeadStatus } from "@/types/leads";
 import StatusUpdateForm from "@/components/admin/StatusUpdateForm";
+import { LeadUpdates } from "@/components/admin/LeadUpdates";
+import { LeadActions } from "@/components/admin/LeadActions";
+import { FollowupGrade } from "@/components/admin/FollowupGrade";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -15,6 +18,18 @@ async function getCommercialLead(id: string) {
   });
 
   return lead;
+}
+
+async function getLeadUpdates(leadId: string) {
+  const updates = await prisma.leadUpdate.findMany({
+    where: {
+      leadId,
+      leadType: "COMMERCIAL",
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return updates;
 }
 
 function formatDate(date: Date) {
@@ -44,9 +59,30 @@ function getStatusBadge(status: LeadStatus) {
   );
 }
 
+function getGradeBadge(grade: string | null) {
+  if (!grade) return null;
+
+  const styles: Record<string, string> = {
+    A: "bg-green-100 text-green-800 border-green-300",
+    B: "bg-teal-100 text-teal-800 border-teal-300",
+    C: "bg-yellow-100 text-yellow-800 border-yellow-300",
+    D: "bg-orange-100 text-orange-800 border-orange-300",
+    F: "bg-red-100 text-red-800 border-red-300",
+  };
+
+  return (
+    <span className={`px-3 py-1 text-sm font-bold rounded-full border ${styles[grade] || "bg-gray-100"}`}>
+      Grade: {grade}
+    </span>
+  );
+}
+
 export default async function CommercialDetailPage({ params }: PageProps) {
   const { id } = await params;
-  const lead = await getCommercialLead(id);
+  const [lead, updates] = await Promise.all([
+    getCommercialLead(id),
+    getLeadUpdates(id),
+  ]);
 
   if (!lead) {
     notFound();
@@ -54,6 +90,14 @@ export default async function CommercialDetailPage({ params }: PageProps) {
 
   return (
     <div className="space-y-6 pb-20 lg:pb-0">
+      {/* Archived Banner */}
+      {lead.archived && (
+        <div className="flex items-center gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+          <Archive className="w-5 h-5 text-amber-600" />
+          <p className="text-amber-800 font-medium">This lead has been archived</p>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center gap-4">
         <Link
@@ -66,7 +110,10 @@ export default async function CommercialDetailPage({ params }: PageProps) {
           <h1 className="text-2xl font-bold text-navy-900">{lead.propertyName}</h1>
           <p className="text-navy-600 mt-1">Commercial Inquiry</p>
         </div>
-        {getStatusBadge(lead.status)}
+        <div className="flex items-center gap-3">
+          {getGradeBadge(lead.grade)}
+          {getStatusBadge(lead.status)}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -151,6 +198,19 @@ export default async function CommercialDetailPage({ params }: PageProps) {
               </div>
             </div>
           )}
+
+          {/* Updates */}
+          <LeadUpdates
+            leadId={lead.id}
+            leadType="commercial"
+            updates={updates.map((u: { id: string; createdAt: Date; message: string | null; communicationType: string | null; adminEmail: string | null }) => ({
+              id: u.id,
+              createdAt: u.createdAt.toISOString(),
+              message: u.message || "",
+              communicationType: u.communicationType || "",
+              adminEmail: u.adminEmail || "",
+            }))}
+          />
         </div>
 
         {/* Sidebar */}
@@ -161,6 +221,14 @@ export default async function CommercialDetailPage({ params }: PageProps) {
             leadType="commercial"
             currentStatus={lead.status}
             notes={lead.notes}
+          />
+
+          {/* Followup & Grade */}
+          <FollowupGrade
+            leadId={lead.id}
+            leadType="commercial"
+            currentFollowupDate={lead.followupDate?.toISOString()}
+            currentGrade={lead.grade}
           />
 
           {/* Timeline */}
@@ -190,6 +258,13 @@ export default async function CommercialDetailPage({ params }: PageProps) {
               )}
             </div>
           </div>
+
+          {/* Actions */}
+          <LeadActions
+            leadId={lead.id}
+            leadType="commercial"
+            isArchived={lead.archived}
+          />
         </div>
       </div>
     </div>
