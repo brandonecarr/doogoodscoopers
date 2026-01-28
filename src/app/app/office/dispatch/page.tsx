@@ -10,7 +10,7 @@ import {
   RotateCcw,
   Trash2,
   MoreVertical,
-  Image,
+  Image as ImageIcon,
   MessageSquare,
   UserPlus,
   CalendarDays,
@@ -18,8 +18,29 @@ import {
   SkipForward,
   Plus,
   Repeat,
+  X,
+  Info,
+  Search,
 } from "lucide-react";
 import Link from "next/link";
+
+interface Client {
+  id: string;
+  firstName: string;
+  lastName: string;
+  companyName: string | null;
+  clientType: string;
+}
+
+interface AddOn {
+  id: string;
+  name: string;
+  description: string | null;
+  priceCents: number;
+  priceType: string;
+  isRecurring: boolean;
+  isActive: boolean;
+}
 
 interface Job {
   id: string;
@@ -82,6 +103,44 @@ export default function DispatchBoardPage() {
 
   // Selection
   const [selectedJobs, setSelectedJobs] = useState<string[]>([]);
+
+  // Clients for Add Job modals
+  const [clientList, setClientList] = useState<Client[]>([]);
+  const [clientSearchQuery, setClientSearchQuery] = useState("");
+
+  // Modal states
+  const [showAdjustPendingModal, setShowAdjustPendingModal] = useState(false);
+  const [showReassignModal, setShowReassignModal] = useState(false);
+  const [showChangeDateModal, setShowChangeDateModal] = useState(false);
+  const [showAddResidentialModal, setShowAddResidentialModal] = useState(false);
+  const [showAddCommercialModal, setShowAddCommercialModal] = useState(false);
+  const [showAddResAddOnModal, setShowAddResAddOnModal] = useState(false);
+  const [showAddCommAddOnModal, setShowAddCommAddOnModal] = useState(false);
+
+  // Add-ons for add-on service modals
+  const [addOnList, setAddOnList] = useState<AddOn[]>([]);
+  const [selectedAddOnId, setSelectedAddOnId] = useState("");
+  const [addOnJobId, setAddOnJobId] = useState(""); // Existing job to add service to
+
+  // Adjust Pending Jobs modal form
+  const [adjustTechId, setAdjustTechId] = useState("");
+  const [adjustDate, setAdjustDate] = useState("");
+  const [adjustMessage, setAdjustMessage] = useState("");
+
+  // Reassign Tech modal form
+  const [reassignTechId, setReassignTechId] = useState("");
+
+  // Change Date modal form
+  const [newDate, setNewDate] = useState("");
+
+  // Add Job modal form (shared between residential/commercial)
+  const [addJobClientId, setAddJobClientId] = useState("");
+  const [addJobCrossSell, setAddJobCrossSell] = useState("");
+  const [addJobPrice, setAddJobPrice] = useState("");
+  const [addJobTechId, setAddJobTechId] = useState("");
+  const [addJobDate, setAddJobDate] = useState("");
+  const [addJobEstimatedTime, setAddJobEstimatedTime] = useState("30");
+  const [addJobReoptimize, setAddJobReoptimize] = useState(true);
 
   const fetchJobs = useCallback(async () => {
     setLoading(true);
@@ -183,6 +242,38 @@ export default function DispatchBoardPage() {
       }
     } catch (err) {
       console.error("Error fetching staff:", err);
+    }
+  }, []);
+
+  const fetchClients = useCallback(async (type: string) => {
+    try {
+      const res = await fetch(`/api/admin/clients?type=${type}&limit=500`);
+      const data = await res.json();
+      if (res.ok) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const clients = (data.clients || []).map((c: any) => ({
+          id: c.id,
+          firstName: c.first_name || "",
+          lastName: c.last_name || "",
+          companyName: c.company_name || null,
+          clientType: c.client_type,
+        }));
+        setClientList(clients);
+      }
+    } catch (err) {
+      console.error("Error fetching clients:", err);
+    }
+  }, []);
+
+  const fetchAddOns = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/add-ons?active=true");
+      const data = await res.json();
+      if (res.ok) {
+        setAddOnList(data.addOns || []);
+      }
+    } catch (err) {
+      console.error("Error fetching add-ons:", err);
     }
   }, []);
 
@@ -358,17 +449,335 @@ export default function DispatchBoardPage() {
         break;
 
       case "reassign":
-        alert("Reassign Tech modal would open here - select a new tech to assign selected jobs");
+        setReassignTechId("");
+        setShowReassignModal(true);
         break;
 
       case "change_date":
-        alert("Change Date modal would open here - select a new date for selected jobs");
+        setNewDate(selectedDate);
+        setShowChangeDateModal(true);
+        break;
+
+      case "adjust_pending":
+        setAdjustTechId("");
+        setAdjustDate(selectedDate);
+        setAdjustMessage("");
+        setShowAdjustPendingModal(true);
+        break;
+
+      case "add_residential":
+        fetchClients("residential");
+        setAddJobClientId("");
+        setAddJobCrossSell("");
+        setAddJobPrice("");
+        setAddJobTechId("");
+        setAddJobDate(selectedDate);
+        setAddJobEstimatedTime("30");
+        setAddJobReoptimize(true);
+        setClientSearchQuery("");
+        setShowAddResidentialModal(true);
+        break;
+
+      case "add_commercial":
+        fetchClients("commercial");
+        setAddJobClientId("");
+        setAddJobCrossSell("");
+        setAddJobPrice("");
+        setAddJobTechId("");
+        setAddJobDate(selectedDate);
+        setAddJobEstimatedTime("30");
+        setAddJobReoptimize(true);
+        setClientSearchQuery("");
+        setShowAddCommercialModal(true);
+        break;
+
+      case "add_res_addon":
+        if (selectedJobs.length !== 1) {
+          setError("Please select exactly one job to add an add-on service");
+          return;
+        }
+        fetchClients("residential");
+        fetchAddOns();
+        setAddOnJobId(selectedJobs[0]);
+        setSelectedAddOnId("");
+        setAddJobClientId("");
+        setAddJobPrice("");
+        setAddJobTechId("");
+        setAddJobDate(selectedDate);
+        setClientSearchQuery("");
+        setShowAddResAddOnModal(true);
+        break;
+
+      case "add_comm_addon":
+        if (selectedJobs.length !== 1) {
+          setError("Please select exactly one job to add an add-on service");
+          return;
+        }
+        fetchClients("commercial");
+        fetchAddOns();
+        setAddOnJobId(selectedJobs[0]);
+        setSelectedAddOnId("");
+        setAddJobClientId("");
+        setAddJobPrice("");
+        setAddJobTechId("");
+        setAddJobDate(selectedDate);
+        setClientSearchQuery("");
+        setShowAddCommAddOnModal(true);
         break;
 
       default:
-        alert(`Action "${action}" would be implemented here`);
+        setError(`Action "${action}" not implemented yet`);
     }
   };
+
+  // Handle Adjust Pending Jobs submit
+  const handleAdjustPendingSubmit = async () => {
+    if (!adjustTechId && !adjustDate) {
+      setError("Please select a tech or date");
+      return;
+    }
+
+    try {
+      // Update jobs with new tech and/or date
+      for (const jobId of selectedJobs) {
+        const updates: Record<string, unknown> = { id: jobId };
+        if (adjustTechId) updates.assigned_to = adjustTechId;
+        if (adjustDate) updates.scheduled_date = adjustDate;
+        if (adjustMessage) updates.notes = adjustMessage;
+
+        await fetch("/api/admin/jobs", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updates),
+        });
+      }
+
+      setSuccess(`${selectedJobs.length} jobs adjusted successfully`);
+      setTimeout(() => setSuccess(null), 3000);
+      setSelectedJobs([]);
+      setShowAdjustPendingModal(false);
+      fetchJobs();
+    } catch {
+      setError("Failed to adjust jobs");
+    }
+  };
+
+  // Handle Reassign Tech submit
+  const handleReassignSubmit = async () => {
+    if (!reassignTechId) {
+      setError("Please select a tech");
+      return;
+    }
+
+    try {
+      // Update assigned_to for each job
+      for (const jobId of selectedJobs) {
+        await fetch("/api/admin/jobs", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: jobId,
+            assigned_to: reassignTechId,
+          }),
+        });
+      }
+
+      setSuccess(`${selectedJobs.length} jobs reassigned successfully`);
+      setTimeout(() => setSuccess(null), 3000);
+      setSelectedJobs([]);
+      setShowReassignModal(false);
+      fetchJobs();
+    } catch {
+      setError("Failed to reassign jobs");
+    }
+  };
+
+  // Handle Change Date submit
+  const handleChangeDateSubmit = async () => {
+    if (!newDate) {
+      setError("Please select a date");
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/admin/jobs/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "reschedule",
+          job_ids: selectedJobs,
+          new_date: newDate,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setSuccess(`${data.affected} jobs rescheduled successfully`);
+        setTimeout(() => setSuccess(null), 3000);
+        setSelectedJobs([]);
+        setShowChangeDateModal(false);
+        fetchJobs();
+      }
+    } catch {
+      setError("Failed to reschedule jobs");
+    }
+  };
+
+  // Handle Add Job submit
+  const handleAddJobSubmit = async (clientType: string) => {
+    if (!addJobClientId) {
+      setError("Please select a client");
+      return;
+    }
+    if (!addJobDate) {
+      setError("Please select a date");
+      return;
+    }
+
+    try {
+      // First, get the client's primary location
+      const clientRes = await fetch(`/api/admin/clients/${addJobClientId}`);
+      const clientData = await clientRes.json();
+
+      if (!clientRes.ok || !clientData.client) {
+        setError("Failed to load client data");
+        return;
+      }
+
+      const client = clientData.client;
+      const primaryLocation = client.locations?.find((l: { is_primary: boolean }) => l.is_primary) || client.locations?.[0];
+
+      if (!primaryLocation) {
+        setError("Client has no location. Please add a location first.");
+        return;
+      }
+
+      // Create the job
+      const jobRes = await fetch("/api/admin/jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          client_id: addJobClientId,
+          location_id: primaryLocation.id,
+          scheduled_date: addJobDate,
+          assigned_to: addJobTechId || null,
+          price_cents: addJobPrice ? Math.round(parseFloat(addJobPrice) * 100) : 0,
+          status: "SCHEDULED",
+          metadata: {
+            job_type: "ONE_TIME",
+            service_name: addJobCrossSell || "Custom Job",
+            estimated_minutes: parseInt(addJobEstimatedTime) || 30,
+            client_type: clientType,
+            reoptimize_route: addJobReoptimize,
+          },
+        }),
+      });
+
+      if (jobRes.ok) {
+        setSuccess("Job created successfully");
+        setTimeout(() => setSuccess(null), 3000);
+        setShowAddResidentialModal(false);
+        setShowAddCommercialModal(false);
+        fetchJobs();
+      } else {
+        const data = await jobRes.json();
+        setError(data.error || "Failed to create job");
+      }
+    } catch {
+      setError("Failed to create job");
+    }
+  };
+
+  // Handle Add-On Service submit
+  const handleAddOnServiceSubmit = async (clientType: string) => {
+    if (!selectedAddOnId) {
+      setError("Please select an add-on service");
+      return;
+    }
+    if (!addJobClientId) {
+      setError("Please select a client");
+      return;
+    }
+    if (!addJobDate) {
+      setError("Please select a date");
+      return;
+    }
+
+    try {
+      // Get the selected add-on details
+      const selectedAddOn = addOnList.find((a) => a.id === selectedAddOnId);
+      if (!selectedAddOn) {
+        setError("Selected add-on not found");
+        return;
+      }
+
+      // Get the client's primary location
+      const clientRes = await fetch(`/api/admin/clients/${addJobClientId}`);
+      const clientData = await clientRes.json();
+
+      if (!clientRes.ok || !clientData.client) {
+        setError("Failed to load client data");
+        return;
+      }
+
+      const client = clientData.client;
+      const primaryLocation = client.locations?.find((l: { is_primary: boolean }) => l.is_primary) || client.locations?.[0];
+
+      if (!primaryLocation) {
+        setError("Client has no location. Please add a location first.");
+        return;
+      }
+
+      // Use custom price if provided, otherwise use add-on price
+      const priceCents = addJobPrice
+        ? Math.round(parseFloat(addJobPrice) * 100)
+        : selectedAddOn.priceCents;
+
+      // Create the add-on service job
+      const jobRes = await fetch("/api/admin/jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          client_id: addJobClientId,
+          location_id: primaryLocation.id,
+          scheduled_date: addJobDate,
+          assigned_to: addJobTechId || null,
+          price_cents: priceCents,
+          status: "SCHEDULED",
+          metadata: {
+            job_type: "ADD_ON",
+            service_name: selectedAddOn.name,
+            add_on_id: selectedAddOn.id,
+            estimated_minutes: 15,
+            client_type: clientType,
+            related_job_id: addOnJobId || null,
+          },
+        }),
+      });
+
+      if (jobRes.ok) {
+        setSuccess("Add-on service created successfully");
+        setTimeout(() => setSuccess(null), 3000);
+        setShowAddResAddOnModal(false);
+        setShowAddCommAddOnModal(false);
+        setSelectedJobs([]);
+        fetchJobs();
+      } else {
+        const data = await jobRes.json();
+        setError(data.error || "Failed to create add-on service");
+      }
+    } catch {
+      setError("Failed to create add-on service");
+    }
+  };
+
+  // Filter clients based on search query
+  const filteredClients = clientList.filter((client) => {
+    const searchLower = clientSearchQuery.toLowerCase();
+    const fullName = `${client.firstName} ${client.lastName}`.toLowerCase();
+    const companyName = (client.companyName || "").toLowerCase();
+    return fullName.includes(searchLower) || companyName.includes(searchLower);
+  });
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -746,7 +1155,7 @@ export default function DispatchBoardPage() {
                         )}
                         {hasPhotos && (
                           <div className="mt-1 flex items-center gap-2 text-xs">
-                            <Image className="w-3 h-3 text-blue-500" />
+                            <ImageIcon className="w-3 h-3 text-blue-500" />
                             <span className="text-blue-600">Photo to Client</span>
                           </div>
                         )}
@@ -817,6 +1226,815 @@ export default function DispatchBoardPage() {
           </table>
         </div>
       </div>
+
+      {/* Adjust Pending Jobs Modal */}
+      {showAdjustPendingModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">Adjust Pending Job</h2>
+              <button
+                onClick={() => setShowAdjustPendingModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Field Tech
+                </label>
+                <select
+                  value={adjustTechId}
+                  onChange={(e) => setAdjustTechId(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                >
+                  <option value="">Select Tech</option>
+                  {staffList.map((staff) => (
+                    <option key={staff.id} value={staff.id}>
+                      {staff.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Date
+                </label>
+                <input
+                  type="date"
+                  value={adjustDate}
+                  onChange={(e) => setAdjustDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Custom Off-Schedule Message to Client
+                </label>
+                <textarea
+                  value={adjustMessage}
+                  onChange={(e) => setAdjustMessage(e.target.value)}
+                  placeholder="Enter message to send to client..."
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 p-4 border-t border-gray-200">
+              <button
+                onClick={() => setShowAdjustPendingModal(false)}
+                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAdjustPendingSubmit}
+                className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reassign Tech Modal */}
+      {showReassignModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">Reassign Tech</h2>
+              <button
+                onClick={() => setShowReassignModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 space-y-4">
+              <p className="text-sm text-gray-600">
+                Reassigning {selectedJobs.length} job{selectedJobs.length > 1 ? "s" : ""} to a new tech.
+              </p>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Select New Tech
+                </label>
+                <select
+                  value={reassignTechId}
+                  onChange={(e) => setReassignTechId(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                >
+                  <option value="">Select Tech</option>
+                  {staffList.map((staff) => (
+                    <option key={staff.id} value={staff.id}>
+                      {staff.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 p-4 border-t border-gray-200">
+              <button
+                onClick={() => setShowReassignModal(false)}
+                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleReassignSubmit}
+                disabled={!reassignTechId}
+                className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50"
+              >
+                Reassign
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Change Date Modal */}
+      {showChangeDateModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">Change Date</h2>
+              <button
+                onClick={() => setShowChangeDateModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 space-y-4">
+              <p className="text-sm text-gray-600">
+                Rescheduling {selectedJobs.length} job{selectedJobs.length > 1 ? "s" : ""} to a new date.
+              </p>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Select New Date
+                </label>
+                <input
+                  type="date"
+                  value={newDate}
+                  onChange={(e) => setNewDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 p-4 border-t border-gray-200">
+              <button
+                onClick={() => setShowChangeDateModal(false)}
+                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleChangeDateSubmit}
+                disabled={!newDate}
+                className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50"
+              >
+                Change Date
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Residential Job Modal */}
+      {showAddResidentialModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">Set Up Residential Custom Job</h2>
+              <button
+                onClick={() => setShowAddResidentialModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 space-y-4">
+              {/* Info Banner */}
+              <div className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg">
+                <Info className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-blue-700">
+                  Add a NEW Residential Custom Job for a client that does not currently have any Subscription.
+                  Client won&apos;t be charged via Autopay. An invoice will need to be created separately.
+                </p>
+              </div>
+
+              {/* Client Search */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Custom Job Client
+                </label>
+                <div className="relative">
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                    <Search className="w-4 h-4" />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Search clients..."
+                    value={clientSearchQuery}
+                    onChange={(e) => setClientSearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                  />
+                </div>
+                <select
+                  value={addJobClientId}
+                  onChange={(e) => setAddJobClientId(e.target.value)}
+                  size={5}
+                  className="w-full mt-2 px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                >
+                  <option value="">Select a client</option>
+                  {filteredClients.map((client) => (
+                    <option key={client.id} value={client.id}>
+                      {client.firstName} {client.lastName}
+                      {client.companyName ? ` (${client.companyName})` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Cross-Sell */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Cross-Sell (Service Type)
+                </label>
+                <select
+                  value={addJobCrossSell}
+                  onChange={(e) => setAddJobCrossSell(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                >
+                  <option value="">Select service type</option>
+                  <option value="One-Time Cleanup">One-Time Cleanup</option>
+                  <option value="Initial Cleanup">Initial Cleanup</option>
+                  <option value="Deep Clean">Deep Clean</option>
+                  <option value="Yard Deodorizing">Yard Deodorizing</option>
+                  <option value="Sanitizing Service">Sanitizing Service</option>
+                </select>
+              </div>
+
+              {/* Price Per Unit */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Price Per Unit ($)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={addJobPrice}
+                  onChange={(e) => setAddJobPrice(e.target.value)}
+                  placeholder="0.00"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                />
+              </div>
+
+              {/* Tech */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Custom Job Tech
+                </label>
+                <select
+                  value={addJobTechId}
+                  onChange={(e) => setAddJobTechId(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                >
+                  <option value="">Select Tech (Optional)</option>
+                  {staffList.map((staff) => (
+                    <option key={staff.id} value={staff.id}>
+                      {staff.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Date */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Custom Job Date
+                </label>
+                <input
+                  type="date"
+                  value={addJobDate}
+                  onChange={(e) => setAddJobDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                />
+              </div>
+
+              {/* Estimated Time */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Estimated Time (minutes)
+                </label>
+                <input
+                  type="number"
+                  value={addJobEstimatedTime}
+                  onChange={(e) => setAddJobEstimatedTime(e.target.value)}
+                  placeholder="30"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                />
+              </div>
+
+              {/* Reoptimize Route */}
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="reoptimize"
+                  checked={addJobReoptimize}
+                  onChange={(e) => setAddJobReoptimize(e.target.checked)}
+                  className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                />
+                <label htmlFor="reoptimize" className="text-sm text-gray-700">
+                  Reoptimize Route
+                </label>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 p-4 border-t border-gray-200">
+              <button
+                onClick={() => setShowAddResidentialModal(false)}
+                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleAddJobSubmit("residential")}
+                disabled={!addJobClientId || !addJobDate}
+                className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50"
+              >
+                Create Job
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Commercial Job Modal */}
+      {showAddCommercialModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">Set Up Commercial Custom Job</h2>
+              <button
+                onClick={() => setShowAddCommercialModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 space-y-4">
+              {/* Info Banner */}
+              <div className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg">
+                <Info className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-blue-700">
+                  Add a NEW Commercial Custom Job for a client that does not currently have any Subscription.
+                  Client won&apos;t be charged via Autopay. An invoice will need to be created separately.
+                </p>
+              </div>
+
+              {/* Client Search */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Custom Job Client
+                </label>
+                <div className="relative">
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                    <Search className="w-4 h-4" />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Search clients..."
+                    value={clientSearchQuery}
+                    onChange={(e) => setClientSearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                  />
+                </div>
+                <select
+                  value={addJobClientId}
+                  onChange={(e) => setAddJobClientId(e.target.value)}
+                  size={5}
+                  className="w-full mt-2 px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                >
+                  <option value="">Select a client</option>
+                  {filteredClients.map((client) => (
+                    <option key={client.id} value={client.id}>
+                      {client.companyName || `${client.firstName} ${client.lastName}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Cross-Sell */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Cross-Sell (Service Type)
+                </label>
+                <select
+                  value={addJobCrossSell}
+                  onChange={(e) => setAddJobCrossSell(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                >
+                  <option value="">Select service type</option>
+                  <option value="Commercial Cleanup">Commercial Cleanup</option>
+                  <option value="One-Time Cleanup">One-Time Cleanup</option>
+                  <option value="Deep Clean">Deep Clean</option>
+                  <option value="Sanitizing Service">Sanitizing Service</option>
+                  <option value="Deodorizing Service">Deodorizing Service</option>
+                </select>
+              </div>
+
+              {/* Price Per Unit */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Price Per Unit ($)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={addJobPrice}
+                  onChange={(e) => setAddJobPrice(e.target.value)}
+                  placeholder="0.00"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                />
+              </div>
+
+              {/* Tech */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Custom Job Tech
+                </label>
+                <select
+                  value={addJobTechId}
+                  onChange={(e) => setAddJobTechId(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                >
+                  <option value="">Select Tech (Optional)</option>
+                  {staffList.map((staff) => (
+                    <option key={staff.id} value={staff.id}>
+                      {staff.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Date */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Custom Job Date
+                </label>
+                <input
+                  type="date"
+                  value={addJobDate}
+                  onChange={(e) => setAddJobDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                />
+              </div>
+
+              {/* Estimated Time */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Estimated Time (minutes)
+                </label>
+                <input
+                  type="number"
+                  value={addJobEstimatedTime}
+                  onChange={(e) => setAddJobEstimatedTime(e.target.value)}
+                  placeholder="30"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                />
+              </div>
+
+              {/* Reoptimize Route */}
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="reoptimize-commercial"
+                  checked={addJobReoptimize}
+                  onChange={(e) => setAddJobReoptimize(e.target.checked)}
+                  className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                />
+                <label htmlFor="reoptimize-commercial" className="text-sm text-gray-700">
+                  Reoptimize Route
+                </label>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 p-4 border-t border-gray-200">
+              <button
+                onClick={() => setShowAddCommercialModal(false)}
+                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleAddJobSubmit("commercial")}
+                disabled={!addJobClientId || !addJobDate}
+                className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50"
+              >
+                Create Job
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Residential One-Time Add-On Service Modal */}
+      {showAddResAddOnModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">Add Residential One-Time Add-On Service</h2>
+              <button
+                onClick={() => setShowAddResAddOnModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 space-y-4">
+              {/* Info Banner */}
+              <div className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg">
+                <Info className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-blue-700">
+                  Add a one-time add-on service for a residential client.
+                  This will be scheduled as a separate job linked to the selected job.
+                </p>
+              </div>
+
+              {/* Add-On Service Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Add-On Service
+                </label>
+                <select
+                  value={selectedAddOnId}
+                  onChange={(e) => {
+                    setSelectedAddOnId(e.target.value);
+                    // Auto-fill price when add-on is selected
+                    const addOn = addOnList.find((a) => a.id === e.target.value);
+                    if (addOn) {
+                      setAddJobPrice((addOn.priceCents / 100).toFixed(2));
+                    }
+                  }}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                >
+                  <option value="">Select add-on service</option>
+                  {addOnList.map((addOn) => (
+                    <option key={addOn.id} value={addOn.id}>
+                      {addOn.name} - ${(addOn.priceCents / 100).toFixed(2)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Client Search */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Client
+                </label>
+                <div className="relative">
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                    <Search className="w-4 h-4" />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Search clients..."
+                    value={clientSearchQuery}
+                    onChange={(e) => setClientSearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                  />
+                </div>
+                <select
+                  value={addJobClientId}
+                  onChange={(e) => setAddJobClientId(e.target.value)}
+                  size={5}
+                  className="w-full mt-2 px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                >
+                  <option value="">Select a client</option>
+                  {filteredClients.map((client) => (
+                    <option key={client.id} value={client.id}>
+                      {client.firstName} {client.lastName}
+                      {client.companyName ? ` (${client.companyName})` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Price Override */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Price ($)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={addJobPrice}
+                  onChange={(e) => setAddJobPrice(e.target.value)}
+                  placeholder="0.00"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                />
+                <p className="text-xs text-gray-500 mt-1">Leave blank to use default add-on price</p>
+              </div>
+
+              {/* Tech */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Assign To
+                </label>
+                <select
+                  value={addJobTechId}
+                  onChange={(e) => setAddJobTechId(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                >
+                  <option value="">Select Tech (Optional)</option>
+                  {staffList.map((staff) => (
+                    <option key={staff.id} value={staff.id}>
+                      {staff.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Date */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Service Date
+                </label>
+                <input
+                  type="date"
+                  value={addJobDate}
+                  onChange={(e) => setAddJobDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 p-4 border-t border-gray-200">
+              <button
+                onClick={() => setShowAddResAddOnModal(false)}
+                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleAddOnServiceSubmit("residential")}
+                disabled={!selectedAddOnId || !addJobClientId || !addJobDate}
+                className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50"
+              >
+                Add Service
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Commercial One-Time Add-On Service Modal */}
+      {showAddCommAddOnModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">Add Commercial One-Time Add-On Service</h2>
+              <button
+                onClick={() => setShowAddCommAddOnModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 space-y-4">
+              {/* Info Banner */}
+              <div className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg">
+                <Info className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-blue-700">
+                  Add a one-time add-on service for a commercial client.
+                  This will be scheduled as a separate job linked to the selected job.
+                </p>
+              </div>
+
+              {/* Add-On Service Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Add-On Service
+                </label>
+                <select
+                  value={selectedAddOnId}
+                  onChange={(e) => {
+                    setSelectedAddOnId(e.target.value);
+                    // Auto-fill price when add-on is selected
+                    const addOn = addOnList.find((a) => a.id === e.target.value);
+                    if (addOn) {
+                      setAddJobPrice((addOn.priceCents / 100).toFixed(2));
+                    }
+                  }}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                >
+                  <option value="">Select add-on service</option>
+                  {addOnList.map((addOn) => (
+                    <option key={addOn.id} value={addOn.id}>
+                      {addOn.name} - ${(addOn.priceCents / 100).toFixed(2)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Client Search */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Client
+                </label>
+                <div className="relative">
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                    <Search className="w-4 h-4" />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Search clients..."
+                    value={clientSearchQuery}
+                    onChange={(e) => setClientSearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                  />
+                </div>
+                <select
+                  value={addJobClientId}
+                  onChange={(e) => setAddJobClientId(e.target.value)}
+                  size={5}
+                  className="w-full mt-2 px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                >
+                  <option value="">Select a client</option>
+                  {filteredClients.map((client) => (
+                    <option key={client.id} value={client.id}>
+                      {client.companyName || `${client.firstName} ${client.lastName}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Price Override */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Price ($)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={addJobPrice}
+                  onChange={(e) => setAddJobPrice(e.target.value)}
+                  placeholder="0.00"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                />
+                <p className="text-xs text-gray-500 mt-1">Leave blank to use default add-on price</p>
+              </div>
+
+              {/* Tech */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Assign To
+                </label>
+                <select
+                  value={addJobTechId}
+                  onChange={(e) => setAddJobTechId(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                >
+                  <option value="">Select Tech (Optional)</option>
+                  {staffList.map((staff) => (
+                    <option key={staff.id} value={staff.id}>
+                      {staff.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Date */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Service Date
+                </label>
+                <input
+                  type="date"
+                  value={addJobDate}
+                  onChange={(e) => setAddJobDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 p-4 border-t border-gray-200">
+              <button
+                onClick={() => setShowAddCommAddOnModal(false)}
+                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleAddOnServiceSubmit("commercial")}
+                disabled={!selectedAddOnId || !addJobClientId || !addJobDate}
+                className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50"
+              >
+                Add Service
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
