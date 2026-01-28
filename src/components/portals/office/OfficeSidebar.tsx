@@ -82,8 +82,8 @@ const navigation: NavItem[] = [
     children: [
       { name: "Residential Subscriptions", href: "/app/office/subscriptions/residential" },
       { name: "Commercial Subscriptions", href: "/app/office/subscriptions/commercial" },
-      { name: "Recurring Invoices", href: "/app/office/invoices" },
-      { name: "One Time Invoices", href: "/app/office/invoices/one-time" },
+      { name: "Recurring Invoices", href: "/app/office/billing/recurring-invoices" },
+      { name: "One Time Invoices", href: "/app/office/invoices" },
       { name: "Payments", href: "/app/office/payments" },
       { name: "Coupons", href: "/app/office/coupons" },
       { name: "Gift Certificates", href: "/app/office/gift-cards" },
