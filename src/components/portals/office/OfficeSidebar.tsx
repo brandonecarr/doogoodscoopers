@@ -183,8 +183,8 @@ export function OfficeSidebar({ user }: OfficeSidebarProps) {
               <Dog className="w-6 h-6 text-white" />
             </div>
             <div>
-              <span className="text-gray-900 font-bold">DooGoodScoopers</span>
-              <p className="text-xs text-gray-700">Office Portal</p>
+              <span className="text-white font-bold">DooGoodScoopers</span>
+              <p className="text-xs text-white/70">Office Portal</p>
             </div>
           </div>
 
@@ -205,22 +205,22 @@ export function OfficeSidebar({ user }: OfficeSidebarProps) {
                           className={cn(
                             "w-full group flex items-center justify-between rounded-md p-2 text-sm font-medium leading-6 transition-colors",
                             isActive
-                              ? "bg-white/50 text-gray-900"
-                              : "text-gray-700 hover:bg-white/30"
+                              ? "bg-white/30 text-white"
+                              : "text-white hover:bg-white/20"
                           )}
                         >
                           <div className="flex items-center gap-x-3">
                             <item.icon
                               className={cn(
                                 "h-5 w-5 shrink-0",
-                                isActive ? "text-teal-700" : "text-gray-600"
+                                isActive ? "text-white" : "text-white/80"
                               )}
                             />
                             {item.name}
                           </div>
                           <ChevronDown
                             className={cn(
-                              "h-4 w-4 text-gray-600 transition-transform",
+                              "h-4 w-4 text-white/80 transition-transform",
                               isExpanded && "rotate-180"
                             )}
                           />
@@ -236,8 +236,8 @@ export function OfficeSidebar({ user }: OfficeSidebarProps) {
                                     className={cn(
                                       "block rounded-md py-2 pl-11 pr-2 text-sm leading-6 transition-colors",
                                       childActive
-                                        ? "bg-white/50 text-gray-900 font-medium"
-                                        : "text-gray-700 hover:bg-white/30 hover:text-gray-900"
+                                        ? "bg-white/30 text-white font-medium"
+                                        : "text-white/80 hover:bg-white/20 hover:text-white"
                                     )}
                                   >
                                     {child.name}
@@ -254,14 +254,14 @@ export function OfficeSidebar({ user }: OfficeSidebarProps) {
                         className={cn(
                           "group flex items-center gap-x-3 rounded-md p-2 text-sm font-medium leading-6 transition-colors",
                           isActive
-                            ? "bg-white/50 text-gray-900"
-                            : "text-gray-700 hover:bg-white/30"
+                            ? "bg-white/30 text-white"
+                            : "text-white hover:bg-white/20"
                         )}
                       >
                         <item.icon
                           className={cn(
                             "h-5 w-5 shrink-0",
-                            isActive ? "text-teal-700" : "text-gray-600"
+                            isActive ? "text-white" : "text-white/80"
                           )}
                         />
                         {item.name}
@@ -280,10 +280,10 @@ export function OfficeSidebar({ user }: OfficeSidebarProps) {
                 {user.firstName?.[0] || user.email[0].toUpperCase()}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-gray-900 truncate">
+                <p className="text-sm font-medium text-white truncate">
                   {user.firstName || user.email}
                 </p>
-                <p className="text-xs text-gray-700 truncate">{user.role}</p>
+                <p className="text-xs text-white/70 truncate">{user.role}</p>
               </div>
             </div>
           </div>
