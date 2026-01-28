@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
   const today = new Date().toISOString().split("T")[0];
 
   try {
-    // Get all active subscriptions with client and location info
+    // Get all active subscriptions that don't have a tech assigned
     const { data: subscriptions, error: subscriptionsError } = await supabase
       .from("subscriptions")
       .select(`
@@ -61,6 +61,7 @@ export async function GET(request: NextRequest) {
         frequency,
         initial_cleanup_required,
         initial_cleanup_completed,
+        assigned_to,
         created_at,
         client:clients!inner (
           id,
@@ -82,6 +83,7 @@ export async function GET(request: NextRequest) {
       `)
       .eq("org_id", orgId)
       .eq("status", "ACTIVE")
+      .is("assigned_to", null)
       .order("created_at", { ascending: false });
 
     if (subscriptionsError) {

@@ -208,13 +208,16 @@ export async function POST(request: NextRequest) {
       // The initial_cleanup_completed stays false until the job is completed
     }
 
-    // Update subscription preferred_day (use first service day)
+    // Update subscription with preferred_day and assigned_to
     const { serviceDays, techId: recurringTechId } = body.recurringService;
     const primaryDay = serviceDays[0];
 
     await supabase
       .from("subscriptions")
-      .update({ preferred_day: primaryDay })
+      .update({
+        preferred_day: primaryDay,
+        assigned_to: recurringTechId,
+      })
       .eq("id", subscription.id);
 
     // Update all future scheduled jobs with tech and route assignment
