@@ -1,533 +1,822 @@
 "use client";
 
-import { useState, useEffect, useCallback, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useState, useEffect, useCallback } from "react";
 import {
-  ChevronLeft,
-  ChevronRight,
-  Loader2,
-  AlertCircle,
-  CheckCircle,
-  Clock,
-  MapPin,
-  User,
-  Phone,
-  Truck,
-  Play,
-  Pause,
-  SkipForward,
+  Calendar,
   RefreshCw,
+  ChevronDown,
+  AlertCircle,
+  Eye,
+  RotateCcw,
+  Trash2,
+  MoreVertical,
+  Image,
+  MessageSquare,
+  UserPlus,
+  CalendarDays,
+  Target,
+  SkipForward,
+  Plus,
+  Repeat,
 } from "lucide-react";
+import Link from "next/link";
 
 interface Job {
   id: string;
+  scheduledDate: string;
   status: string;
-  route_id: string | null;
-  route_order: number | null;
-  scheduled_date: string;
-  started_at: string | null;
-  completed_at: string | null;
-  duration_minutes: number | null;
-  price_cents: number;
-  client: {
-    id: string;
-    first_name: string;
-    last_name: string;
-    phone: string;
-  } | null;
-  location: {
-    id: string;
-    address_line1: string;
-    city: string;
-    zip_code: string;
-    latitude: number | null;
-    longitude: number | null;
-  } | null;
-  assigned_user: {
-    id: string;
-    first_name: string;
-    last_name: string;
-  } | null;
+  jobType: string;
+  clientId: string;
+  clientName: string;
+  assignedToId: string | null;
+  assignedToName: string;
+  serviceName: string;
+  completedAt: string | null;
+  estimatedMinutes: number;
+  durationMinutes: number | null;
+  notes: string | null;
+  internalNotes: string | null;
+  photos: string[] | null;
 }
 
-interface Route {
+interface StaffMember {
   id: string;
-  name: string | null;
-  status: string;
-  route_date: string;
-  start_time: string | null;
-  end_time: string | null;
-  assigned_user: {
-    id: string;
-    first_name: string;
-    last_name: string;
-    phone: string;
-  } | null;
+  name: string;
 }
 
-interface DispatchData {
-  date: string;
-  jobs: Job[];
-  routes: Route[];
-  jobStats: {
-    total: number;
-    scheduled: number;
-    en_route: number;
-    in_progress: number;
-    completed: number;
-    skipped: number;
-    canceled: number;
-    unassigned: number;
-  };
-  routeStats: {
-    total: number;
-    planned: number;
-    in_progress: number;
-    completed: number;
-  };
-  jobsByRoute: Record<string, Job[]>;
-  revenueMetrics: {
-    scheduled_total: number;
-    completed_total: number;
-    completion_rate: number;
-  };
-  activeStaff: Array<{
-    id: string;
-    status: string;
-    clock_in: string;
-    user: {
-      id: string;
-      first_name: string;
-      last_name: string;
-      phone: string;
-    } | null;
-  }>;
-}
+const JOB_STATUSES = [
+  { value: "SCHEDULED", label: "Pending", color: "text-gray-500" },
+  { value: "EN_ROUTE", label: "Dispatched", color: "text-orange-500" },
+  { value: "IN_PROGRESS", label: "In Progress", color: "text-blue-500" },
+  { value: "COMPLETED", label: "Completed", color: "text-green-600" },
+  { value: "SKIPPED", label: "Skipped", color: "text-yellow-600" },
+  { value: "CANCELED", label: "Canceled", color: "text-gray-400" },
+  { value: "MISSED", label: "Missed", color: "text-red-500" },
+];
 
-function DispatchContent() {
-  const searchParams = useSearchParams();
-  const dateParam = searchParams.get("date");
+const JOB_TYPES = [
+  { value: "RECURRING", label: "Recurring" },
+  { value: "ONE_TIME", label: "One Time" },
+  { value: "ADD_ON", label: "Add-On" },
+];
 
-  const [currentDate, setCurrentDate] = useState(() => {
-    if (dateParam) {
-      return new Date(dateParam + "T00:00:00");
-    }
-    return new Date();
-  });
-  const [dispatchData, setDispatchData] = useState<DispatchData | null>(null);
+export default function DispatchBoardPage() {
   const [loading, setLoading] = useState(true);
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [staffList, setStaffList] = useState<StaffMember[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
-  const fetchDispatchData = useCallback(async () => {
+  // Filters
+  const [selectedDate, setSelectedDate] = useState<string>(() => {
+    return new Date().toISOString().split("T")[0];
+  });
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
+  const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
+  const [selectedTech, setSelectedTech] = useState<string>("");
+
+  // Dropdowns
+  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
+  const [typeDropdownOpen, setTypeDropdownOpen] = useState(false);
+  const [actionsDropdownOpen, setActionsDropdownOpen] = useState(false);
+
+  // Selection
+  const [selectedJobs, setSelectedJobs] = useState<string[]>([]);
+
+  const fetchJobs = useCallback(async () => {
     setLoading(true);
     setError(null);
-
     try {
-      const response = await fetch(
-        `/api/admin/dispatch?date=${currentDate.toISOString().split("T")[0]}`
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch dispatch data");
+      const params = new URLSearchParams();
+      params.set("date", selectedDate);
+      if (selectedStatuses.length > 0) {
+        params.set("status", selectedStatuses.join(","));
+      }
+      if (selectedTech) {
+        params.set("assignedTo", selectedTech);
       }
 
-      const data = await response.json();
-      setDispatchData(data);
+      const res = await fetch(`/api/admin/jobs?${params}`);
+      const data = await res.json();
+
+      if (res.ok) {
+        // Format jobs
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const formattedJobs: Job[] = (data.jobs || []).map((job: any) => {
+          const clientName = job.client
+            ? `${job.client.first_name || ""} ${job.client.last_name || ""}`.trim()
+            : "Unknown";
+          const assignedName = job.assigned_user
+            ? `${job.assigned_user.first_name || ""} ${job.assigned_user.last_name || ""}`.trim()
+            : "Unassigned";
+
+          // Get service name from subscription plan or metadata
+          let serviceName = "No data";
+          if (job.subscription?.plan?.name) {
+            serviceName = job.subscription.plan.name;
+          } else if (job.metadata?.service_name) {
+            serviceName = job.metadata.service_name;
+          }
+
+          // Determine job type
+          let jobType = "RECURRING";
+          if (job.metadata?.job_type) {
+            jobType = job.metadata.job_type;
+          } else if (!job.subscription_id) {
+            jobType = "ONE_TIME";
+          }
+
+          // Check if job is missed (past date, not completed)
+          let status = job.status;
+          const today = new Date().toISOString().split("T")[0];
+          if (job.scheduled_date < today && !["COMPLETED", "SKIPPED", "CANCELED"].includes(job.status)) {
+            status = "MISSED";
+          }
+
+          return {
+            id: job.id,
+            scheduledDate: job.scheduled_date,
+            status,
+            jobType,
+            clientId: job.client_id,
+            clientName,
+            assignedToId: job.assigned_to,
+            assignedToName: assignedName,
+            serviceName,
+            completedAt: job.completed_at,
+            estimatedMinutes: job.metadata?.estimated_minutes || 30,
+            durationMinutes: job.duration_minutes,
+            notes: job.notes,
+            internalNotes: job.internal_notes,
+            photos: job.photos,
+          };
+        });
+
+        // Filter by job type if selected
+        const filteredJobs = selectedTypes.length > 0
+          ? formattedJobs.filter((j) => selectedTypes.includes(j.jobType))
+          : formattedJobs;
+
+        setJobs(filteredJobs);
+      } else {
+        setError(data.error || "Failed to load jobs");
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
+      console.error("Error fetching jobs:", err);
+      setError("Failed to load jobs");
     } finally {
       setLoading(false);
     }
-  }, [currentDate]);
+  }, [selectedDate, selectedStatuses, selectedTech, selectedTypes]);
+
+  const fetchStaff = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/staff");
+      const data = await res.json();
+      if (res.ok) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const staff = (data.users || []).map((u: any) => ({
+          id: u.id,
+          name: `${u.first_name || ""} ${u.last_name || ""}`.trim() || u.email,
+        }));
+        setStaffList(staff);
+      }
+    } catch (err) {
+      console.error("Error fetching staff:", err);
+    }
+  }, []);
 
   useEffect(() => {
-    fetchDispatchData();
-  }, [fetchDispatchData]);
+    fetchJobs();
+    fetchStaff();
+  }, [fetchJobs, fetchStaff]);
 
-  const prevDay = () => {
-    const newDate = new Date(currentDate);
-    newDate.setDate(newDate.getDate() - 1);
-    setCurrentDate(newDate);
+  const handleGo = () => {
+    fetchJobs();
   };
 
-  const nextDay = () => {
-    const newDate = new Date(currentDate);
-    newDate.setDate(newDate.getDate() + 1);
-    setCurrentDate(newDate);
+  const resetFilters = () => {
+    setSelectedDate(new Date().toISOString().split("T")[0]);
+    setSelectedStatuses([]);
+    setSelectedTypes([]);
+    setSelectedTech("");
   };
 
-  const goToToday = () => {
-    setCurrentDate(new Date());
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "COMPLETED":
-        return "bg-green-100 text-green-700";
-      case "IN_PROGRESS":
-        return "bg-blue-100 text-blue-700";
-      case "EN_ROUTE":
-        return "bg-purple-100 text-purple-700";
-      case "SKIPPED":
-        return "bg-yellow-100 text-yellow-700";
-      case "CANCELED":
-        return "bg-red-100 text-red-700";
-      default:
-        return "bg-gray-100 text-gray-700";
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "COMPLETED":
-        return <CheckCircle className="w-4 h-4" />;
-      case "IN_PROGRESS":
-        return <Play className="w-4 h-4" />;
-      case "EN_ROUTE":
-        return <Truck className="w-4 h-4" />;
-      case "SKIPPED":
-        return <SkipForward className="w-4 h-4" />;
-      case "CANCELED":
-        return <Pause className="w-4 h-4" />;
-      default:
-        return <Clock className="w-4 h-4" />;
-    }
-  };
-
-  const formatDate = (date: Date) => {
-    const options: Intl.DateTimeFormatOptions = {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    };
-    return date.toLocaleDateString("en-US", options);
-  };
-
-  const isToday = (date: Date) => {
-    const today = new Date();
-    return (
-      date.getDate() === today.getDate() &&
-      date.getMonth() === today.getMonth() &&
-      date.getFullYear() === today.getFullYear()
+  const toggleStatus = (status: string) => {
+    setSelectedStatuses((prev) =>
+      prev.includes(status) ? prev.filter((s) => s !== status) : [...prev, status]
     );
   };
 
-  const renderJobCard = (job: Job) => (
-    <div
-      key={job.id}
-      className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow"
-    >
-      <div className="flex items-start justify-between">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span
-              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
-                job.status
-              )}`}
-            >
-              {getStatusIcon(job.status)}
-              {job.status.replace("_", " ")}
-            </span>
-            {job.route_order && (
-              <span className="text-xs text-gray-500">Stop #{job.route_order}</span>
-            )}
-          </div>
+  const toggleType = (type: string) => {
+    setSelectedTypes((prev) =>
+      prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
+    );
+  };
 
-          <h4 className="mt-2 font-medium text-gray-900 truncate">
-            {job.client
-              ? `${job.client.first_name} ${job.client.last_name}`
-              : "Unknown Client"}
-          </h4>
+  const toggleJobSelection = (jobId: string) => {
+    setSelectedJobs((prev) =>
+      prev.includes(jobId) ? prev.filter((id) => id !== jobId) : [...prev, jobId]
+    );
+  };
 
-          {job.location && (
-            <div className="mt-1 flex items-center text-sm text-gray-500">
-              <MapPin className="w-4 h-4 mr-1 flex-shrink-0" />
-              <span className="truncate">
-                {job.location.address_line1}, {job.location.city}
-              </span>
-            </div>
-          )}
+  const toggleAllJobs = () => {
+    if (selectedJobs.length === jobs.length) {
+      setSelectedJobs([]);
+    } else {
+      setSelectedJobs(jobs.map((j) => j.id));
+    }
+  };
 
-          {job.client?.phone && (
-            <div className="mt-1 flex items-center text-sm text-gray-500">
-              <Phone className="w-4 h-4 mr-1 flex-shrink-0" />
-              {job.client.phone}
-            </div>
-          )}
+  const formatTime = (dateTimeString: string | null) => {
+    if (!dateTimeString) return "--:--:--";
+    return new Date(dateTimeString).toLocaleString("en-US", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    }).replace(",", "");
+  };
 
-          {job.assigned_user && (
-            <div className="mt-1 flex items-center text-sm text-gray-500">
-              <User className="w-4 h-4 mr-1 flex-shrink-0" />
-              {job.assigned_user.first_name} {job.assigned_user.last_name}
-            </div>
-          )}
-        </div>
+  const formatDuration = (minutes: number | null) => {
+    if (minutes === null || minutes === undefined) return "--:--";
+    const hrs = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return `${hrs.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")}`;
+  };
 
-        <div className="text-right">
-          <div className="text-sm font-medium text-gray-900">
-            ${(job.price_cents / 100).toFixed(2)}
-          </div>
-          {job.duration_minutes && (
-            <div className="text-xs text-gray-500">{job.duration_minutes} min</div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
+  const formatEstimatedTime = (minutes: number) => {
+    const hrs = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return `${hrs.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")}`;
+  };
+
+  const getStatusDisplay = (status: string) => {
+    const statusConfig = JOB_STATUSES.find((s) => s.value === status);
+    return statusConfig || { label: status, color: "text-gray-500" };
+  };
+
+  const handleDeleteJob = async (jobId: string) => {
+    if (!confirm("Are you sure you want to delete this job?")) return;
+
+    try {
+      const res = await fetch(`/api/admin/jobs?id=${jobId}`, { method: "DELETE" });
+      if (res.ok) {
+        setSuccess("Job deleted successfully");
+        setTimeout(() => setSuccess(null), 3000);
+        fetchJobs();
+      } else {
+        const data = await res.json();
+        setError(data.error || "Failed to delete job");
+      }
+    } catch (err) {
+      console.error("Error deleting job:", err);
+      setError("Failed to delete job");
+    }
+  };
+
+  const handleRecleanJob = async (jobId: string) => {
+    try {
+      const res = await fetch("/api/admin/jobs", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: jobId,
+          status: "SCHEDULED",
+          completed_at: null,
+          duration_minutes: null,
+          started_at: null,
+        }),
+      });
+
+      if (res.ok) {
+        setSuccess("Job marked for reclean");
+        setTimeout(() => setSuccess(null), 3000);
+        fetchJobs();
+      } else {
+        const data = await res.json();
+        setError(data.error || "Failed to mark job for reclean");
+      }
+    } catch (err) {
+      console.error("Error marking reclean:", err);
+      setError("Failed to mark job for reclean");
+    }
+  };
+
+  const handleBulkAction = async (action: string) => {
+    if (selectedJobs.length === 0 && !["add_residential", "add_commercial", "add_res_addon", "add_comm_addon"].includes(action)) {
+      setError("Please select at least one job");
+      return;
+    }
+
+    setActionsDropdownOpen(false);
+
+    switch (action) {
+      case "skip_pending":
+      case "skip_dispatched":
+        try {
+          const res = await fetch("/api/admin/jobs/bulk", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "skip",
+              job_ids: selectedJobs,
+              skip_reason: "Skipped from dispatch board",
+            }),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            setSuccess(`${data.affected} jobs skipped successfully`);
+            setTimeout(() => setSuccess(null), 3000);
+            setSelectedJobs([]);
+            fetchJobs();
+          }
+        } catch {
+          setError("Failed to skip jobs");
+        }
+        break;
+
+      case "reclean":
+        for (const jobId of selectedJobs) {
+          await handleRecleanJob(jobId);
+        }
+        setSelectedJobs([]);
+        break;
+
+      case "delete":
+        if (!confirm(`Are you sure you want to delete ${selectedJobs.length} jobs?`)) return;
+        for (const jobId of selectedJobs) {
+          await fetch(`/api/admin/jobs?id=${jobId}`, { method: "DELETE" });
+        }
+        setSuccess("Jobs deleted successfully");
+        setTimeout(() => setSuccess(null), 3000);
+        setSelectedJobs([]);
+        fetchJobs();
+        break;
+
+      case "reassign":
+        alert("Reassign Tech modal would open here - select a new tech to assign selected jobs");
+        break;
+
+      case "change_date":
+        alert("Change Date modal would open here - select a new date for selected jobs");
+        break;
+
+      default:
+        alert(`Action "${action}" would be implemented here`);
+    }
+  };
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => {
+      setStatusDropdownOpen(false);
+      setTypeDropdownOpen(false);
+      setActionsDropdownOpen(false);
+    };
+    document.addEventListener("click", handleClickOutside);
+    return () => document.removeEventListener("click", handleClickOutside);
+  }, []);
+
+  const statusLabel = selectedStatuses.length === 0
+    ? "All Statuses"
+    : selectedStatuses.length === 1
+    ? JOB_STATUSES.find((s) => s.value === selectedStatuses[0])?.label
+    : `${JOB_STATUSES.find((s) => s.value === selectedStatuses[0])?.label} (+${selectedStatuses.length - 1} others)`;
+
+  const typeLabel = selectedTypes.length === 0
+    ? "All Types"
+    : selectedTypes.length === 1
+    ? JOB_TYPES.find((t) => t.value === selectedTypes[0])?.label
+    : `${JOB_TYPES.find((t) => t.value === selectedTypes[0])?.label} (+${selectedTypes.length - 1} others)`;
 
   return (
     <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Dispatch Board</h1>
-          <p className="text-gray-600">Real-time view of today&apos;s operations</p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={prevDay}
-            className="p-2 hover:bg-gray-100 rounded-lg"
-          >
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-
-          <button
-            onClick={goToToday}
-            className={`px-4 py-2 text-sm font-medium rounded-lg ${
-              isToday(currentDate)
-                ? "bg-teal-600 text-white"
-                : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
-            }`}
-          >
-            Today
-          </button>
-
-          <button
-            onClick={nextDay}
-            className="p-2 hover:bg-gray-100 rounded-lg"
-          >
-            <ChevronRight className="w-5 h-5" />
-          </button>
-
-          <button
-            onClick={fetchDispatchData}
-            className="p-2 hover:bg-gray-100 rounded-lg ml-2"
-            title="Refresh"
-          >
-            <RefreshCw className="w-5 h-5" />
-          </button>
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-gray-900">Dispatch Board</h1>
+        <div className="flex items-center gap-2 border-l-4 border-teal-500 pl-3">
+          <span className="text-3xl font-bold text-teal-600">{jobs.length}</span>
+          <div className="text-xs text-gray-500 leading-tight">
+            <div>JOBS</div>
+            <div>TOTAL</div>
+          </div>
         </div>
       </div>
 
-      {/* Date Display */}
-      <div className="text-center">
-        <h2 className="text-xl font-semibold text-gray-900">{formatDate(currentDate)}</h2>
-      </div>
-
-      {/* Loading State */}
-      {loading && (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-8 h-8 animate-spin text-teal-600" />
-        </div>
-      )}
-
-      {/* Error State */}
+      {/* Messages */}
       {error && (
-        <div className="flex items-center justify-center py-12 text-red-600">
-          <AlertCircle className="w-5 h-5 mr-2" />
+        <div className="flex items-center gap-2 p-4 bg-red-50 text-red-700 rounded-lg">
+          <AlertCircle className="w-5 h-5 flex-shrink-0" />
           {error}
+          <button onClick={() => setError(null)} className="ml-auto text-red-500 hover:text-red-700">×</button>
+        </div>
+      )}
+      {success && (
+        <div className="flex items-center gap-2 p-4 bg-green-50 text-green-700 rounded-lg">
+          {success}
+          <button onClick={() => setSuccess(null)} className="ml-auto text-green-500 hover:text-green-700">×</button>
         </div>
       )}
 
-      {/* Dispatch Content */}
-      {!loading && !error && dispatchData && (
-        <>
-          {/* Stats Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4">
-            <div className="bg-white rounded-lg shadow p-4">
-              <div className="text-sm text-gray-500">Total Jobs</div>
-              <div className="text-2xl font-bold text-gray-900">
-                {dispatchData.jobStats.total}
+      {/* Filters */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-4">
+        <div className="flex flex-wrap items-center gap-4">
+          {/* Date Picker */}
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Date</label>
+            <div className="relative">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                <Calendar className="w-4 h-4" />
               </div>
-            </div>
-            <div className="bg-white rounded-lg shadow p-4">
-              <div className="text-sm text-gray-500">Completed</div>
-              <div className="text-2xl font-bold text-green-600">
-                {dispatchData.jobStats.completed}
-              </div>
-            </div>
-            <div className="bg-white rounded-lg shadow p-4">
-              <div className="text-sm text-gray-500">In Progress</div>
-              <div className="text-2xl font-bold text-blue-600">
-                {dispatchData.jobStats.in_progress}
-              </div>
-            </div>
-            <div className="bg-white rounded-lg shadow p-4">
-              <div className="text-sm text-gray-500">Scheduled</div>
-              <div className="text-2xl font-bold text-gray-600">
-                {dispatchData.jobStats.scheduled}
-              </div>
-            </div>
-            <div className="bg-white rounded-lg shadow p-4">
-              <div className="text-sm text-gray-500">Completion</div>
-              <div className="text-2xl font-bold text-teal-600">
-                {dispatchData.revenueMetrics.completion_rate}%
-              </div>
-            </div>
-            <div className="bg-white rounded-lg shadow p-4">
-              <div className="text-sm text-gray-500">Revenue</div>
-              <div className="text-2xl font-bold text-gray-900">
-                ${(dispatchData.revenueMetrics.completed_total / 100).toLocaleString()}
-              </div>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="pl-10 pr-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+              />
             </div>
           </div>
 
-          {/* Active Staff */}
-          {dispatchData.activeStaff.length > 0 && (
-            <div className="bg-white rounded-lg shadow overflow-hidden">
-              <div className="px-4 py-3 border-b border-gray-200">
-                <h3 className="font-semibold text-gray-900">Active Staff</h3>
-              </div>
-              <div className="p-4">
-                <div className="flex flex-wrap gap-4">
-                  {dispatchData.activeStaff.map((staff) => (
-                    <div
-                      key={staff.id}
-                      className="flex items-center gap-2 bg-green-50 rounded-lg px-3 py-2"
+          {/* Status Dropdown */}
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Job Status</label>
+            <div className="relative">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setStatusDropdownOpen(!statusDropdownOpen);
+                  setTypeDropdownOpen(false);
+                }}
+                className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 min-w-[180px] bg-white"
+              >
+                <span className="text-sm">{statusLabel}</span>
+                <ChevronDown className="w-4 h-4 ml-auto" />
+              </button>
+              {statusDropdownOpen && (
+                <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 min-w-[200px]">
+                  {JOB_STATUSES.map((status) => (
+                    <label
+                      key={status.value}
+                      className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 cursor-pointer"
                     >
-                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                      <span className="font-medium text-green-800">
-                        {staff.user
-                          ? `${staff.user.first_name} ${staff.user.last_name}`
-                          : "Unknown"}
-                      </span>
-                      <span className="text-xs text-green-600">
-                        {staff.status === "ON_BREAK" ? "On Break" : "Active"}
-                      </span>
-                    </div>
+                      <input
+                        type="checkbox"
+                        checked={selectedStatuses.includes(status.value)}
+                        onChange={() => toggleStatus(status.value)}
+                        className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                      />
+                      <span className={`text-sm ${status.color}`}>{status.label}</span>
+                    </label>
                   ))}
                 </div>
-              </div>
+              )}
             </div>
-          )}
-
-          {/* Routes & Jobs */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-            {/* Unassigned Jobs */}
-            {dispatchData.jobsByRoute.unassigned &&
-              dispatchData.jobsByRoute.unassigned.length > 0 && (
-                <div className="bg-orange-50 rounded-lg shadow overflow-hidden">
-                  <div className="px-4 py-3 border-b border-orange-200 bg-orange-100">
-                    <div className="flex items-center justify-between">
-                      <h3 className="font-semibold text-orange-800">
-                        Unassigned Jobs
-                      </h3>
-                      <span className="bg-orange-200 text-orange-800 px-2 py-0.5 rounded-full text-sm">
-                        {dispatchData.jobsByRoute.unassigned.length}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="p-4 space-y-3 max-h-[500px] overflow-y-auto">
-                    {dispatchData.jobsByRoute.unassigned.map(renderJobCard)}
-                  </div>
-                </div>
-              )}
-
-            {/* Routes */}
-            {dispatchData.routes.map((route) => {
-              const routeJobs = dispatchData.jobsByRoute[route.id] || [];
-              const completedCount = routeJobs.filter(
-                (j) => j.status === "COMPLETED"
-              ).length;
-
-              return (
-                <div
-                  key={route.id}
-                  className="bg-white rounded-lg shadow overflow-hidden"
-                >
-                  <div
-                    className={`px-4 py-3 border-b ${
-                      route.status === "IN_PROGRESS"
-                        ? "bg-blue-50 border-blue-200"
-                        : route.status === "COMPLETED"
-                        ? "bg-green-50 border-green-200"
-                        : "bg-gray-50 border-gray-200"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="font-semibold text-gray-900">
-                          {route.name || `Route ${route.id.slice(0, 8)}`}
-                        </h3>
-                        {route.assigned_user && (
-                          <p className="text-sm text-gray-600">
-                            {route.assigned_user.first_name}{" "}
-                            {route.assigned_user.last_name}
-                          </p>
-                        )}
-                      </div>
-                      <div className="text-right">
-                        <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                            route.status === "IN_PROGRESS"
-                              ? "bg-blue-100 text-blue-700"
-                              : route.status === "COMPLETED"
-                              ? "bg-green-100 text-green-700"
-                              : "bg-gray-100 text-gray-700"
-                          }`}
-                        >
-                          {route.status.replace("_", " ")}
-                        </span>
-                        <p className="text-sm text-gray-600 mt-1">
-                          {completedCount}/{routeJobs.length} done
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="p-4 space-y-3 max-h-[500px] overflow-y-auto">
-                    {routeJobs.length > 0 ? (
-                      routeJobs.map(renderJobCard)
-                    ) : (
-                      <p className="text-center text-gray-500 py-4">
-                        No jobs assigned
-                      </p>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-
-            {/* Empty State */}
-            {dispatchData.routes.length === 0 &&
-              (!dispatchData.jobsByRoute.unassigned ||
-                dispatchData.jobsByRoute.unassigned.length === 0) && (
-                <div className="col-span-full text-center py-12">
-                  <Truck className="mx-auto h-12 w-12 text-gray-400" />
-                  <h3 className="mt-2 text-sm font-medium text-gray-900">
-                    No jobs scheduled
-                  </h3>
-                  <p className="mt-1 text-sm text-gray-500">
-                    There are no jobs or routes scheduled for this date.
-                  </p>
-                </div>
-              )}
           </div>
-        </>
-      )}
-    </div>
-  );
-}
 
-export default function DispatchPage() {
-  return (
-    <Suspense fallback={
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-8 h-8 animate-spin text-teal-600" />
+          {/* Type Dropdown */}
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Job Type</label>
+            <div className="relative">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setTypeDropdownOpen(!typeDropdownOpen);
+                  setStatusDropdownOpen(false);
+                }}
+                className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 min-w-[180px] bg-white"
+              >
+                <span className="text-sm">{typeLabel}</span>
+                <ChevronDown className="w-4 h-4 ml-auto" />
+              </button>
+              {typeDropdownOpen && (
+                <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 min-w-[180px]">
+                  {JOB_TYPES.map((type) => (
+                    <label
+                      key={type.value}
+                      className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedTypes.includes(type.value)}
+                        onChange={() => toggleType(type.value)}
+                        className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                      />
+                      <span className="text-sm">{type.label}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Tech Dropdown */}
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Field Tech Name</label>
+            <select
+              value={selectedTech}
+              onChange={(e) => setSelectedTech(e.target.value)}
+              className="px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 min-w-[180px] bg-white"
+            >
+              <option value="">All Techs</option>
+              {staffList.map((staff) => (
+                <option key={staff.id} value={staff.id}>
+                  {staff.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* GO Button */}
+          <div className="pt-5">
+            <button
+              onClick={handleGo}
+              disabled={loading}
+              className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 font-medium"
+            >
+              GO
+            </button>
+          </div>
+
+          <div className="flex-1" />
+
+          {/* More Options */}
+          <div className="pt-5">
+            <button className="p-2 text-gray-400 hover:text-gray-600">
+              <MoreVertical className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Refresh */}
+          <div className="pt-5">
+            <button
+              onClick={fetchJobs}
+              disabled={loading}
+              className="p-2 text-teal-600 hover:bg-teal-50 rounded-lg disabled:opacity-50 border border-teal-200"
+            >
+              <RefreshCw className={`w-5 h-5 ${loading ? "animate-spin" : ""}`} />
+            </button>
+          </div>
+
+          {/* Actions Dropdown */}
+          <div className="pt-5 relative">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setActionsDropdownOpen(!actionsDropdownOpen);
+              }}
+              className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
+            >
+              ACTIONS
+              <ChevronDown className="w-4 h-4" />
+            </button>
+            {actionsDropdownOpen && (
+              <div className="absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 min-w-[300px]">
+                <button
+                  onClick={() => handleBulkAction("reassign")}
+                  className="flex items-center gap-3 w-full px-4 py-3 hover:bg-gray-50 text-left"
+                >
+                  <UserPlus className="w-5 h-5 text-gray-500" />
+                  <span>Reassign Tech</span>
+                </button>
+                <button
+                  onClick={() => handleBulkAction("change_date")}
+                  className="flex items-center gap-3 w-full px-4 py-3 hover:bg-gray-50 text-left"
+                >
+                  <CalendarDays className="w-5 h-5 text-gray-500" />
+                  <span>Change Date</span>
+                </button>
+                <button
+                  onClick={() => handleBulkAction("adjust_pending")}
+                  className="flex items-center gap-3 w-full px-4 py-3 hover:bg-gray-50 text-left"
+                >
+                  <Target className="w-5 h-5 text-gray-500" />
+                  <span>Adjust Pending Jobs</span>
+                </button>
+                <button
+                  onClick={() => handleBulkAction("skip_dispatched")}
+                  className="flex items-center gap-3 w-full px-4 py-3 hover:bg-gray-50 text-left"
+                >
+                  <SkipForward className="w-5 h-5 text-orange-500" />
+                  <span>Skip Dispatched</span>
+                </button>
+                <button
+                  onClick={() => handleBulkAction("skip_pending")}
+                  className="flex items-center gap-3 w-full px-4 py-3 hover:bg-gray-50 text-left"
+                >
+                  <SkipForward className="w-5 h-5 text-gray-500" />
+                  <span>Skip Pending</span>
+                </button>
+                <button
+                  onClick={() => handleBulkAction("reclean")}
+                  className="flex items-center gap-3 w-full px-4 py-3 hover:bg-gray-50 text-left"
+                >
+                  <RotateCcw className="w-5 h-5 text-orange-500" />
+                  <span>Reclean Job</span>
+                </button>
+                <div className="border-t border-gray-100" />
+                <button
+                  onClick={() => handleBulkAction("add_residential")}
+                  className="flex items-center gap-3 w-full px-4 py-3 hover:bg-gray-50 text-left"
+                >
+                  <Plus className="w-5 h-5 text-green-500" />
+                  <span>Add Residential Job</span>
+                </button>
+                <button
+                  onClick={() => handleBulkAction("add_commercial")}
+                  className="flex items-center gap-3 w-full px-4 py-3 hover:bg-gray-50 text-left"
+                >
+                  <Plus className="w-5 h-5 text-green-500" />
+                  <span>Add Commercial Job</span>
+                </button>
+                <button
+                  onClick={() => handleBulkAction("add_res_addon")}
+                  className="flex items-center gap-3 w-full px-4 py-3 hover:bg-gray-50 text-left"
+                >
+                  <Repeat className="w-5 h-5 text-teal-500" />
+                  <span>Add Residential One-Time Add-On Service</span>
+                </button>
+                <button
+                  onClick={() => handleBulkAction("add_comm_addon")}
+                  className="flex items-center gap-3 w-full px-4 py-3 hover:bg-gray-50 text-left"
+                >
+                  <Repeat className="w-5 h-5 text-teal-500" />
+                  <span>Add Commercial One-Time Add-On Service</span>
+                </button>
+                <div className="border-t border-gray-100" />
+                <button
+                  onClick={() => handleBulkAction("delete")}
+                  className="flex items-center gap-3 w-full px-4 py-3 hover:bg-gray-50 text-left text-red-600"
+                >
+                  <Trash2 className="w-5 h-5" />
+                  <span>Delete Job</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Reset Filters */}
+        <div className="mt-3">
+          <button
+            onClick={resetFilters}
+            className="text-teal-600 hover:text-teal-700 text-sm font-medium"
+          >
+            Reset Filters
+          </button>
+        </div>
       </div>
-    }>
-      <DispatchContent />
-    </Suspense>
+
+      {/* Table */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50 border-b border-gray-100">
+              <tr>
+                <th className="px-4 py-3 text-left">
+                  <input
+                    type="checkbox"
+                    checked={selectedJobs.length === jobs.length && jobs.length > 0}
+                    onChange={toggleAllJobs}
+                    className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                  />
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Client Name</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cleanup Assign To</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Service Name</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Completed Time</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estimated Time</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Spent Time</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {loading ? (
+                <tr>
+                  <td colSpan={10} className="px-4 py-12 text-center">
+                    <div className="animate-spin w-6 h-6 border-2 border-teal-500 border-t-transparent rounded-full mx-auto" />
+                  </td>
+                </tr>
+              ) : jobs.length === 0 ? (
+                <tr>
+                  <td colSpan={10} className="px-4 py-12 text-center text-gray-500">
+                    No jobs found for this date
+                  </td>
+                </tr>
+              ) : (
+                jobs.map((job) => {
+                  const statusDisplay = getStatusDisplay(job.status);
+                  const hasNotes = job.internalNotes;
+                  const hasPhotos = job.photos && job.photos.length > 0;
+
+                  return (
+                    <tr key={job.id} className="group">
+                      {/* Main row */}
+                      <td className="px-4 py-3 align-top">
+                        <input
+                          type="checkbox"
+                          checked={selectedJobs.includes(job.id)}
+                          onChange={() => toggleJobSelection(job.id)}
+                          className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                        />
+                      </td>
+                      <td className="px-4 py-3 align-top">
+                        {job.jobType === "RECURRING" ? (
+                          <RefreshCw className="w-4 h-4 text-gray-400" />
+                        ) : (
+                          <Repeat className="w-4 h-4 text-blue-400" />
+                        )}
+                      </td>
+                      <td className="px-4 py-3 align-top">
+                        <span className={`text-sm font-medium ${statusDisplay.color}`}>
+                          {statusDisplay.label.toUpperCase()}
+                        </span>
+                        {/* Notes indicator row */}
+                        {hasNotes && (
+                          <div className="mt-2 flex items-center gap-2 text-xs">
+                            <MessageSquare className="w-3 h-3 text-yellow-500" />
+                            <span className="text-teal-600">Note To Office:</span>
+                            <span className="text-gray-600 truncate max-w-[200px]">{job.internalNotes}</span>
+                          </div>
+                        )}
+                        {hasPhotos && (
+                          <div className="mt-1 flex items-center gap-2 text-xs">
+                            <Image className="w-3 h-3 text-blue-500" />
+                            <span className="text-blue-600">Photo to Client</span>
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 align-top">
+                        <div className="flex items-center gap-2">
+                          <button className="text-gray-400 hover:text-gray-600">
+                            <MoreVertical className="w-4 h-4" />
+                          </button>
+                          <Link
+                            href={`/app/office/clients/${job.clientId}`}
+                            className="text-sm text-gray-900 hover:text-teal-600"
+                          >
+                            {job.clientName}
+                          </Link>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 align-top">
+                        <div className="flex items-center gap-2">
+                          <button className="text-gray-400 hover:text-gray-600">
+                            <MoreVertical className="w-4 h-4" />
+                          </button>
+                          <span className="text-sm text-gray-900">{job.assignedToName}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-500 align-top">
+                        {job.serviceName}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-900 align-top">
+                        {formatTime(job.completedAt)}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-900 align-top">
+                        {formatEstimatedTime(job.estimatedMinutes)}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-900 align-top">
+                        {formatDuration(job.durationMinutes)}
+                      </td>
+                      <td className="px-4 py-3 align-top">
+                        <div className="flex items-center gap-1 text-sm">
+                          <Link
+                            href={`/app/office/jobs/${job.id}`}
+                            className="text-teal-600 hover:text-teal-700 flex items-center gap-1"
+                          >
+                            View
+                            {hasPhotos && <Eye className="w-3 h-3" />}
+                          </Link>
+                          <button
+                            onClick={() => handleRecleanJob(job.id)}
+                            className="text-orange-500 hover:text-orange-600 flex items-center gap-1 ml-2"
+                          >
+                            Reclean
+                            <RotateCcw className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteJob(job.id)}
+                            className="text-red-400 hover:text-red-600 flex items-center gap-1 ml-2"
+                          >
+                            Delete
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
   );
 }
