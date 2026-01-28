@@ -58,8 +58,7 @@ export async function GET(request: NextRequest) {
         first_name,
         last_name,
         phone,
-        email,
-        status
+        email
       ),
       location:location_id (
         id,
