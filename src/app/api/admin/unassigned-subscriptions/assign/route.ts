@@ -208,7 +208,9 @@ export async function POST(request: NextRequest) {
       // The initial_cleanup_completed stays false until the job is completed
     }
 
-    // Update subscription with preferred_day and assigned_to
+    // Update subscription with preferred_day
+    // Note: subscriptions table doesn't have assigned_to column
+    // Tech assignment is done at the job/route level
     const { serviceDays, techId: recurringTechId } = body.recurringService;
     const primaryDay = serviceDays[0];
 
@@ -216,7 +218,6 @@ export async function POST(request: NextRequest) {
       .from("subscriptions")
       .update({
         preferred_day: primaryDay,
-        assigned_to: recurringTechId,
       })
       .eq("id", subscription.id);
 
