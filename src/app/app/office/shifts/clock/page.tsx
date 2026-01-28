@@ -22,7 +22,7 @@ export default function StartEndMyShiftPage() {
 
   // Clock In form
   const [startOdometer, setStartOdometer] = useState("");
-  const [isCompanyVehicle, setIsCompanyVehicle] = useState(true);
+  const [isCompanyVehicle, setIsCompanyVehicle] = useState(false);
   const [startNotes, setStartNotes] = useState("");
 
   // Clock Out form
