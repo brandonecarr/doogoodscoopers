@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { GoogleMap, Marker } from "@react-google-maps/api";
 import {
   MapPin,
@@ -8,6 +8,7 @@ import {
   ChevronDown,
   ChevronUp,
   Edit,
+  Pencil,
 } from "lucide-react";
 import { useGoogleMaps } from "@/components/route-planner/GoogleMapsProvider";
 import { calculateBounds } from "@/lib/distance-utils";
@@ -67,8 +68,8 @@ const defaultCenter = {
   lng: -117.8265, // Irvine, CA as default
 };
 
-// Day colors matching Sweep&Go
-const dayColors: Record<string, string> = {
+// Default day colors matching Sweep&Go
+const DEFAULT_DAY_COLORS: Record<string, string> = {
   MONDAY: "#0AEFFF",
   TUESDAY: "#A1FF0A",
   WEDNESDAY: "#580AFF",
@@ -77,6 +78,9 @@ const dayColors: Record<string, string> = {
   SATURDAY: "#FF8700",
   SUNDAY: "#FEE440",
 };
+
+// LocalStorage key for custom colors
+const DAY_COLORS_STORAGE_KEY = "schedule-map-day-colors";
 
 // Unassigned/unknown day color
 const unassignedColor = "#6B7280";
@@ -154,6 +158,30 @@ function getTypeDisplay(item: ScheduleItem): string {
   return "Recurring";
 }
 
+// Load saved colors from localStorage
+function loadSavedColors(): Record<string, string> {
+  if (typeof window === "undefined") return DEFAULT_DAY_COLORS;
+  try {
+    const saved = localStorage.getItem(DAY_COLORS_STORAGE_KEY);
+    if (saved) {
+      return { ...DEFAULT_DAY_COLORS, ...JSON.parse(saved) };
+    }
+  } catch {
+    // Ignore errors
+  }
+  return DEFAULT_DAY_COLORS;
+}
+
+// Save colors to localStorage
+function saveColors(colors: Record<string, string>) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(DAY_COLORS_STORAGE_KEY, JSON.stringify(colors));
+  } catch {
+    // Ignore errors
+  }
+}
+
 export function ScheduleMap({
   schedule,
   techs,
@@ -163,9 +191,19 @@ export function ScheduleMap({
 }: ScheduleMapProps) {
   const [, setMap] = useState<google.maps.Map | null>(null);
   const [selectedItem, setSelectedItem] = useState<ScheduleItem | null>(null);
-  const [showMapKey, setShowMapKey] = useState(true);
+  const [showMapKey, setShowMapKey] = useState(false);
+  const [showEditColorsModal, setShowEditColorsModal] = useState(false);
+  const [dayColors, setDayColors] = useState<Record<string, string>>(DEFAULT_DAY_COLORS);
+  const [editingColors, setEditingColors] = useState<Record<string, string>>(DEFAULT_DAY_COLORS);
 
   const { isLoaded, loadError } = useGoogleMaps();
+
+  // Load saved colors on mount
+  useEffect(() => {
+    const saved = loadSavedColors();
+    setDayColors(saved);
+    setEditingColors(saved);
+  }, []);
 
   // Build tech color map for legend
   const techColorMap = useMemo(() => {
@@ -293,6 +331,30 @@ export function ScheduleMap({
     return getTechInitials(item.assignedTo);
   };
 
+  // Handle opening edit colors modal
+  const handleOpenEditColors = () => {
+    setEditingColors({ ...dayColors });
+    setShowEditColorsModal(true);
+  };
+
+  // Handle saving colors
+  const handleSaveColors = () => {
+    setDayColors(editingColors);
+    saveColors(editingColors);
+    setShowEditColorsModal(false);
+  };
+
+  // Handle reset to default colors
+  const handleResetColors = () => {
+    setEditingColors({ ...DEFAULT_DAY_COLORS });
+  };
+
+  // Handle cancel
+  const handleCancelEditColors = () => {
+    setEditingColors({ ...dayColors });
+    setShowEditColorsModal(false);
+  };
+
   if (loadError) {
     return (
       <div
@@ -343,6 +405,78 @@ export function ScheduleMap({
 
   return (
     <div className={`${className}`}>
+      {/* Edit Day Colors Modal */}
+      {showEditColorsModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div className="p-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-6">
+                Edit Day Colors
+              </h2>
+
+              <div className="space-y-4">
+                {days.map((day) => (
+                  <div key={day} className="flex items-center gap-4">
+                    <div
+                      className="w-6 h-6 rounded-full border border-gray-200 cursor-pointer"
+                      style={{ backgroundColor: editingColors[day] }}
+                    />
+                    <div className="flex-1">
+                      <p className="text-sm text-gray-500">{formatDay(day)} Color</p>
+                      <input
+                        type="text"
+                        value={editingColors[day]}
+                        onChange={(e) =>
+                          setEditingColors({
+                            ...editingColors,
+                            [day]: e.target.value,
+                          })
+                        }
+                        className="w-full text-sm font-mono text-gray-900 border-b border-gray-200 focus:border-teal-500 focus:outline-none py-1"
+                        placeholder="#000000"
+                      />
+                    </div>
+                    <input
+                      type="color"
+                      value={editingColors[day]}
+                      onChange={(e) =>
+                        setEditingColors({
+                          ...editingColors,
+                          [day]: e.target.value.toUpperCase(),
+                        })
+                      }
+                      className="w-8 h-8 cursor-pointer border-0 bg-transparent"
+                    />
+                  </div>
+                ))}
+              </div>
+
+              <button
+                onClick={handleResetColors}
+                className="mt-6 text-teal-600 hover:text-teal-700 text-sm font-medium"
+              >
+                Reset Default Colors
+              </button>
+
+              <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-100">
+                <button
+                  onClick={handleCancelEditColors}
+                  className="px-4 py-2 text-gray-600 hover:text-gray-800 text-sm font-medium"
+                >
+                  CANCEL
+                </button>
+                <button
+                  onClick={handleSaveColors}
+                  className="px-6 py-2 bg-teal-500 text-white rounded hover:bg-teal-600 text-sm font-medium"
+                >
+                  SAVE
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Map Container with Details Panel */}
       <div
         className="rounded-lg overflow-hidden border border-gray-200 flex"
@@ -516,7 +650,7 @@ export function ScheduleMap({
             </p>
 
             {/* Day Colors */}
-            <div className="grid grid-cols-4 gap-3 mb-4">
+            <div className="space-y-2 mb-3">
               {days.map((day) => (
                 <div key={day} className="flex items-center gap-2">
                   <span
@@ -527,6 +661,15 @@ export function ScheduleMap({
                 </div>
               ))}
             </div>
+
+            {/* Edit Colors Link */}
+            <button
+              onClick={handleOpenEditColors}
+              className="flex items-center gap-1 text-teal-600 hover:text-teal-700 text-sm font-medium mb-3"
+            >
+              <Pencil className="w-3 h-3" />
+              Edit colors
+            </button>
 
             {/* Frequency Legend */}
             <div className="border-t border-gray-200 pt-3 mt-3">
