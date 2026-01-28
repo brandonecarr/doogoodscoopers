@@ -203,7 +203,7 @@ export function OfficeSidebar({ user }: OfficeSidebarProps) {
                         <button
                           onClick={() => toggleExpand(item.name)}
                           className={cn(
-                            "w-full group flex items-center justify-between rounded-md p-2 text-sm font-medium leading-6 transition-colors",
+                            "w-full group flex items-center justify-between rounded-md p-2 text-sm font-semibold leading-6 transition-colors",
                             isActive
                               ? "bg-white/30 text-white"
                               : "text-white hover:bg-white/20"
@@ -234,9 +234,9 @@ export function OfficeSidebar({ user }: OfficeSidebarProps) {
                                   <Link
                                     href={child.href}
                                     className={cn(
-                                      "block rounded-md py-2 pl-11 pr-2 text-sm leading-6 transition-colors",
+                                      "block rounded-md py-2 pl-11 pr-2 text-sm font-medium leading-6 transition-colors",
                                       childActive
-                                        ? "bg-white/30 text-white font-medium"
+                                        ? "bg-white/30 text-white font-semibold"
                                         : "text-white/80 hover:bg-white/20 hover:text-white"
                                     )}
                                   >
@@ -252,7 +252,7 @@ export function OfficeSidebar({ user }: OfficeSidebarProps) {
                       <Link
                         href={item.href!}
                         className={cn(
-                          "group flex items-center gap-x-3 rounded-md p-2 text-sm font-medium leading-6 transition-colors",
+                          "group flex items-center gap-x-3 rounded-md p-2 text-sm font-semibold leading-6 transition-colors",
                           isActive
                             ? "bg-white/30 text-white"
                             : "text-white hover:bg-white/20"
