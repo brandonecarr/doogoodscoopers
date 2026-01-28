@@ -532,12 +532,13 @@ export default function ResidentialSubscriptionsPage() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1">
-                        <button
+                        <a
+                          href={`/app/office/subscriptions/${sub.id}`}
                           className="p-1.5 text-teal-500 hover:bg-teal-50 rounded"
                           title="View"
                         >
                           <Eye className="w-4 h-4" />
-                        </button>
+                        </a>
                         <button
                           className="p-1.5 text-amber-500 hover:bg-amber-50 rounded"
                           title="Pause"
