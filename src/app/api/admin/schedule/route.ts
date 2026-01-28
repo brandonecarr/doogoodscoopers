@@ -53,6 +53,7 @@ export async function GET(request: NextRequest) {
       preferred_day,
       price_per_visit_cents,
       created_at,
+      assigned_to,
       client:client_id (
         id,
         first_name,
@@ -73,11 +74,6 @@ export async function GET(request: NextRequest) {
           id,
           is_active
         )
-      ),
-      assigned_user:users!assigned_to (
-        id,
-        first_name,
-        last_name
       ),
       plan:service_plans (
         id,
@@ -157,11 +153,21 @@ export async function GET(request: NextRequest) {
     return map[freq] || freq;
   };
 
+  // Build tech lookup map for assigned user names
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const techMap = new Map((techs || []).map((t: any) => [
+    t.id,
+    `${t.first_name || ""} ${t.last_name || ""}`.trim()
+  ]));
+
   // Format the response
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const formattedSchedule = filteredSubscriptions.map((sub: any) => {
     // Count active dogs at the location
     const activeDogs = sub.location?.dogs?.filter((d: { is_active: boolean }) => d.is_active) || [];
+
+    // Look up assigned user name from techs
+    const assignedUserName = sub.assigned_to ? techMap.get(sub.assigned_to) : null;
 
     return {
       id: sub.id,
@@ -179,10 +185,8 @@ export async function GET(request: NextRequest) {
       zipCode: sub.location?.zip_code || "",
       latitude: sub.location?.latitude,
       longitude: sub.location?.longitude,
-      assignedTo: sub.assigned_user
-        ? `${sub.assigned_user.first_name || ""} ${sub.assigned_user.last_name || ""}`.trim()
-        : "Unassigned",
-      assignedUserId: sub.assigned_user?.id || null,
+      assignedTo: assignedUserName || "Unassigned",
+      assignedUserId: sub.assigned_to || null,
       frequency: sub.frequency,
       frequencyDisplay: formatFrequency(sub.frequency),
       preferredDay: sub.preferred_day,
