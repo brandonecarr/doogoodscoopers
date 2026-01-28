@@ -20,6 +20,7 @@ import {
   MapPin,
 } from "lucide-react";
 import { GoogleMapsProvider } from "@/components/route-planner/GoogleMapsProvider";
+import { ScheduleMap } from "@/components/schedule/ScheduleMap";
 
 interface ScheduleItem {
   id: string;
@@ -639,19 +640,13 @@ function ScheduleContent() {
 
         {/* Map View */}
         {!loading && !error && viewMode === "map" && (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
-            <div className="h-[600px] flex items-center justify-center bg-gray-100">
-              <div className="text-center">
-                <MapPin className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500">Map View</p>
-                <p className="text-sm text-gray-400 mt-1">
-                  Showing {schedule.length} locations
-                </p>
-                <p className="text-sm text-gray-400 mt-2">
-                  Map integration coming soon
-                </p>
-              </div>
-            </div>
+          <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-4">
+            <ScheduleMap
+              schedule={schedule}
+              techs={techs}
+              selectedTechId={selectedTechId}
+              selectedFrequency={selectedFrequency}
+            />
           </div>
         )}
 
