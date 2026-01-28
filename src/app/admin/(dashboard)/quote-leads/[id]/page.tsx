@@ -284,12 +284,12 @@ export default async function QuoteLeadDetailPage({ params }: PageProps) {
           <LeadUpdates
             leadId={lead.id}
             leadType="quote"
-            updates={updates.map((u) => ({
+            updates={updates.map((u: { id: string; createdAt: Date; message: string | null; communicationType: string | null; adminEmail: string | null }) => ({
               id: u.id,
               createdAt: u.createdAt.toISOString(),
-              message: u.message,
-              communicationType: u.communicationType,
-              adminEmail: u.adminEmail,
+              message: u.message || "",
+              communicationType: u.communicationType || "",
+              adminEmail: u.adminEmail || "",
             }))}
           />
         </div>

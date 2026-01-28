@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   Home,
   Users,
@@ -128,20 +128,36 @@ const navigation: NavItem[] = [
 
 export function OfficeSidebar({ user }: OfficeSidebarProps) {
   const pathname = usePathname();
-  const [expandedItem, setExpandedItem] = useState<string | null>(() => {
-    // Auto-expand the section that contains the current path
+  const searchParams = useSearchParams();
+  const [expandedItem, setExpandedItem] = useState<string | null>(null);
+
+  // Auto-expand the section that contains the current path on initial load
+  useEffect(() => {
     for (const item of navigation) {
       if (item.children) {
-        const isChildActive = item.children.some(
-          (child) => pathname === child.href || pathname.startsWith(child.href.split("?")[0] + "/")
-        );
+        const isChildActive = item.children.some((child) => {
+          const [basePath, queryString] = child.href.split("?");
+          if (pathname !== basePath && !pathname.startsWith(basePath + "/")) {
+            return false;
+          }
+          // If child href has query params, check they match
+          if (queryString) {
+            const childParams = new URLSearchParams(queryString);
+            for (const [key, value] of childParams.entries()) {
+              if (searchParams.get(key) !== value) {
+                return false;
+              }
+            }
+          }
+          return true;
+        });
         if (isChildActive) {
-          return item.name;
+          setExpandedItem(item.name);
+          return;
         }
       }
     }
-    return null;
-  });
+  }, [pathname, searchParams]);
 
   const toggleExpand = (name: string) => {
     setExpandedItem((prev) => (prev === name ? null : name));
@@ -168,22 +184,80 @@ export function OfficeSidebar({ user }: OfficeSidebarProps) {
   };
 
   const isSubItemActive = (href: string, siblings: NavSubItem[] = []): boolean => {
-    const basePath = href.split("?")[0];
+    const [basePath, queryString] = href.split("?");
+    const currentQueryString = searchParams.toString();
 
-    // Check if this path matches at all
+    // If the href has query params, we need exact matching
+    if (queryString) {
+      // Check if we're on the same base path
+      if (pathname !== basePath && !pathname.startsWith(basePath + "/")) {
+        return false;
+      }
+
+      // Parse the href query params
+      const hrefParams = new URLSearchParams(queryString);
+
+      // Check if all href query params match current query params
+      for (const [key, value] of hrefParams.entries()) {
+        if (searchParams.get(key) !== value) {
+          return false;
+        }
+      }
+
+      // For exact path match with matching query params, it's active
+      if (pathname === basePath) {
+        return true;
+      }
+
+      // For subpath, check if a sibling with query params is a better match
+      const hasBetterSiblingMatch = siblings.some((sibling) => {
+        const [siblingBase, siblingQuery] = sibling.href.split("?");
+        if (!siblingQuery || siblingBase === basePath) return false;
+
+        // Check if sibling matches the path better (more specific)
+        if (pathname === siblingBase || pathname.startsWith(siblingBase + "/")) {
+          if (siblingBase.length > basePath.length) {
+            // Check if sibling's query params also match
+            const siblingParams = new URLSearchParams(siblingQuery);
+            for (const [key, value] of siblingParams.entries()) {
+              if (searchParams.get(key) !== value) {
+                return false;
+              }
+            }
+            return true;
+          }
+        }
+        return false;
+      });
+
+      return !hasBetterSiblingMatch;
+    }
+
+    // No query params in href - use path-based matching
     const isMatch = pathname === basePath || pathname.startsWith(basePath + "/");
 
     if (!isMatch) return false;
 
-    // If exact match, definitely active
-    if (pathname === basePath) return true;
+    // If on this exact path with no query params in URL, it's active
+    if (pathname === basePath && !currentQueryString) return true;
 
-    // If starts with this path, check if a sibling is a better (more specific) match
+    // Check if a sibling is a better match
     const hasBetterSiblingMatch = siblings.some((sibling) => {
-      const siblingBase = sibling.href.split("?")[0];
-      if (siblingBase === basePath) return false; // Same path, skip
+      const [siblingBase, siblingQuery] = sibling.href.split("?");
 
-      // Check if sibling is a more specific match (longer path that also matches)
+      // If sibling has query params that match current URL, prefer that
+      if (siblingQuery && pathname === siblingBase) {
+        const siblingParams = new URLSearchParams(siblingQuery);
+        for (const [key, value] of siblingParams.entries()) {
+          if (searchParams.get(key) === value) {
+            return true;
+          }
+        }
+      }
+
+      if (siblingBase === basePath) return false;
+
+      // Check if sibling is a more specific match (longer path)
       return (pathname === siblingBase || pathname.startsWith(siblingBase + "/")) &&
              siblingBase.length > basePath.length;
     });
