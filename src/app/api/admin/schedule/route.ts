@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
         first_name,
         last_name
       ),
-      plan:plan_id (
+      plan:service_plans (
         id,
         name,
         frequency
