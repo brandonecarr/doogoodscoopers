@@ -1,26 +1,19 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard,
+  Home,
   Users,
   UserCog,
   Calendar,
-  Clock,
-  Truck,
-  FileText,
+  CreditCard,
   DollarSign,
-  MessageSquare,
-  Settings,
-  Gift,
-  Share2,
-  Target,
   BarChart3,
+  Settings,
+  ChevronDown,
   Dog,
-  MapPin,
-  Package,
-  Shield,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AuthUser } from "@/lib/auth-supabase";
@@ -30,35 +23,132 @@ interface OfficeSidebarProps {
   user: AuthUser;
 }
 
-interface NavItem {
+interface NavSubItem {
   name: string;
   href: string;
+}
+
+interface NavItem {
+  name: string;
+  href?: string;
   icon: React.ComponentType<{ className?: string }>;
   permission?: Permission;
+  children?: NavSubItem[];
 }
 
 const navigation: NavItem[] = [
-  { name: "Dashboard", href: "/app/office", icon: LayoutDashboard },
-  { name: "Clients", href: "/app/office/clients", icon: Users, permission: "clients:read" },
-  { name: "Scheduling", href: "/app/office/scheduling", icon: Calendar, permission: "jobs:read" },
-  { name: "Dispatch", href: "/app/office/dispatch", icon: Truck, permission: "jobs:assign" },
-  { name: "Routes", href: "/app/office/routes", icon: MapPin, permission: "routes:read" },
-  { name: "Leads", href: "/app/office/leads", icon: Target, permission: "leads:read" },
-  { name: "Invoices", href: "/app/office/invoices", icon: FileText, permission: "invoices:read" },
-  { name: "Payments", href: "/app/office/payments", icon: DollarSign, permission: "payments:read" },
-  { name: "Messages", href: "/app/office/messages", icon: MessageSquare, permission: "notifications:read" },
-  { name: "Gift Cards", href: "/app/office/gift-cards", icon: Gift, permission: "gift_certificates:read" },
-  { name: "Referrals", href: "/app/office/referrals", icon: Share2, permission: "referrals:read" },
-  { name: "Staff", href: "/app/office/staff", icon: UserCog, permission: "staff:read" },
-  { name: "Shifts", href: "/app/office/shifts", icon: Clock, permission: "shifts:read" },
-  { name: "Add-Ons", href: "/app/office/add-ons", icon: Package, permission: "pricing:read" },
-  { name: "Zip Guard", href: "/app/office/zip-guard", icon: Shield, permission: "settings:read" },
-  { name: "Reports", href: "/app/office/reports", icon: BarChart3, permission: "reports:read" },
-  { name: "Settings", href: "/app/office/settings", icon: Settings, permission: "settings:read" },
+  {
+    name: "Home",
+    href: "/app/office",
+    icon: Home,
+  },
+  {
+    name: "Clients",
+    icon: Users,
+    permission: "clients:read",
+    children: [
+      { name: "Residential Clients", href: "/app/office/clients?type=residential" },
+      { name: "Commercial Clients", href: "/app/office/clients?type=commercial" },
+      { name: "Change Requests", href: "/app/office/change-requests" },
+    ],
+  },
+  {
+    name: "Staff",
+    icon: UserCog,
+    permission: "staff:read",
+    children: [
+      { name: "Staff List", href: "/app/office/staff" },
+      { name: "Shifts", href: "/app/office/shifts" },
+      { name: "My Shift Report", href: "/app/office/shifts/my-report" },
+      { name: "Time & Mileage Report", href: "/app/office/shifts/time-mileage" },
+      { name: "Start/End My Shift", href: "/app/office/shifts/clock" },
+    ],
+  },
+  {
+    name: "Scheduler",
+    icon: Calendar,
+    permission: "jobs:read",
+    children: [
+      { name: "Dispatch Board", href: "/app/office/dispatch" },
+      { name: "Route Manager", href: "/app/office/routes" },
+      { name: "Schedule", href: "/app/office/scheduling" },
+      { name: "Unassigned", href: "/app/office/unassigned" },
+    ],
+  },
+  {
+    name: "Billing",
+    icon: CreditCard,
+    permission: "invoices:read",
+    children: [
+      { name: "Residential Subscriptions", href: "/app/office/subscriptions/residential" },
+      { name: "Commercial Subscriptions", href: "/app/office/subscriptions/commercial" },
+      { name: "Recurring Invoices", href: "/app/office/invoices" },
+      { name: "One Time Invoices", href: "/app/office/invoices/one-time" },
+      { name: "Payments", href: "/app/office/payments" },
+      { name: "Coupons", href: "/app/office/coupons" },
+      { name: "Gift Certificates", href: "/app/office/gift-cards" },
+      { name: "Payouts", href: "/app/office/payouts" },
+      { name: "Sales Tax Report", href: "/app/office/reports/sales-tax" },
+    ],
+  },
+  {
+    name: "Payroll",
+    icon: DollarSign,
+    permission: "staff:read",
+    children: [
+      { name: "Create Pay Slips", href: "/app/office/payroll/pay-slips" },
+      { name: "Payroll Report", href: "/app/office/payroll/report" },
+      { name: "Productivity Report", href: "/app/office/payroll/productivity" },
+    ],
+  },
+  {
+    name: "Reports",
+    icon: BarChart3,
+    permission: "reports:read",
+    children: [
+      { name: "Route Planning", href: "/app/office/route-planner" },
+      { name: "Completed Jobs", href: "/app/office/reports/completed-jobs" },
+      { name: "Residential Cross-Sells", href: "/app/office/reports/residential-cross-sells" },
+      { name: "Commercial Cross-Sells", href: "/app/office/reports/commercial-cross-sells" },
+      { name: "Open Balance Report", href: "/app/office/reports/open-balance" },
+      { name: "Cleanup Notifications Report", href: "/app/office/reports/cleanup-notifications" },
+      { name: "Ratings & Comments", href: "/app/office/reports/ratings" },
+      { name: "Tips", href: "/app/office/reports/tips" },
+      { name: "Work Area Activity Log", href: "/app/office/reports/activity-log" },
+      { name: "Work Area Inventory", href: "/app/office/reports/inventory" },
+    ],
+  },
+  {
+    name: "Settings",
+    href: "/app/office/settings",
+    icon: Settings,
+    permission: "settings:read",
+  },
 ];
 
 export function OfficeSidebar({ user }: OfficeSidebarProps) {
   const pathname = usePathname();
+  const [expandedItems, setExpandedItems] = useState<string[]>(() => {
+    // Auto-expand the section that contains the current path
+    const expanded: string[] = [];
+    navigation.forEach((item) => {
+      if (item.children) {
+        const isChildActive = item.children.some(
+          (child) => pathname === child.href || pathname.startsWith(child.href.split("?")[0] + "/")
+        );
+        if (isChildActive) {
+          expanded.push(item.name);
+        }
+      }
+    });
+    return expanded;
+  });
+
+  const toggleExpand = (name: string) => {
+    setExpandedItems((prev) =>
+      prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]
+    );
+  };
 
   // Filter navigation items based on user permissions
   const filteredNav = navigation.filter((item) => {
@@ -66,19 +156,38 @@ export function OfficeSidebar({ user }: OfficeSidebarProps) {
     return hasPermission(user.role, item.permission);
   });
 
+  const isItemActive = (item: NavItem): boolean => {
+    if (item.href) {
+      return item.href === "/app/office"
+        ? pathname === item.href
+        : pathname === item.href || pathname.startsWith(item.href + "/");
+    }
+    if (item.children) {
+      return item.children.some(
+        (child) => pathname === child.href.split("?")[0] || pathname.startsWith(child.href.split("?")[0] + "/")
+      );
+    }
+    return false;
+  };
+
+  const isSubItemActive = (href: string): boolean => {
+    const basePath = href.split("?")[0];
+    return pathname === basePath || pathname.startsWith(basePath + "/");
+  };
+
   return (
     <>
       {/* Desktop Sidebar */}
       <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-64 lg:flex-col">
-        <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-navy-900 px-6 pb-4">
+        <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-white border-r border-gray-200 px-4 pb-4">
           {/* Logo */}
-          <div className="flex h-16 shrink-0 items-center gap-3">
+          <div className="flex h-16 shrink-0 items-center gap-3 px-2">
             <div className="w-10 h-10 bg-teal-500 rounded-full flex items-center justify-center">
               <Dog className="w-6 h-6 text-white" />
             </div>
             <div>
-              <span className="text-white font-bold">DooGoodScoopers</span>
-              <p className="text-xs text-gray-400">Office Portal</p>
+              <span className="text-gray-900 font-bold">DooGoodScoopers</span>
+              <p className="text-xs text-gray-500">Office Portal</p>
             </div>
           </div>
 
@@ -86,29 +195,81 @@ export function OfficeSidebar({ user }: OfficeSidebarProps) {
           <nav className="flex flex-1 flex-col">
             <ul role="list" className="flex flex-1 flex-col gap-y-1">
               {filteredNav.map((item) => {
-                // Dashboard (root path) should only be active on exact match
-                const isActive = item.href === "/app/office"
-                  ? pathname === item.href
-                  : pathname === item.href || pathname.startsWith(item.href + "/");
+                const isActive = isItemActive(item);
+                const isExpanded = expandedItems.includes(item.name);
+                const hasChildren = item.children && item.children.length > 0;
+
                 return (
                   <li key={item.name}>
-                    <Link
-                      href={item.href}
-                      className={cn(
-                        "group flex gap-x-3 rounded-md p-2 text-sm font-medium leading-6 transition-colors",
-                        isActive
-                          ? "bg-teal-600 text-white"
-                          : "text-gray-300 hover:bg-navy-800 hover:text-white"
-                      )}
-                    >
-                      <item.icon
-                        className={cn(
-                          "h-5 w-5 shrink-0",
-                          isActive ? "text-white" : "text-gray-400 group-hover:text-white"
+                    {hasChildren ? (
+                      <>
+                        <button
+                          onClick={() => toggleExpand(item.name)}
+                          className={cn(
+                            "w-full group flex items-center justify-between rounded-md p-2 text-sm font-medium leading-6 transition-colors",
+                            isActive
+                              ? "bg-teal-50 text-teal-700"
+                              : "text-gray-700 hover:bg-gray-50"
+                          )}
+                        >
+                          <div className="flex items-center gap-x-3">
+                            <item.icon
+                              className={cn(
+                                "h-5 w-5 shrink-0",
+                                isActive ? "text-teal-600" : "text-gray-400"
+                              )}
+                            />
+                            {item.name}
+                          </div>
+                          <ChevronDown
+                            className={cn(
+                              "h-4 w-4 text-gray-400 transition-transform",
+                              isExpanded && "rotate-180"
+                            )}
+                          />
+                        </button>
+                        {isExpanded && (
+                          <ul className="mt-1 space-y-1">
+                            {item.children?.map((child) => {
+                              const childActive = isSubItemActive(child.href);
+                              return (
+                                <li key={child.href}>
+                                  <Link
+                                    href={child.href}
+                                    className={cn(
+                                      "block rounded-md py-2 pl-11 pr-2 text-sm leading-6 transition-colors",
+                                      childActive
+                                        ? "bg-teal-50 text-teal-700 font-medium"
+                                        : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                                    )}
+                                  >
+                                    {child.name}
+                                  </Link>
+                                </li>
+                              );
+                            })}
+                          </ul>
                         )}
-                      />
-                      {item.name}
-                    </Link>
+                      </>
+                    ) : (
+                      <Link
+                        href={item.href!}
+                        className={cn(
+                          "group flex items-center gap-x-3 rounded-md p-2 text-sm font-medium leading-6 transition-colors",
+                          isActive
+                            ? "bg-teal-50 text-teal-700"
+                            : "text-gray-700 hover:bg-gray-50"
+                        )}
+                      >
+                        <item.icon
+                          className={cn(
+                            "h-5 w-5 shrink-0",
+                            isActive ? "text-teal-600" : "text-gray-400"
+                          )}
+                        />
+                        {item.name}
+                      </Link>
+                    )}
                   </li>
                 );
               })}
@@ -116,16 +277,16 @@ export function OfficeSidebar({ user }: OfficeSidebarProps) {
           </nav>
 
           {/* User Info */}
-          <div className="border-t border-navy-700 pt-4">
+          <div className="border-t border-gray-200 pt-4">
             <div className="flex items-center gap-x-3 p-2">
               <div className="w-8 h-8 bg-teal-600 rounded-full flex items-center justify-center text-white text-sm font-medium">
                 {user.firstName?.[0] || user.email[0].toUpperCase()}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-white truncate">
+                <p className="text-sm font-medium text-gray-900 truncate">
                   {user.firstName || user.email}
                 </p>
-                <p className="text-xs text-gray-400 truncate">{user.role}</p>
+                <p className="text-xs text-gray-500 truncate">{user.role}</p>
               </div>
             </div>
           </div>
@@ -133,20 +294,18 @@ export function OfficeSidebar({ user }: OfficeSidebarProps) {
       </div>
 
       {/* Mobile Bottom Navigation */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-navy-900 border-t border-navy-700">
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200">
         <nav className="flex justify-around py-2">
           {filteredNav.slice(0, 5).map((item) => {
-            // Dashboard (root path) should only be active on exact match
-            const isActive = item.href === "/app/office"
-              ? pathname === item.href
-              : pathname === item.href || pathname.startsWith(item.href + "/");
+            const isActive = isItemActive(item);
+            const href = item.href || (item.children?.[0]?.href ?? "/app/office");
             return (
               <Link
                 key={item.name}
-                href={item.href}
+                href={href}
                 className={cn(
                   "flex flex-col items-center gap-1 px-3 py-1",
-                  isActive ? "text-teal-400" : "text-gray-400"
+                  isActive ? "text-teal-600" : "text-gray-400"
                 )}
               >
                 <item.icon className="w-5 h-5" />
