@@ -93,9 +93,14 @@ export async function GET(request: NextRequest) {
     .in("role", STAFF_ROLES)
     .order("first_name", { ascending: true });
 
-  // Filter by role
-  if (role && STAFF_ROLES.includes(role as UserRole)) {
-    query = query.eq("role", role);
+  // Filter by role(s) - supports comma-separated values like "FIELD_TECH,CREW_LEAD"
+  if (role) {
+    const roles = role.split(",").filter((r) => STAFF_ROLES.includes(r as UserRole));
+    if (roles.length === 1) {
+      query = query.eq("role", roles[0]);
+    } else if (roles.length > 1) {
+      query = query.in("role", roles);
+    }
   }
 
   // Filter by status
@@ -133,10 +138,18 @@ export async function GET(request: NextRequest) {
 
   const activeShiftUsers = new Set((todayShifts || []).map((s) => s.user_id));
 
-  // Normalize staff_profile from array to object
+  // Normalize staff_profile from array to object and add camelCase aliases
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const normalizedStaff = (staff || []).map((s: any) => ({
     ...s,
+    // Add camelCase aliases for compatibility with client components
+    firstName: s.first_name,
+    lastName: s.last_name,
+    avatarUrl: s.avatar_url,
+    isActive: s.is_active,
+    lastLoginAt: s.last_login_at,
+    createdAt: s.created_at,
+    updatedAt: s.updated_at,
     staff_profile: Array.isArray(s.staff_profile)
       ? s.staff_profile[0] || null
       : s.staff_profile,

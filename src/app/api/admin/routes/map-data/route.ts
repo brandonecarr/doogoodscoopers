@@ -183,8 +183,8 @@ export async function GET(request: NextRequest) {
     .from("users")
     .select("id, first_name, last_name, role")
     .eq("org_id", auth.user.orgId)
-    .in("role", ["FIELD_TECH", "ADMIN", "MANAGER"])
-    .eq("status", "ACTIVE")
+    .in("role", ["FIELD_TECH", "ADMIN", "MANAGER", "CREW_LEAD"])
+    .eq("is_active", true)
     .order("first_name", { ascending: true });
 
   // Define tech colors for map pins

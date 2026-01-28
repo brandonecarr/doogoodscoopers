@@ -69,7 +69,11 @@ export async function GET(request: NextRequest) {
         state,
         zip_code,
         latitude,
-        longitude
+        longitude,
+        dogs (
+          id,
+          is_active
+        )
       ),
       assigned_user:assigned_to (
         id,
@@ -137,8 +141,8 @@ export async function GET(request: NextRequest) {
     .from("users")
     .select("id, first_name, last_name, role")
     .eq("org_id", auth.user.orgId)
-    .in("role", ["FIELD_TECH", "ADMIN", "MANAGER"])
-    .eq("status", "ACTIVE")
+    .in("role", ["FIELD_TECH", "ADMIN", "MANAGER", "CREW_LEAD"])
+    .eq("is_active", true)
     .order("first_name", { ascending: true });
 
   // Format frequency for display
@@ -156,34 +160,40 @@ export async function GET(request: NextRequest) {
 
   // Format the response
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const formattedSchedule = filteredSubscriptions.map((sub: any) => ({
-    id: sub.id,
-    locationId: sub.location?.id?.slice(0, 6) || "N/A",
-    clientId: sub.client?.id,
-    clientName: sub.client
-      ? `${sub.client.first_name || ""} ${sub.client.last_name || ""}`.trim()
-      : "Unknown",
-    clientFirstName: sub.client?.first_name || "",
-    clientLastName: sub.client?.last_name || "",
-    address: sub.location?.address_line1 || "",
-    addressLine2: sub.location?.address_line2 || "",
-    city: sub.location?.city || "",
-    state: sub.location?.state || "",
-    zipCode: sub.location?.zip_code || "",
-    latitude: sub.location?.latitude,
-    longitude: sub.location?.longitude,
-    assignedTo: sub.assigned_user
-      ? `${sub.assigned_user.first_name || ""} ${sub.assigned_user.last_name || ""}`.trim()
-      : "Unassigned",
-    assignedUserId: sub.assigned_user?.id || null,
-    frequency: sub.frequency,
-    frequencyDisplay: formatFrequency(sub.frequency),
-    preferredDay: sub.preferred_day,
-    pricePerVisitCents: sub.price_per_visit_cents,
-    planName: sub.plan?.name || null,
-    status: sub.status,
-    createdAt: sub.created_at,
-  }));
+  const formattedSchedule = filteredSubscriptions.map((sub: any) => {
+    // Count active dogs at the location
+    const activeDogs = sub.location?.dogs?.filter((d: { is_active: boolean }) => d.is_active) || [];
+
+    return {
+      id: sub.id,
+      locationId: sub.location?.id?.slice(0, 6) || "N/A",
+      clientId: sub.client?.id,
+      clientName: sub.client
+        ? `${sub.client.first_name || ""} ${sub.client.last_name || ""}`.trim()
+        : "Unknown",
+      clientFirstName: sub.client?.first_name || "",
+      clientLastName: sub.client?.last_name || "",
+      address: sub.location?.address_line1 || "",
+      addressLine2: sub.location?.address_line2 || "",
+      city: sub.location?.city || "",
+      state: sub.location?.state || "",
+      zipCode: sub.location?.zip_code || "",
+      latitude: sub.location?.latitude,
+      longitude: sub.location?.longitude,
+      assignedTo: sub.assigned_user
+        ? `${sub.assigned_user.first_name || ""} ${sub.assigned_user.last_name || ""}`.trim()
+        : "Unassigned",
+      assignedUserId: sub.assigned_user?.id || null,
+      frequency: sub.frequency,
+      frequencyDisplay: formatFrequency(sub.frequency),
+      preferredDay: sub.preferred_day,
+      pricePerVisitCents: sub.price_per_visit_cents,
+      planName: sub.plan?.name || null,
+      status: sub.status,
+      createdAt: sub.created_at,
+      dogCount: activeDogs.length,
+    };
+  });
 
   // Format techs
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

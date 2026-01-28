@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, Suspense, useRef } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   Loader2,
@@ -14,8 +14,8 @@ import {
   ChevronsRight,
   Eye,
   Pencil,
-  Download,
-  Filter,
+  Cloud,
+  SlidersHorizontal,
   ArrowRightLeft,
   MapPin,
 } from "lucide-react";
@@ -44,6 +44,7 @@ interface ScheduleItem {
   planName: string | null;
   status: string;
   createdAt: string;
+  dogCount: number;
 }
 
 interface Tech {
@@ -63,7 +64,6 @@ interface Pagination {
 
 function ScheduleContent() {
   const searchParams = useSearchParams();
-  const router = useRouter();
 
   const [schedule, setSchedule] = useState<ScheduleItem[]>([]);
   const [techs, setTechs] = useState<Tech[]>([]);
@@ -206,26 +206,49 @@ function ScheduleContent() {
     }
   };
 
+  // Format preferred day for display
+  const formatServiceDay = (day: string | null): string => {
+    if (!day) return "";
+    const dayMap: Record<string, string> = {
+      MONDAY: "Monday",
+      TUESDAY: "Tuesday",
+      WEDNESDAY: "Wednesday",
+      THURSDAY: "Thursday",
+      FRIDAY: "Friday",
+      SATURDAY: "Saturday",
+      SUNDAY: "Sunday",
+    };
+    return dayMap[day] || day;
+  };
+
   // Export to CSV
   const exportToCSV = () => {
     const headers = [
-      "Location ID",
       "Client Name",
-      "Address",
+      "Client Address",
       "City",
-      "Zip",
-      "Cleanup Assigned To",
-      "Service Frequency",
+      "State",
+      "Zip Code",
+      "Subscription Name",
+      "Subscription Status",
+      "Service Days",
+      "Assigned To",
+      "Cleanup Frequency",
+      "Number Of Dogs",
     ];
 
     const rows = schedule.map((item) => [
-      item.locationId,
       item.clientName,
       item.address,
       item.city,
+      item.state,
       item.zipCode,
+      item.planName || "",
+      item.status,
+      formatServiceDay(item.preferredDay),
       item.assignedTo,
       item.frequencyDisplay,
+      item.dogCount.toString(),
     ]);
 
     const csvContent = [
@@ -236,7 +259,7 @@ function ScheduleContent() {
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = `schedule-${new Date().toISOString().split("T")[0]}.csv`;
+    link.download = `Master Schedule.csv`;
     link.click();
   };
 
@@ -251,29 +274,30 @@ function ScheduleContent() {
   return (
     <GoogleMapsProvider>
       <div className="space-y-6">
-        {/* Header */}
+        {/* Header Row */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <h1 className="text-2xl font-bold text-gray-900">Schedule</h1>
+          {/* Left side - Title and View Mode */}
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-semibold text-gray-900">Schedule</h1>
 
             {/* View Mode Dropdown */}
             <div className="relative" ref={viewModeRef}>
               <button
                 onClick={() => setViewModeDropdownOpen(!viewModeDropdownOpen)}
-                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded hover:bg-gray-200"
               >
                 {viewMode === "table" ? "Table View" : "Map View"}
                 <ChevronDown className="w-4 h-4" />
               </button>
 
               {viewModeDropdownOpen && (
-                <div className="absolute left-0 top-full mt-1 w-36 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                <div className="absolute left-0 top-full mt-1 w-32 bg-white rounded shadow-lg border border-gray-200 py-1 z-50">
                   <button
                     onClick={() => {
                       setViewMode("table");
                       setViewModeDropdownOpen(false);
                     }}
-                    className={`w-full px-4 py-2 text-left text-sm ${
+                    className={`w-full px-3 py-2 text-left text-sm ${
                       viewMode === "table"
                         ? "bg-teal-50 text-teal-700"
                         : "text-gray-700 hover:bg-gray-50"
@@ -286,7 +310,7 @@ function ScheduleContent() {
                       setViewMode("map");
                       setViewModeDropdownOpen(false);
                     }}
-                    className={`w-full px-4 py-2 text-left text-sm ${
+                    className={`w-full px-3 py-2 text-left text-sm ${
                       viewMode === "map"
                         ? "bg-teal-50 text-teal-700"
                         : "text-gray-700 hover:bg-gray-50"
@@ -299,28 +323,29 @@ function ScheduleContent() {
             </div>
           </div>
 
+          {/* Right side - CSV and Actions */}
           <div className="flex items-center gap-3">
             {/* CSV Export */}
             <button
               onClick={exportToCSV}
-              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+              className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900"
             >
-              <Download className="w-4 h-4" />
-              CSV
+              <Cloud className="w-5 h-5" />
+              <span>CSV</span>
             </button>
 
             {/* Actions Dropdown */}
             <div className="relative" ref={actionsRef}>
               <button
                 onClick={() => setActionsDropdownOpen(!actionsDropdownOpen)}
-                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700"
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-teal-500 rounded hover:bg-teal-600"
               >
                 ACTIONS
                 <ChevronDown className="w-4 h-4" />
               </button>
 
               {actionsDropdownOpen && (
-                <div className="absolute right-0 top-full mt-1 w-44 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                <div className="absolute right-0 top-full mt-1 w-44 bg-white rounded shadow-lg border border-gray-200 py-1 z-50">
                   <button
                     onClick={() => {
                       setActionsDropdownOpen(false);
@@ -341,84 +366,82 @@ function ScheduleContent() {
           </div>
         </div>
 
-        {/* Search and Filters */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-4">
-          <form onSubmit={handleSearch} className="flex items-center gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search"
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-              />
+        {/* Search Row */}
+        <div className="flex items-center gap-4">
+          <form onSubmit={handleSearch} className="flex-1 relative">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search"
+              className="w-full pl-4 pr-10 py-2 border-b border-gray-300 focus:border-teal-500 focus:outline-none bg-transparent"
+            />
+            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+          </form>
+
+          <button
+            type="button"
+            onClick={() => setShowFilters(!showFilters)}
+            className="inline-flex items-center gap-2 text-sm font-medium text-teal-600 hover:text-teal-700"
+          >
+            <SlidersHorizontal className="w-4 h-4" />
+            {showFilters ? "Hide Filters" : "Show Filters"}
+          </button>
+        </div>
+
+        {/* Filter Options */}
+        {showFilters && (
+          <div className="flex items-center gap-4 pb-4 border-b border-gray-100">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Cleanup Assigned To
+              </label>
+              <select
+                value={selectedTechId}
+                onChange={(e) => {
+                  setSelectedTechId(e.target.value);
+                  setPagination((prev) => ({ ...prev, page: 1 }));
+                }}
+                className="px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-sm"
+              >
+                <option value="">All Techs</option>
+                {techs.map((tech) => (
+                  <option key={tech.id} value={tech.id}>
+                    {tech.fullName}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Service Frequency
+              </label>
+              <select
+                value={selectedFrequency}
+                onChange={(e) => {
+                  setSelectedFrequency(e.target.value);
+                  setPagination((prev) => ({ ...prev, page: 1 }));
+                }}
+                className="px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-sm"
+              >
+                <option value="">All Frequencies</option>
+                <option value="WEEKLY">Once a week</option>
+                <option value="BIWEEKLY">Bi weekly</option>
+                <option value="MONTHLY">Monthly</option>
+                <option value="TWICE_WEEKLY">Twice a week</option>
+                <option value="ONE_TIME">One time</option>
+              </select>
             </div>
 
             <button
-              type="button"
-              onClick={() => setShowFilters(!showFilters)}
-              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-teal-600 hover:text-teal-700"
+              onClick={resetFilters}
+              className="mt-6 text-sm text-gray-500 hover:text-gray-700"
             >
-              <Filter className="w-4 h-4" />
-              {showFilters ? "Hide Filters" : "Show Filters"}
+              Reset Filters
             </button>
-          </form>
-
-          {/* Filter Options */}
-          {showFilters && (
-            <div className="mt-4 pt-4 border-t border-gray-100 flex items-center gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Cleanup Assigned To
-                </label>
-                <select
-                  value={selectedTechId}
-                  onChange={(e) => {
-                    setSelectedTechId(e.target.value);
-                    setPagination((prev) => ({ ...prev, page: 1 }));
-                  }}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-sm"
-                >
-                  <option value="">All Techs</option>
-                  {techs.map((tech) => (
-                    <option key={tech.id} value={tech.id}>
-                      {tech.fullName}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Service Frequency
-                </label>
-                <select
-                  value={selectedFrequency}
-                  onChange={(e) => {
-                    setSelectedFrequency(e.target.value);
-                    setPagination((prev) => ({ ...prev, page: 1 }));
-                  }}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-sm"
-                >
-                  <option value="">All Frequencies</option>
-                  <option value="WEEKLY">Once a week</option>
-                  <option value="BIWEEKLY">Bi weekly</option>
-                  <option value="MONTHLY">Monthly</option>
-                  <option value="TWICE_WEEKLY">Twice a week</option>
-                  <option value="ONE_TIME">One time</option>
-                </select>
-              </div>
-
-              <button
-                onClick={resetFilters}
-                className="mt-6 text-sm text-gray-500 hover:text-gray-700"
-              >
-                Reset Filters
-              </button>
-            </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Loading State */}
         {loading && (
@@ -437,41 +460,33 @@ function ScheduleContent() {
 
         {/* Table View */}
         {!loading && !error && viewMode === "table" && (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
+          <div className="bg-white overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-gray-200 bg-gray-50">
-                    <th className="px-4 py-3 text-left">
-                      <input
-                        type="checkbox"
-                        checked={selectedItems.size === schedule.length && schedule.length > 0}
-                        onChange={handleSelectAll}
-                        className="w-4 h-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500"
-                      />
-                    </th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">
+                  <tr className="border-b border-gray-200">
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">
                       Location ID
                     </th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">
                       Client Name
                     </th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">
                       Address
                     </th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">
                       City
                     </th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">
                       Zip
                     </th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">
                       Cleanup Assigned To
                     </th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">
                       Service Frequency
                     </th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">
                       Actions
                     </th>
                   </tr>
@@ -479,28 +494,31 @@ function ScheduleContent() {
                 <tbody className="divide-y divide-gray-100">
                   {schedule.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="px-4 py-12 text-center text-gray-500">
+                      <td colSpan={8} className="px-4 py-12 text-center text-gray-500">
                         No schedule items found
                       </td>
                     </tr>
                   ) : (
-                    schedule.map((item) => (
-                      <tr key={item.id} className="hover:bg-gray-50">
+                    schedule.map((item, index) => (
+                      <tr
+                        key={item.id}
+                        className={index % 2 === 1 ? "bg-teal-50/30" : ""}
+                        onClick={() => handleSelectItem(item.id)}
+                      >
                         <td className="px-4 py-3">
-                          <input
-                            type="checkbox"
-                            checked={selectedItems.has(item.id)}
-                            onChange={() => handleSelectItem(item.id)}
-                            className="w-4 h-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500"
-                          />
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-900">
-                          {item.locationId}
+                          <Link
+                            href={`/app/office/clients/${item.clientId}`}
+                            className="text-sm text-teal-600 hover:text-teal-700 hover:underline"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {item.locationId}
+                          </Link>
                         </td>
                         <td className="px-4 py-3">
                           <Link
                             href={`/app/office/clients/${item.clientId}`}
                             className="text-sm text-teal-600 hover:text-teal-700 hover:underline"
+                            onClick={(e) => e.stopPropagation()}
                           >
                             {item.clientName}
                           </Link>
@@ -521,18 +539,20 @@ function ScheduleContent() {
                           {item.frequencyDisplay}
                         </td>
                         <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1">
                             <Link
                               href={`/app/office/clients/${item.clientId}`}
-                              className="p-1.5 text-teal-600 hover:text-teal-700 hover:bg-teal-50 rounded"
+                              className="p-1.5 text-white bg-teal-500 hover:bg-teal-600 rounded"
                               title="View"
+                              onClick={(e) => e.stopPropagation()}
                             >
                               <Eye className="w-4 h-4" />
                             </Link>
                             <Link
                               href={`/app/office/clients/${item.clientId}/edit`}
-                              className="p-1.5 text-teal-600 hover:text-teal-700 hover:bg-teal-50 rounded"
+                              className="p-1.5 text-white bg-green-500 hover:bg-green-600 rounded"
                               title="Edit"
+                              onClick={(e) => e.stopPropagation()}
                             >
                               <Pencil className="w-4 h-4" />
                             </Link>
@@ -569,9 +589,13 @@ function ScheduleContent() {
 
               <div className="flex items-center gap-4">
                 <span className="text-sm text-gray-600">
-                  {(pagination.page - 1) * pagination.limit + 1}-
-                  {Math.min(pagination.page * pagination.limit, pagination.total)} of{" "}
-                  {pagination.total}
+                  {pagination.total === 0
+                    ? "0"
+                    : `${(pagination.page - 1) * pagination.limit + 1}-${Math.min(
+                        pagination.page * pagination.limit,
+                        pagination.total
+                      )}`}{" "}
+                  of {pagination.total}
                 </span>
 
                 <div className="flex items-center gap-1">

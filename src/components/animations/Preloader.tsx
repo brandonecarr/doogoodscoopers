@@ -256,7 +256,7 @@ export function Preloader({ onComplete }: PreloaderProps) {
             <div className="relative">
               {/* Low opacity logo (background) */}
               <Image
-                src="/logo.webp"
+                src="/logo-light.webp"
                 alt="DooGoodScoopers"
                 width={600}
                 height={200}
@@ -273,7 +273,7 @@ export function Preloader({ onComplete }: PreloaderProps) {
                 }}
               >
                 <Image
-                  src="/logo.webp"
+                  src="/logo-light.webp"
                   alt="DooGoodScoopers"
                   width={600}
                   height={200}
