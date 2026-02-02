@@ -272,9 +272,7 @@ export function OfficeSidebar({ user }: OfficeSidebarProps) {
         <div className="flex grow flex-col gap-y-5 overflow-y-auto border-r border-gray-200 px-4 pb-4" style={{ backgroundColor: '#9CD5CF' }}>
           {/* Logo */}
           <div className="flex h-16 shrink-0 items-center gap-3 px-2">
-            <div className="w-10 h-10 rounded-full border-2 border-teal-400 overflow-hidden bg-white flex items-center justify-center">
-              <Image src="/dog-icon.svg" alt="DooGoodScoopers" width={36} height={36} className="w-9 h-9" />
-            </div>
+            <Image src="/dog-icon.svg" alt="DooGoodScoopers" width={40} height={40} className="w-10 h-10" />
             <div>
               <span className="text-white font-bold">DooGoodScoopers</span>
               <p className="text-xs text-white/70">Office Portal</p>
