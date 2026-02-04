@@ -104,9 +104,15 @@ export async function getOrCreateStripeCustomer(
 
   // Return existing customer if linked
   if (client.stripe_customer_id) {
-    return await stripe.customers.retrieve(
-      client.stripe_customer_id
-    ) as Stripe.Customer;
+    try {
+      const existing = await stripe.customers.retrieve(client.stripe_customer_id);
+      if (!existing.deleted) {
+        return existing as Stripe.Customer;
+      }
+    } catch {
+      // Customer doesn't exist on this Stripe account (e.g. switched from live to test)
+      // Fall through to create a new one
+    }
   }
 
   // Create new customer
