@@ -175,6 +175,14 @@ interface Client {
 }
 
 // Helper functions
+function formatPhoneNumber(value: string): string {
+  const digits = value.replace(/\D/g, "");
+  if (digits.length === 0) return "";
+  if (digits.length <= 3) return `(${digits}`;
+  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
+}
+
 function formatCurrency(cents: number) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -247,6 +255,19 @@ export default function ClientDetailPage({ params }: PageProps) {
     receiveInvoicesEmail: false,
   });
   const [savingContact, setSavingContact] = useState(false);
+
+  // Edit contact modal state
+  const [editingContactId, setEditingContactId] = useState<string | null>(null); // "primary" or contact id
+  const [editContactForm, setEditContactForm] = useState({
+    firstName: "",
+    middleName: "",
+    lastName: "",
+    email: "",
+    homePhone: "",
+    cellPhone: "",
+    taxExempt: false,
+  });
+  const [savingEditContact, setSavingEditContact] = useState(false);
 
   // Subscription modal state
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
@@ -550,6 +571,118 @@ export default function ClientDetailPage({ params }: PageProps) {
     }
   };
 
+  const handleEditContact = (type: "primary" | string) => {
+    if (type === "primary" && client) {
+      setEditContactForm({
+        firstName: client.firstName || "",
+        middleName: "",
+        lastName: client.lastName || "",
+        email: client.email || "",
+        homePhone: client.phone ? formatPhoneNumber(client.phone) : "",
+        cellPhone: client.secondaryPhone ? formatPhoneNumber(client.secondaryPhone) : "",
+        taxExempt: false,
+      });
+    } else {
+      const contact = client?.contacts.find((c) => c.id === type);
+      if (contact) {
+        setEditContactForm({
+          firstName: contact.firstName || "",
+          middleName: contact.middleName || "",
+          lastName: contact.lastName || "",
+          email: contact.email || "",
+          homePhone: contact.homePhone ? formatPhoneNumber(contact.homePhone) : "",
+          cellPhone: contact.cellPhone ? formatPhoneNumber(contact.cellPhone) : "",
+          taxExempt: false,
+        });
+      }
+    }
+    setEditingContactId(type);
+  };
+
+  const handleSaveEditContact = async () => {
+    if (!editContactForm.firstName || !editContactForm.lastName) return;
+    setSavingEditContact(true);
+
+    try {
+      if (editingContactId === "primary") {
+        const res = await fetch("/api/admin/clients", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id,
+            firstName: editContactForm.firstName,
+            lastName: editContactForm.lastName,
+            email: editContactForm.email || null,
+            phone: editContactForm.homePhone || null,
+            secondaryPhone: editContactForm.cellPhone || null,
+          }),
+        });
+
+        if (res.ok) {
+          if (client) {
+            setClient({
+              ...client,
+              firstName: editContactForm.firstName,
+              lastName: editContactForm.lastName,
+              fullName: `${editContactForm.firstName} ${editContactForm.lastName}`.trim(),
+              email: editContactForm.email || null,
+              phone: editContactForm.homePhone || null,
+              secondaryPhone: editContactForm.cellPhone || null,
+            });
+          }
+          setEditingContactId(null);
+        } else {
+          const data = await res.json();
+          alert(data.error || "Failed to update contact info");
+        }
+      } else {
+        const res = await fetch(`/api/admin/clients/${id}/contacts`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: editingContactId,
+            firstName: editContactForm.firstName,
+            middleName: editContactForm.middleName || null,
+            lastName: editContactForm.lastName,
+            email: editContactForm.email || null,
+            homePhone: editContactForm.homePhone || null,
+            cellPhone: editContactForm.cellPhone || null,
+          }),
+        });
+
+        if (res.ok) {
+          if (client) {
+            setClient({
+              ...client,
+              contacts: client.contacts.map((c) =>
+                c.id === editingContactId
+                  ? {
+                      ...c,
+                      firstName: editContactForm.firstName,
+                      middleName: editContactForm.middleName || null,
+                      lastName: editContactForm.lastName || null,
+                      email: editContactForm.email || null,
+                      homePhone: editContactForm.homePhone || null,
+                      cellPhone: editContactForm.cellPhone || null,
+                    }
+                  : c
+              ),
+            });
+          }
+          setEditingContactId(null);
+        } else {
+          const data = await res.json();
+          alert(data.error || "Failed to update contact");
+        }
+      }
+    } catch (err) {
+      console.error("Error updating contact:", err);
+      alert("Failed to update contact");
+    } finally {
+      setSavingEditContact(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -715,7 +848,7 @@ export default function ClientDetailPage({ params }: PageProps) {
                 </div>
                 <div className="flex gap-4 py-2 border-b border-gray-100">
                   <span className="text-sm text-gray-500 min-w-[140px]">Home Phone Number</span>
-                  <span className="text-sm font-semibold text-gray-900">{client.phone || "No Data"}</span>
+                  <span className="text-sm font-semibold text-gray-900">{client.phone ? formatPhoneNumber(client.phone) : "No Data"}</span>
                 </div>
                 <div className="flex gap-4 py-2 border-b border-gray-100">
                   <span className="text-sm text-gray-500 min-w-[140px]">Middle Name</span>
@@ -723,7 +856,7 @@ export default function ClientDetailPage({ params }: PageProps) {
                 </div>
                 <div className="flex gap-4 py-2 border-b border-gray-100">
                   <span className="text-sm text-gray-500 min-w-[140px]">Cell Phone Number</span>
-                  <span className="text-sm font-semibold text-gray-900">{client.secondaryPhone || "No Data"}</span>
+                  <span className="text-sm font-semibold text-gray-900">{client.secondaryPhone ? formatPhoneNumber(client.secondaryPhone) : "No Data"}</span>
                 </div>
                 <div className="flex gap-4 py-2 border-b border-gray-100">
                   <span className="text-sm text-gray-500 min-w-[140px]">Last name</span>
@@ -740,7 +873,7 @@ export default function ClientDetailPage({ params }: PageProps) {
               </div>
               <div className="flex justify-end gap-2 mt-4">
                 <button className="text-sm font-medium text-red-600 hover:text-red-700">REMOVE</button>
-                <button className="text-sm font-medium text-teal-600 hover:text-teal-700">EDIT</button>
+                <button onClick={() => handleEditContact("primary")} className="text-sm font-medium text-teal-600 hover:text-teal-700">EDIT</button>
               </div>
             </>
           )}
@@ -754,7 +887,7 @@ export default function ClientDetailPage({ params }: PageProps) {
                   </div>
                   <div className="flex gap-4 py-2 border-b border-gray-100">
                     <span className="text-sm text-gray-500 min-w-[140px]">Home Phone Number</span>
-                    <span className="text-sm font-semibold text-gray-900">{contact.homePhone || "No Data"}</span>
+                    <span className="text-sm font-semibold text-gray-900">{contact.homePhone ? formatPhoneNumber(contact.homePhone) : "No Data"}</span>
                   </div>
                   <div className="flex gap-4 py-2 border-b border-gray-100">
                     <span className="text-sm text-gray-500 min-w-[140px]">Middle Name</span>
@@ -764,7 +897,7 @@ export default function ClientDetailPage({ params }: PageProps) {
                   </div>
                   <div className="flex gap-4 py-2 border-b border-gray-100">
                     <span className="text-sm text-gray-500 min-w-[140px]">Cell Phone Number</span>
-                    <span className="text-sm font-semibold text-gray-900">{contact.cellPhone || "No Data"}</span>
+                    <span className="text-sm font-semibold text-gray-900">{contact.cellPhone ? formatPhoneNumber(contact.cellPhone) : "No Data"}</span>
                   </div>
                   <div className="flex gap-4 py-2 border-b border-gray-100">
                     <span className="text-sm text-gray-500 min-w-[140px]">Last name</span>
@@ -786,7 +919,7 @@ export default function ClientDetailPage({ params }: PageProps) {
                   >
                     REMOVE
                   </button>
-                  <button className="text-sm font-medium text-teal-600 hover:text-teal-700">EDIT</button>
+                  <button onClick={() => handleEditContact(contact.id)} className="text-sm font-medium text-teal-600 hover:text-teal-700">EDIT</button>
                 </div>
               </div>
             )
@@ -1578,7 +1711,7 @@ export default function ClientDetailPage({ params }: PageProps) {
                     type="tel"
                     placeholder="Home Phone Number"
                     value={contactForm.homePhone}
-                    onChange={(e) => setContactForm({ ...contactForm, homePhone: e.target.value })}
+                    onChange={(e) => setContactForm({ ...contactForm, homePhone: formatPhoneNumber(e.target.value) })}
                     className="w-full px-0 py-2 border-0 border-b border-gray-300 focus:border-teal-500 focus:ring-0 text-sm placeholder-gray-400"
                   />
                 </div>
@@ -1588,7 +1721,7 @@ export default function ClientDetailPage({ params }: PageProps) {
                     type="tel"
                     placeholder="Cell Phone Number"
                     value={contactForm.cellPhone}
-                    onChange={(e) => setContactForm({ ...contactForm, cellPhone: e.target.value })}
+                    onChange={(e) => setContactForm({ ...contactForm, cellPhone: formatPhoneNumber(e.target.value) })}
                     className="w-full px-0 py-2 border-0 border-b border-gray-300 focus:border-teal-500 focus:ring-0 text-sm placeholder-gray-400"
                   />
                 </div>
@@ -1632,6 +1765,107 @@ export default function ClientDetailPage({ params }: PageProps) {
                   className="px-6 py-2 text-sm font-medium text-white bg-teal-600 rounded hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {savingContact ? "SAVING..." : "SAVE"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Contact Info Modal */}
+      {editingContactId !== null && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4">
+            <div className="p-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-6">Edit Contact Info</h2>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">First Name*</label>
+                  <input
+                    type="text"
+                    value={editContactForm.firstName}
+                    onChange={(e) => setEditContactForm({ ...editContactForm, firstName: e.target.value })}
+                    className="w-full px-0 py-2 border-0 border-b border-gray-300 focus:border-teal-500 focus:ring-0 text-sm"
+                  />
+                </div>
+
+                <div>
+                  <input
+                    type="text"
+                    placeholder="Middle Name"
+                    value={editContactForm.middleName}
+                    onChange={(e) => setEditContactForm({ ...editContactForm, middleName: e.target.value })}
+                    className="w-full px-0 py-2 border-0 border-b border-gray-300 focus:border-teal-500 focus:ring-0 text-sm placeholder-gray-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Last Name*</label>
+                  <input
+                    type="text"
+                    value={editContactForm.lastName}
+                    onChange={(e) => setEditContactForm({ ...editContactForm, lastName: e.target.value })}
+                    className="w-full px-0 py-2 border-0 border-b border-gray-300 focus:border-teal-500 focus:ring-0 text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Email</label>
+                  <input
+                    type="email"
+                    value={editContactForm.email}
+                    onChange={(e) => setEditContactForm({ ...editContactForm, email: e.target.value })}
+                    className="w-full px-0 py-2 border-0 border-b border-gray-300 focus:border-teal-500 focus:ring-0 text-sm"
+                  />
+                </div>
+
+                <div>
+                  <input
+                    type="tel"
+                    placeholder="Home Phone Number"
+                    value={editContactForm.homePhone}
+                    onChange={(e) => setEditContactForm({ ...editContactForm, homePhone: formatPhoneNumber(e.target.value) })}
+                    className="w-full px-0 py-2 border-0 border-b border-gray-300 focus:border-teal-500 focus:ring-0 text-sm placeholder-gray-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Cell Phone Number</label>
+                  <input
+                    type="tel"
+                    value={editContactForm.cellPhone}
+                    onChange={(e) => setEditContactForm({ ...editContactForm, cellPhone: formatPhoneNumber(e.target.value) })}
+                    className="w-full px-0 py-2 border-0 border-b border-gray-300 focus:border-teal-500 focus:ring-0 text-sm"
+                  />
+                </div>
+
+                <div className="pt-4">
+                  <label className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      checked={editContactForm.taxExempt}
+                      onChange={(e) => setEditContactForm({ ...editContactForm, taxExempt: e.target.checked })}
+                      className="w-4 h-4 border-gray-300 rounded text-teal-600 focus:ring-teal-500"
+                    />
+                    <span className="text-sm text-gray-700">Tax exempt</span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="flex justify-center gap-3 mt-8">
+                <button
+                  onClick={() => setEditingContactId(null)}
+                  className="px-6 py-2 text-sm font-medium text-teal-600 hover:text-teal-700"
+                >
+                  CANCEL
+                </button>
+                <button
+                  onClick={handleSaveEditContact}
+                  disabled={savingEditContact || !editContactForm.firstName || !editContactForm.lastName}
+                  className="px-6 py-2 text-sm font-medium text-white bg-teal-600 rounded hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {savingEditContact ? "SAVING..." : "SAVE"}
                 </button>
               </div>
             </div>
