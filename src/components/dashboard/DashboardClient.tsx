@@ -148,7 +148,7 @@ export function DashboardClient({ user }: DashboardClientProps) {
             count={counts.openOneTimeInvoices}
             title="Open One-Time Invoices"
             subtitle="View One-Time Invoices"
-            href="/app/office/invoices?status=OPEN&type=one-time"
+            href="/app/office/invoices?status=OPEN"
           />
         )}
         {isVisible("openRecurringInvoices") && (
@@ -156,7 +156,7 @@ export function DashboardClient({ user }: DashboardClientProps) {
             count={counts.openRecurringInvoices}
             title="Open Recurring Invoices"
             subtitle="View Recurring Invoices"
-            href="/app/office/invoices?status=OPEN&type=recurring"
+            href="/app/office/invoices?status=OPEN"
           />
         )}
         {isVisible("overdueOneTimeInvoices") && (
@@ -164,7 +164,7 @@ export function DashboardClient({ user }: DashboardClientProps) {
             count={counts.overdueOneTimeInvoices}
             title="Overdue One-Time Invoices"
             subtitle="View One-Time Invoices"
-            href="/app/office/invoices?status=OVERDUE&type=one-time"
+            href="/app/office/invoices?status=OVERDUE"
             highlight
           />
         )}
@@ -173,7 +173,7 @@ export function DashboardClient({ user }: DashboardClientProps) {
             count={counts.overdueRecurringInvoices}
             title="Overdue Recurring Invoices"
             subtitle="View Recurring Invoices"
-            href="/app/office/invoices?status=OVERDUE&type=recurring"
+            href="/app/office/invoices?status=OVERDUE"
             highlight
           />
         )}
@@ -182,7 +182,7 @@ export function DashboardClient({ user }: DashboardClientProps) {
             count={counts.failedOneTimeInvoices}
             title="Failed One-Time Invoices"
             subtitle="View One-Time Invoices"
-            href="/app/office/invoices?status=FAILED&type=one-time"
+            href="/app/office/invoices?status=UNCOLLECTIBLE"
             highlight
           />
         )}
@@ -191,7 +191,7 @@ export function DashboardClient({ user }: DashboardClientProps) {
             count={counts.failedRecurringInvoices}
             title="Failed Recurring Invoices"
             subtitle="View Recurring Invoices"
-            href="/app/office/invoices?status=FAILED&type=recurring"
+            href="/app/office/invoices?status=UNCOLLECTIBLE"
             highlight
           />
         )}
@@ -239,7 +239,7 @@ export function DashboardClient({ user }: DashboardClientProps) {
             count={counts.openShifts}
             title="Open Shifts"
             subtitle="View Shifts"
-            href="/app/office/staff/shifts"
+            href="/app/office/shifts?status=SCHEDULED"
           />
         )}
         {isVisible("incompleteShifts") && (
@@ -247,7 +247,7 @@ export function DashboardClient({ user }: DashboardClientProps) {
             count={counts.incompleteShifts}
             title="Incomplete Shifts"
             subtitle="View Shifts"
-            href="/app/office/staff/shifts"
+            href="/app/office/shifts?status=CLOCKED_IN"
           />
         )}
         {isVisible("clockedInStaff") && (
@@ -255,7 +255,7 @@ export function DashboardClient({ user }: DashboardClientProps) {
             count={counts.clockedInStaff}
             title="Clocked In Staff"
             subtitle="View Shifts"
-            href="/app/office/staff/shifts"
+            href="/app/office/shifts?status=CLOCKED_IN"
           />
         )}
         {isVisible("staffOnBreak") && (
@@ -263,7 +263,7 @@ export function DashboardClient({ user }: DashboardClientProps) {
             count={counts.staffOnBreak}
             title="Staff On Break"
             subtitle="View Shifts"
-            href="/app/office/staff/shifts"
+            href="/app/office/shifts?status=ON_BREAK"
           />
         )}
       </div>

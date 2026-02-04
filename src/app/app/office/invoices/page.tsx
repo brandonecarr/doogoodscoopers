@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   FileText,
   Plus,
@@ -119,6 +120,8 @@ function formatCurrency(cents: number) {
 }
 
 export default function InvoicesPage() {
+  const searchParams = useSearchParams();
+  const initialStatus = useMemo(() => searchParams.get("status") || "", []);
   const [loading, setLoading] = useState(true);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [stats, setStats] = useState<InvoiceStats>({
@@ -132,7 +135,7 @@ export default function InvoicesPage() {
     outstandingCents: 0,
   });
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<string>(initialStatus);
   const [showModal, setShowModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);

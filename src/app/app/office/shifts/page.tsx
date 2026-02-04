@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   Clock,
   RefreshCw,
@@ -60,6 +61,8 @@ interface StaffMember {
 }
 
 export default function ShiftsPage() {
+  const searchParams = useSearchParams();
+  const initialStatus = useMemo(() => searchParams.get("status") || "", []);
   const [loading, setLoading] = useState(true);
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [staff, setStaff] = useState<StaffMember[]>([]);
@@ -68,7 +71,7 @@ export default function ShiftsPage() {
   );
   const [dateRange, setDateRange] = useState<"day" | "week" | "month">("day");
   const [staffFilter, setStaffFilter] = useState<string>("");
-  const [statusFilter, setStatusFilter] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<string>(initialStatus);
   const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
