@@ -175,6 +175,19 @@ interface Client {
 }
 
 // Helper functions
+const US_STATES: Record<string, string> = {
+  AL: "Alabama", AK: "Alaska", AZ: "Arizona", AR: "Arkansas", CA: "California",
+  CO: "Colorado", CT: "Connecticut", DE: "Delaware", FL: "Florida", GA: "Georgia",
+  HI: "Hawaii", ID: "Idaho", IL: "Illinois", IN: "Indiana", IA: "Iowa",
+  KS: "Kansas", KY: "Kentucky", LA: "Louisiana", ME: "Maine", MD: "Maryland",
+  MA: "Massachusetts", MI: "Michigan", MN: "Minnesota", MS: "Mississippi", MO: "Missouri",
+  MT: "Montana", NE: "Nebraska", NV: "Nevada", NH: "New Hampshire", NJ: "New Jersey",
+  NM: "New Mexico", NY: "New York", NC: "North Carolina", ND: "North Dakota", OH: "Ohio",
+  OK: "Oklahoma", OR: "Oregon", PA: "Pennsylvania", RI: "Rhode Island", SC: "South Carolina",
+  SD: "South Dakota", TN: "Tennessee", TX: "Texas", UT: "Utah", VT: "Vermont",
+  VA: "Virginia", WA: "Washington", WV: "West Virginia", WI: "Wisconsin", WY: "Wyoming",
+};
+
 function formatPhoneNumber(value: string): string {
   const digits = value.replace(/\D/g, "");
   if (digits.length === 0) return "";
@@ -268,6 +281,17 @@ export default function ClientDetailPage({ params }: PageProps) {
     taxExempt: false,
   });
   const [savingEditContact, setSavingEditContact] = useState(false);
+
+  // Edit location modal state
+  const [showEditLocationModal, setShowEditLocationModal] = useState(false);
+  const [editLocationForm, setEditLocationForm] = useState({
+    locationId: "",
+    addressLine1: "",
+    city: "",
+    state: "",
+    zipCode: "",
+  });
+  const [savingEditLocation, setSavingEditLocation] = useState(false);
 
   // Subscription modal state
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
@@ -683,6 +707,52 @@ export default function ClientDetailPage({ params }: PageProps) {
     }
   };
 
+  const handleEditLocation = () => {
+    if (!primaryLocation) return;
+    setEditLocationForm({
+      locationId: primaryLocation.id,
+      addressLine1: primaryLocation.addressLine1 || "",
+      city: primaryLocation.city || "",
+      state: primaryLocation.state || "",
+      zipCode: primaryLocation.zipCode || "",
+    });
+    setShowEditLocationModal(true);
+  };
+
+  const handleSaveEditLocation = async () => {
+    if (!editLocationForm.addressLine1 || !editLocationForm.zipCode || !editLocationForm.city) return;
+    setSavingEditLocation(true);
+
+    try {
+      const res = await fetch(`/api/admin/clients/${id}/locations`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editLocationForm),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (client) {
+          setClient({
+            ...client,
+            locations: client.locations.map((l) =>
+              l.id === editLocationForm.locationId ? data.location : l
+            ),
+          });
+        }
+        setShowEditLocationModal(false);
+      } else {
+        const data = await res.json();
+        alert(data.error || "Failed to update location");
+      }
+    } catch (err) {
+      console.error("Error updating location:", err);
+      alert("Failed to update location");
+    } finally {
+      setSavingEditLocation(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -960,7 +1030,7 @@ export default function ClientDetailPage({ params }: PageProps) {
             <p className="text-sm text-gray-400">No location data</p>
           )}
           <div className="flex justify-end mt-4">
-            <button className="text-sm font-medium text-teal-600 hover:text-teal-700">EDIT</button>
+            <button onClick={handleEditLocation} className="text-sm font-medium text-teal-600 hover:text-teal-700">EDIT</button>
           </div>
         </div>
       </div>
@@ -1866,6 +1936,91 @@ export default function ClientDetailPage({ params }: PageProps) {
                   className="px-6 py-2 text-sm font-medium text-white bg-teal-600 rounded hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {savingEditContact ? "SAVING..." : "SAVE"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Location Modal */}
+      {showEditLocationModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4">
+            <div className="p-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-6">Edit Location</h2>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Home Address *</label>
+                  <input
+                    type="text"
+                    value={editLocationForm.addressLine1}
+                    onChange={(e) => setEditLocationForm({ ...editLocationForm, addressLine1: e.target.value })}
+                    className="w-full px-0 py-2 border-0 border-b border-gray-300 focus:border-teal-500 focus:ring-0 text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Zip Code *</label>
+                  <input
+                    type="text"
+                    value={editLocationForm.zipCode}
+                    onChange={(e) => setEditLocationForm({ ...editLocationForm, zipCode: e.target.value })}
+                    className="w-full px-0 py-2 border-0 border-b border-gray-300 focus:border-teal-500 focus:ring-0 text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">City *</label>
+                  <input
+                    type="text"
+                    value={editLocationForm.city}
+                    onChange={(e) => setEditLocationForm({ ...editLocationForm, city: e.target.value })}
+                    className="w-full px-0 py-2 border-0 border-b border-gray-300 focus:border-teal-500 focus:ring-0 text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">State</label>
+                  <select
+                    value={editLocationForm.state}
+                    onChange={(e) => setEditLocationForm({ ...editLocationForm, state: e.target.value })}
+                    className="w-full px-0 py-2 border-0 border-b border-gray-300 focus:border-teal-500 focus:ring-0 text-sm bg-white appearance-none"
+                  >
+                    <option value="">Select state</option>
+                    {Object.entries(US_STATES).map(([abbr, name]) => (
+                      <option key={abbr} value={abbr}>
+                        {name} - {abbr}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Country</label>
+                  <input
+                    type="text"
+                    value="United States"
+                    disabled
+                    className="w-full px-0 py-2 border-0 border-b border-gray-300 text-sm text-gray-500 bg-transparent"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-center gap-3 mt-8">
+                <button
+                  onClick={() => setShowEditLocationModal(false)}
+                  className="px-6 py-2 text-sm font-medium text-teal-600 hover:text-teal-700"
+                >
+                  CANCEL
+                </button>
+                <button
+                  onClick={handleSaveEditLocation}
+                  disabled={savingEditLocation || !editLocationForm.addressLine1 || !editLocationForm.zipCode || !editLocationForm.city}
+                  className="px-6 py-2 text-sm font-medium text-white bg-teal-600 rounded hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {savingEditLocation ? "SAVING..." : "SAVE"}
                 </button>
               </div>
             </div>
