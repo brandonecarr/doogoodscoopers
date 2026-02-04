@@ -123,6 +123,14 @@ function getStatusColor(status: ClientStatus) {
   }
 }
 
+function formatPhoneNumber(value: string): string {
+  const digits = value.replace(/\D/g, "");
+  if (digits.length === 0) return "";
+  if (digits.length <= 3) return `(${digits}`;
+  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
+}
+
 function formatCurrency(cents: number) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -656,7 +664,7 @@ export default function ClientsPage() {
                           {client.phone && (
                             <p className="text-sm text-gray-600 flex items-center gap-1">
                               <Phone className="w-3 h-3" />
-                              {client.phone}
+                              {formatPhoneNumber(client.phone)}
                             </p>
                           )}
                         </div>
@@ -864,7 +872,7 @@ export default function ClientsPage() {
                     <input
                       type="tel"
                       value={form.homePhone}
-                      onChange={(e) => setForm({ ...form, homePhone: e.target.value })}
+                      onChange={(e) => setForm({ ...form, homePhone: formatPhoneNumber(e.target.value) })}
                       placeholder="(555) 555-5555"
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white"
                     />
@@ -876,7 +884,7 @@ export default function ClientsPage() {
                     <input
                       type="tel"
                       value={form.cellPhone}
-                      onChange={(e) => setForm({ ...form, cellPhone: e.target.value })}
+                      onChange={(e) => setForm({ ...form, cellPhone: formatPhoneNumber(e.target.value) })}
                       placeholder="(555) 555-5555"
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white"
                     />
