@@ -29,7 +29,11 @@ import {
   X,
   Info,
 } from "lucide-react";
+import { loadStripe } from "@stripe/stripe-js";
+import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import type { ClientStatus, Frequency } from "@/lib/supabase/types";
+
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "");
 
 // Types - API returns camelCase format
 interface Location {
@@ -131,6 +135,36 @@ interface Payment {
   createdAt: string;
 }
 
+interface Invoice {
+  id: string;
+  invoiceNumber: string;
+  status: string;
+  subtotalCents: number;
+  discountCents: number;
+  taxCents: number;
+  totalCents: number;
+  amountPaidCents: number;
+  amountDueCents: number;
+  tipCents: number;
+  dueDate: string | null;
+  paidAt: string | null;
+  billingOption: string | null;
+  billingInterval: string | null;
+  paymentMethod: string | null;
+  subscriptionId: string | null;
+  createdAt: string;
+}
+
+interface PaymentMethodCard {
+  id: string;
+  brand: string | null;
+  last4: string | null;
+  expMonth: number | null;
+  expYear: number | null;
+  name: string | null;
+  isDefault: boolean;
+}
+
 interface Contact {
   id: string;
   firstName: string;
@@ -171,6 +205,7 @@ interface Client {
   subscriptions: Subscription[];
   recentJobs: Job[];
   recentPayments: Payment[];
+  invoices: Invoice[];
   contacts: Contact[];
 }
 
@@ -241,6 +276,138 @@ function getStatusBadge(status: string) {
   return colors[status] || "text-gray-700 bg-gray-100";
 }
 
+function getCardBrandDisplay(brand: string | null) {
+  const b = (brand || "").toLowerCase();
+  switch (b) {
+    case "visa": return { label: "VISA", color: "text-blue-600" };
+    case "mastercard": return { label: "MC", color: "text-orange-600" };
+    case "amex": return { label: "AMEX", color: "text-blue-700" };
+    case "discover": return { label: "DISC", color: "text-orange-500" };
+    default: return { label: (brand || "CARD").toUpperCase(), color: "text-gray-600" };
+  }
+}
+
+function AddCardForm({ clientId, onSuccess, onCancel }: {
+  clientId: string;
+  onSuccess: () => void;
+  onCancel: () => void;
+}) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [nameOnCard, setNameOnCard] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [processing, setProcessing] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!stripe || !elements) return;
+    if (!nameOnCard.trim()) {
+      setError("Please enter the name on card.");
+      return;
+    }
+    setProcessing(true);
+    setError(null);
+
+    try {
+      const res = await fetch(`/api/admin/clients/${clientId}/cards`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!res.ok) {
+        setError("Failed to initialize card setup.");
+        setProcessing(false);
+        return;
+      }
+      const { clientSecret } = await res.json();
+
+      const cardElement = elements.getElement(CardElement);
+      if (!cardElement) {
+        setError("Card element not found.");
+        setProcessing(false);
+        return;
+      }
+
+      const { error: stripeError } = await stripe.confirmCardSetup(clientSecret, {
+        payment_method: {
+          card: cardElement,
+          billing_details: { name: nameOnCard },
+        },
+      });
+
+      if (stripeError) {
+        setError(stripeError.message || "An error occurred.");
+        setProcessing(false);
+      } else {
+        onSuccess();
+      }
+    } catch {
+      setError("Failed to add card.");
+      setProcessing(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-gray-100 px-4 py-3 rounded text-sm font-medium text-gray-700">
+        Credit Card Info
+      </div>
+
+      <div>
+        <input
+          type="text"
+          placeholder="Name On Card"
+          value={nameOnCard}
+          onChange={(e) => setNameOnCard(e.target.value)}
+          disabled={processing}
+          className="w-full px-0 py-2 border-0 border-b border-gray-300 focus:border-teal-500 focus:ring-0 text-sm placeholder-gray-400"
+        />
+      </div>
+
+      <div>
+        <label className="block text-xs text-gray-500 mb-1">Card</label>
+        <div className="py-2 border-b border-gray-300">
+          <CardElement
+            options={{
+              style: {
+                base: {
+                  fontSize: "16px",
+                  color: "#002842",
+                  fontFamily: '"Inter", system-ui, sans-serif',
+                  "::placeholder": { color: "#9CA3AF" },
+                },
+                invalid: { color: "#EF4444" },
+              },
+              hidePostalCode: true,
+            }}
+          />
+        </div>
+      </div>
+
+      {error && <p className="text-sm text-red-500">{error}</p>}
+
+      <p className="text-xs text-gray-500 italic">
+        *Enter Credit Card to Be Used for Payments.
+      </p>
+
+      <div className="flex justify-center gap-3 mt-6">
+        <button
+          onClick={onCancel}
+          disabled={processing}
+          className="px-6 py-2 text-sm font-medium text-teal-600 hover:text-teal-700"
+        >
+          CANCEL
+        </button>
+        <button
+          onClick={handleSubmit}
+          disabled={processing || !stripe}
+          className="px-6 py-2 text-sm font-medium text-white bg-teal-600 rounded hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {processing ? "ADDING..." : "ADD CARD"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 interface PageProps {
   params: Promise<{ id: string }>;
 }
@@ -293,6 +460,21 @@ export default function ClientDetailPage({ params }: PageProps) {
   });
   const [savingEditLocation, setSavingEditLocation] = useState(false);
 
+  // Credit card state
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethodCard[]>([]);
+  const [loadingCards, setLoadingCards] = useState(false);
+  const [showAddCardModal, setShowAddCardModal] = useState(false);
+  const [showCardLinkModal, setShowCardLinkModal] = useState(false);
+  const [cardLinkUrl, setCardLinkUrl] = useState<string | null>(null);
+  const [cardLinkCopied, setCardLinkCopied] = useState(false);
+  const [generatingLink, setGeneratingLink] = useState(false);
+  const [deletingCardId, setDeletingCardId] = useState<string | null>(null);
+  const [settingDefaultId, setSettingDefaultId] = useState<string | null>(null);
+
+  // Create invoice draft modal state
+  const [showCreateInvoiceModal, setShowCreateInvoiceModal] = useState(false);
+  const [creatingInvoice, setCreatingInvoice] = useState(false);
+
   // Subscription modal state
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
   const [subscriptionForm, setSubscriptionForm] = useState({
@@ -313,6 +495,20 @@ export default function ClientDetailPage({ params }: PageProps) {
   const [loadingServicePlans, setLoadingServicePlans] = useState(false);
   const [cleanupFrequencies, setCleanupFrequencies] = useState<string[]>([]);
   const [residentialCrossSells, setResidentialCrossSells] = useState<CrossSellItem[]>([]);
+
+  // Gift certificate modal state
+  const [showGiftCertModal, setShowGiftCertModal] = useState(false);
+  const [giftCertForm, setGiftCertForm] = useState({
+    purchaserName: "",
+    purchaserEmail: "",
+    purchaserPhone: "",
+    amount: "",
+    expiresAt: "",
+    purchasedAt: "",
+    referenceNumber: "",
+    specialNote: "",
+  });
+  const [savingGiftCert, setSavingGiftCert] = useState(false);
 
   const resetSubscriptionForm = () => {
     setSubscriptionForm({
@@ -753,6 +949,209 @@ export default function ClientDetailPage({ params }: PageProps) {
     }
   };
 
+  const handleCreateInvoiceDraft = async () => {
+    setCreatingInvoice(true);
+    try {
+      const activeDogCount = client?.dogs?.filter((d) => d.isActive).length || 0;
+      const res = await fetch("/api/admin/invoices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clientId: id,
+          items: [
+            {
+              description: `One Time Job: ${activeDogCount}d 0.00-0.00`,
+              quantity: 1,
+              unitPriceCents: 0,
+            },
+          ],
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const inv = data.invoice;
+        if (client) {
+          setClient({
+            ...client,
+            invoices: [
+              {
+                id: inv.id,
+                invoiceNumber: inv.invoice_number,
+                status: inv.status,
+                subtotalCents: inv.subtotal_cents,
+                discountCents: inv.discount_cents,
+                taxCents: inv.tax_cents,
+                totalCents: inv.total_cents,
+                amountPaidCents: inv.amount_paid_cents,
+                amountDueCents: inv.amount_due_cents,
+                tipCents: inv.tip_cents || 0,
+                dueDate: inv.due_date,
+                paidAt: inv.paid_at,
+                billingOption: inv.billing_option || "PREPAID_VARIABLE",
+                billingInterval: inv.billing_interval || "ONCE",
+                paymentMethod: inv.payment_method || "CREDIT_CARD",
+                subscriptionId: inv.subscription_id,
+                createdAt: inv.created_at,
+              },
+              ...client.invoices,
+            ],
+          });
+        }
+        setShowCreateInvoiceModal(false);
+      } else {
+        const data = await res.json();
+        alert(data.error || "Failed to create invoice draft");
+      }
+    } catch (err) {
+      console.error("Error creating invoice draft:", err);
+      alert("Failed to create invoice draft");
+    } finally {
+      setCreatingInvoice(false);
+    }
+  };
+
+  const fetchPaymentMethods = async () => {
+    setLoadingCards(true);
+    try {
+      const res = await fetch(`/api/admin/clients/${id}/cards`);
+      if (res.ok) {
+        const data = await res.json();
+        setPaymentMethods(data.cards || []);
+      }
+    } catch (err) {
+      console.error("Error fetching cards:", err);
+    } finally {
+      setLoadingCards(false);
+    }
+  };
+
+  const handleDeleteCard = async (paymentMethodId: string) => {
+    if (!confirm("Are you sure you want to remove this card?")) return;
+    setDeletingCardId(paymentMethodId);
+    try {
+      const res = await fetch(`/api/admin/clients/${id}/cards`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paymentMethodId }),
+      });
+      if (res.ok) {
+        setPaymentMethods((prev) => prev.filter((pm) => pm.id !== paymentMethodId));
+      } else {
+        alert("Failed to remove card");
+      }
+    } catch (err) {
+      console.error("Error deleting card:", err);
+      alert("Failed to remove card");
+    } finally {
+      setDeletingCardId(null);
+    }
+  };
+
+  const handleSetDefault = async (paymentMethodId: string) => {
+    setSettingDefaultId(paymentMethodId);
+    try {
+      const res = await fetch(`/api/admin/clients/${id}/cards`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paymentMethodId }),
+      });
+      if (res.ok) {
+        setPaymentMethods((prev) =>
+          prev.map((pm) => ({ ...pm, isDefault: pm.id === paymentMethodId }))
+        );
+      } else {
+        alert("Failed to set default card");
+      }
+    } catch (err) {
+      console.error("Error setting default:", err);
+      alert("Failed to set default card");
+    } finally {
+      setSettingDefaultId(null);
+    }
+  };
+
+  const handleGenerateCardLink = async () => {
+    setGeneratingLink(true);
+    try {
+      const res = await fetch(`/api/admin/clients/${id}/cards/link`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCardLinkUrl(data.link);
+        setShowCardLinkModal(true);
+      } else {
+        alert("Failed to generate card link");
+      }
+    } catch (err) {
+      console.error("Error generating card link:", err);
+      alert("Failed to generate card link");
+    } finally {
+      setGeneratingLink(false);
+    }
+  };
+
+  const handleSaveGiftCert = async () => {
+    if (!giftCertForm.amount) return;
+    setSavingGiftCert(true);
+    try {
+      const res = await fetch("/api/admin/gift-certificates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: parseFloat(giftCertForm.amount),
+          purchaserName: giftCertForm.purchaserName || undefined,
+          purchaserEmail: giftCertForm.purchaserEmail || undefined,
+          purchaserPhone: giftCertForm.purchaserPhone || undefined,
+          clientId: id,
+          recipientName: client?.fullName || undefined,
+          recipientEmail: client?.email || undefined,
+          expiresAt: giftCertForm.expiresAt || undefined,
+          purchasedAt: giftCertForm.purchasedAt || undefined,
+          referenceNumber: giftCertForm.referenceNumber || undefined,
+          message: giftCertForm.specialNote || undefined,
+        }),
+      });
+      if (res.ok) {
+        setShowGiftCertModal(false);
+        setGiftCertForm({
+          purchaserName: "",
+          purchaserEmail: "",
+          purchaserPhone: "",
+          amount: "",
+          expiresAt: "",
+          purchasedAt: "",
+          referenceNumber: "",
+          specialNote: "",
+        });
+        // Refresh client data to show new gift cert
+        const refreshRes = await fetch(`/api/admin/clients/${id}`);
+        if (refreshRes.ok) {
+          const data = await refreshRes.json();
+          setClient(data.client);
+        }
+      } else {
+        const data = await res.json();
+        alert(data.error || "Failed to create gift certificate");
+      }
+    } catch (err) {
+      console.error("Error creating gift certificate:", err);
+      alert("Failed to create gift certificate");
+    } finally {
+      setSavingGiftCert(false);
+    }
+  };
+
+  // Fetch payment methods when cards tab is selected
+  useEffect(() => {
+    if (billingTab === "cards" && client) {
+      fetchPaymentMethods();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [billingTab]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -1125,46 +1524,79 @@ export default function ClientDetailPage({ params }: PageProps) {
                   <thead>
                     <tr className="text-left text-gray-500">
                       <th className="pb-3 font-medium">Date Created</th>
-                      <th className="pb-3 font-medium">Invoice #</th>
+                      <th className="pb-3 font-medium">Invoices #</th>
                       <th className="pb-3 font-medium">Type</th>
                       <th className="pb-3 font-medium">Payment Method</th>
                       <th className="pb-3 font-medium">Status</th>
                       <th className="pb-3 font-medium">Invoice Total</th>
+                      <th className="pb-3 font-medium">Tip</th>
+                      <th className="pb-3 font-medium">Invoice Remaining</th>
                       <th className="pb-3 font-medium">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {client.recentPayments?.length > 0 ? (
-                      client.recentPayments.map((payment) => (
-                        <tr key={payment.id}>
-                          <td className="py-3 font-semibold">{formatDate(payment.createdAt)}</td>
-                          <td className="py-3 font-semibold text-teal-600">{payment.invoiceNumber || "N/A"}</td>
-                          <td className="py-3 font-semibold">{payment.paymentType}</td>
-                          <td className="py-3 font-semibold">Credit Card</td>
+                    {client.invoices?.length > 0 ? (
+                      client.invoices.map((invoice) => (
+                        <tr key={invoice.id}>
+                          <td className="py-3 font-semibold">
+                            {new Date(invoice.createdAt).toLocaleString("en-US", {
+                              year: "numeric",
+                              month: "2-digit",
+                              day: "2-digit",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                              second: "2-digit",
+                              hour12: false,
+                            })}
+                          </td>
+                          <td className="py-3 font-semibold text-teal-600">{invoice.invoiceNumber}</td>
+                          <td className="py-3 font-semibold">{invoice.subscriptionId ? "Subscription" : "One Time"}</td>
+                          <td className="py-3 font-semibold">
+                            {invoice.paymentMethod === "CREDIT_CARD" ? "Credit Card"
+                              : invoice.paymentMethod === "CHECK" ? "Check"
+                              : invoice.paymentMethod === "CASH" ? "Cash"
+                              : invoice.paymentMethod === "ACH" ? "ACH"
+                              : "Credit Card"}
+                          </td>
                           <td className="py-3">
-                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusBadge(payment.status)}`}>
-                              {payment.status}
+                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                              invoice.status === "DRAFT" ? "text-red-600 bg-red-50"
+                                : invoice.status === "PAID" ? "text-green-700 bg-green-100"
+                                : invoice.status === "OPEN" ? "text-blue-700 bg-blue-100"
+                                : invoice.status === "VOID" ? "text-gray-700 bg-gray-100"
+                                : "text-orange-700 bg-orange-100"
+                            }`}>
+                              {invoice.status}
                             </span>
                           </td>
-                          <td className="py-3 font-semibold">{formatCurrency(payment.amountCents)}</td>
+                          <td className="py-3 font-semibold">{formatCurrency(invoice.totalCents)}</td>
+                          <td className="py-3 font-semibold">{formatCurrency(invoice.tipCents)}</td>
+                          <td className="py-3 font-semibold">{formatCurrency(invoice.amountDueCents)}</td>
                           <td className="py-3">
                             <div className="flex items-center gap-2">
-                              <button className="text-teal-600 hover:text-teal-700 text-sm">View</button>
-                              <button className="text-gray-400 hover:text-gray-600 text-sm">More...</button>
+                              <button className="text-teal-600 hover:text-teal-700 text-sm flex items-center gap-1">
+                                View <Eye className="w-3.5 h-3.5" />
+                              </button>
+                              <button className="text-gray-400 hover:text-gray-600 text-sm">More ...</button>
                             </div>
                           </td>
                         </tr>
                       ))
                     ) : (
                       <tr>
-                        <td colSpan={7} className="py-8 text-center text-gray-400">No invoices</td>
+                        <td colSpan={9} className="py-8 text-center text-gray-400">No invoices</td>
                       </tr>
                     )}
                   </tbody>
                 </table>
               </div>
               <div className="flex justify-end mt-4">
-                <button className="text-sm font-medium text-teal-600 hover:text-teal-700">CREATE INVOICE DRAFT</button>
+                <button
+                  onClick={() => setShowCreateInvoiceModal(true)}
+                  className="text-sm font-medium text-teal-600 hover:text-teal-700"
+                >
+                  CREATE INVOICE DRAFT
+                </button>
               </div>
             </>
           )}
@@ -1234,21 +1666,55 @@ export default function ClientDetailPage({ params }: PageProps) {
                     </tr>
                   </thead>
                   <tbody>
-                    {client.hasStripeCustomer ? (
+                    {loadingCards ? (
                       <tr>
-                        <td className="py-3 font-semibold">
-                          <span className="font-bold text-blue-600">VISA</span>
-                          <span className="ml-2">xxxx xxxx (Default)</span>
-                        </td>
-                        <td className="py-3 font-semibold">{fullName}</td>
-                        <td className="py-3 font-semibold">XX/XXXX</td>
-                        <td className="py-3">
-                          <div className="flex items-center gap-4">
-                            <button className="text-sm text-gray-500">Set Default</button>
-                            <button className="text-sm text-red-600">Delete</button>
-                          </div>
+                        <td colSpan={4} className="py-8 text-center">
+                          <div className="inline-block animate-spin w-5 h-5 border-2 border-teal-500 border-t-transparent rounded-full" />
                         </td>
                       </tr>
+                    ) : paymentMethods.length > 0 ? (
+                      paymentMethods.map((pm) => {
+                        const brand = getCardBrandDisplay(pm.brand);
+                        return (
+                          <tr key={pm.id}>
+                            <td className="py-3 font-semibold">
+                              <span className={`font-bold ${brand.color}`}>{brand.label}</span>
+                              <span className="ml-2">xxxx {pm.last4}</span>
+                              {pm.isDefault && (
+                                <span className="ml-2 text-teal-600 text-xs">(Default)</span>
+                              )}
+                            </td>
+                            <td className="py-3 font-semibold">{pm.name || fullName}</td>
+                            <td className="py-3 font-semibold">
+                              {pm.expMonth?.toString().padStart(2, "0")}/{pm.expYear}
+                            </td>
+                            <td className="py-3">
+                              <div className="flex items-center gap-4">
+                                <button
+                                  onClick={() => handleSetDefault(pm.id)}
+                                  disabled={pm.isDefault || settingDefaultId === pm.id}
+                                  className={`text-sm flex items-center gap-1 ${
+                                    pm.isDefault
+                                      ? "text-gray-300 cursor-default"
+                                      : "text-gray-500 hover:text-teal-600"
+                                  }`}
+                                >
+                                  Set Default {settingDefaultId === pm.id ? "..." : ""}
+                                  {pm.isDefault && <CheckCircle className="w-3.5 h-3.5 text-teal-500" />}
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteCard(pm.id)}
+                                  disabled={deletingCardId === pm.id}
+                                  className="text-sm text-red-600 hover:text-red-700 flex items-center gap-1"
+                                >
+                                  Delete {deletingCardId === pm.id ? "..." : ""}
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
                     ) : (
                       <tr>
                         <td colSpan={4} className="py-8 text-center text-gray-400">No credit cards on file</td>
@@ -1258,8 +1724,19 @@ export default function ClientDetailPage({ params }: PageProps) {
                 </table>
               </div>
               <div className="flex justify-end gap-4 mt-4">
-                <button className="text-sm font-medium text-teal-600 hover:text-teal-700">CREATE CARD LINK</button>
-                <button className="text-sm font-medium text-teal-600 hover:text-teal-700">ADD CARD</button>
+                <button
+                  onClick={handleGenerateCardLink}
+                  disabled={generatingLink}
+                  className="text-sm font-medium text-teal-600 hover:text-teal-700 disabled:opacity-50"
+                >
+                  {generatingLink ? "GENERATING..." : "CREATE CARD LINK"}
+                </button>
+                <button
+                  onClick={() => setShowAddCardModal(true)}
+                  className="text-sm font-medium text-teal-600 hover:text-teal-700"
+                >
+                  ADD CARD
+                </button>
               </div>
             </>
           )}
@@ -1285,7 +1762,12 @@ export default function ClientDetailPage({ params }: PageProps) {
                 </table>
               </div>
               <div className="flex justify-end mt-4">
-                <button className="text-sm font-medium text-teal-600 hover:text-teal-700">CREATE GIFT CERTIFICATE</button>
+                <button
+                  onClick={() => setShowGiftCertModal(true)}
+                  className="text-sm font-medium text-teal-600 hover:text-teal-700"
+                >
+                  CREATE GIFT CERTIFICATE
+                </button>
               </div>
             </>
           )}
@@ -1943,6 +2425,121 @@ export default function ClientDetailPage({ params }: PageProps) {
         </div>
       )}
 
+      {/* Create Invoice Draft Modal */}
+      {showCreateInvoiceModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div className="p-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-6">Create Invoice Draft</h2>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
+                <div className="w-5 h-5 rounded-full bg-blue-500 text-white flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <span className="text-xs font-bold">i</span>
+                </div>
+                <p className="text-sm text-gray-700">
+                  This action will create One Time Invoice Draft.
+                </p>
+              </div>
+
+              <div className="flex justify-center gap-3 mt-8">
+                <button
+                  onClick={() => setShowCreateInvoiceModal(false)}
+                  className="px-6 py-2 text-sm font-medium text-teal-600 hover:text-teal-700"
+                >
+                  CANCEL
+                </button>
+                <button
+                  onClick={handleCreateInvoiceDraft}
+                  disabled={creatingInvoice}
+                  className="px-6 py-2 text-sm font-medium text-white bg-teal-600 rounded hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {creatingInvoice ? "CREATING..." : "CREATE"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Card Link Modal */}
+      {showCardLinkModal && cardLinkUrl && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div className="p-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">Link has been created</h2>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3 mb-4">
+                <div className="w-5 h-5 rounded-full bg-blue-500 text-white flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <span className="text-xs font-bold">i</span>
+                </div>
+                <p className="text-sm text-gray-700">This link will expire in 24 hours</p>
+              </div>
+
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Add Credit Card Link</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={cardLinkUrl}
+                    readOnly
+                    className="flex-1 px-0 py-2 border-0 border-b border-gray-300 text-sm text-gray-700 bg-transparent outline-none"
+                  />
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(cardLinkUrl);
+                      setCardLinkCopied(true);
+                      setTimeout(() => setCardLinkCopied(false), 2000);
+                    }}
+                    className="p-2 text-gray-400 hover:text-gray-600"
+                    title="Copy to clipboard"
+                  >
+                    {cardLinkCopied ? (
+                      <CheckCircle className="w-5 h-5 text-teal-500" />
+                    ) : (
+                      <FileText className="w-5 h-5" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex justify-end mt-6">
+                <button
+                  onClick={() => {
+                    setShowCardLinkModal(false);
+                    setCardLinkUrl(null);
+                    setCardLinkCopied(false);
+                  }}
+                  className="px-6 py-2 text-sm font-medium text-white bg-teal-600 rounded hover:bg-teal-700"
+                >
+                  OK
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Card Modal */}
+      {showAddCardModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4">
+            <div className="p-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-6">Add Card</h2>
+              <Elements stripe={stripePromise}>
+                <AddCardForm
+                  clientId={id}
+                  onSuccess={() => {
+                    setShowAddCardModal(false);
+                    fetchPaymentMethods();
+                  }}
+                  onCancel={() => setShowAddCardModal(false)}
+                />
+              </Elements>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Edit Location Modal */}
       {showEditLocationModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -2266,6 +2863,145 @@ export default function ClientDetailPage({ params }: PageProps) {
                   className="px-6 py-2 text-sm font-medium text-white bg-teal-600 rounded hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {savingSubscription ? "SAVING..." : "SAVE"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Gift Certificate Modal */}
+      {showGiftCertModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-6">
+                Create New Gift Certificate For {client?.fullName}
+              </h2>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Purchaser Name</label>
+                  <input
+                    type="text"
+                    value={giftCertForm.purchaserName}
+                    onChange={(e) => setGiftCertForm({ ...giftCertForm, purchaserName: e.target.value })}
+                    className="w-full px-0 py-2 border-0 border-b border-gray-300 focus:border-teal-500 focus:ring-0 text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Purchaser Email</label>
+                  <input
+                    type="email"
+                    value={giftCertForm.purchaserEmail}
+                    onChange={(e) => setGiftCertForm({ ...giftCertForm, purchaserEmail: e.target.value })}
+                    className="w-full px-0 py-2 border-0 border-b border-gray-300 focus:border-teal-500 focus:ring-0 text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Purchaser Phone</label>
+                  <input
+                    type="tel"
+                    value={giftCertForm.purchaserPhone}
+                    onChange={(e) => {
+                      const formatted = formatPhoneNumber(e.target.value);
+                      setGiftCertForm({ ...giftCertForm, purchaserPhone: formatted });
+                    }}
+                    className="w-full px-0 py-2 border-0 border-b border-gray-300 focus:border-teal-500 focus:ring-0 text-sm"
+                    placeholder="(XXX) XXX-XXXX"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Amount *</label>
+                  <div className="relative">
+                    <DollarSign className="absolute left-0 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={giftCertForm.amount}
+                      onChange={(e) => setGiftCertForm({ ...giftCertForm, amount: e.target.value })}
+                      className="w-full pl-5 pr-0 py-2 border-0 border-b border-gray-300 focus:border-teal-500 focus:ring-0 text-sm"
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Expires</label>
+                  <div className="relative">
+                    <Calendar className="absolute left-0 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="date"
+                      value={giftCertForm.expiresAt}
+                      onChange={(e) => setGiftCertForm({ ...giftCertForm, expiresAt: e.target.value })}
+                      className="w-full pl-5 pr-0 py-2 border-0 border-b border-gray-300 focus:border-teal-500 focus:ring-0 text-sm"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Bought</label>
+                  <div className="relative">
+                    <Calendar className="absolute left-0 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="date"
+                      value={giftCertForm.purchasedAt}
+                      onChange={(e) => setGiftCertForm({ ...giftCertForm, purchasedAt: e.target.value })}
+                      className="w-full pl-5 pr-0 py-2 border-0 border-b border-gray-300 focus:border-teal-500 focus:ring-0 text-sm"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Reference Number</label>
+                  <input
+                    type="text"
+                    value={giftCertForm.referenceNumber}
+                    onChange={(e) => setGiftCertForm({ ...giftCertForm, referenceNumber: e.target.value })}
+                    className="w-full px-0 py-2 border-0 border-b border-gray-300 focus:border-teal-500 focus:ring-0 text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Special Note</label>
+                  <input
+                    type="text"
+                    value={giftCertForm.specialNote}
+                    onChange={(e) => setGiftCertForm({ ...giftCertForm, specialNote: e.target.value })}
+                    className="w-full px-0 py-2 border-0 border-b border-gray-300 focus:border-teal-500 focus:ring-0 text-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-center gap-3 mt-8">
+                <button
+                  onClick={() => {
+                    setShowGiftCertModal(false);
+                    setGiftCertForm({
+                      purchaserName: "",
+                      purchaserEmail: "",
+                      purchaserPhone: "",
+                      amount: "",
+                      expiresAt: "",
+                      purchasedAt: "",
+                      referenceNumber: "",
+                      specialNote: "",
+                    });
+                  }}
+                  className="px-6 py-2 text-sm font-medium text-teal-600 hover:text-teal-700"
+                >
+                  CANCEL
+                </button>
+                <button
+                  onClick={handleSaveGiftCert}
+                  disabled={savingGiftCert || !giftCertForm.amount}
+                  className="px-6 py-2 text-sm font-medium text-white bg-teal-600 rounded hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {savingGiftCert ? "SAVING..." : "SAVE"}
                 </button>
               </div>
             </div>

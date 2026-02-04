@@ -146,6 +146,14 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     .order("created_at", { ascending: false })
     .limit(20);
 
+  // Fetch invoices
+  const { data: invoices } = await supabase
+    .from("invoices")
+    .select("*")
+    .eq("client_id", id)
+    .order("created_at", { ascending: false })
+    .limit(50);
+
   // Fetch client contacts
   const { data: contacts } = await supabase
     .from("client_contacts")
@@ -267,6 +275,26 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       dueDate: p.due_date,
       paidAt: p.paid_at,
       createdAt: p.created_at,
+    })) || [],
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    invoices: (invoices as any[] | null)?.map((inv) => ({
+      id: inv.id,
+      invoiceNumber: inv.invoice_number,
+      status: inv.status,
+      subtotalCents: inv.subtotal_cents,
+      discountCents: inv.discount_cents,
+      taxCents: inv.tax_cents,
+      totalCents: inv.total_cents,
+      amountPaidCents: inv.amount_paid_cents,
+      amountDueCents: inv.amount_due_cents,
+      tipCents: inv.tip_cents || 0,
+      dueDate: inv.due_date,
+      paidAt: inv.paid_at,
+      billingOption: inv.billing_option,
+      billingInterval: inv.billing_interval,
+      paymentMethod: inv.payment_method,
+      subscriptionId: inv.subscription_id,
+      createdAt: inv.created_at,
     })) || [],
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     contacts: (contacts as any[] | null)?.map((c) => ({

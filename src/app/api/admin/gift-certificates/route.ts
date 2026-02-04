@@ -139,20 +139,19 @@ export async function POST(request: NextRequest) {
       amount,
       recipientName,
       recipientEmail,
+      purchaserName,
+      purchaserEmail,
+      purchaserPhone,
+      clientId,
       message,
       expiresAt,
+      purchasedAt,
+      referenceNumber,
       sendEmail,
     } = body;
 
     if (!amount || amount < 1) {
       return NextResponse.json({ error: "Amount required" }, { status: 400 });
-    }
-
-    if (!recipientName || !recipientEmail) {
-      return NextResponse.json(
-        { error: "Recipient name and email required" },
-        { status: 400 }
-      );
     }
 
     // Generate unique code
@@ -166,12 +165,16 @@ export async function POST(request: NextRequest) {
         initial_value_cents: Math.round(amount * 100),
         balance_cents: Math.round(amount * 100),
         status: "ACTIVE",
-        purchaser_name: "Admin",
-        purchaser_email: auth.user.email || "admin@doogoodscoopers.com",
-        recipient_name: recipientName,
-        recipient_email: recipientEmail,
+        purchaser_name: purchaserName || "Admin",
+        purchaser_email: purchaserEmail || auth.user.email || "admin@doogoodscoopers.com",
+        purchaser_phone: purchaserPhone || null,
+        recipient_name: recipientName || null,
+        recipient_email: recipientEmail || null,
+        client_id: clientId || null,
         message: message || null,
         expires_at: expiresAt || null,
+        purchased_at: purchasedAt || null,
+        reference_number: referenceNumber || null,
         delivered_at: sendEmail ? new Date().toISOString() : null,
       })
       .select()
