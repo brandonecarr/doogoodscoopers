@@ -334,13 +334,24 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     // Generate draft invoice for the subscription
     try {
-      // Get the total invoice count for generating invoice number
-      const { count: invoiceCount } = await supabase
+      // Generate invoice number - find the highest existing number and increment
+      const { data: latestInvoice } = await supabase
         .from("invoices")
-        .select("*", { count: "exact", head: true })
-        .eq("org_id", auth.user.orgId);
+        .select("invoice_number")
+        .eq("org_id", auth.user.orgId)
+        .like("invoice_number", "INV-%")
+        .order("invoice_number", { ascending: false })
+        .limit(1)
+        .single();
 
-      const invoiceNumber = `INV-${String((invoiceCount || 0) + 1).padStart(5, "0")}`;
+      let nextNumber = 1;
+      if (latestInvoice?.invoice_number) {
+        const match = latestInvoice.invoice_number.match(/INV-(\d+)/);
+        if (match) {
+          nextNumber = parseInt(match[1], 10) + 1;
+        }
+      }
+      const invoiceNumber = `INV-${String(nextNumber).padStart(5, "0")}`;
 
       // Create the draft invoice
       const { data: invoice, error: invoiceError } = await supabase

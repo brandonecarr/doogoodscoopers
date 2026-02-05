@@ -417,8 +417,24 @@ async function handleInvoiceCreated(
     return;
   }
 
-  // Generate invoice number
-  const invoiceNumber = `INV-${Date.now().toString(36).toUpperCase()}`;
+  // Generate invoice number - find the highest existing number and increment
+  const { data: latestInvoice } = await supabase
+    .from("invoices")
+    .select("invoice_number")
+    .eq("org_id", client.org_id)
+    .like("invoice_number", "INV-%")
+    .order("invoice_number", { ascending: false })
+    .limit(1)
+    .single();
+
+  let nextNumber = 1;
+  if (latestInvoice?.invoice_number) {
+    const match = latestInvoice.invoice_number.match(/INV-(\d+)/);
+    if (match) {
+      nextNumber = parseInt(match[1], 10) + 1;
+    }
+  }
+  const invoiceNumber = `INV-${String(nextNumber).padStart(5, "0")}`;
 
   // Calculate discount from invoice (total discount amounts is in newer API)
   const discountCents =

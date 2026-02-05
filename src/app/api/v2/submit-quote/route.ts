@@ -311,8 +311,24 @@ async function submitInServiceAreaQuote(data: QuoteSubmission) {
     // 7a. Create draft invoice for the new subscription
     if (subscription && pricePerVisitCents > 0) {
       try {
-        // Generate invoice number
-        const invoiceNumber = `INV-${Date.now().toString(36).toUpperCase()}-SUB`;
+        // Generate invoice number - find the highest existing number and increment
+        const { data: latestInvoices } = await supabase
+          .from("invoices")
+          .select("invoice_number")
+          .eq("org_id", org.id)
+          .like("invoice_number", "INV-%")
+          .order("invoice_number", { ascending: false })
+          .limit(1);
+
+        const latestInvoice = latestInvoices?.[0] as { invoice_number: string } | undefined;
+        let nextNumber = 1;
+        if (latestInvoice?.invoice_number) {
+          const match = latestInvoice.invoice_number.match(/INV-(\d+)/);
+          if (match) {
+            nextNumber = parseInt(match[1], 10) + 1;
+          }
+        }
+        const invoiceNumber = `INV-${String(nextNumber).padStart(5, "0")}`;
 
         // Determine billing interval based on frequency
         const billingIntervalMap: Record<string, string> = {
@@ -453,13 +469,32 @@ async function submitInServiceAreaQuote(data: QuoteSubmission) {
 
         initialCleanupInvoiceId = invoice.id;
 
+        // Generate invoice number for initial cleanup
+        const { data: latestCleanupInvoices } = await supabase
+          .from("invoices")
+          .select("invoice_number")
+          .eq("org_id", org.id)
+          .like("invoice_number", "INV-%")
+          .order("invoice_number", { ascending: false })
+          .limit(1);
+
+        const latestCleanupInvoice = latestCleanupInvoices?.[0] as { invoice_number: string } | undefined;
+        let nextCleanupNumber = 1;
+        if (latestCleanupInvoice?.invoice_number) {
+          const match = latestCleanupInvoice.invoice_number.match(/INV-(\d+)/);
+          if (match) {
+            nextCleanupNumber = parseInt(match[1], 10) + 1;
+          }
+        }
+        const cleanupInvoiceNumber = `INV-${String(nextCleanupNumber).padStart(5, "0")}`;
+
         // Create local invoice record
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await (supabase as any).from("invoices").insert({
           org_id: org.id,
           client_id: client.id,
           stripe_invoice_id: invoice.id,
-          invoice_number: `INV-${Date.now().toString(36).toUpperCase()}`,
+          invoice_number: cleanupInvoiceNumber,
           status: "OPEN",
           subtotal_cents: initialCleanupCents,
           discount_cents: 0,

@@ -279,13 +279,25 @@ export async function POST(request: NextRequest) {
     const taxCents = Math.round(subtotalCents * (taxRate / 100));
     const totalCents = subtotalCents + taxCents - discountCents;
 
-    // Generate invoice number
-    const { count } = await supabase
+    // Generate invoice number - find the highest existing number and increment
+    const { data: latestInvoice } = await supabase
       .from("invoices")
-      .select("*", { count: "exact", head: true })
-      .eq("org_id", auth.user.orgId);
+      .select("invoice_number")
+      .eq("org_id", auth.user.orgId)
+      .like("invoice_number", "INV-%")
+      .order("invoice_number", { ascending: false })
+      .limit(1)
+      .single();
 
-    const invoiceNumber = `INV-${String((count || 0) + 1).padStart(5, "0")}`;
+    let nextNumber = 1;
+    if (latestInvoice?.invoice_number) {
+      // Extract the number from INV-00001 format
+      const match = latestInvoice.invoice_number.match(/INV-(\d+)/);
+      if (match) {
+        nextNumber = parseInt(match[1], 10) + 1;
+      }
+    }
+    const invoiceNumber = `INV-${String(nextNumber).padStart(5, "0")}`;
 
     // Create invoice
     const { data: newInvoice, error: invoiceError } = await supabase
