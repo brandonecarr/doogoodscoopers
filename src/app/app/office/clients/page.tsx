@@ -7,7 +7,6 @@ import {
   Plus,
   Search,
   RefreshCw,
-  Edit,
   X,
   AlertCircle,
   Phone,
@@ -169,6 +168,7 @@ export default function ClientsPage() {
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   // Form state
   const [form, setForm] = useState({
@@ -210,7 +210,7 @@ export default function ClientsPage() {
 
   useEffect(() => {
     fetchClients();
-  }, [statusFilter, typeFilter, page]);
+  }, [statusFilter, typeFilter, page, itemsPerPage]);
 
   async function fetchClients() {
     setLoading(true);
@@ -220,7 +220,7 @@ export default function ClientsPage() {
       if (typeFilter) params.set("type", typeFilter);
       if (searchQuery) params.set("search", searchQuery);
       params.set("page", page.toString());
-      params.set("limit", "50");
+      params.set("limit", itemsPerPage.toString());
 
       const res = await fetch(`/api/admin/clients?${params}`);
       const data = await res.json();
@@ -732,22 +732,13 @@ export default function ClientsPage() {
                         )}
                       </td>
                       <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            onClick={() => openEditModal(client)}
-                            className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
-                            title="Edit"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => router.push(`/app/office/clients/${client.id}`)}
-                            className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
-                            title="View Details"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                        </div>
+                        <button
+                          onClick={() => router.push(`/app/office/clients/${client.id}`)}
+                          className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
+                          title="View Details"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -756,8 +747,23 @@ export default function ClientsPage() {
             </div>
 
             {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
+            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
+              <div className="flex items-center gap-4">
+                <span className="text-sm text-gray-500">Items per page:</span>
+                <select
+                  value={itemsPerPage}
+                  onChange={(e) => {
+                    setItemsPerPage(parseInt(e.target.value));
+                    setPage(1);
+                  }}
+                  className="px-2 py-1 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                >
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-4">
                 <p className="text-sm text-gray-500">
                   Page {page} of {totalPages}
                 </p>
@@ -765,20 +771,20 @@ export default function ClientsPage() {
                   <button
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
                     disabled={page === 1}
-                    className="px-3 py-1 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                    className="px-3 py-1 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Previous
                   </button>
                   <button
                     onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                     disabled={page === totalPages}
-                    className="px-3 py-1 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                    className="px-3 py-1 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Next
                   </button>
                 </div>
               </div>
-            )}
+            </div>
           </>
         )}
       </div>
