@@ -140,6 +140,31 @@ export async function POST(
           .single();
         console.log(`[CHARGE] Verification read:`, verifyInvoice);
 
+        // Create payment record if it doesn't exist
+        const { data: existingPaymentRecord } = await supabase
+          .from("payments")
+          .select("id")
+          .eq("stripe_payment_intent_id", existingSuccessfulPayment.id)
+          .single();
+
+        if (!existingPaymentRecord) {
+          const chargeId = typeof existingSuccessfulPayment.latest_charge === 'string'
+            ? existingSuccessfulPayment.latest_charge
+            : (existingSuccessfulPayment.latest_charge as { id: string } | null)?.id || null;
+
+          await supabase.from("payments").insert({
+            org_id: auth.user.orgId,
+            client_id: invoice.client_id,
+            invoice_id: invoice.id,
+            stripe_payment_intent_id: existingSuccessfulPayment.id,
+            stripe_charge_id: chargeId,
+            amount_cents: amountToCharge,
+            status: "SUCCEEDED",
+            payment_method: "CREDIT_CARD",
+          });
+          console.log(`[CHARGE] Created missing payment record for already-paid invoice ${invoice.id}`);
+        }
+
         return NextResponse.json({
           success: true,
           message: "Invoice was already paid. Status has been updated.",
@@ -283,6 +308,30 @@ export async function POST(
       }
 
       console.log(`[CHARGE] Invoice ${invoice.id} successfully updated to PAID`);
+
+      // Create payment record
+      // Get the charge ID from the payment intent for payout tracking
+      const chargeId = typeof confirmedPayment.latest_charge === 'string'
+        ? confirmedPayment.latest_charge
+        : confirmedPayment.latest_charge?.id || null;
+
+      const { error: paymentError } = await supabase.from("payments").insert({
+        org_id: auth.user.orgId,
+        client_id: invoice.client_id,
+        invoice_id: invoice.id,
+        stripe_payment_intent_id: confirmedPayment.id,
+        stripe_charge_id: chargeId,
+        amount_cents: amountToCharge,
+        status: "SUCCEEDED",
+        payment_method: "CREDIT_CARD",
+      });
+
+      if (paymentError) {
+        console.error("[CHARGE] Failed to create payment record:", paymentError);
+        // Don't fail the request - payment succeeded, just log the error
+      } else {
+        console.log(`[CHARGE] Payment record created for invoice ${invoice.id}`);
+      }
 
       // Log activity
       await supabase.from("activity_logs").insert({
