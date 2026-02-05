@@ -108,10 +108,11 @@ export async function GET(
       );
 
       if (successfulPayment) {
-        console.log(`Auto-healing invoice ${invoice.invoice_number}: Found successful Stripe payment ${successfulPayment.id}`);
+        console.log(`[AUTO-HEAL] Found successful Stripe payment ${successfulPayment.id} for invoice ${invoice.invoice_number}`);
 
         // Update the invoice in the database
-        const { error: healError } = await supabase
+        // Note: Using only id filter since we already verified org ownership
+        const { data: healedRows, error: healError } = await supabase
           .from("invoices")
           .update({
             status: "PAID",
@@ -122,9 +123,11 @@ export async function GET(
             updated_at: new Date().toISOString(),
           })
           .eq("id", invoice.id)
-          .eq("org_id", auth.user.orgId);
+          .select("id, status");
 
-        if (!healError) {
+        console.log(`[AUTO-HEAL] Update result - rows: ${JSON.stringify(healedRows)}, error: ${healError?.message || 'none'}`);
+
+        if (!healError && healedRows && healedRows.length > 0) {
           // Update local variables for the response
           invoiceStatus = "PAID";
           invoicePaidAt = new Date(successfulPayment.created * 1000).toISOString();
@@ -145,7 +148,7 @@ export async function GET(
             },
           });
         } else {
-          console.error("Failed to auto-heal invoice:", healError);
+          console.error("[AUTO-HEAL] Failed to update invoice:", healError);
         }
       }
     } catch (e) {

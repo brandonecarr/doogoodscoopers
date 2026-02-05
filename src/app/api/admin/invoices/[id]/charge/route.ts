@@ -98,10 +98,13 @@ export async function POST(
       );
 
       if (existingSuccessfulPayment) {
-        console.log(`Found existing successful payment ${existingSuccessfulPayment.id} for invoice ${invoice.invoice_number}`);
+        console.log(`[CHARGE] Found existing successful payment ${existingSuccessfulPayment.id} for invoice ${invoice.invoice_number}`);
+        console.log(`[CHARGE] Attempting to fix invoice ${invoice.id} to PAID status`);
 
         // Invoice was already paid - fix the database and return
-        const { error: fixError } = await supabase
+        // Note: Using only id filter since we already verified org ownership,
+        // and service role key should bypass RLS
+        const { data: fixedRows, error: fixError } = await supabase
           .from("invoices")
           .update({
             status: "PAID",
@@ -112,11 +115,24 @@ export async function POST(
             updated_at: new Date().toISOString(),
           })
           .eq("id", invoice.id)
-          .eq("org_id", auth.user.orgId);
+          .select("id, status, org_id");
+
+        console.log(`[CHARGE] Fix update result - rows: ${fixedRows?.length || 0}, error: ${fixError?.message || 'none'}`);
+        if (fixedRows && fixedRows.length > 0) {
+          console.log(`[CHARGE] Fixed row:`, fixedRows[0]);
+        }
 
         if (fixError) {
-          console.error("Failed to fix invoice status after finding existing payment:", fixError);
+          console.error("[CHARGE] Failed to fix invoice status:", fixError);
         }
+
+        // Verify the fix worked by reading back
+        const { data: verifyInvoice } = await supabase
+          .from("invoices")
+          .select("id, status, org_id")
+          .eq("id", invoice.id)
+          .single();
+        console.log(`[CHARGE] Verification read:`, verifyInvoice);
 
         return NextResponse.json({
           success: true,
@@ -124,6 +140,7 @@ export async function POST(
           paymentIntentId: existingSuccessfulPayment.id,
           status: "succeeded",
           alreadyPaid: true,
+          debug: { fixedRows, verifyInvoice },
         });
       }
     } catch (e) {
@@ -197,7 +214,9 @@ export async function POST(
 
     if (confirmedPayment.status === "succeeded") {
       // Update invoice as paid
-      console.log(`[CHARGE] Updating invoice ${invoice.id} to PAID. org_id: ${auth.user.orgId}`);
+      // Note: Using only id filter since we already verified org ownership at the start
+      console.log(`[CHARGE] Payment succeeded! Updating invoice ${invoice.id} to PAID.`);
+      console.log(`[CHARGE] Auth user orgId: ${auth.user.orgId}`);
 
       const { data: updatedRows, error: updateError } = await supabase
         .from("invoices")
@@ -210,10 +229,9 @@ export async function POST(
           updated_at: new Date().toISOString(),
         })
         .eq("id", invoice.id)
-        .eq("org_id", auth.user.orgId)
-        .select("id, status");
+        .select("id, status, org_id");
 
-      console.log(`[CHARGE] Update result - rows: ${updatedRows?.length || 0}, error: ${updateError?.message || 'none'}`);
+      console.log(`[CHARGE] Update result - rows: ${JSON.stringify(updatedRows)}, error: ${updateError?.message || 'none'}`);
 
       if (updateError) {
         console.error("[CHARGE] Update error:", updateError);
@@ -285,15 +303,14 @@ export async function POST(
         { status: 400 }
       );
     } else {
-      // Mark as uncollectible
+      // Mark as failed
       await supabase
         .from("invoices")
         .update({
           status: "FAILED",
           updated_at: new Date().toISOString(),
         })
-        .eq("id", id)
-        .eq("org_id", auth.user.orgId);
+        .eq("id", id);
 
       return NextResponse.json(
         { error: `Payment failed: ${confirmedPayment.status}` },
