@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { authenticateWithPermission, errorResponse } from "@/lib/api-auth";
+import { getStripe, listPaymentMethods } from "@/lib/stripe";
 
 function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -57,7 +58,8 @@ export async function GET(
         first_name,
         last_name,
         email,
-        phone
+        phone,
+        stripe_customer_id
       ),
       invoice_items (
         id,
@@ -92,6 +94,40 @@ export async function GET(
 
     if (location) {
       clientAddress = `${location.address_line1}, ${location.city}, ${location.state} ${location.zip_code}`;
+    }
+  }
+
+  // Get default payment method if client has Stripe customer
+  let defaultCard: { brand: string; last4: string } | null = null;
+  if (clientData?.stripe_customer_id) {
+    try {
+      const stripe = getStripe();
+      const stripeCustomer = await stripe.customers.retrieve(clientData.stripe_customer_id);
+
+      if (!stripeCustomer.deleted) {
+        const defaultPmId = stripeCustomer.invoice_settings?.default_payment_method as string | null;
+
+        if (defaultPmId) {
+          const pm = await stripe.paymentMethods.retrieve(defaultPmId);
+          if (pm.card) {
+            defaultCard = {
+              brand: pm.card.brand,
+              last4: pm.card.last4,
+            };
+          }
+        } else {
+          // No default set, try to get first card
+          const paymentMethods = await listPaymentMethods(clientData.stripe_customer_id);
+          if (paymentMethods.length > 0 && paymentMethods[0].card) {
+            defaultCard = {
+              brand: paymentMethods[0].card.brand,
+              last4: paymentMethods[0].card.last4,
+            };
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Error fetching payment method:", e);
     }
   }
 
@@ -134,6 +170,7 @@ export async function GET(
         }
       : null,
     items: invoice.invoice_items || [],
+    defaultCard,
   };
 
   return NextResponse.json({ invoice: formattedInvoice });

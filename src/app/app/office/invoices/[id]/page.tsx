@@ -2,7 +2,7 @@
 
 import { useState, useEffect, use } from "react";
 import Link from "next/link";
-import { ArrowLeft, Trash2, Edit, Ban, Printer, Mail } from "lucide-react";
+import { ArrowLeft, Trash2, Edit, Ban, Printer, Mail, RefreshCw, DollarSign, Calendar, Hash } from "lucide-react";
 
 interface InvoiceItem {
   id: string;
@@ -40,6 +40,7 @@ interface Invoice {
     address?: string | null;
   } | null;
   items: InvoiceItem[];
+  defaultCard: { brand: string; last4: string } | null;
 }
 
 function formatCurrency(cents: number) {
@@ -84,6 +85,10 @@ function getStatusLabel(status: string) {
   }
 }
 
+function capitalizeCardBrand(brand: string) {
+  return brand.charAt(0).toUpperCase() + brand.slice(1);
+}
+
 export default function InvoiceDetailPage({
   params,
 }: {
@@ -93,6 +98,15 @@ export default function InvoiceDetailPage({
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Billing section state
+  const [paymentMethod, setPaymentMethod] = useState<"card" | "check">("card");
+  const [processing, setProcessing] = useState(false);
+  const [checkForm, setCheckForm] = useState({
+    amount: "",
+    paymentDate: new Date().toISOString().split("T")[0],
+    referenceNumber: "",
+  });
 
   useEffect(() => {
     fetchInvoice();
@@ -106,6 +120,13 @@ export default function InvoiceDetailPage({
 
       if (res.ok) {
         setInvoice(data.invoice);
+        // Pre-fill amount with amount due
+        if (data.invoice?.amountDueCents) {
+          setCheckForm((prev) => ({
+            ...prev,
+            amount: (data.invoice.amountDueCents / 100).toFixed(2),
+          }));
+        }
       } else {
         setError(data.error || "Failed to load invoice");
       }
@@ -154,6 +175,89 @@ export default function InvoiceDetailPage({
     } catch (err) {
       console.error("Error deleting invoice:", err);
       alert("Failed to delete invoice");
+    }
+  }
+
+  async function handleChargeCard() {
+    if (!invoice) return;
+
+    if (!invoice.defaultCard) {
+      alert("No payment method on file for this client");
+      return;
+    }
+
+    if (!confirm(`Charge ${formatCurrency(invoice.amountDueCents)} to the card ending in ${invoice.defaultCard.last4}?`)) {
+      return;
+    }
+
+    setProcessing(true);
+    try {
+      const res = await fetch(`/api/admin/invoices/${invoice.id}/charge`, {
+        method: "POST",
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        alert("Payment successful!");
+        fetchInvoice();
+      } else {
+        alert(data.error || "Failed to charge card");
+      }
+    } catch (err) {
+      console.error("Error charging card:", err);
+      alert("Failed to process payment");
+    } finally {
+      setProcessing(false);
+    }
+  }
+
+  async function handleReceiveCheckPayment() {
+    if (!invoice) return;
+
+    const amountCents = Math.round(parseFloat(checkForm.amount) * 100);
+
+    if (isNaN(amountCents) || amountCents <= 0) {
+      alert("Please enter a valid amount");
+      return;
+    }
+
+    if (!checkForm.paymentDate) {
+      alert("Please enter a payment date");
+      return;
+    }
+
+    if (!checkForm.referenceNumber.trim()) {
+      alert("Please enter a reference number");
+      return;
+    }
+
+    setProcessing(true);
+    try {
+      const res = await fetch(`/api/admin/invoices/${invoice.id}/check-payment`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amountCents,
+          paymentDate: checkForm.paymentDate,
+          referenceNumber: checkForm.referenceNumber.trim(),
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        alert(data.fullyPaid ? "Payment recorded. Invoice marked as paid!" : "Payment recorded.");
+        fetchInvoice();
+        setCheckForm({ amount: "", paymentDate: new Date().toISOString().split("T")[0], referenceNumber: "" });
+      } else {
+        alert(data.error || "Failed to record payment");
+      }
+    } catch (err) {
+      console.error("Error recording check payment:", err);
+      alert("Failed to record payment");
+    } finally {
+      setProcessing(false);
     }
   }
 
@@ -415,34 +519,111 @@ export default function InvoiceDetailPage({
       {(invoice.status === "OPEN" || invoice.status === "UNCOLLECTIBLE") && (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <h3 className="font-semibold text-gray-900 mb-4">Billing</h3>
+
+          {/* Payment Method Options */}
           <div className="space-y-3">
-            <label className="flex items-center gap-3 cursor-pointer">
+            {/* Card Option */}
+            <label className="flex items-start gap-3 cursor-pointer">
               <input
                 type="radio"
                 name="paymentMethod"
-                defaultChecked
-                className="w-4 h-4 text-teal-600"
+                checked={paymentMethod === "card"}
+                onChange={() => setPaymentMethod("card")}
+                className="w-4 h-4 text-teal-600 mt-0.5"
               />
-              <span className="text-gray-700">
-                Charge a payment method on file
-              </span>
+              <div>
+                <span className="text-gray-700 flex items-center gap-2">
+                  Charge a payment method on file
+                  {processing && paymentMethod === "card" && (
+                    <RefreshCw className="w-4 h-4 animate-spin text-teal-600" />
+                  )}
+                </span>
+                <p className="text-sm text-gray-500 mt-1">
+                  {invoice.defaultCard
+                    ? `Credit Card: ${capitalizeCardBrand(invoice.defaultCard.brand)} **** ${invoice.defaultCard.last4}`
+                    : "No card on file"}
+                </p>
+              </div>
             </label>
-            <div className="ml-7 text-sm text-gray-500">
-              Credit Card on file
-            </div>
-            <label className="flex items-center gap-3 cursor-pointer">
+
+            {/* Check Option */}
+            <label className="flex items-start gap-3 cursor-pointer">
               <input
                 type="radio"
                 name="paymentMethod"
-                className="w-4 h-4 text-teal-600"
+                checked={paymentMethod === "check"}
+                onChange={() => setPaymentMethod("check")}
+                className="w-4 h-4 text-teal-600 mt-0.5"
               />
               <span className="text-gray-700">Receive check payment</span>
             </label>
           </div>
+
+          {/* Check Payment Fields */}
+          {paymentMethod === "check" && (
+            <div className="mt-6 flex items-end gap-4">
+              <div className="flex-1">
+                <label className="flex items-center gap-2 text-sm text-gray-500 mb-1">
+                  <DollarSign className="w-4 h-4" />
+                  Amount Received *
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={checkForm.amount}
+                  onChange={(e) => setCheckForm({ ...checkForm, amount: e.target.value })}
+                  placeholder="0.00"
+                  className="w-full px-3 py-2 border-b-2 border-teal-500 focus:outline-none focus:border-teal-600 bg-transparent"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="flex items-center gap-2 text-sm text-gray-500 mb-1">
+                  <Calendar className="w-4 h-4" />
+                  Payment Date *
+                </label>
+                <input
+                  type="date"
+                  value={checkForm.paymentDate}
+                  onChange={(e) => setCheckForm({ ...checkForm, paymentDate: e.target.value })}
+                  className="w-full px-3 py-2 border-b-2 border-teal-500 focus:outline-none focus:border-teal-600 bg-transparent"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="flex items-center gap-2 text-sm text-gray-500 mb-1">
+                  <Hash className="w-4 h-4" />
+                  Reference Number *
+                </label>
+                <input
+                  type="text"
+                  value={checkForm.referenceNumber}
+                  onChange={(e) => setCheckForm({ ...checkForm, referenceNumber: e.target.value })}
+                  placeholder="Check #"
+                  className="w-full px-3 py-2 border-b-2 border-teal-500 focus:outline-none focus:border-teal-600 bg-transparent"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Action Button */}
           <div className="flex justify-end mt-6">
-            <button className="text-teal-600 hover:text-teal-700 font-medium">
-              CHARGE CLIENT
-            </button>
+            {paymentMethod === "card" ? (
+              <button
+                onClick={handleChargeCard}
+                disabled={processing || !invoice.defaultCard}
+                className="text-teal-600 hover:text-teal-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {processing ? "PROCESSING..." : "CHARGE CLIENT"}
+              </button>
+            ) : (
+              <button
+                onClick={handleReceiveCheckPayment}
+                disabled={processing}
+                className="text-teal-600 hover:text-teal-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {processing ? "PROCESSING..." : "RECEIVE CHECK PAYMENT"}
+              </button>
+            )}
           </div>
         </div>
       )}
