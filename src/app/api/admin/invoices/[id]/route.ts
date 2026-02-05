@@ -195,7 +195,7 @@ export async function PUT(
 
   try {
     const body = await request.json();
-    const { items, notes, internalMemo, finalize } = body;
+    const { items, notes, finalize } = body;
 
     // Fetch existing invoice
     const { data: invoice, error: invoiceError } = await supabase
@@ -277,7 +277,6 @@ export async function PUT(
       total_cents: totalCents,
       amount_due_cents: totalCents,
       notes: notes || null,
-      internal_memo: internalMemo || null,
       updated_at: new Date().toISOString(),
     };
 

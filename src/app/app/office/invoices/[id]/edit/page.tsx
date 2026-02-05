@@ -23,7 +23,6 @@ interface Invoice {
   totalCents: number;
   dueDate: string | null;
   notes: string | null;
-  internalMemo?: string | null;
   createdAt: string;
   client: {
     id: string;
@@ -67,7 +66,6 @@ export default function EditInvoicePage({
   // Editable state
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [noteToClient, setNoteToClient] = useState("");
-  const [internalMemo, setInternalMemo] = useState("");
 
   useEffect(() => {
     fetchInvoice();
@@ -84,7 +82,6 @@ export default function EditInvoicePage({
         // Initialize editable state
         setItems(data.invoice.items || []);
         setNoteToClient(data.invoice.notes || "");
-        setInternalMemo(data.invoice.internalMemo || "");
       } else {
         setError(data.error || "Failed to load invoice");
       }
@@ -152,7 +149,6 @@ export default function EditInvoicePage({
             unitPriceCents: item.unit_price_cents,
           })),
           notes: noteToClient || null,
-          internalMemo: internalMemo || null,
           finalize,
         }),
       });
@@ -395,7 +391,7 @@ export default function EditInvoicePage({
       </div>
 
       {/* Notes Section */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-6">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Note to Client
@@ -408,22 +404,6 @@ export default function EditInvoicePage({
             onChange={(e) => setNoteToClient(e.target.value)}
             rows={3}
             placeholder="Add a note for the client..."
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-teal-500 resize-none"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Internal Memo
-          </label>
-          <p className="text-xs text-gray-500 mb-2">
-            This memo is for internal use only and will not be visible on the invoice
-          </p>
-          <textarea
-            value={internalMemo}
-            onChange={(e) => setInternalMemo(e.target.value)}
-            rows={3}
-            placeholder="Add an internal memo..."
             className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-teal-500 resize-none"
           />
         </div>
