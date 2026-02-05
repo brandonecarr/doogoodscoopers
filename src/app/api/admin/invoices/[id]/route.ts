@@ -1,0 +1,137 @@
+/**
+ * Single Invoice API
+ *
+ * GET /api/admin/invoices/[id] - Get invoice by ID
+ */
+
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+import { authenticateWithPermission, errorResponse } from "@/lib/api-auth";
+
+function getSupabase() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceKey) {
+    throw new Error("Supabase environment variables not configured");
+  }
+  return createClient(url, serviceKey);
+}
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const auth = await authenticateWithPermission(request, "invoices:read");
+  if (!auth.user) {
+    return errorResponse(auth.error!, auth.status);
+  }
+
+  const { id } = await params;
+  const supabase = getSupabase();
+
+  // Fetch invoice with client and items
+  const { data: invoice, error } = await supabase
+    .from("invoices")
+    .select(
+      `
+      id,
+      invoice_number,
+      status,
+      subtotal_cents,
+      discount_cents,
+      tax_cents,
+      total_cents,
+      amount_paid_cents,
+      amount_due_cents,
+      tip_cents,
+      due_date,
+      paid_at,
+      notes,
+      billing_option,
+      billing_interval,
+      payment_method,
+      subscription_id,
+      created_at,
+      client:client_id (
+        id,
+        first_name,
+        last_name,
+        email,
+        phone
+      ),
+      invoice_items (
+        id,
+        description,
+        quantity,
+        unit_price_cents,
+        total_cents
+      )
+    `
+    )
+    .eq("id", id)
+    .eq("org_id", auth.user.orgId)
+    .single();
+
+  if (error || !invoice) {
+    console.error("Error fetching invoice:", error);
+    return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+  }
+
+  // Get client's primary address if available
+  let clientAddress = null;
+  if (invoice.client) {
+    const { data: location } = await supabase
+      .from("client_locations")
+      .select("address_line1, city, state, zip_code")
+      .eq("client_id", (invoice.client as { id: string }).id)
+      .eq("is_primary", true)
+      .single();
+
+    if (location) {
+      clientAddress = `${location.address_line1}, ${location.city}, ${location.state} ${location.zip_code}`;
+    }
+  }
+
+  // Format response
+  const client = invoice.client as {
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string | null;
+    phone: string | null;
+  } | null;
+
+  const formattedInvoice = {
+    id: invoice.id,
+    invoiceNumber: invoice.invoice_number,
+    status: invoice.status,
+    subtotalCents: invoice.subtotal_cents || 0,
+    discountCents: invoice.discount_cents || 0,
+    taxCents: invoice.tax_cents || 0,
+    tipCents: invoice.tip_cents || 0,
+    totalCents: invoice.total_cents || 0,
+    amountPaidCents: invoice.amount_paid_cents || 0,
+    amountDueCents: invoice.amount_due_cents || 0,
+    dueDate: invoice.due_date,
+    paidAt: invoice.paid_at,
+    notes: invoice.notes,
+    billingOption: invoice.billing_option,
+    billingInterval: invoice.billing_interval,
+    paymentMethod: invoice.payment_method,
+    subscriptionId: invoice.subscription_id,
+    createdAt: invoice.created_at,
+    client: client
+      ? {
+          id: client.id,
+          firstName: client.first_name,
+          lastName: client.last_name,
+          email: client.email,
+          phone: client.phone,
+          address: clientAddress,
+        }
+      : null,
+    items: invoice.invoice_items || [],
+  };
+
+  return NextResponse.json({ invoice: formattedInvoice });
+}
