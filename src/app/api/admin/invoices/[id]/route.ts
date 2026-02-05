@@ -2,6 +2,7 @@
  * Single Invoice API
  *
  * GET /api/admin/invoices/[id] - Get invoice by ID
+ * PUT /api/admin/invoices/[id] - Update invoice items and details
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -174,4 +175,167 @@ export async function GET(
   };
 
   return NextResponse.json({ invoice: formattedInvoice });
+}
+
+/**
+ * PUT /api/admin/invoices/[id]
+ * Update invoice items and details (for draft invoices)
+ */
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const auth = await authenticateWithPermission(request, "invoices:write");
+  if (!auth.user) {
+    return errorResponse(auth.error!, auth.status);
+  }
+
+  const { id } = await params;
+  const supabase = getSupabase();
+
+  try {
+    const body = await request.json();
+    const { items, notes, internalMemo, finalize } = body;
+
+    // Fetch existing invoice
+    const { data: invoice, error: invoiceError } = await supabase
+      .from("invoices")
+      .select("id, status, invoice_number")
+      .eq("id", id)
+      .eq("org_id", auth.user.orgId)
+      .single();
+
+    if (invoiceError || !invoice) {
+      return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+    }
+
+    // Only allow editing draft invoices
+    if (invoice.status !== "DRAFT") {
+      return NextResponse.json(
+        { error: "Only draft invoices can be edited" },
+        { status: 400 }
+      );
+    }
+
+    // Validate items
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return NextResponse.json(
+        { error: "At least one line item is required" },
+        { status: 400 }
+      );
+    }
+
+    // Delete existing items
+    await supabase
+      .from("invoice_items")
+      .delete()
+      .eq("invoice_id", id);
+
+    // Calculate totals
+    let subtotalCents = 0;
+    const newItems = items.map(
+      (item: {
+        description: string;
+        quantity: number;
+        unitPriceCents: number;
+        isService?: boolean;
+        isTaxable?: boolean;
+      }) => {
+        const totalCents = item.quantity * item.unitPriceCents;
+        subtotalCents += totalCents;
+        return {
+          org_id: auth.user!.orgId,
+          invoice_id: id,
+          description: item.description,
+          quantity: item.quantity,
+          unit_price_cents: item.unitPriceCents,
+          total_cents: totalCents,
+          is_service: item.isService ?? true,
+          is_taxable: item.isTaxable ?? false,
+        };
+      }
+    );
+
+    // Insert new items
+    const { error: itemsError } = await supabase
+      .from("invoice_items")
+      .insert(newItems);
+
+    if (itemsError) {
+      console.error("Error creating invoice items:", itemsError);
+      return NextResponse.json(
+        { error: "Failed to update invoice items" },
+        { status: 500 }
+      );
+    }
+
+    // Calculate tax (based on taxable items)
+    const taxableAmount = newItems
+      .filter((item) => item.is_taxable)
+      .reduce((sum, item) => sum + item.total_cents, 0);
+    const taxRate = 0; // Could be made org-configurable
+    const taxCents = Math.round(taxableAmount * (taxRate / 100));
+    const totalCents = subtotalCents + taxCents;
+
+    // Update invoice
+    const updateData: Record<string, unknown> = {
+      subtotal_cents: subtotalCents,
+      tax_cents: taxCents,
+      total_cents: totalCents,
+      amount_due_cents: totalCents,
+      notes: notes || null,
+      internal_memo: internalMemo || null,
+      updated_at: new Date().toISOString(),
+    };
+
+    // Finalize = change status to OPEN
+    if (finalize) {
+      updateData.status = "OPEN";
+    }
+
+    const { error: updateError } = await supabase
+      .from("invoices")
+      .update(updateData)
+      .eq("id", id);
+
+    if (updateError) {
+      console.error("Error updating invoice:", updateError);
+      return NextResponse.json(
+        { error: "Failed to update invoice" },
+        { status: 500 }
+      );
+    }
+
+    // Log activity
+    await supabase.from("activity_logs").insert({
+      org_id: auth.user.orgId,
+      user_id: auth.user.id,
+      action: finalize ? "INVOICE_FINALIZED" : "INVOICE_UPDATED",
+      entity_type: "INVOICE",
+      entity_id: id,
+      details: {
+        invoiceNumber: invoice.invoice_number,
+        subtotalCents,
+        totalCents,
+        itemCount: items.length,
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      invoice: {
+        id,
+        status: finalize ? "OPEN" : "DRAFT",
+        subtotalCents,
+        taxCents,
+        totalCents,
+      },
+    });
+  } catch (error) {
+    console.error("Error updating invoice:", error);
+    return NextResponse.json(
+      { error: "Failed to update invoice" },
+      { status: 500 }
+    );
+  }
 }
