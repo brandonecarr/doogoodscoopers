@@ -72,7 +72,7 @@ export async function POST(
       );
     }
 
-    if (invoice.status !== "OPEN" && invoice.status !== "UNCOLLECTIBLE") {
+    if (invoice.status !== "OPEN" && invoice.status !== "FAILED") {
       return NextResponse.json(
         { error: "Invoice is not in a chargeable state" },
         { status: 400 }
@@ -215,7 +215,7 @@ export async function POST(
       await supabase
         .from("invoices")
         .update({
-          status: "UNCOLLECTIBLE",
+          status: "FAILED",
           updated_at: new Date().toISOString(),
         })
         .eq("id", id)

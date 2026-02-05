@@ -31,7 +31,7 @@ function getSupabase() {
   return createClient(url, serviceKey);
 }
 
-const INVOICE_STATUSES: InvoiceStatus[] = ["DRAFT", "OPEN", "PAID", "OVERDUE", "VOID", "UNCOLLECTIBLE"];
+const INVOICE_STATUSES: InvoiceStatus[] = ["DRAFT", "OPEN", "PAID", "OVERDUE", "VOID", "FAILED"];
 
 /**
  * GET /api/admin/recurring-invoices
@@ -197,7 +197,7 @@ export async function GET(request: NextRequest) {
           stats.paid.count++;
           stats.paid.amountCents += inv.total_cents || 0;
           break;
-        case "UNCOLLECTIBLE":
+        case "FAILED":
           stats.failed.count++;
           stats.failed.amountCents += inv.total_cents || 0;
           break;

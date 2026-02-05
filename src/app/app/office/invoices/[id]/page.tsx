@@ -69,7 +69,7 @@ function getStatusColor(status: string) {
       return "text-green-600";
     case "VOID":
       return "text-gray-500";
-    case "UNCOLLECTIBLE":
+    case "FAILED":
       return "text-red-600";
     default:
       return "text-gray-600";
@@ -78,7 +78,7 @@ function getStatusColor(status: string) {
 
 function getStatusLabel(status: string) {
   switch (status) {
-    case "UNCOLLECTIBLE":
+    case "FAILED":
       return "FAILED";
     default:
       return status;
@@ -329,7 +329,7 @@ export default function InvoiceDetailPage({
             </>
           )}
 
-          {(invoice.status === "PAID" || invoice.status === "OPEN" || invoice.status === "UNCOLLECTIBLE") && (
+          {(invoice.status === "PAID" || invoice.status === "OPEN" || invoice.status === "FAILED") && (
             <button
               onClick={handleVoid}
               className="inline-flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
@@ -490,7 +490,7 @@ export default function InvoiceDetailPage({
               <span className="font-semibold text-gray-900">Invoice Total</span>
               <span className="font-semibold text-gray-900">{formatCurrency(invoice.totalCents)}</span>
             </div>
-            {(invoice.status === "PAID" || invoice.status === "UNCOLLECTIBLE" || invoice.amountPaidCents > 0) && (
+            {(invoice.status === "PAID" || invoice.status === "FAILED" || invoice.amountPaidCents > 0) && (
               <>
                 <div className="flex justify-between w-64">
                   <span className="text-gray-500">Amount Received</span>
@@ -516,7 +516,7 @@ export default function InvoiceDetailPage({
       </div>
 
       {/* Billing Section - for unpaid invoices */}
-      {(invoice.status === "OPEN" || invoice.status === "UNCOLLECTIBLE") && (
+      {(invoice.status === "OPEN" || invoice.status === "FAILED") && (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <h3 className="font-semibold text-gray-900 mb-4">Billing</h3>
 

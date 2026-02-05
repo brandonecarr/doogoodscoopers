@@ -23,8 +23,8 @@ function getSupabase() {
   return createClient(url, serviceKey);
 }
 
-type InvoiceStatus = "DRAFT" | "OPEN" | "PAID" | "VOID" | "UNCOLLECTIBLE";
-const INVOICE_STATUSES: InvoiceStatus[] = ["DRAFT", "OPEN", "PAID", "VOID", "UNCOLLECTIBLE"];
+type InvoiceStatus = "DRAFT" | "OPEN" | "PAID" | "VOID" | "FAILED";
+const INVOICE_STATUSES: InvoiceStatus[] = ["DRAFT", "OPEN", "PAID", "VOID", "FAILED"];
 
 /**
  * GET /api/admin/invoices
@@ -159,7 +159,7 @@ export async function GET(request: NextRequest) {
       case "PAID":
         statsAccum.paidAmountCents += inv.total_cents || 0;
         break;
-      case "UNCOLLECTIBLE":
+      case "FAILED":
         statsAccum.failedAmountCents += inv.total_cents || 0;
         break;
     }

@@ -182,7 +182,7 @@ export function DashboardClient({ user }: DashboardClientProps) {
             count={counts.failedOneTimeInvoices}
             title="Failed One-Time Invoices"
             subtitle="View One-Time Invoices"
-            href="/app/office/invoices?status=UNCOLLECTIBLE"
+            href="/app/office/invoices?status=FAILED"
             highlight
           />
         )}
@@ -191,7 +191,7 @@ export function DashboardClient({ user }: DashboardClientProps) {
             count={counts.failedRecurringInvoices}
             title="Failed Recurring Invoices"
             subtitle="View Recurring Invoices"
-            href="/app/office/invoices?status=UNCOLLECTIBLE"
+            href="/app/office/invoices?status=FAILED"
             highlight
           />
         )}

@@ -2,7 +2,7 @@
  * Types for the Billing module
  */
 
-export type InvoiceStatus = 'DRAFT' | 'OPEN' | 'PAID' | 'OVERDUE' | 'VOID' | 'UNCOLLECTIBLE';
+export type InvoiceStatus = 'DRAFT' | 'OPEN' | 'PAID' | 'OVERDUE' | 'VOID' | 'FAILED';
 export type BillingOption = 'PREPAID_FIXED' | 'PREPAID_VARIABLE' | 'POSTPAID';
 export type BillingInterval = 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
 export type PaymentMethod = 'CREDIT_CARD' | 'CHECK' | 'CASH' | 'ACH' | 'OTHER';
@@ -111,7 +111,7 @@ export const STATUS_COLORS: Record<InvoiceStatus, { text: string; bg: string }> 
   PAID: { text: 'text-green-700', bg: 'bg-green-100' },
   OVERDUE: { text: 'text-red-700', bg: 'bg-red-100' },
   VOID: { text: 'text-gray-500', bg: 'bg-gray-100' },
-  UNCOLLECTIBLE: { text: 'text-red-700', bg: 'bg-red-100' },
+  FAILED: { text: 'text-red-700', bg: 'bg-red-100' },
 };
 
 // Status display labels
@@ -121,5 +121,5 @@ export const STATUS_LABELS: Record<InvoiceStatus, string> = {
   PAID: 'Paid',
   OVERDUE: 'Overdue',
   VOID: 'Voided',
-  UNCOLLECTIBLE: 'Failed',
+  FAILED: 'Failed',
 };

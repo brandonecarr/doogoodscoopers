@@ -67,7 +67,7 @@ export async function POST(
       return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
     }
 
-    if (invoice.status !== "OPEN" && invoice.status !== "UNCOLLECTIBLE") {
+    if (invoice.status !== "OPEN" && invoice.status !== "FAILED") {
       return NextResponse.json(
         { error: "Invoice is not in a payable state" },
         { status: 400 }

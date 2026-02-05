@@ -83,14 +83,14 @@ export async function GET(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const clientData = invoice.client as any;
 
-  // Self-healing check: If invoice shows as OPEN/UNCOLLECTIBLE, verify against Stripe
+  // Self-healing check: If invoice shows as OPEN/FAILED, verify against Stripe
   // to see if there's actually a successful payment we missed updating
   let invoiceStatus = invoice.status;
   let invoicePaidAt = invoice.paid_at;
   let invoiceAmountPaidCents = invoice.amount_paid_cents;
   let invoiceAmountDueCents = invoice.amount_due_cents;
 
-  if ((invoice.status === "OPEN" || invoice.status === "UNCOLLECTIBLE") && clientData?.stripe_customer_id) {
+  if ((invoice.status === "OPEN" || invoice.status === "FAILED") && clientData?.stripe_customer_id) {
     try {
       const stripe = getStripe();
       // Search for successful PaymentIntents with this invoice_id in metadata

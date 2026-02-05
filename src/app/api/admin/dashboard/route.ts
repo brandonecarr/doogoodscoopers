@@ -190,7 +190,7 @@ export async function GET(request: NextRequest) {
         .from("invoices")
         .select("id", { count: "exact", head: true })
         .eq("org_id", orgId)
-        .eq("status", "UNCOLLECTIBLE")
+        .eq("status", "FAILED")
         .is("subscription_id", null),
 
       // Failed recurring invoices
@@ -198,7 +198,7 @@ export async function GET(request: NextRequest) {
         .from("invoices")
         .select("id", { count: "exact", head: true })
         .eq("org_id", orgId)
-        .eq("status", "UNCOLLECTIBLE")
+        .eq("status", "FAILED")
         .not("subscription_id", "is", null),
 
       // Open jobs (today)

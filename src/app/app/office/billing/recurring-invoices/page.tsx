@@ -53,7 +53,7 @@ const STATUS_OPTIONS: { value: InvoiceStatus; label: string }[] = [
   { value: "OPEN", label: "Open" },
   { value: "OVERDUE", label: "Overdue" },
   { value: "VOID", label: "Voided" },
-  { value: "UNCOLLECTIBLE", label: "Failed" },
+  { value: "FAILED", label: "Failed" },
 ];
 
 const BILLING_OPTION_OPTIONS: { value: BillingOption; label: string }[] = [

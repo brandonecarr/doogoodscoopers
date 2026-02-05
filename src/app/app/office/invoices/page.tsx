@@ -19,7 +19,7 @@ import {
   Trash2,
 } from "lucide-react";
 
-type InvoiceStatus = "DRAFT" | "OPEN" | "PAID" | "OVERDUE" | "VOID" | "UNCOLLECTIBLE";
+type InvoiceStatus = "DRAFT" | "OPEN" | "PAID" | "OVERDUE" | "VOID" | "FAILED";
 
 interface InvoiceClient {
   id: string;
@@ -61,7 +61,7 @@ interface ClientOption {
   email: string | null;
 }
 
-const INVOICE_STATUSES: InvoiceStatus[] = ["DRAFT", "OPEN", "OVERDUE", "PAID", "VOID", "UNCOLLECTIBLE"];
+const INVOICE_STATUSES: InvoiceStatus[] = ["DRAFT", "OPEN", "OVERDUE", "PAID", "VOID", "FAILED"];
 
 function getStatusIcon(status: InvoiceStatus) {
   switch (status) {
@@ -75,7 +75,7 @@ function getStatusIcon(status: InvoiceStatus) {
       return <AlertTriangle className="w-4 h-4 text-red-500" />;
     case "VOID":
       return <Ban className="w-4 h-4 text-gray-400" />;
-    case "UNCOLLECTIBLE":
+    case "FAILED":
       return <AlertCircle className="w-4 h-4 text-red-500" />;
   }
 }
@@ -92,14 +92,14 @@ function getStatusColor(status: InvoiceStatus) {
       return "text-red-700 bg-red-100";
     case "VOID":
       return "text-gray-600 bg-gray-100";
-    case "UNCOLLECTIBLE":
+    case "FAILED":
       return "text-red-700 bg-red-100";
   }
 }
 
 function getStatusLabel(status: InvoiceStatus) {
   switch (status) {
-    case "UNCOLLECTIBLE":
+    case "FAILED":
       return "Failed";
     default:
       return status.charAt(0) + status.slice(1).toLowerCase();
@@ -353,7 +353,7 @@ export default function InvoicesPage() {
         case "PAID":
           result.paidAmountCents += amount;
           break;
-        case "UNCOLLECTIBLE":
+        case "FAILED":
           result.failedAmountCents += amount;
           break;
       }
@@ -431,7 +431,7 @@ export default function InvoicesPage() {
               <p className="text-sm font-semibold text-gray-900">{formatCurrency(visibleStats.paidAmountCents)}</p>
             </button>
             <button
-              onClick={() => { setStatusFilter("UNCOLLECTIBLE"); setPage(1); }}
+              onClick={() => { setStatusFilter("FAILED"); setPage(1); }}
               className="text-center hover:opacity-80 transition-opacity"
             >
               <div className="w-2 h-2 rounded-full bg-red-500 mx-auto mb-1.5" />
