@@ -149,7 +149,11 @@ interface FormOptions {
 // Onboarding settings from admin configuration
 interface OnboardingSettings {
   couponCode?: { enabled: boolean };
-  defaultCouponCode?: string | null;
+  defaultCoupon?: {
+    code: string;
+    discountType: "PERCENTAGE" | "FIXED_AMOUNT" | "FREE_VISITS";
+    discountValue: number;
+  } | null;
   maxDogs?: number;
   lastTimeYardWasCleaned?: { enabled: boolean };
   requestFirstNameBeforeQuote?: { enabled: boolean };
@@ -520,8 +524,8 @@ function QuoteFormInner() {
         serviceForm.setValue("lastCleaned", "one_week");
       }
       // Pre-fill default coupon code if one is set
-      if (onboardingSettings.defaultCouponCode) {
-        serviceForm.setValue("couponCode", onboardingSettings.defaultCouponCode);
+      if (onboardingSettings.defaultCoupon?.code) {
+        serviceForm.setValue("couponCode", onboardingSettings.defaultCoupon.code);
       }
     }
   }, [isLoadingOptions, onboardingSettings, serviceForm]);
@@ -1303,6 +1307,25 @@ function QuoteFormInner() {
                           ${pricing.recurringPrice}<span className="text-sm font-normal">/visit</span>
                         </span>
                       </div>
+                      {pricing.monthlyPrice && onboardingSettings.defaultCoupon && (
+                        <div className="flex justify-between items-center py-2 border-b border-teal-200/50">
+                          <div>
+                            <span className="text-teal-700">First Month</span>
+                            <p className="text-xs text-teal-600/70">
+                              with coupon code &quot;{onboardingSettings.defaultCoupon.code}&quot;
+                            </p>
+                          </div>
+                          <span className="font-semibold text-green-600">
+                            $
+                            {onboardingSettings.defaultCoupon.discountType === "PERCENTAGE"
+                              ? (pricing.monthlyPrice * (1 - onboardingSettings.defaultCoupon.discountValue / 100)).toFixed(2)
+                              : onboardingSettings.defaultCoupon.discountType === "FIXED_AMOUNT"
+                              ? Math.max(0, pricing.monthlyPrice - onboardingSettings.defaultCoupon.discountValue / 100).toFixed(2)
+                              : pricing.monthlyPrice.toFixed(2)}
+                            /month
+                          </span>
+                        </div>
+                      )}
                       {pricing.monthlyPrice && pricing.monthlyPrice !== pricing.recurringPrice && (
                         <div className="flex justify-between items-center py-2 border-b border-teal-200/50">
                           <span className="text-teal-700">Monthly Total</span>
@@ -1891,6 +1914,25 @@ function QuoteFormInner() {
                   <span className="text-teal-700">Per cleanup:</span>
                   <span className="font-semibold text-teal-900">${pricing.recurringPrice}/visit</span>
                 </div>
+                {pricing.monthlyPrice && onboardingSettings.defaultCoupon && (
+                  <div className="flex justify-between items-center mt-1 text-sm">
+                    <div>
+                      <span className="text-teal-600">First month:</span>
+                      <span className="text-xs text-teal-500 ml-1">
+                        ({onboardingSettings.defaultCoupon.code})
+                      </span>
+                    </div>
+                    <span className="text-green-600 font-medium">
+                      $
+                      {onboardingSettings.defaultCoupon.discountType === "PERCENTAGE"
+                        ? (pricing.monthlyPrice * (1 - onboardingSettings.defaultCoupon.discountValue / 100)).toFixed(2)
+                        : onboardingSettings.defaultCoupon.discountType === "FIXED_AMOUNT"
+                        ? Math.max(0, pricing.monthlyPrice - onboardingSettings.defaultCoupon.discountValue / 100).toFixed(2)
+                        : pricing.monthlyPrice.toFixed(2)}
+                      /month
+                    </span>
+                  </div>
+                )}
                 {pricing.monthlyPrice && pricing.monthlyPrice !== pricing.recurringPrice && (
                   <div className="flex justify-between items-center mt-1 text-sm">
                     <span className="text-teal-600">Monthly total:</span>
@@ -2240,6 +2282,25 @@ function QuoteFormInner() {
                     <span className="text-teal-700">Per Cleanup:</span>
                     <span className="font-semibold text-teal-900">${pricing.recurringPrice}/visit</span>
                   </div>
+                  {pricing.monthlyPrice && onboardingSettings.defaultCoupon && (
+                    <div className="flex justify-between">
+                      <div>
+                        <span className="text-teal-700">First Month:</span>
+                        <p className="text-xs text-teal-600/70">
+                          with &quot;{onboardingSettings.defaultCoupon.code}&quot;
+                        </p>
+                      </div>
+                      <span className="font-semibold text-green-600">
+                        $
+                        {onboardingSettings.defaultCoupon.discountType === "PERCENTAGE"
+                          ? (pricing.monthlyPrice * (1 - onboardingSettings.defaultCoupon.discountValue / 100)).toFixed(2)
+                          : onboardingSettings.defaultCoupon.discountType === "FIXED_AMOUNT"
+                          ? Math.max(0, pricing.monthlyPrice - onboardingSettings.defaultCoupon.discountValue / 100).toFixed(2)
+                          : pricing.monthlyPrice.toFixed(2)}
+                        /month
+                      </span>
+                    </div>
+                  )}
                   {pricing.monthlyPrice && pricing.monthlyPrice !== pricing.recurringPrice && (
                     <div className="flex justify-between">
                       <span className="text-teal-700">Monthly Total:</span>

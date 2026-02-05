@@ -165,19 +165,27 @@ export async function GET() {
       .eq("slug", "doogoodscoopers")
       .single<{ id: string; settings: Record<string, unknown> | null }>();
 
-    // Get default coupon code if one exists
-    let defaultCouponCode: string | null = null;
+    // Get default coupon if one exists
+    let defaultCoupon: {
+      code: string;
+      discountType: "PERCENTAGE" | "FIXED_AMOUNT" | "FREE_VISITS";
+      discountValue: number;
+    } | null = null;
     if (org?.id) {
-      const { data: defaultCoupon } = await supabase
+      const { data: couponData } = await supabase
         .from("coupons")
-        .select("code")
+        .select("code, discount_type, discount_value")
         .eq("org_id", org.id)
         .eq("is_default", true)
         .eq("is_active", true)
-        .single<{ code: string }>();
+        .single<{ code: string; discount_type: string; discount_value: number }>();
 
-      if (defaultCoupon?.code) {
-        defaultCouponCode = defaultCoupon.code;
+      if (couponData?.code) {
+        defaultCoupon = {
+          code: couponData.code,
+          discountType: couponData.discount_type as "PERCENTAGE" | "FIXED_AMOUNT" | "FREE_VISITS",
+          discountValue: couponData.discount_value,
+        };
       }
     }
 
@@ -224,7 +232,7 @@ export async function GET() {
       // Include onboarding settings for frontend conditional rendering
       onboardingSettings: {
         couponCode: onboardingSettings.couponCode,
-        defaultCouponCode,
+        defaultCoupon,
         maxDogs: onboardingSettings.maxDogs,
         lastTimeYardWasCleaned: onboardingSettings.lastTimeYardWasCleaned,
         requestFirstNameBeforeQuote: onboardingSettings.requestFirstNameBeforeQuote,
