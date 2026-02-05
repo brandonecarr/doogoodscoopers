@@ -571,6 +571,69 @@ export async function createGiftCertificateCheckout(
 }
 
 // =====================================================
+// PAYOUTS
+// =====================================================
+
+export interface ListPayoutsOptions {
+  limit?: number;
+  starting_after?: string;
+  status?: "pending" | "paid" | "failed" | "canceled";
+}
+
+/**
+ * List Stripe payouts with pagination
+ */
+export async function listPayouts(
+  options?: ListPayoutsOptions
+): Promise<Stripe.ApiList<Stripe.Payout>> {
+  const stripe = getStripe();
+  return await stripe.payouts.list({
+    limit: options?.limit || 25,
+    starting_after: options?.starting_after,
+    status: options?.status,
+  });
+}
+
+/**
+ * Get a single Stripe payout by ID
+ */
+export async function getPayout(payoutId: string): Promise<Stripe.Payout> {
+  const stripe = getStripe();
+  return await stripe.payouts.retrieve(payoutId);
+}
+
+/**
+ * Get all balance transactions for a payout
+ * This includes charges, refunds, fees, etc.
+ */
+export async function getPayoutBalanceTransactions(
+  payoutId: string
+): Promise<Stripe.BalanceTransaction[]> {
+  const stripe = getStripe();
+  const transactions: Stripe.BalanceTransaction[] = [];
+  let hasMore = true;
+  let startingAfter: string | undefined;
+
+  while (hasMore) {
+    const response = await stripe.balanceTransactions.list({
+      payout: payoutId,
+      limit: 100,
+      starting_after: startingAfter,
+      expand: ["data.source"],
+    });
+
+    transactions.push(...response.data);
+    hasMore = response.has_more;
+
+    if (response.data.length > 0) {
+      startingAfter = response.data[response.data.length - 1].id;
+    }
+  }
+
+  return transactions;
+}
+
+// =====================================================
 // WEBHOOK SIGNATURE VERIFICATION
 // =====================================================
 
