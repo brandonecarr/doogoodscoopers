@@ -177,22 +177,27 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Get available cross-sells (recurring add-ons)
-    const { data: addOns } = await supabase
-      .from("add_ons")
-      .select("id, name, description, price_cents, price_type, is_recurring")
+    // Get cross-sells from onboarding settings (where admin configures them)
+    const { data: onboardingSettings } = await supabase
+      .from("onboarding_settings")
+      .select("settings")
       .eq("org_id", org.id)
-      .eq("is_active", true)
-      .eq("is_recurring", true)
-      .order("sort_order", { ascending: true });
+      .single<{ settings: { residentialCrossSells?: { items?: Array<{ id: string; name: string; description: string; pricePerUnit: number; unit: string }>; placement?: string } } }>();
 
-    const crossSells = (addOns as AddOn[] | null)?.map((addOn) => ({
-      id: addOn.id,
-      name: addOn.name,
-      description: addOn.description,
-      unit_amount: addOn.price_cents / 100,
-      price_type: addOn.price_type,
-    })) || [];
+    // Extract cross-sells from settings, respecting the placement setting
+    const crossSellsSettings = onboardingSettings?.settings?.residentialCrossSells;
+    const crossSellsPlacement = crossSellsSettings?.placement || "BOTTOM";
+
+    // Only include cross-sells if placement is not "DONT_SHOW"
+    const crossSells = crossSellsPlacement !== "DONT_SHOW"
+      ? (crossSellsSettings?.items || []).map((item) => ({
+          id: item.id,
+          name: item.name,
+          description: item.description,
+          unit_amount: item.pricePerUnit / 100, // Convert cents to dollars
+          unit: item.unit,
+        }))
+      : [];
 
     return NextResponse.json({
       success: true,
