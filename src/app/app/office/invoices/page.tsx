@@ -7,22 +7,18 @@ import {
   Plus,
   Search,
   RefreshCw,
-  Edit,
   X,
   AlertCircle,
   Send,
   CheckCircle,
-  Clock,
   AlertTriangle,
   Ban,
-  DollarSign,
   Calendar,
-  Download,
   Eye,
   Trash2,
 } from "lucide-react";
 
-type InvoiceStatus = "DRAFT" | "SENT" | "PAID" | "PARTIAL" | "OVERDUE" | "VOID";
+type InvoiceStatus = "DRAFT" | "OPEN" | "PAID" | "OVERDUE" | "VOID" | "UNCOLLECTIBLE";
 
 interface InvoiceClient {
   id: string;
@@ -47,10 +43,9 @@ interface Invoice {
   subtotalCents: number;
   taxCents: number;
   discountCents: number;
-  paidCents: number;
-  balanceCents: number;
+  amountPaidCents: number;
+  amountDueCents: number;
   dueDate: string | null;
-  issuedDate: string | null;
   paidAt: string | null;
   notes: string | null;
   createdAt: string;
@@ -61,13 +56,12 @@ interface Invoice {
 
 interface InvoiceStats {
   total: number;
-  draft: number;
-  sent: number;
-  paid: number;
-  overdue: number;
   totalAmountCents: number;
+  draftAmountCents: number;
+  openAmountCents: number;
+  overdueAmountCents: number;
   paidAmountCents: number;
-  outstandingCents: number;
+  failedAmountCents: number;
 }
 
 interface ClientOption {
@@ -76,22 +70,22 @@ interface ClientOption {
   email: string | null;
 }
 
-const INVOICE_STATUSES: InvoiceStatus[] = ["DRAFT", "SENT", "PAID", "PARTIAL", "OVERDUE", "VOID"];
+const INVOICE_STATUSES: InvoiceStatus[] = ["DRAFT", "OPEN", "OVERDUE", "PAID", "VOID", "UNCOLLECTIBLE"];
 
 function getStatusIcon(status: InvoiceStatus) {
   switch (status) {
     case "DRAFT":
       return <FileText className="w-4 h-4 text-gray-500" />;
-    case "SENT":
+    case "OPEN":
       return <Send className="w-4 h-4 text-blue-500" />;
     case "PAID":
       return <CheckCircle className="w-4 h-4 text-green-500" />;
-    case "PARTIAL":
-      return <Clock className="w-4 h-4 text-orange-500" />;
     case "OVERDUE":
       return <AlertTriangle className="w-4 h-4 text-red-500" />;
     case "VOID":
       return <Ban className="w-4 h-4 text-gray-400" />;
+    case "UNCOLLECTIBLE":
+      return <AlertCircle className="w-4 h-4 text-red-500" />;
   }
 }
 
@@ -99,16 +93,25 @@ function getStatusColor(status: InvoiceStatus) {
   switch (status) {
     case "DRAFT":
       return "text-gray-700 bg-gray-100";
-    case "SENT":
+    case "OPEN":
       return "text-blue-700 bg-blue-100";
     case "PAID":
       return "text-green-700 bg-green-100";
-    case "PARTIAL":
-      return "text-orange-700 bg-orange-100";
     case "OVERDUE":
       return "text-red-700 bg-red-100";
     case "VOID":
       return "text-gray-600 bg-gray-100";
+    case "UNCOLLECTIBLE":
+      return "text-red-700 bg-red-100";
+  }
+}
+
+function getStatusLabel(status: InvoiceStatus) {
+  switch (status) {
+    case "UNCOLLECTIBLE":
+      return "Failed";
+    default:
+      return status.charAt(0) + status.slice(1).toLowerCase();
   }
 }
 
@@ -126,13 +129,12 @@ export default function InvoicesPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [stats, setStats] = useState<InvoiceStats>({
     total: 0,
-    draft: 0,
-    sent: 0,
-    paid: 0,
-    overdue: 0,
     totalAmountCents: 0,
+    draftAmountCents: 0,
+    openAmountCents: 0,
+    overdueAmountCents: 0,
     paidAmountCents: 0,
-    outstandingCents: 0,
+    failedAmountCents: 0,
   });
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>(initialStatus);
@@ -376,49 +378,57 @@ export default function InvoicesPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-              <FileText className="w-5 h-5 text-blue-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Total Invoices</p>
-              <p className="text-xl font-bold text-gray-900">{stats.total}</p>
-            </div>
-          </div>
+      <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-5 flex items-stretch gap-6">
+        {/* Left: Invoices Total */}
+        <div className="flex flex-col justify-center pr-6 border-r border-gray-200 min-w-[180px]">
+          <p className="text-sm font-medium text-gray-500 mb-1">Invoices Total</p>
+          <p className="text-3xl font-bold text-teal-600">{formatCurrency(stats.totalAmountCents)}</p>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-              <DollarSign className="w-5 h-5 text-green-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Total Billed</p>
-              <p className="text-xl font-bold text-gray-900">{formatCurrency(stats.totalAmountCents)}</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-teal-100 rounded-lg flex items-center justify-center">
-              <CheckCircle className="w-5 h-5 text-teal-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Total Paid</p>
-              <p className="text-xl font-bold text-gray-900">{formatCurrency(stats.paidAmountCents)}</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
-              <AlertTriangle className="w-5 h-5 text-red-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Outstanding</p>
-              <p className="text-xl font-bold text-gray-900">{formatCurrency(stats.outstandingCents)}</p>
-            </div>
+
+        {/* Right: Invoices by Status */}
+        <div className="flex-1">
+          <p className="text-sm font-medium text-gray-500 mb-3">Invoices by Status</p>
+          <div className="flex items-end gap-6">
+            <button
+              onClick={() => { setStatusFilter("DRAFT"); setPage(1); }}
+              className="text-center hover:opacity-80 transition-opacity"
+            >
+              <div className="w-2 h-2 rounded-full bg-gray-400 mx-auto mb-1.5" />
+              <p className="text-xs text-gray-500 mb-0.5">Draft</p>
+              <p className="text-sm font-semibold text-gray-900">{formatCurrency(stats.draftAmountCents)}</p>
+            </button>
+            <button
+              onClick={() => { setStatusFilter("OPEN"); setPage(1); }}
+              className="text-center hover:opacity-80 transition-opacity"
+            >
+              <div className="w-2 h-2 rounded-full bg-blue-500 mx-auto mb-1.5" />
+              <p className="text-xs text-gray-500 mb-0.5">Open</p>
+              <p className="text-sm font-semibold text-gray-900">{formatCurrency(stats.openAmountCents)}</p>
+            </button>
+            <button
+              onClick={() => { setStatusFilter("OVERDUE"); setPage(1); }}
+              className="text-center hover:opacity-80 transition-opacity"
+            >
+              <div className="w-2 h-2 rounded-full bg-orange-500 mx-auto mb-1.5" />
+              <p className="text-xs text-gray-500 mb-0.5">Overdue</p>
+              <p className="text-sm font-semibold text-gray-900">{formatCurrency(stats.overdueAmountCents)}</p>
+            </button>
+            <button
+              onClick={() => { setStatusFilter("PAID"); setPage(1); }}
+              className="text-center hover:opacity-80 transition-opacity"
+            >
+              <div className="w-2 h-2 rounded-full bg-green-500 mx-auto mb-1.5" />
+              <p className="text-xs text-gray-500 mb-0.5">Paid</p>
+              <p className="text-sm font-semibold text-gray-900">{formatCurrency(stats.paidAmountCents)}</p>
+            </button>
+            <button
+              onClick={() => { setStatusFilter("UNCOLLECTIBLE"); setPage(1); }}
+              className="text-center hover:opacity-80 transition-opacity"
+            >
+              <div className="w-2 h-2 rounded-full bg-red-500 mx-auto mb-1.5" />
+              <p className="text-xs text-gray-500 mb-0.5">Failed</p>
+              <p className="text-sm font-semibold text-gray-900">{formatCurrency(stats.failedAmountCents)}</p>
+            </button>
           </div>
         </div>
       </div>
@@ -447,9 +457,9 @@ export default function InvoicesPage() {
             className="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
           >
             <option value="">All Statuses</option>
-            {INVOICE_STATUSES.map((status) => (
-              <option key={status} value={status}>
-                {status.charAt(0) + status.slice(1).toLowerCase()}
+            {INVOICE_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {getStatusLabel(s)}
               </option>
             ))}
           </select>
@@ -526,9 +536,9 @@ export default function InvoicesPage() {
                         <p className="text-sm font-medium text-gray-900">
                           {formatCurrency(invoice.totalCents)}
                         </p>
-                        {invoice.balanceCents > 0 && invoice.status !== "DRAFT" && (
+                        {invoice.amountDueCents > 0 && invoice.status !== "DRAFT" && (
                           <p className="text-xs text-red-600">
-                            Balance: {formatCurrency(invoice.balanceCents)}
+                            Balance: {formatCurrency(invoice.amountDueCents)}
                           </p>
                         )}
                       </td>
@@ -539,14 +549,14 @@ export default function InvoicesPage() {
                           )}`}
                         >
                           {getStatusIcon(invoice.status)}
-                          {invoice.status}
+                          {getStatusLabel(invoice.status)}
                         </span>
                       </td>
                       <td className="px-4 py-3">
                         <div className="text-sm">
                           <p className="text-gray-900">
-                            {invoice.issuedDate
-                              ? new Date(invoice.issuedDate).toLocaleDateString()
+                            {invoice.createdAt
+                              ? new Date(invoice.createdAt).toLocaleDateString()
                               : "Not issued"}
                           </p>
                           {invoice.dueDate && (
@@ -568,14 +578,14 @@ export default function InvoicesPage() {
                           </button>
                           {invoice.status === "DRAFT" && (
                             <button
-                              onClick={() => handleStatusChange(invoice, "SENT")}
+                              onClick={() => handleStatusChange(invoice, "OPEN")}
                               className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
                               title="Send"
                             >
                               <Send className="w-4 h-4" />
                             </button>
                           )}
-                          {["SENT", "PARTIAL", "OVERDUE"].includes(invoice.status) && (
+                          {["OPEN", "OVERDUE"].includes(invoice.status) && (
                             <button
                               onClick={() => handleMarkPaid(invoice)}
                               className="p-2 text-green-600 hover:bg-green-50 rounded-lg"
@@ -850,7 +860,7 @@ export default function InvoicesPage() {
                   )}`}
                 >
                   {getStatusIcon(selectedInvoice.status)}
-                  {selectedInvoice.status}
+                  {getStatusLabel(selectedInvoice.status)}
                 </span>
               </div>
               <button
@@ -878,8 +888,8 @@ export default function InvoicesPage() {
                 <div>
                   <p className="text-sm text-gray-500">Issued Date</p>
                   <p className="font-medium">
-                    {selectedInvoice.issuedDate
-                      ? new Date(selectedInvoice.issuedDate).toLocaleDateString()
+                    {selectedInvoice.createdAt
+                      ? new Date(selectedInvoice.createdAt).toLocaleDateString()
                       : "Not issued"}
                   </p>
                 </div>
@@ -946,15 +956,15 @@ export default function InvoicesPage() {
                   <span>Total</span>
                   <span>{formatCurrency(selectedInvoice.totalCents)}</span>
                 </div>
-                {selectedInvoice.paidCents > 0 && (
+                {selectedInvoice.amountPaidCents > 0 && (
                   <>
                     <div className="flex justify-between text-sm text-green-600">
                       <span>Paid</span>
-                      <span>-{formatCurrency(selectedInvoice.paidCents)}</span>
+                      <span>-{formatCurrency(selectedInvoice.amountPaidCents)}</span>
                     </div>
                     <div className="flex justify-between font-bold">
                       <span>Balance Due</span>
-                      <span>{formatCurrency(selectedInvoice.balanceCents)}</span>
+                      <span>{formatCurrency(selectedInvoice.amountDueCents)}</span>
                     </div>
                   </>
                 )}
@@ -973,7 +983,7 @@ export default function InvoicesPage() {
                 {selectedInvoice.status === "DRAFT" && (
                   <>
                     <button
-                      onClick={() => handleStatusChange(selectedInvoice, "SENT")}
+                      onClick={() => handleStatusChange(selectedInvoice, "OPEN")}
                       className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                     >
                       <Send className="w-4 h-4" />
@@ -987,7 +997,7 @@ export default function InvoicesPage() {
                     </button>
                   </>
                 )}
-                {["SENT", "PARTIAL", "OVERDUE"].includes(selectedInvoice.status) && (
+                {["OPEN", "OVERDUE"].includes(selectedInvoice.status) && (
                   <button
                     onClick={() => handleMarkPaid(selectedInvoice)}
                     className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"

@@ -88,8 +88,13 @@ export async function GET(request: NextRequest) {
     .order("created_at", { ascending: false });
 
   // Filter by status
-  if (status && INVOICE_STATUSES.includes(status as InvoiceStatus)) {
-    query = query.eq("status", status);
+  if (status) {
+    if (status === "OVERDUE") {
+      // Overdue = OPEN + past due date
+      query = query.eq("status", "OPEN").lt("due_date", new Date().toISOString());
+    } else if (INVOICE_STATUSES.includes(status as InvoiceStatus)) {
+      query = query.eq("status", status);
+    }
   }
 
   // Filter by client
@@ -118,25 +123,49 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // Get stats
+  // Get stats (include due_date for overdue detection)
   const { data: allInvoices } = await supabase
     .from("invoices")
-    .select("status, total_cents, amount_paid_cents, amount_due_cents")
+    .select("status, total_cents, amount_paid_cents, amount_due_cents, due_date")
     .eq("org_id", auth.user.orgId);
 
-  const stats = {
-    total: allInvoices?.length || 0,
-    draft: allInvoices?.filter((i) => i.status === "DRAFT").length || 0,
-    open: allInvoices?.filter((i) => i.status === "OPEN").length || 0,
-    paid: allInvoices?.filter((i) => i.status === "PAID").length || 0,
-    void: allInvoices?.filter((i) => i.status === "VOID").length || 0,
-    uncollectible: allInvoices?.filter((i) => i.status === "UNCOLLECTIBLE").length || 0,
-    totalAmountCents: allInvoices?.reduce((sum, i) => sum + i.total_cents, 0) || 0,
-    paidAmountCents: allInvoices?.reduce((sum, i) => sum + (i.amount_paid_cents || 0), 0) || 0,
-    outstandingCents: allInvoices
-      ?.filter((i) => !["PAID", "VOID", "UNCOLLECTIBLE"].includes(i.status))
-      .reduce((sum, i) => sum + (i.amount_due_cents || 0), 0) || 0,
+  const now = new Date();
+  const statsAccum = {
+    total: 0,
+    totalAmountCents: 0,
+    draftAmountCents: 0,
+    openAmountCents: 0,
+    overdueAmountCents: 0,
+    paidAmountCents: 0,
+    failedAmountCents: 0,
   };
+
+  for (const inv of allInvoices || []) {
+    if (inv.status === "VOID") continue;
+    statsAccum.total++;
+    statsAccum.totalAmountCents += inv.total_cents || 0;
+
+    switch (inv.status) {
+      case "DRAFT":
+        statsAccum.draftAmountCents += inv.total_cents || 0;
+        break;
+      case "OPEN":
+        if (inv.due_date && new Date(inv.due_date) < now) {
+          statsAccum.overdueAmountCents += inv.amount_due_cents || 0;
+        } else {
+          statsAccum.openAmountCents += inv.amount_due_cents || 0;
+        }
+        break;
+      case "PAID":
+        statsAccum.paidAmountCents += inv.total_cents || 0;
+        break;
+      case "UNCOLLECTIBLE":
+        statsAccum.failedAmountCents += inv.total_cents || 0;
+        break;
+    }
+  }
+
+  const stats = statsAccum;
 
   // Format invoices
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
