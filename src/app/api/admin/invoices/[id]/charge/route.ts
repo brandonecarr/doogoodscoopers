@@ -80,6 +80,56 @@ export async function POST(
     }
 
     const amountToCharge = invoice.amount_due_cents || invoice.total_cents;
+
+    // CRITICAL: Check Stripe for existing successful payment BEFORE charging
+    // This prevents double-charging if database update previously failed
+    const stripe = getStripe();
+    try {
+      const existingPayments = await stripe.paymentIntents.list({
+        customer: client.stripe_customer_id,
+        limit: 20,
+      });
+
+      const existingSuccessfulPayment = existingPayments.data.find(
+        (pi) =>
+          pi.status === "succeeded" &&
+          pi.metadata?.invoice_id === invoice.id &&
+          pi.amount === amountToCharge
+      );
+
+      if (existingSuccessfulPayment) {
+        console.log(`Found existing successful payment ${existingSuccessfulPayment.id} for invoice ${invoice.invoice_number}`);
+
+        // Invoice was already paid - fix the database and return
+        const { error: fixError } = await supabase
+          .from("invoices")
+          .update({
+            status: "PAID",
+            amount_paid_cents: invoice.total_cents,
+            amount_due_cents: 0,
+            paid_at: new Date(existingSuccessfulPayment.created * 1000).toISOString(),
+            payment_method: "card",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", invoice.id)
+          .eq("org_id", auth.user.orgId);
+
+        if (fixError) {
+          console.error("Failed to fix invoice status after finding existing payment:", fixError);
+        }
+
+        return NextResponse.json({
+          success: true,
+          message: "Invoice was already paid. Status has been updated.",
+          paymentIntentId: existingSuccessfulPayment.id,
+          status: "succeeded",
+          alreadyPaid: true,
+        });
+      }
+    } catch (e) {
+      console.error("Error checking for existing payments:", e);
+      // Continue with charging if check fails
+    }
     if (amountToCharge <= 0) {
       return NextResponse.json(
         { error: "No amount to charge" },
@@ -88,7 +138,6 @@ export async function POST(
     }
 
     // Get default payment method from Stripe customer
-    const stripe = getStripe();
     let stripeCustomer;
     try {
       stripeCustomer = await stripe.customers.retrieve(client.stripe_customer_id);
@@ -147,8 +196,10 @@ export async function POST(
     );
 
     if (confirmedPayment.status === "succeeded") {
-      // Update invoice as paid - use select() to verify the update worked
-      const { data: updatedInvoice, error: updateError } = await supabase
+      // Update invoice as paid
+      console.log(`[CHARGE] Updating invoice ${invoice.id} to PAID. org_id: ${auth.user.orgId}`);
+
+      const { data: updatedRows, error: updateError } = await supabase
         .from("invoices")
         .update({
           status: "PAID",
@@ -160,13 +211,12 @@ export async function POST(
         })
         .eq("id", invoice.id)
         .eq("org_id", auth.user.orgId)
-        .select("id, status")
-        .single();
+        .select("id, status");
 
-      if (updateError || !updatedInvoice) {
-        console.error("Failed to update invoice status after successful payment:", updateError);
-        console.error("Invoice ID:", invoice.id, "Org ID:", auth.user.orgId);
-        // Payment succeeded but DB update failed - return success with warning
+      console.log(`[CHARGE] Update result - rows: ${updatedRows?.length || 0}, error: ${updateError?.message || 'none'}`);
+
+      if (updateError) {
+        console.error("[CHARGE] Update error:", updateError);
         return NextResponse.json({
           success: true,
           warning: "Payment succeeded but invoice status update failed. Please refresh.",
@@ -175,9 +225,31 @@ export async function POST(
         });
       }
 
+      if (!updatedRows || updatedRows.length === 0) {
+        console.error("[CHARGE] No rows updated! Invoice may have wrong org_id.");
+        console.error("[CHARGE] Query params - id:", invoice.id, "org_id:", auth.user.orgId);
+
+        // Try to verify what's in the database
+        const { data: checkInvoice } = await supabase
+          .from("invoices")
+          .select("id, org_id, status")
+          .eq("id", invoice.id)
+          .single();
+        console.error("[CHARGE] Actual invoice in DB:", checkInvoice);
+
+        return NextResponse.json({
+          success: true,
+          warning: "Payment succeeded but invoice status update failed. Please refresh.",
+          paymentIntentId: confirmedPayment.id,
+          status: confirmedPayment.status,
+        });
+      }
+
+      const updatedInvoice = updatedRows[0];
+
       // Verify the status actually changed
       if (updatedInvoice.status !== "PAID") {
-        console.error("Invoice status not updated to PAID. Current status:", updatedInvoice.status);
+        console.error("[CHARGE] Invoice status not updated to PAID. Current status:", updatedInvoice.status);
         return NextResponse.json({
           success: true,
           warning: "Payment succeeded but status may not have updated correctly.",
@@ -185,6 +257,8 @@ export async function POST(
           status: confirmedPayment.status,
         });
       }
+
+      console.log(`[CHARGE] Invoice ${invoice.id} successfully updated to PAID`);
 
       // Log activity
       await supabase.from("activity_logs").insert({

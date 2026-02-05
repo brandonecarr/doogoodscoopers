@@ -199,8 +199,15 @@ export default function InvoiceDetailPage({
       const data = await res.json();
 
       if (res.ok) {
-        alert("Payment successful!");
-        fetchInvoice();
+        if (data.alreadyPaid) {
+          alert("This invoice was already paid. Refreshing...");
+        } else if (data.warning) {
+          alert(`Payment successful! Note: ${data.warning}`);
+        } else {
+          alert("Payment successful!");
+        }
+        // Force hard refresh to ensure clean state
+        window.location.reload();
       } else {
         alert(data.error || "Failed to charge card");
       }
