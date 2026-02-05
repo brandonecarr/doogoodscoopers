@@ -1307,7 +1307,7 @@ function QuoteFormInner() {
                           ${pricing.recurringPrice}<span className="text-sm font-normal">/visit</span>
                         </span>
                       </div>
-                      {pricing.monthlyPrice && onboardingSettings.defaultCoupon && (
+                      {pricing.monthlyPrice && onboardingSettings.defaultCoupon && serviceData?.couponCode === onboardingSettings.defaultCoupon.code && (
                         <div className="flex justify-between items-center py-2 border-b border-teal-200/50">
                           <div>
                             <span className="text-teal-700">First Month</span>
@@ -1914,7 +1914,7 @@ function QuoteFormInner() {
                   <span className="text-teal-700">Per cleanup:</span>
                   <span className="font-semibold text-teal-900">${pricing.recurringPrice}/visit</span>
                 </div>
-                {pricing.monthlyPrice && onboardingSettings.defaultCoupon && (
+                {pricing.monthlyPrice && onboardingSettings.defaultCoupon && serviceData?.couponCode === onboardingSettings.defaultCoupon.code && (
                   <div className="flex justify-between items-center mt-1 text-sm">
                     <div>
                       <span className="text-teal-600">First month:</span>
@@ -2282,7 +2282,7 @@ function QuoteFormInner() {
                     <span className="text-teal-700">Per Cleanup:</span>
                     <span className="font-semibold text-teal-900">${pricing.recurringPrice}/visit</span>
                   </div>
-                  {pricing.monthlyPrice && onboardingSettings.defaultCoupon && (
+                  {pricing.monthlyPrice && onboardingSettings.defaultCoupon && serviceData?.couponCode === onboardingSettings.defaultCoupon.code && (
                     <div className="flex justify-between">
                       <div>
                         <span className="text-teal-700">First Month:</span>
