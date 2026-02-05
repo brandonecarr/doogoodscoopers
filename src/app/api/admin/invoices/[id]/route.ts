@@ -77,13 +77,16 @@ export async function GET(
     return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const clientData = invoice.client as any;
+
   // Get client's primary address if available
   let clientAddress = null;
-  if (invoice.client) {
+  if (clientData?.id) {
     const { data: location } = await supabase
       .from("client_locations")
       .select("address_line1, city, state, zip_code")
-      .eq("client_id", (invoice.client as { id: string }).id)
+      .eq("client_id", clientData.id)
       .eq("is_primary", true)
       .single();
 
@@ -93,13 +96,13 @@ export async function GET(
   }
 
   // Format response
-  const client = invoice.client as {
-    id: string;
-    first_name: string;
-    last_name: string;
-    email: string | null;
-    phone: string | null;
-  } | null;
+  const client = clientData ? {
+    id: clientData.id as string,
+    first_name: clientData.first_name as string,
+    last_name: clientData.last_name as string,
+    email: clientData.email as string | null,
+    phone: clientData.phone as string | null,
+  } : null;
 
   const formattedInvoice = {
     id: invoice.id,
