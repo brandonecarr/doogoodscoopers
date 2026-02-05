@@ -147,8 +147,8 @@ export async function POST(
     );
 
     if (confirmedPayment.status === "succeeded") {
-      // Update invoice as paid
-      const { error: updateError } = await supabase
+      // Update invoice as paid - use select() to verify the update worked
+      const { data: updatedInvoice, error: updateError } = await supabase
         .from("invoices")
         .update({
           status: "PAID",
@@ -158,15 +158,29 @@ export async function POST(
           payment_method: "card",
           updated_at: new Date().toISOString(),
         })
-        .eq("id", id)
-        .eq("org_id", auth.user.orgId);
+        .eq("id", invoice.id)
+        .eq("org_id", auth.user.orgId)
+        .select("id, status")
+        .single();
 
-      if (updateError) {
+      if (updateError || !updatedInvoice) {
         console.error("Failed to update invoice status after successful payment:", updateError);
+        console.error("Invoice ID:", invoice.id, "Org ID:", auth.user.orgId);
         // Payment succeeded but DB update failed - return success with warning
         return NextResponse.json({
           success: true,
           warning: "Payment succeeded but invoice status update failed. Please refresh.",
+          paymentIntentId: confirmedPayment.id,
+          status: confirmedPayment.status,
+        });
+      }
+
+      // Verify the status actually changed
+      if (updatedInvoice.status !== "PAID") {
+        console.error("Invoice status not updated to PAID. Current status:", updatedInvoice.status);
+        return NextResponse.json({
+          success: true,
+          warning: "Payment succeeded but status may not have updated correctly.",
           paymentIntentId: confirmedPayment.id,
           status: confirmedPayment.status,
         });
