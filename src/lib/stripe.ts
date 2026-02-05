@@ -454,6 +454,7 @@ export async function createPaymentIntent(
     amount: amountCents,
     currency: "usd",
     customer: stripeCustomerId,
+    payment_method_types: ["card"],
     setup_future_usage: "off_session",
     metadata,
   });
