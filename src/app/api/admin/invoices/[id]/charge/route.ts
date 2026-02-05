@@ -148,7 +148,7 @@ export async function POST(
 
     if (confirmedPayment.status === "succeeded") {
       // Update invoice as paid
-      await supabase
+      const { error: updateError } = await supabase
         .from("invoices")
         .update({
           status: "PAID",
@@ -158,7 +158,19 @@ export async function POST(
           payment_method: "card",
           updated_at: new Date().toISOString(),
         })
-        .eq("id", id);
+        .eq("id", id)
+        .eq("org_id", auth.user.orgId);
+
+      if (updateError) {
+        console.error("Failed to update invoice status after successful payment:", updateError);
+        // Payment succeeded but DB update failed - return success with warning
+        return NextResponse.json({
+          success: true,
+          warning: "Payment succeeded but invoice status update failed. Please refresh.",
+          paymentIntentId: confirmedPayment.id,
+          status: confirmedPayment.status,
+        });
+      }
 
       // Log activity
       await supabase.from("activity_logs").insert({
@@ -192,7 +204,8 @@ export async function POST(
           status: "UNCOLLECTIBLE",
           updated_at: new Date().toISOString(),
         })
-        .eq("id", id);
+        .eq("id", id)
+        .eq("org_id", auth.user.orgId);
 
       return NextResponse.json(
         { error: `Payment failed: ${confirmedPayment.status}` },
