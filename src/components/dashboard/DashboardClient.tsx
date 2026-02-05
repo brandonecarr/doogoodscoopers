@@ -233,7 +233,6 @@ export function DashboardClient({ user }: DashboardClientProps) {
             href="/app/office/routes"
           />
         )}
-        <div /> {/* Spacer for grid alignment */}
         {isVisible("openShifts") && (
           <StatusCardSmall
             count={counts.openShifts}
