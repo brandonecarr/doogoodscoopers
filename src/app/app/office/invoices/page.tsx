@@ -54,16 +54,6 @@ interface Invoice {
   itemCount: number;
 }
 
-interface InvoiceStats {
-  total: number;
-  totalAmountCents: number;
-  draftAmountCents: number;
-  openAmountCents: number;
-  overdueAmountCents: number;
-  paidAmountCents: number;
-  failedAmountCents: number;
-}
-
 interface ClientOption {
   id: string;
   name: string;
@@ -127,15 +117,6 @@ export default function InvoicesPage() {
   const initialStatus = useMemo(() => searchParams.get("status") || "", []);
   const [loading, setLoading] = useState(true);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [stats, setStats] = useState<InvoiceStats>({
-    total: 0,
-    totalAmountCents: 0,
-    draftAmountCents: 0,
-    openAmountCents: 0,
-    overdueAmountCents: 0,
-    paidAmountCents: 0,
-    failedAmountCents: 0,
-  });
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>(initialStatus);
   const [showModal, setShowModal] = useState(false);
@@ -176,7 +157,6 @@ export default function InvoicesPage() {
 
       if (res.ok) {
         setInvoices(data.invoices || []);
-        setStats(data.stats || {});
         setTotalPages(data.pagination?.totalPages || 1);
       } else {
         setError(data.error || "Failed to load invoices");
@@ -352,6 +332,42 @@ export default function InvoicesPage() {
       inv.client?.name?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Compute stats from visible invoices only
+  const visibleStats = useMemo(() => {
+    const now = new Date();
+    const result = {
+      totalAmountCents: 0,
+      draftAmountCents: 0,
+      openAmountCents: 0,
+      overdueAmountCents: 0,
+      paidAmountCents: 0,
+      failedAmountCents: 0,
+    };
+    for (const inv of filteredInvoices) {
+      if (inv.status === "VOID") continue;
+      result.totalAmountCents += inv.totalCents || 0;
+      switch (inv.status) {
+        case "DRAFT":
+          result.draftAmountCents += inv.totalCents || 0;
+          break;
+        case "OPEN":
+          if (inv.dueDate && new Date(inv.dueDate) < now) {
+            result.overdueAmountCents += inv.amountDueCents || 0;
+          } else {
+            result.openAmountCents += inv.amountDueCents || 0;
+          }
+          break;
+        case "PAID":
+          result.paidAmountCents += inv.totalCents || 0;
+          break;
+        case "UNCOLLECTIBLE":
+          result.failedAmountCents += inv.totalCents || 0;
+          break;
+      }
+    }
+    return result;
+  }, [filteredInvoices]);
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -378,15 +394,15 @@ export default function InvoicesPage() {
       </div>
 
       {/* Stats */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-5 flex items-stretch gap-6">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-5 flex items-stretch">
         {/* Left: Invoices Total */}
         <div className="flex flex-col justify-center pr-6 border-r border-gray-200 min-w-[180px]">
           <p className="text-sm font-medium text-gray-500 mb-1">Invoices Total</p>
-          <p className="text-3xl font-bold text-teal-600">{formatCurrency(stats.totalAmountCents)}</p>
+          <p className="text-3xl font-bold text-teal-600">{formatCurrency(visibleStats.totalAmountCents)}</p>
         </div>
 
         {/* Right: Invoices by Status */}
-        <div className="flex-1">
+        <div className="ml-auto">
           <p className="text-sm font-medium text-gray-500 mb-3">Invoices by Status</p>
           <div className="flex items-end gap-6">
             <button
@@ -395,7 +411,7 @@ export default function InvoicesPage() {
             >
               <div className="w-2 h-2 rounded-full bg-gray-400 mx-auto mb-1.5" />
               <p className="text-xs text-gray-500 mb-0.5">Draft</p>
-              <p className="text-sm font-semibold text-gray-900">{formatCurrency(stats.draftAmountCents)}</p>
+              <p className="text-sm font-semibold text-gray-900">{formatCurrency(visibleStats.draftAmountCents)}</p>
             </button>
             <button
               onClick={() => { setStatusFilter("OPEN"); setPage(1); }}
@@ -403,7 +419,7 @@ export default function InvoicesPage() {
             >
               <div className="w-2 h-2 rounded-full bg-blue-500 mx-auto mb-1.5" />
               <p className="text-xs text-gray-500 mb-0.5">Open</p>
-              <p className="text-sm font-semibold text-gray-900">{formatCurrency(stats.openAmountCents)}</p>
+              <p className="text-sm font-semibold text-gray-900">{formatCurrency(visibleStats.openAmountCents)}</p>
             </button>
             <button
               onClick={() => { setStatusFilter("OVERDUE"); setPage(1); }}
@@ -411,7 +427,7 @@ export default function InvoicesPage() {
             >
               <div className="w-2 h-2 rounded-full bg-orange-500 mx-auto mb-1.5" />
               <p className="text-xs text-gray-500 mb-0.5">Overdue</p>
-              <p className="text-sm font-semibold text-gray-900">{formatCurrency(stats.overdueAmountCents)}</p>
+              <p className="text-sm font-semibold text-gray-900">{formatCurrency(visibleStats.overdueAmountCents)}</p>
             </button>
             <button
               onClick={() => { setStatusFilter("PAID"); setPage(1); }}
@@ -419,7 +435,7 @@ export default function InvoicesPage() {
             >
               <div className="w-2 h-2 rounded-full bg-green-500 mx-auto mb-1.5" />
               <p className="text-xs text-gray-500 mb-0.5">Paid</p>
-              <p className="text-sm font-semibold text-gray-900">{formatCurrency(stats.paidAmountCents)}</p>
+              <p className="text-sm font-semibold text-gray-900">{formatCurrency(visibleStats.paidAmountCents)}</p>
             </button>
             <button
               onClick={() => { setStatusFilter("UNCOLLECTIBLE"); setPage(1); }}
@@ -427,7 +443,7 @@ export default function InvoicesPage() {
             >
               <div className="w-2 h-2 rounded-full bg-red-500 mx-auto mb-1.5" />
               <p className="text-xs text-gray-500 mb-0.5">Failed</p>
-              <p className="text-sm font-semibold text-gray-900">{formatCurrency(stats.failedAmountCents)}</p>
+              <p className="text-sm font-semibold text-gray-900">{formatCurrency(visibleStats.failedAmountCents)}</p>
             </button>
           </div>
         </div>
