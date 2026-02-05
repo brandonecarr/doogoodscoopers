@@ -583,7 +583,7 @@ export default function ClientsPage() {
       </div>
 
       {/* Client List */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-100">
         {loading ? (
           <div className="p-8 text-center">
             <div className="animate-spin w-6 h-6 border-2 border-teal-500 border-t-transparent rounded-full mx-auto" />
@@ -601,7 +601,7 @@ export default function ClientsPage() {
           </div>
         ) : (
           <>
-            <div className="overflow-x-auto">
+            <div>
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-100">
                   <tr>
