@@ -47,8 +47,8 @@ const navigation: NavItem[] = [
     icon: Users,
     permission: "clients:read",
     children: [
-      { name: "Residential Clients", href: "/app/office/clients?type=residential" },
-      { name: "Commercial Clients", href: "/app/office/clients?type=commercial" },
+      { name: "Residential Clients", href: "/app/office/clients" },
+      { name: "Commercial Clients", href: "/app/office/commercial-clients" },
       { name: "Change Requests", href: "/app/office/change-requests" },
     ],
   },
