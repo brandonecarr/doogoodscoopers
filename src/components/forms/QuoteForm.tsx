@@ -149,6 +149,7 @@ interface FormOptions {
 // Onboarding settings from admin configuration
 interface OnboardingSettings {
   couponCode?: { enabled: boolean };
+  defaultCouponCode?: string | null;
   maxDogs?: number;
   lastTimeYardWasCleaned?: { enabled: boolean };
   requestFirstNameBeforeQuote?: { enabled: boolean };
@@ -517,6 +518,10 @@ function QuoteFormInner() {
       // If lastTimeYardWasCleaned is disabled, set a default value
       if (onboardingSettings.lastTimeYardWasCleaned?.enabled === false) {
         serviceForm.setValue("lastCleaned", "one_week");
+      }
+      // Pre-fill default coupon code if one is set
+      if (onboardingSettings.defaultCouponCode) {
+        serviceForm.setValue("couponCode", onboardingSettings.defaultCouponCode);
       }
     }
   }, [isLoadingOptions, onboardingSettings, serviceForm]);
