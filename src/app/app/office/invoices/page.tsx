@@ -266,7 +266,6 @@ export default function InvoicesPage() {
         return;
       }
       fetchInvoices();
-      setShowDetailModal(false);
     } catch (err) {
       console.error("Error updating status:", err);
       alert("Failed to update status");
@@ -289,7 +288,6 @@ export default function InvoicesPage() {
         return;
       }
       fetchInvoices();
-      setShowDetailModal(false);
     } catch (err) {
       console.error("Error marking paid:", err);
       alert("Failed to mark as paid");
