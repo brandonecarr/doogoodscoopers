@@ -87,23 +87,41 @@ export async function POST(
       );
     }
 
-    // Get customer's payment methods to find default
-    const paymentMethods = await listPaymentMethods(client.stripe_customer_id);
-
-    if (paymentMethods.length === 0) {
+    // Get default payment method from Stripe customer
+    const stripe = getStripe();
+    let stripeCustomer;
+    try {
+      stripeCustomer = await stripe.customers.retrieve(client.stripe_customer_id);
+    } catch (e) {
+      console.error("Failed to retrieve Stripe customer:", e);
       return NextResponse.json(
-        { error: "No payment method on file" },
+        { error: "Customer not found in Stripe. The card may need to be re-added." },
         { status: 400 }
       );
     }
 
-    // Get default payment method from Stripe customer
-    const stripe = getStripe();
-    const stripeCustomer = await stripe.customers.retrieve(client.stripe_customer_id);
-
     if (stripeCustomer.deleted) {
       return NextResponse.json(
         { error: "Customer has been deleted in Stripe" },
+        { status: 400 }
+      );
+    }
+
+    // Get customer's payment methods to find default
+    let paymentMethods;
+    try {
+      paymentMethods = await listPaymentMethods(client.stripe_customer_id);
+    } catch (e) {
+      console.error("Failed to list payment methods:", e);
+      return NextResponse.json(
+        { error: "Failed to retrieve payment methods" },
+        { status: 400 }
+      );
+    }
+
+    if (paymentMethods.length === 0) {
+      return NextResponse.json(
+        { error: "No payment method on file" },
         { status: 400 }
       );
     }
@@ -184,15 +202,44 @@ export async function POST(
   } catch (error) {
     console.error("Error charging invoice:", error);
 
-    if (error instanceof Stripe.errors.StripeCardError) {
+    // Handle specific Stripe errors
+    if (error instanceof Stripe.errors.StripeError) {
+      const stripeError = error as Stripe.errors.StripeError;
+      console.error("Stripe error details:", {
+        type: stripeError.type,
+        code: stripeError.code,
+        message: stripeError.message,
+      });
+
+      // Card declined or payment failed
+      if (stripeError.type === "StripeCardError") {
+        return NextResponse.json(
+          { error: stripeError.message || "Card was declined" },
+          { status: 400 }
+        );
+      }
+
+      // Invalid request (e.g., customer doesn't exist)
+      if (stripeError.type === "StripeInvalidRequestError") {
+        return NextResponse.json(
+          { error: stripeError.message || "Invalid payment request" },
+          { status: 400 }
+        );
+      }
+
+      // Return the Stripe error message
       return NextResponse.json(
-        { error: error.message || "Card was declined" },
+        { error: stripeError.message || "Payment processing error" },
         { status: 400 }
       );
     }
 
+    // Generic error
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    console.error("Non-Stripe error:", errorMessage);
+
     return NextResponse.json(
-      { error: "Failed to process payment" },
+      { error: `Failed to process payment: ${errorMessage}` },
       { status: 500 }
     );
   }
