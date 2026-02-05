@@ -28,6 +28,8 @@ import {
   XCircle,
   X,
   Info,
+  ExternalLink,
+  MoreHorizontal,
 } from "lucide-react";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
@@ -418,6 +420,7 @@ export default function ClientDetailPage({ params }: PageProps) {
   const [client, setClient] = useState<Client | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showActions, setShowActions] = useState(false);
+  const [openInvoiceMenu, setOpenInvoiceMenu] = useState<string | null>(null);
   const [billingTab, setBillingTab] = useState<"subscriptions" | "invoices" | "payments" | "cards" | "giftcerts">("subscriptions");
   const [scheduleTab, setScheduleTab] = useState<"recurring" | "initial" | "latest">("recurring");
   const [notesTab, setNotesTab] = useState<"office" | "totech" | "fromtech" | "fromclient">("office");
@@ -685,6 +688,17 @@ export default function ClientDetailPage({ params }: PageProps) {
       fetchServicePlans();
     }
   }, [showSubscriptionModal]);
+
+  // Close invoice menu when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (openInvoiceMenu && !(e.target as Element).closest(".invoice-menu-container")) {
+        setOpenInvoiceMenu(null);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [openInvoiceMenu]);
 
   useEffect(() => {
     async function fetchClient() {
@@ -1574,10 +1588,46 @@ export default function ClientDetailPage({ params }: PageProps) {
                           <td className="py-3 font-semibold">{formatCurrency(invoice.amountDueCents)}</td>
                           <td className="py-3">
                             <div className="flex items-center gap-2">
-                              <button className="text-teal-600 hover:text-teal-700 text-sm flex items-center gap-1">
+                              <Link
+                                href={`/app/office/invoices?highlight=${invoice.id}`}
+                                className="text-teal-600 hover:text-teal-700 text-sm flex items-center gap-1"
+                              >
                                 View <Eye className="w-3.5 h-3.5" />
-                              </button>
-                              <button className="text-gray-400 hover:text-gray-600 text-sm">More ...</button>
+                              </Link>
+                              <div className="relative invoice-menu-container">
+                                <button
+                                  onClick={() => setOpenInvoiceMenu(openInvoiceMenu === invoice.id ? null : invoice.id)}
+                                  className="text-teal-600 hover:text-teal-700 text-sm flex items-center gap-1"
+                                >
+                                  More <MoreHorizontal className="w-3.5 h-3.5" />
+                                </button>
+                                {openInvoiceMenu === invoice.id && (
+                                  <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-20">
+                                    <Link
+                                      href={`/app/office/invoices?highlight=${invoice.id}`}
+                                      target="_blank"
+                                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
+                                    >
+                                      <ExternalLink className="w-4 h-4 text-gray-400" />
+                                      View in new tab
+                                    </Link>
+                                    <button className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3">
+                                      <Edit className="w-4 h-4 text-gray-400" />
+                                      Edit
+                                    </button>
+                                    {invoice.status === "DRAFT" && (
+                                      <button className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3">
+                                        <FileText className="w-4 h-4 text-gray-400" />
+                                        Finalize Invoice
+                                      </button>
+                                    )}
+                                    <button className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-3">
+                                      <Trash2 className="w-4 h-4" />
+                                      Delete
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </td>
                         </tr>
