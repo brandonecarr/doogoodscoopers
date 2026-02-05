@@ -11,8 +11,6 @@ interface InvoiceItem {
   quantity: number;
   unit_price_cents: number;
   total_cents: number;
-  is_service?: boolean;
-  is_taxable?: boolean;
 }
 
 interface Invoice {
@@ -84,13 +82,7 @@ export default function EditInvoicePage({
       if (res.ok) {
         setInvoice(data.invoice);
         // Initialize editable state
-        setItems(
-          data.invoice.items.map((item: InvoiceItem) => ({
-            ...item,
-            is_service: item.is_service ?? true,
-            is_taxable: item.is_taxable ?? false,
-          }))
-        );
+        setItems(data.invoice.items || []);
         setNoteToClient(data.invoice.notes || "");
         setInternalMemo(data.invoice.internalMemo || "");
       } else {
@@ -112,8 +104,6 @@ export default function EditInvoicePage({
         quantity: 1,
         unit_price_cents: 0,
         total_cents: 0,
-        is_service: true,
-        is_taxable: false,
       },
     ]);
   }
@@ -138,10 +128,8 @@ export default function EditInvoicePage({
 
   // Calculate totals
   const subtotalCents = items.reduce((sum, item) => sum + item.total_cents, 0);
-  const taxableItems = items.filter((item) => item.is_taxable);
-  const taxableCents = taxableItems.reduce((sum, item) => sum + item.total_cents, 0);
   const taxRate = 0; // Could be made configurable
-  const taxCents = Math.round(taxableCents * (taxRate / 100));
+  const taxCents = Math.round(subtotalCents * (taxRate / 100));
   const discountCents = invoice?.discountCents || 0;
   const totalCents = subtotalCents + taxCents - discountCents;
 
@@ -162,8 +150,6 @@ export default function EditInvoicePage({
             description: item.description,
             quantity: item.quantity,
             unitPriceCents: item.unit_price_cents,
-            isService: item.is_service,
-            isTaxable: item.is_taxable,
           })),
           notes: noteToClient || null,
           internalMemo: internalMemo || null,
@@ -295,22 +281,16 @@ export default function EditInvoicePage({
         <table className="w-full">
           <thead>
             <tr className="border-b border-gray-200 bg-gray-50">
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 w-1/3">
+              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">
                 Description
               </th>
-              <th className="px-4 py-3 text-center text-sm font-medium text-gray-500 w-20">
+              <th className="px-4 py-3 text-center text-sm font-medium text-gray-500 w-24">
                 Quantity
               </th>
-              <th className="px-4 py-3 text-right text-sm font-medium text-gray-500 w-28">
+              <th className="px-4 py-3 text-right text-sm font-medium text-gray-500 w-32">
                 Rate
               </th>
-              <th className="px-4 py-3 text-center text-sm font-medium text-gray-500 w-20">
-                Service
-              </th>
-              <th className="px-4 py-3 text-center text-sm font-medium text-gray-500 w-20">
-                Taxable
-              </th>
-              <th className="px-4 py-3 text-right text-sm font-medium text-gray-500 w-28">
+              <th className="px-4 py-3 text-right text-sm font-medium text-gray-500 w-32">
                 Amount
               </th>
               <th className="px-4 py-3 w-12"></th>
@@ -359,22 +339,6 @@ export default function EditInvoicePage({
                       className="w-full pl-6 pr-2 py-1 border border-gray-200 rounded text-right focus:outline-none focus:border-teal-500"
                     />
                   </div>
-                </td>
-                <td className="px-4 py-2 text-center">
-                  <input
-                    type="checkbox"
-                    checked={item.is_service ?? true}
-                    onChange={(e) => updateItem(index, "is_service", e.target.checked)}
-                    className="w-4 h-4 text-teal-600 rounded focus:ring-teal-500"
-                  />
-                </td>
-                <td className="px-4 py-2 text-center">
-                  <input
-                    type="checkbox"
-                    checked={item.is_taxable ?? false}
-                    onChange={(e) => updateItem(index, "is_taxable", e.target.checked)}
-                    className="w-4 h-4 text-teal-600 rounded focus:ring-teal-500"
-                  />
                 </td>
                 <td className="px-4 py-2 text-right text-gray-900">
                   {formatCurrency(item.total_cents)}

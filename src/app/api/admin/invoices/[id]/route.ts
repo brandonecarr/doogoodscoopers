@@ -238,8 +238,6 @@ export async function PUT(
         description: string;
         quantity: number;
         unitPriceCents: number;
-        isService?: boolean;
-        isTaxable?: boolean;
       }) => {
         const totalCents = item.quantity * item.unitPriceCents;
         subtotalCents += totalCents;
@@ -250,8 +248,6 @@ export async function PUT(
           quantity: item.quantity,
           unit_price_cents: item.unitPriceCents,
           total_cents: totalCents,
-          is_service: item.isService ?? true,
-          is_taxable: item.isTaxable ?? false,
         };
       }
     );
@@ -269,12 +265,9 @@ export async function PUT(
       );
     }
 
-    // Calculate tax (based on taxable items)
-    const taxableAmount = newItems
-      .filter((item) => item.is_taxable)
-      .reduce((sum, item) => sum + item.total_cents, 0);
-    const taxRate = 0; // Could be made org-configurable
-    const taxCents = Math.round(taxableAmount * (taxRate / 100));
+    // Calculate tax (could be made org-configurable in the future)
+    const taxRate = 0;
+    const taxCents = Math.round(subtotalCents * (taxRate / 100));
     const totalCents = subtotalCents + taxCents;
 
     // Update invoice
