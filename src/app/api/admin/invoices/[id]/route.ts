@@ -83,6 +83,76 @@ export async function GET(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const clientData = invoice.client as any;
 
+  // Self-healing check: If invoice shows as OPEN/UNCOLLECTIBLE, verify against Stripe
+  // to see if there's actually a successful payment we missed updating
+  let invoiceStatus = invoice.status;
+  let invoicePaidAt = invoice.paid_at;
+  let invoiceAmountPaidCents = invoice.amount_paid_cents;
+  let invoiceAmountDueCents = invoice.amount_due_cents;
+
+  if ((invoice.status === "OPEN" || invoice.status === "UNCOLLECTIBLE") && clientData?.stripe_customer_id) {
+    try {
+      const stripe = getStripe();
+      // Search for successful PaymentIntents with this invoice_id in metadata
+      const paymentIntents = await stripe.paymentIntents.list({
+        customer: clientData.stripe_customer_id,
+        limit: 10,
+      });
+
+      // Find a successful payment that matches this invoice
+      const successfulPayment = paymentIntents.data.find(
+        (pi) =>
+          pi.status === "succeeded" &&
+          pi.metadata?.invoice_id === invoice.id &&
+          pi.amount === invoice.total_cents
+      );
+
+      if (successfulPayment) {
+        console.log(`Auto-healing invoice ${invoice.invoice_number}: Found successful Stripe payment ${successfulPayment.id}`);
+
+        // Update the invoice in the database
+        const { error: healError } = await supabase
+          .from("invoices")
+          .update({
+            status: "PAID",
+            amount_paid_cents: invoice.total_cents,
+            amount_due_cents: 0,
+            paid_at: new Date(successfulPayment.created * 1000).toISOString(),
+            payment_method: "card",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", invoice.id)
+          .eq("org_id", auth.user.orgId);
+
+        if (!healError) {
+          // Update local variables for the response
+          invoiceStatus = "PAID";
+          invoicePaidAt = new Date(successfulPayment.created * 1000).toISOString();
+          invoiceAmountPaidCents = invoice.total_cents;
+          invoiceAmountDueCents = 0;
+
+          // Log the auto-heal
+          await supabase.from("activity_logs").insert({
+            org_id: auth.user.orgId,
+            user_id: auth.user.id,
+            action: "INVOICE_AUTO_HEALED",
+            entity_type: "INVOICE",
+            entity_id: invoice.id,
+            details: {
+              invoiceNumber: invoice.invoice_number,
+              paymentIntentId: successfulPayment.id,
+              previousStatus: invoice.status,
+            },
+          });
+        } else {
+          console.error("Failed to auto-heal invoice:", healError);
+        }
+      }
+    } catch (e) {
+      console.error("Error checking Stripe for invoice payment:", e);
+    }
+  }
+
   // Get client's primary address if available
   let clientAddress = null;
   if (clientData?.id) {
@@ -144,16 +214,16 @@ export async function GET(
   const formattedInvoice = {
     id: invoice.id,
     invoiceNumber: invoice.invoice_number,
-    status: invoice.status,
+    status: invoiceStatus,
     subtotalCents: invoice.subtotal_cents || 0,
     discountCents: invoice.discount_cents || 0,
     taxCents: invoice.tax_cents || 0,
     tipCents: invoice.tip_cents || 0,
     totalCents: invoice.total_cents || 0,
-    amountPaidCents: invoice.amount_paid_cents || 0,
-    amountDueCents: invoice.amount_due_cents || 0,
+    amountPaidCents: invoiceAmountPaidCents || 0,
+    amountDueCents: invoiceAmountDueCents || 0,
     dueDate: invoice.due_date,
-    paidAt: invoice.paid_at,
+    paidAt: invoicePaidAt,
     notes: invoice.notes,
     billingOption: invoice.billing_option,
     billingInterval: invoice.billing_interval,
