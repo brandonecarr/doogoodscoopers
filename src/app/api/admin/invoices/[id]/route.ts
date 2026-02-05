@@ -119,7 +119,7 @@ export async function GET(
             amount_paid_cents: invoice.total_cents,
             amount_due_cents: 0,
             paid_at: new Date(successfulPayment.created * 1000).toISOString(),
-            payment_method: "card",
+            payment_method: "CREDIT_CARD",
             updated_at: new Date().toISOString(),
           })
           .eq("id", invoice.id)

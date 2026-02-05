@@ -21,7 +21,13 @@ function getSupabase() {
   if (!url || !serviceKey) {
     throw new Error("Supabase environment variables not configured");
   }
-  return createClient(url, serviceKey);
+  // Use service role key with explicit options to bypass RLS
+  return createClient(url, serviceKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
 }
 
 export async function POST(
@@ -111,7 +117,7 @@ export async function POST(
             amount_paid_cents: invoice.total_cents,
             amount_due_cents: 0,
             paid_at: new Date(existingSuccessfulPayment.created * 1000).toISOString(),
-            payment_method: "card",
+            payment_method: "CREDIT_CARD",
             updated_at: new Date().toISOString(),
           })
           .eq("id", invoice.id)
@@ -225,7 +231,7 @@ export async function POST(
           amount_paid_cents: invoice.total_cents,
           amount_due_cents: 0,
           paid_at: new Date().toISOString(),
-          payment_method: "card",
+          payment_method: "CREDIT_CARD",
           updated_at: new Date().toISOString(),
         })
         .eq("id", invoice.id)
