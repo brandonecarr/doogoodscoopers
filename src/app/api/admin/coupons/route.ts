@@ -194,7 +194,7 @@ export async function POST(request: NextRequest) {
 
 /**
  * PUT /api/admin/coupons
- * Update an existing coupon
+ * Update an existing coupon or set/unset default
  */
 export async function PUT(request: NextRequest) {
   const auth = await authenticateWithPermission(request, "pricing:write");
@@ -217,7 +217,7 @@ export async function PUT(request: NextRequest) {
     // Verify coupon belongs to org
     const { data: existing } = await supabase
       .from("coupons")
-      .select("id, code, discount_type")
+      .select("id, code, discount_type, is_default")
       .eq("id", body.id)
       .eq("org_id", auth.user.orgId)
       .single();
@@ -227,6 +227,54 @@ export async function PUT(request: NextRequest) {
         { error: "Coupon not found" },
         { status: 404 }
       );
+    }
+
+    // Handle setDefault action
+    if (body.action === "setDefault") {
+      // First, unset any existing default for this org
+      await supabase
+        .from("coupons")
+        .update({ is_default: false })
+        .eq("org_id", auth.user.orgId)
+        .eq("is_default", true);
+
+      // Then set this coupon as default
+      const { data: coupon, error } = await supabase
+        .from("coupons")
+        .update({ is_default: true })
+        .eq("id", body.id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error("Error setting default coupon:", error);
+        return NextResponse.json(
+          { error: "Failed to set default coupon" },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json({ coupon });
+    }
+
+    // Handle unsetDefault action
+    if (body.action === "unsetDefault") {
+      const { data: coupon, error } = await supabase
+        .from("coupons")
+        .update({ is_default: false })
+        .eq("id", body.id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error("Error unsetting default coupon:", error);
+        return NextResponse.json(
+          { error: "Failed to unset default coupon" },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json({ coupon });
     }
 
     // Build update object (can't change code or discount_type after creation)
