@@ -332,7 +332,7 @@ export default function InvoicesPage() {
       inv.client?.name?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Compute stats from visible invoices only
+  // Compute stats from visible invoices only (use totalCents consistently so numbers add up)
   const visibleStats = useMemo(() => {
     const now = new Date();
     const result = {
@@ -345,23 +345,24 @@ export default function InvoicesPage() {
     };
     for (const inv of filteredInvoices) {
       if (inv.status === "VOID") continue;
-      result.totalAmountCents += inv.totalCents || 0;
+      const amount = inv.totalCents || 0;
+      result.totalAmountCents += amount;
       switch (inv.status) {
         case "DRAFT":
-          result.draftAmountCents += inv.totalCents || 0;
+          result.draftAmountCents += amount;
           break;
         case "OPEN":
           if (inv.dueDate && new Date(inv.dueDate) < now) {
-            result.overdueAmountCents += inv.amountDueCents || 0;
+            result.overdueAmountCents += amount;
           } else {
-            result.openAmountCents += inv.amountDueCents || 0;
+            result.openAmountCents += amount;
           }
           break;
         case "PAID":
-          result.paidAmountCents += inv.totalCents || 0;
+          result.paidAmountCents += amount;
           break;
         case "UNCOLLECTIBLE":
-          result.failedAmountCents += inv.totalCents || 0;
+          result.failedAmountCents += amount;
           break;
       }
     }

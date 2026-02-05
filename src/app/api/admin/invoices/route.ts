@@ -151,9 +151,9 @@ export async function GET(request: NextRequest) {
         break;
       case "OPEN":
         if (inv.due_date && new Date(inv.due_date) < now) {
-          statsAccum.overdueAmountCents += inv.amount_due_cents || 0;
+          statsAccum.overdueAmountCents += inv.total_cents || 0;
         } else {
-          statsAccum.openAmountCents += inv.amount_due_cents || 0;
+          statsAccum.openAmountCents += inv.total_cents || 0;
         }
         break;
       case "PAID":
