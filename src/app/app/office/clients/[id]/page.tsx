@@ -421,6 +421,7 @@ export default function ClientDetailPage({ params }: PageProps) {
   const [error, setError] = useState<string | null>(null);
   const [showActions, setShowActions] = useState(false);
   const [openInvoiceMenu, setOpenInvoiceMenu] = useState<string | null>(null);
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [billingTab, setBillingTab] = useState<"subscriptions" | "invoices" | "payments" | "cards" | "giftcerts">("subscriptions");
   const [scheduleTab, setScheduleTab] = useState<"recurring" | "initial" | "latest">("recurring");
   const [notesTab, setNotesTab] = useState<"office" | "totech" | "fromtech" | "fromclient">("office");
@@ -1588,12 +1589,12 @@ export default function ClientDetailPage({ params }: PageProps) {
                           <td className="py-3 font-semibold">{formatCurrency(invoice.amountDueCents)}</td>
                           <td className="py-3">
                             <div className="flex items-center gap-2">
-                              <Link
-                                href={`/app/office/invoices?highlight=${invoice.id}`}
+                              <button
+                                onClick={() => setSelectedInvoice(invoice)}
                                 className="text-teal-600 hover:text-teal-700 text-sm flex items-center gap-1"
                               >
                                 View <Eye className="w-3.5 h-3.5" />
-                              </Link>
+                              </button>
                               <div className="relative invoice-menu-container">
                                 <button
                                   onClick={() => setOpenInvoiceMenu(openInvoiceMenu === invoice.id ? null : invoice.id)}
@@ -1602,9 +1603,9 @@ export default function ClientDetailPage({ params }: PageProps) {
                                   More <MoreHorizontal className="w-3.5 h-3.5" />
                                 </button>
                                 {openInvoiceMenu === invoice.id && (
-                                  <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-20">
+                                  <div className="absolute right-0 bottom-full mb-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-20">
                                     <Link
-                                      href={`/app/office/invoices?highlight=${invoice.id}`}
+                                      href={`/app/office/invoices?id=${invoice.id}`}
                                       target="_blank"
                                       className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
                                     >
@@ -3053,6 +3054,134 @@ export default function ClientDetailPage({ params }: PageProps) {
                 >
                   {savingGiftCert ? "SAVING..." : "SAVE"}
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Invoice Detail Modal */}
+      {selectedInvoice && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900">
+                    Invoice {selectedInvoice.invoiceNumber}
+                  </h2>
+                  <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium mt-1 ${
+                    selectedInvoice.status === "DRAFT" ? "text-gray-700 bg-gray-100"
+                    : selectedInvoice.status === "PAID" ? "text-green-700 bg-green-100"
+                    : selectedInvoice.status === "OPEN" ? "text-blue-700 bg-blue-100"
+                    : selectedInvoice.status === "VOID" ? "text-gray-600 bg-gray-100"
+                    : "text-orange-700 bg-orange-100"
+                  }`}>
+                    {selectedInvoice.status}
+                  </span>
+                </div>
+                <button
+                  onClick={() => setSelectedInvoice(null)}
+                  className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Dates */}
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <p className="text-sm text-gray-500">Created</p>
+                  <p className="font-medium">
+                    {new Date(selectedInvoice.createdAt).toLocaleDateString()}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Due Date</p>
+                  <p className="font-medium">
+                    {selectedInvoice.dueDate
+                      ? new Date(selectedInvoice.dueDate).toLocaleDateString()
+                      : "Not set"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Details */}
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <p className="text-sm text-gray-500">Type</p>
+                  <p className="font-medium">
+                    {selectedInvoice.subscriptionId ? "Subscription" : "One Time"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Payment Method</p>
+                  <p className="font-medium">
+                    {selectedInvoice.paymentMethod === "CREDIT_CARD" ? "Credit Card"
+                      : selectedInvoice.paymentMethod === "CHECK" ? "Check"
+                      : selectedInvoice.paymentMethod === "CASH" ? "Cash"
+                      : selectedInvoice.paymentMethod === "ACH" ? "ACH"
+                      : "Credit Card"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Amounts */}
+              <div className="border-t border-gray-100 pt-4 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Subtotal</span>
+                  <span>{formatCurrency(selectedInvoice.subtotalCents)}</span>
+                </div>
+                {selectedInvoice.discountCents > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Discount</span>
+                    <span className="text-red-600">-{formatCurrency(selectedInvoice.discountCents)}</span>
+                  </div>
+                )}
+                {selectedInvoice.taxCents > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Tax</span>
+                    <span>{formatCurrency(selectedInvoice.taxCents)}</span>
+                  </div>
+                )}
+                {selectedInvoice.tipCents > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Tip</span>
+                    <span>{formatCurrency(selectedInvoice.tipCents)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between font-bold pt-2 border-t border-gray-200">
+                  <span>Total</span>
+                  <span>{formatCurrency(selectedInvoice.totalCents)}</span>
+                </div>
+                {selectedInvoice.amountPaidCents > 0 && (
+                  <>
+                    <div className="flex justify-between text-sm text-green-600">
+                      <span>Paid</span>
+                      <span>-{formatCurrency(selectedInvoice.amountPaidCents)}</span>
+                    </div>
+                    <div className="flex justify-between font-bold">
+                      <span>Balance Due</span>
+                      <span>{formatCurrency(selectedInvoice.amountDueCents)}</span>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Actions */}
+              <div className="flex justify-end gap-3 pt-4 mt-4 border-t border-gray-100">
+                <button
+                  onClick={() => setSelectedInvoice(null)}
+                  className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800"
+                >
+                  Close
+                </button>
+                <Link
+                  href={`/app/office/invoices?id=${selectedInvoice.id}`}
+                  className="px-4 py-2 text-sm font-medium text-white bg-teal-600 rounded hover:bg-teal-700"
+                >
+                  View Full Details
+                </Link>
               </div>
             </div>
           </div>
