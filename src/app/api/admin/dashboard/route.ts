@@ -136,21 +136,18 @@ export async function GET(request: NextRequest) {
       subscriptionsResult,
       jobsResult,
     ] = await Promise.all([
-      // Active subscriptions for unassigned count
+      // Active subscriptions for unassigned count (with location IDs)
       supabase
         .from("subscriptions")
-        .select("id, initial_cleanup_required, initial_cleanup_completed")
+        .select("id, initial_cleanup_required, initial_cleanup_completed, location_id")
         .eq("org_id", orgId)
         .eq("status", "ACTIVE"),
 
-      // Jobs without route assignment (for unassigned calculation)
+      // ALL jobs for active subscriptions (to detect no-jobs and unassigned)
       supabase
         .from("jobs")
-        .select("subscription_id")
+        .select("subscription_id, route_id, status, scheduled_date")
         .eq("org_id", orgId)
-        .eq("status", "SCHEDULED")
-        .gte("scheduled_date", today)
-        .is("route_id", null)
         .not("subscription_id", "is", null),
 
       // Open one-time invoices (no subscription_id)
@@ -277,22 +274,45 @@ export async function GET(request: NextRequest) {
         .lte("scheduled_date", monthEnd),
     ]);
 
-    // Calculate unassigned subscriptions count
+    // Calculate unassigned locations count
+    // Must match the logic in /api/admin/unassigned-subscriptions
     const activeSubscriptions = activeSubscriptionsResult.data || [];
-    const unassignedJobSubscriptionIds = new Set(
-      (unassignedJobsResult.data || []).map((j: { subscription_id: string }) => j.subscription_id)
-    );
-    const unassignedSubscriptionsCount = activeSubscriptions.filter(sub => {
-      // Needs initial cleanup scheduled?
-      if (sub.initial_cleanup_required && !sub.initial_cleanup_completed) {
-        return true;
+    const allSubJobs = (unassignedJobsResult.data || []) as { subscription_id: string; route_id: string | null; status: string; scheduled_date: string }[];
+
+    // Build maps: which subscriptions have ANY jobs, and which have unassigned scheduled jobs
+    const subsWithJobs = new Set<string>();
+    const subsWithUnassignedJobs = new Set<string>();
+    for (const job of allSubJobs) {
+      if (job.subscription_id) {
+        subsWithJobs.add(job.subscription_id);
+        if (job.status === "SCHEDULED" && job.scheduled_date >= today && !job.route_id) {
+          subsWithUnassignedJobs.add(job.subscription_id);
+        }
       }
-      // Has jobs without route assignment?
-      if (unassignedJobSubscriptionIds.has(sub.id)) {
-        return true;
-      }
-      return false;
+    }
+
+    // Count subscriptions that are unassigned (conditions 1-3)
+    const unassignedSubCount = activeSubscriptions.filter(sub => {
+      const needsInitialCleanup = sub.initial_cleanup_required && !sub.initial_cleanup_completed;
+      const needsRouteAssignment = subsWithUnassignedJobs.has(sub.id);
+      const hasNoJobs = !subsWithJobs.has(sub.id);
+      return needsInitialCleanup || needsRouteAssignment || hasNoJobs;
     }).length;
+
+    // Count locations without any active subscription (condition 4)
+    const locationIdsWithSubs = new Set(activeSubscriptions.map((s: { location_id: string }) => s.location_id));
+    const { data: allActiveLocations } = await supabase
+      .from("locations")
+      .select("id, client:clients!inner(status)")
+      .eq("org_id", orgId)
+      .eq("is_active", true);
+
+    const orphanedLocationCount = (allActiveLocations || []).filter((loc) => {
+      const client = loc.client as unknown as { status: string };
+      return !locationIdsWithSubs.has(loc.id) && client.status === "ACTIVE";
+    }).length;
+
+    const unassignedSubscriptionsCount = unassignedSubCount + orphanedLocationCount;
 
     // Process status card counts
     const counts: StatusCardCounts = {

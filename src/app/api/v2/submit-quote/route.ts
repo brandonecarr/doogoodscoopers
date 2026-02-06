@@ -1,9 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import Stripe from "stripe";
 import { sendWelcomeEmail, sendNewCustomerNotificationEmail } from "@/lib/email";
 import { getStripe } from "@/lib/stripe";
 import { queueMarketingSync } from "@/lib/marketing-sync";
+
+function getServiceSupabase() {
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
 
 interface DogInfo {
   name: string;
@@ -218,6 +226,54 @@ async function submitInServiceAreaQuote(data: QuoteSubmission) {
         { error: "Failed to create your account." },
         { status: 500 }
       );
+    }
+
+    // 3a. Create Supabase Auth user + users record for client portal login
+    try {
+      const serviceSupabase = getServiceSupabase();
+
+      // Generate a random temp password — client will use magic link or reset to log in
+      const tempPassword = crypto.randomUUID() + "!Aa1";
+
+      const { data: authUser, error: authError } =
+        await serviceSupabase.auth.admin.createUser({
+          email: data.email.toLowerCase(),
+          password: tempPassword,
+          email_confirm: true,
+        });
+
+      if (authError || !authUser.user) {
+        console.warn("Failed to create auth user for client portal:", authError?.message);
+        // Non-fatal — client record exists, they just can't log in yet
+      } else {
+        // Create users table record with CLIENT role
+        const { error: userError } = await serviceSupabase
+          .from("users")
+          .insert({
+            id: authUser.user.id,
+            org_id: org.id,
+            email: data.email.toLowerCase(),
+            role: "CLIENT",
+            first_name: data.firstName,
+            last_name: data.lastName || null,
+            phone: data.phone || null,
+            is_active: true,
+          });
+
+        if (userError) {
+          console.warn("Failed to create users record for client:", userError.message);
+          // Clean up auth user if users record failed
+          await serviceSupabase.auth.admin.deleteUser(authUser.user.id);
+        } else {
+          // Link client record to the auth user
+          await serviceSupabase
+            .from("clients")
+            .update({ user_id: authUser.user.id })
+            .eq("id", client.id);
+        }
+      }
+    } catch (authSetupError) {
+      console.warn("Client auth setup failed (non-fatal):", authSetupError);
     }
 
     // 4. Create Location
