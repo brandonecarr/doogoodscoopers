@@ -102,7 +102,7 @@ export async function GET(request: NextRequest) {
     // Get account balance (invoices - payments)
     const { data: invoices } = await supabase
       .from("invoices")
-      .select("total_cents, paid_cents")
+      .select("total_cents, paid_cents, due_date")
       .eq("client_id", client.id)
       .eq("status", "UNPAID");
 
@@ -110,6 +110,10 @@ export async function GET(request: NextRequest) {
       (sum, inv) => sum + (inv.total_cents - (inv.paid_cents || 0)),
       0
     ) || 0;
+
+    const overdueBalance = invoices
+      ?.filter((inv) => inv.due_date && inv.due_date < today)
+      .reduce((sum, inv) => sum + (inv.total_cents - (inv.paid_cents || 0)), 0) || 0;
 
     // Get recent completed jobs count
     const thirtyDaysAgo = new Date();
@@ -120,6 +124,19 @@ export async function GET(request: NextRequest) {
       .eq("client_id", client.id)
       .eq("status", "COMPLETED")
       .gte("completed_at", thirtyDaysAgo.toISOString());
+
+    // Get organization info for business footer
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: org } = await supabase
+      .from("organizations")
+      .select("name, settings")
+      .eq("id", auth.user.orgId)
+      .single();
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const orgSettings = (org?.settings || {}) as any;
+    const companyInfo = orgSettings?.branding?.companyInfo || {};
+    const portalSettings = orgSettings?.clientPortal || {};
 
     return NextResponse.json({
       client: {
@@ -155,10 +172,25 @@ export async function GET(request: NextRequest) {
       balance: {
         accountCredit: client.account_credit_cents || 0,
         openBalance,
+        overdueBalance,
       },
       referrals: referralStats,
       stats: {
         recentJobsCount: recentJobsCount || 0,
+      },
+      organization: {
+        name: org?.name || "DooGoodScoopers",
+        address: portalSettings.showCompanyAddress !== false ? {
+          line1: companyInfo.addressLine1 || "",
+          line2: companyInfo.addressLine2 || "",
+          city: companyInfo.city || "",
+          state: companyInfo.state || "",
+          zipCode: companyInfo.zipCode || "",
+        } : null,
+        phone: portalSettings.showPhoneNumber !== false ? (companyInfo.businessPhone || null) : null,
+        canText: portalSettings.clientCanText !== false,
+        canCall: portalSettings.clientCanCall !== false,
+        email: portalSettings.showEmailAddress !== false ? (companyInfo.businessEmail || null) : null,
       },
     });
   } catch (error) {

@@ -1,7 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Calendar, CreditCard, Share2, Dog, CheckCircle, MapPin, Loader2 } from "lucide-react";
+import {
+  Calendar,
+  CreditCard,
+  Dog,
+  ArrowRight,
+  Loader2,
+  MapPin,
+  Phone,
+  Mail,
+  MessageSquare,
+  Bell,
+  Heart,
+  RefreshCw,
+  FileText,
+} from "lucide-react";
 import Link from "next/link";
 
 interface DashboardData {
@@ -12,7 +26,6 @@ interface DashboardData {
     email: string;
     phone: string | null;
     status: string;
-    referralCode: string;
   };
   nextService: {
     id: string;
@@ -32,6 +45,7 @@ interface DashboardData {
   balance: {
     accountCredit: number;
     openBalance: number;
+    overdueBalance: number;
   };
   referrals: {
     total: number;
@@ -40,6 +54,20 @@ interface DashboardData {
   };
   stats: {
     recentJobsCount: number;
+  };
+  organization: {
+    name: string;
+    address: {
+      line1: string;
+      line2: string;
+      city: string;
+      state: string;
+      zipCode: string;
+    } | null;
+    phone: string | null;
+    canText: boolean;
+    canCall: boolean;
+    email: string | null;
   };
 }
 
@@ -70,15 +98,6 @@ export default function ClientDashboard() {
     fetchDashboard();
   }, []);
 
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr + "T00:00:00");
-    return date.toLocaleDateString("en-US", {
-      weekday: "long",
-      month: "long",
-      day: "numeric",
-    });
-  };
-
   const formatCurrency = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 
   if (loading) {
@@ -101,173 +120,233 @@ export default function ClientDashboard() {
     return null;
   }
 
+  const org = data.organization;
+  const hasAddress = org.address && (org.address.line1 || org.address.city);
+  const hasContactInfo = org.phone || org.email || hasAddress;
+
   return (
     <div className="space-y-6">
-      {/* Welcome Card */}
-      <div className="bg-gradient-to-r from-teal-500 to-teal-600 rounded-2xl p-6 text-white">
-        <h1 className="text-2xl font-bold mb-1">
-          Hi, {data.client.firstName || "there"}!
-        </h1>
-        <p className="text-teal-100 text-sm">
-          Welcome to your DooGoodScoopers account
-        </p>
-      </div>
-
-      {/* Next Service */}
-      <div className="bg-white rounded-xl shadow-sm p-4">
-        <h2 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-          <Calendar className="w-5 h-5 text-teal-600" />
-          Next Service
-        </h2>
-
-        {data.nextService ? (
-          <div className="bg-teal-50 rounded-lg p-4">
-            <p className="font-medium text-teal-900">{formatDate(data.nextService.date)}</p>
-            <div className="flex items-center gap-1 text-sm text-teal-700 mt-1">
-              <MapPin className="w-4 h-4" />
-              {data.nextService.address}, {data.nextService.city}
+      {/* Welcome Banner */}
+      <div className="bg-white rounded-xl shadow-sm p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">
+              Welcome, {data.client.firstName} {data.client.lastName}
+            </h1>
+            <p className="text-gray-500 mt-1">
+              Here&apos;s an overview of your account
+            </p>
+          </div>
+          <div className="flex gap-4 sm:gap-6">
+            <div className="text-left sm:text-right">
+              <p className="text-xs text-gray-500 uppercase tracking-wide">Open Balance</p>
+              <p className={`text-xl font-bold ${data.balance.openBalance > 0 ? "text-gray-900" : "text-gray-400"}`}>
+                {formatCurrency(data.balance.openBalance)}
+              </p>
             </div>
-            {data.nextService.status !== "SCHEDULED" && (
-              <span className="inline-block mt-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
-                {data.nextService.status === "EN_ROUTE" ? "On The Way!" : data.nextService.status}
-              </span>
+            {data.balance.overdueBalance > 0 && (
+              <div className="text-left sm:text-right">
+                <p className="text-xs text-red-500 uppercase tracking-wide">Overdue</p>
+                <p className="text-xl font-bold text-red-600">
+                  {formatCurrency(data.balance.overdueBalance)}
+                </p>
+              </div>
             )}
           </div>
-        ) : data.subscription ? (
-          <div className="bg-gray-50 rounded-lg p-4 text-center">
-            <Calendar className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-            <p className="text-gray-500 text-sm">No upcoming service scheduled</p>
-            <p className="text-gray-400 text-xs mt-1">
-              Your next service will appear here
+        </div>
+      </div>
+
+      {/* Request Service CTA (only if no active subscription) */}
+      {!data.subscription && (
+        <div className="bg-teal-50 border border-teal-200 rounded-xl p-6 flex flex-col sm:flex-row items-center gap-4">
+          <div className="w-14 h-14 bg-teal-100 rounded-full flex items-center justify-center flex-shrink-0">
+            <Dog className="w-7 h-7 text-teal-600" />
+          </div>
+          <div className="flex-1 text-center sm:text-left">
+            <h2 className="text-lg font-semibold text-teal-900">Request Service</h2>
+            <p className="text-sm text-teal-700 mt-1">
+              Ready to get started? Get a quote for pet waste removal service.
             </p>
           </div>
-        ) : (
-          <div className="bg-gray-50 rounded-lg p-4 text-center">
-            <Dog className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-            <p className="text-gray-500 text-sm">No active subscription</p>
-            <Link href="/quote" className="text-teal-600 text-sm font-medium mt-2 inline-block">
-              Get a Quote →
-            </Link>
-          </div>
-        )}
-      </div>
-
-      {/* Quick Stats */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="bg-white rounded-xl shadow-sm p-4">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-              <CreditCard className="w-4 h-4 text-blue-600" />
-            </div>
-            <span className="text-sm text-gray-500">Balance</span>
-          </div>
-          <p className={`text-2xl font-bold ${data.balance.openBalance > 0 ? "text-red-600" : "text-gray-900"}`}>
-            {formatCurrency(data.balance.openBalance)}
-          </p>
+          <Link
+            href="/quote"
+            className="inline-flex items-center gap-2 bg-teal-600 text-white px-5 py-2.5 rounded-lg font-medium hover:bg-teal-700 transition-colors flex-shrink-0"
+          >
+            Get a Quote
+            <ArrowRight className="w-4 h-4" />
+          </Link>
         </div>
+      )}
 
-        <div className="bg-white rounded-xl shadow-sm p-4">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-              <Share2 className="w-4 h-4 text-green-600" />
-            </div>
-            <span className="text-sm text-gray-500">Credit</span>
-          </div>
-          <p className="text-2xl font-bold text-green-600">
-            {formatCurrency(data.balance.accountCredit)}
-          </p>
-        </div>
-      </div>
-
-      {/* Quick Actions */}
-      <div className="bg-white rounded-xl shadow-sm divide-y divide-gray-100">
-        <Link
+      {/* Quick Links Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <QuickLinkCard
+          href="/app/client/subscription"
+          icon={<RefreshCw className="w-5 h-5 text-teal-600" />}
+          iconBg="bg-teal-100"
+          title="Subscriptions"
+          description="Manage your service plan"
+        />
+        <QuickLinkCard
           href="/app/client/schedule"
-          className="flex items-center justify-between p-4 hover:bg-gray-50"
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-teal-100 rounded-full flex items-center justify-center">
-              <Calendar className="w-5 h-5 text-teal-600" />
-            </div>
-            <div>
-              <p className="font-medium text-gray-900">View Schedule</p>
-              <p className="text-sm text-gray-500">
-                {data.stats.recentJobsCount > 0
-                  ? `${data.stats.recentJobsCount} services in last 30 days`
-                  : "See upcoming services"}
-              </p>
-            </div>
-          </div>
-          <span className="text-gray-400">→</span>
-        </Link>
-
-        <Link
+          icon={<Calendar className="w-5 h-5 text-blue-600" />}
+          iconBg="bg-blue-100"
+          title="Cleanups"
+          description={
+            data.stats.recentJobsCount > 0
+              ? `${data.stats.recentJobsCount} services in last 30 days`
+              : "View upcoming services"
+          }
+        />
+        <QuickLinkCard
           href="/app/client/billing"
-          className="flex items-center justify-between p-4 hover:bg-gray-50"
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-              <CreditCard className="w-5 h-5 text-blue-600" />
-            </div>
-            <div>
-              <p className="font-medium text-gray-900">Billing & Payments</p>
-              <p className="text-sm text-gray-500">Manage payment methods</p>
-            </div>
-          </div>
-          <span className="text-gray-400">→</span>
-        </Link>
-
-        <Link
+          icon={<FileText className="w-5 h-5 text-indigo-600" />}
+          iconBg="bg-indigo-100"
+          title="Invoices"
+          description="View and pay invoices"
+        />
+        <QuickLinkCard
+          href="/app/client/dogs"
+          icon={<Dog className="w-5 h-5 text-purple-600" />}
+          iconBg="bg-purple-100"
+          title="Dog Info"
+          description="Manage your pets"
+        />
+        <QuickLinkCard
+          href="/app/client/billing"
+          icon={<CreditCard className="w-5 h-5 text-green-600" />}
+          iconBg="bg-green-100"
+          title="Payment Methods"
+          description="Update payment info"
+        />
+        <QuickLinkCard
+          href="/app/client/settings"
+          icon={<Bell className="w-5 h-5 text-amber-600" />}
+          iconBg="bg-amber-100"
+          title="Notification Settings"
+          description="Manage your preferences"
+        />
+        <QuickLinkCard
           href="/app/client/referrals"
-          className="flex items-center justify-between p-4 hover:bg-gray-50"
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-              <Share2 className="w-5 h-5 text-green-600" />
-            </div>
-            <div>
-              <p className="font-medium text-gray-900">Refer a Friend</p>
-              <p className="text-sm text-gray-500">
-                {data.referrals.converted > 0
-                  ? `${data.referrals.converted} successful referrals`
-                  : "Earn $25 per referral"}
-              </p>
-            </div>
-          </div>
-          <span className="text-gray-400">→</span>
-        </Link>
-
-        <Link
-          href="/app/client/profile"
-          className="flex items-center justify-between p-4 hover:bg-gray-50"
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
-              <Dog className="w-5 h-5 text-purple-600" />
-            </div>
-            <div>
-              <p className="font-medium text-gray-900">My Profile</p>
-              <p className="text-sm text-gray-500">Account & pet info</p>
-            </div>
-          </div>
-          <span className="text-gray-400">→</span>
-        </Link>
+          icon={<Heart className="w-5 h-5 text-rose-600" />}
+          iconBg="bg-rose-100"
+          title="Refer a Friend"
+          description={
+            data.referrals.converted > 0
+              ? `${data.referrals.converted} successful referrals`
+              : "Earn credit for referrals"
+          }
+        />
       </div>
 
-      {/* Subscription Status */}
-      {data.subscription && (
-        <div className="bg-green-50 rounded-xl p-4 flex items-start gap-3">
-          <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm font-medium text-green-800">
-              {data.subscription.planName} - {data.subscription.frequency.charAt(0) + data.subscription.frequency.slice(1).toLowerCase()}
-            </p>
-            <p className="text-xs text-green-700 mt-1">
-              {formatCurrency(data.subscription.pricePerVisit)} per visit
-            </p>
-          </div>
+      {/* Business Info Footer */}
+      {hasContactInfo && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {hasAddress && org.address && (
+            <div className="bg-white rounded-xl shadow-sm p-5">
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
+                  <MapPin className="w-4 h-4 text-gray-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-900">Address</p>
+                  <p className="text-sm text-gray-500 mt-1">
+                    {org.address.line1}
+                    {org.address.line2 && <><br />{org.address.line2}</>}
+                    {(org.address.city || org.address.state) && (
+                      <><br />{[org.address.city, org.address.state].filter(Boolean).join(", ")} {org.address.zipCode}</>
+                    )}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {org.phone && (
+            <div className="bg-white rounded-xl shadow-sm p-5">
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
+                  <Phone className="w-4 h-4 text-gray-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-900">Phone</p>
+                  <p className="text-sm text-gray-500 mt-1">{org.phone}</p>
+                  <div className="flex gap-3 mt-2">
+                    {org.canCall && (
+                      <a
+                        href={`tel:${org.phone}`}
+                        className="text-xs font-medium text-teal-600 hover:text-teal-700"
+                      >
+                        Call Us
+                      </a>
+                    )}
+                    {org.canText && (
+                      <a
+                        href={`sms:${org.phone}`}
+                        className="inline-flex items-center gap-1 text-xs font-medium text-teal-600 hover:text-teal-700"
+                      >
+                        <MessageSquare className="w-3 h-3" />
+                        Text Us
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {org.email && (
+            <div className="bg-white rounded-xl shadow-sm p-5">
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
+                  <Mail className="w-4 h-4 text-gray-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-900">Email</p>
+                  <a
+                    href={`mailto:${org.email}`}
+                    className="text-sm text-teal-600 hover:text-teal-700 mt-1 inline-block"
+                  >
+                    {org.email}
+                  </a>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
+  );
+}
+
+function QuickLinkCard({
+  href,
+  icon,
+  iconBg,
+  title,
+  description,
+}: {
+  href: string;
+  icon: React.ReactNode;
+  iconBg: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="bg-white rounded-xl shadow-sm p-4 flex items-center justify-between hover:shadow-md transition-shadow group"
+    >
+      <div className="flex items-center gap-3">
+        <div className={`w-10 h-10 ${iconBg} rounded-full flex items-center justify-center`}>
+          {icon}
+        </div>
+        <div>
+          <p className="font-medium text-gray-900">{title}</p>
+          <p className="text-sm text-gray-500">{description}</p>
+        </div>
+      </div>
+      <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-teal-600 transition-colors flex-shrink-0" />
+    </Link>
   );
 }
