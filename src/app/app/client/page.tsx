@@ -147,9 +147,8 @@ export default function ClientDashboard() {
         </div>
       </div>
 
-      {/* Request Service CTA (only if no active subscription) */}
-      {!data.subscription && (
-        <div className="bg-white rounded-lg border border-gray-200 py-10 px-6 text-center">
+      {/* Request Service CTA */}
+      <div className="bg-white rounded-lg border border-gray-200 py-10 px-6 text-center">
           <div className="flex justify-center mb-4">
             <Dog className="w-12 h-12 text-gray-400" />
           </div>
@@ -167,7 +166,6 @@ export default function ClientDashboard() {
             Request Service
           </Link>
         </div>
-      )}
 
       {/* Quick Links */}
       <div className="bg-white rounded-lg border border-gray-200 p-6">

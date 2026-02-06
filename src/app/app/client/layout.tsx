@@ -14,7 +14,7 @@ export default async function ClientLayout({
       <ClientSidebar user={user} />
       <div className="lg:pl-64">
         <ClientHeader user={user} />
-        <main className="py-6 px-4 sm:px-6 lg:px-8 max-w-5xl pb-20 lg:pb-6">
+        <main className="py-6 px-4 sm:px-6 lg:px-8 max-w-[1144px] mx-auto pb-20 lg:pb-6">
           {children}
         </main>
       </div>
