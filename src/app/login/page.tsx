@@ -95,19 +95,20 @@ function LoginForm() {
     setError(null);
 
     try {
-      const supabase = createClient();
+      const redirectTo = `${window.location.origin}/auth/callback${
+        redirect ? `?redirect=${encodeURIComponent(redirect)}` : ""
+      }`;
 
-      const { error: otpError } = await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback${
-            redirect ? `?redirect=${encodeURIComponent(redirect)}` : ""
-          }`,
-        },
+      const res = await fetch("/api/auth/magic-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, redirectTo }),
       });
 
-      if (otpError) {
-        setError(otpError.message);
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || "Failed to send magic link.");
         setIsLoading(false);
         return;
       }
