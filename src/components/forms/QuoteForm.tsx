@@ -315,6 +315,7 @@ function QuoteFormInner() {
   // Cross-sells state
   const [crossSells, setCrossSells] = useState<CrossSell[]>([]);
   const [selectedCrossSells, setSelectedCrossSells] = useState<number[]>([]);
+  const [crossSellFrequencies, setCrossSellFrequencies] = useState<Record<number, "weekly" | "biweekly">>({});
 
   // Payment step state
   const [nameOnCard, setNameOnCard] = useState("");
@@ -865,8 +866,9 @@ function QuoteFormInner() {
           // Pricing fields from API
           billingInterval: pricing?.billingInterval || "per_visit",
           category: pricing?.category || "prepaid",
-          // Cross-sells (add-ons)
+          // Cross-sells (add-ons) with frequency
           crossSells: selectedCrossSells,
+          crossSellFrequencies,
         }),
       });
 
@@ -1959,32 +1961,76 @@ function QuoteFormInner() {
                   {crossSells
                     .filter(cs => !(cs.name || '').toLowerCase().includes('initial'))
                     .map((crossSell) => (
-                    <label
+                    <div
                       key={crossSell.id}
-                      className="flex items-start gap-3 p-3 rounded-lg border border-gray-100 hover:border-teal-200 hover:bg-teal-50/50 transition-colors cursor-pointer"
+                      className={cn(
+                        "p-3 rounded-lg border transition-colors",
+                        selectedCrossSells.includes(crossSell.id)
+                          ? "border-teal-300 bg-teal-50/50"
+                          : "border-gray-100 hover:border-teal-200 hover:bg-teal-50/50"
+                      )}
                     >
-                      <input
-                        type="checkbox"
-                        checked={selectedCrossSells.includes(crossSell.id)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedCrossSells([...selectedCrossSells, crossSell.id]);
-                          } else {
-                            setSelectedCrossSells(selectedCrossSells.filter(id => id !== crossSell.id));
-                          }
-                        }}
-                        className="mt-0.5 h-4 w-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500"
-                      />
-                      <div className="flex-1">
-                        <div className="flex justify-between items-start">
-                          <span className="font-medium text-navy-900">{crossSell.name}</span>
-                          <span className="text-teal-600 font-semibold">${crossSell.unit_amount}/session</span>
+                      <label className="flex items-start gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={selectedCrossSells.includes(crossSell.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedCrossSells([...selectedCrossSells, crossSell.id]);
+                              setCrossSellFrequencies(prev => ({ ...prev, [crossSell.id]: "weekly" }));
+                            } else {
+                              setSelectedCrossSells(selectedCrossSells.filter(id => id !== crossSell.id));
+                              setCrossSellFrequencies(prev => {
+                                const next = { ...prev };
+                                delete next[crossSell.id];
+                                return next;
+                              });
+                            }
+                          }}
+                          className="mt-0.5 h-4 w-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                        />
+                        <div className="flex-1">
+                          <div className="flex justify-between items-start">
+                            <span className="font-medium text-navy-900">{crossSell.name}</span>
+                            <span className="text-teal-600 font-semibold">${crossSell.unit_amount}/session</span>
+                          </div>
+                          {crossSell.description && (
+                            <p className="text-sm text-navy-700/70 mt-0.5">{crossSell.description}</p>
+                          )}
                         </div>
-                        {crossSell.description && (
-                          <p className="text-sm text-navy-700/70 mt-0.5">{crossSell.description}</p>
-                        )}
-                      </div>
-                    </label>
+                      </label>
+                      {selectedCrossSells.includes(crossSell.id) && (
+                        <div className="mt-3 ml-7 flex items-center gap-3">
+                          <span className="text-sm text-navy-700">How often?</span>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setCrossSellFrequencies(prev => ({ ...prev, [crossSell.id]: "weekly" }))}
+                              className={cn(
+                                "px-3 py-1 text-sm rounded-full border transition-colors",
+                                (crossSellFrequencies[crossSell.id] || "weekly") === "weekly"
+                                  ? "bg-teal-600 text-white border-teal-600"
+                                  : "bg-white text-navy-700 border-gray-300 hover:border-teal-400"
+                              )}
+                            >
+                              Weekly (4x/mo)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setCrossSellFrequencies(prev => ({ ...prev, [crossSell.id]: "biweekly" }))}
+                              className={cn(
+                                "px-3 py-1 text-sm rounded-full border transition-colors",
+                                crossSellFrequencies[crossSell.id] === "biweekly"
+                                  ? "bg-teal-600 text-white border-teal-600"
+                                  : "bg-white text-navy-700 border-gray-300 hover:border-teal-400"
+                              )}
+                            >
+                              Bi-Weekly (2x/mo)
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   ))}
                 </div>
               </div>
@@ -2271,70 +2317,89 @@ function QuoteFormInner() {
             </div>
 
             {/* Pricing Summary */}
-            {pricing && (
-              <div className="bg-teal-50 rounded-xl p-6 border border-teal-200">
-                <h4 className="font-medium text-teal-900 mb-4 flex items-center gap-2">
-                  <DollarSign className="w-5 h-5" />
-                  Pricing Summary
-                </h4>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-teal-700">Per Cleanup:</span>
-                    <span className="font-semibold text-teal-900">${pricing.recurringPrice}/visit</span>
+            {pricing && (() => {
+              const selectedAddOns = crossSells.filter(
+                cs => selectedCrossSells.includes(cs.id) && !(cs.name || '').toLowerCase().includes('initial')
+              );
+              const addOnsMonthlyTotal = selectedAddOns.reduce((sum, cs) => {
+                const freq = crossSellFrequencies[cs.id] || "weekly";
+                const sessionsPerMonth = freq === "weekly" ? 4 : 2;
+                return sum + cs.unit_amount * sessionsPerMonth;
+              }, 0);
+              const baseMonthly = pricing.monthlyPrice || pricing.recurringPrice;
+              const afterPromoTotal = baseMonthly + addOnsMonthlyTotal;
+
+              return (
+                <div className="bg-teal-50 rounded-xl p-6 border border-teal-200">
+                  <h4 className="font-medium text-teal-900 mb-4 flex items-center gap-2">
+                    <DollarSign className="w-5 h-5" />
+                    Pricing Summary
+                  </h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-teal-700">Per Cleanup:</span>
+                      <span className="font-semibold text-teal-900">${pricing.recurringPrice}/visit</span>
+                    </div>
+                    {pricing.monthlyPrice && onboardingSettings.defaultCoupon && serviceData?.couponCode === onboardingSettings.defaultCoupon.code && (
+                      <div className="flex justify-between">
+                        <div>
+                          <span className="text-teal-700">First Month:</span>
+                          <p className="text-xs text-teal-600/70">
+                            with &quot;{onboardingSettings.defaultCoupon.code}&quot;
+                          </p>
+                        </div>
+                        <span className="font-semibold text-green-600">
+                          $
+                          {onboardingSettings.defaultCoupon.discountType === "PERCENTAGE"
+                            ? (pricing.monthlyPrice * (1 - onboardingSettings.defaultCoupon.discountValue / 100)).toFixed(2)
+                            : onboardingSettings.defaultCoupon.discountType === "FIXED_AMOUNT"
+                            ? Math.max(0, pricing.monthlyPrice - onboardingSettings.defaultCoupon.discountValue / 100).toFixed(2)
+                            : pricing.monthlyPrice.toFixed(2)}
+                          /month
+                        </span>
+                      </div>
+                    )}
+                    {/* Add-ons below First Month */}
+                    {selectedAddOns.length > 0 && (
+                      <>
+                        <div className="pt-1">
+                          <span className="text-teal-700 text-xs font-medium uppercase">Add-ons:</span>
+                        </div>
+                        {selectedAddOns.map(cs => {
+                          const freq = crossSellFrequencies[cs.id] || "weekly";
+                          const sessionsPerMonth = freq === "weekly" ? 4 : 2;
+                          const monthlyAddonCost = cs.unit_amount * sessionsPerMonth;
+                          return (
+                            <div key={cs.id} className="flex justify-between">
+                              <span className="text-teal-700">
+                                {cs.name}
+                                <span className="text-teal-600/60 text-xs ml-1">
+                                  (${cs.unit_amount} × {sessionsPerMonth}/mo)
+                                </span>
+                              </span>
+                              <span className="font-semibold text-teal-900">${monthlyAddonCost.toFixed(2)}/mo</span>
+                            </div>
+                          );
+                        })}
+                      </>
+                    )}
+                    {pricing.initialCleanupFee > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-teal-700">Initial Cleanup Fee:</span>
+                        <span className="font-semibold text-teal-900">${pricing.initialCleanupFee}</span>
+                      </div>
+                    )}
+                    {/* Horizontal line and After Promo Monthly Total */}
+                    <div className="border-t border-teal-300 pt-2 mt-2">
+                      <div className="flex justify-between">
+                        <span className="text-teal-800 font-medium">After Promo Monthly Total:</span>
+                        <span className="font-bold text-teal-900">${afterPromoTotal.toFixed(2)}/month</span>
+                      </div>
+                    </div>
                   </div>
-                  {pricing.monthlyPrice && onboardingSettings.defaultCoupon && serviceData?.couponCode === onboardingSettings.defaultCoupon.code && (
-                    <div className="flex justify-between">
-                      <div>
-                        <span className="text-teal-700">First Month:</span>
-                        <p className="text-xs text-teal-600/70">
-                          with &quot;{onboardingSettings.defaultCoupon.code}&quot;
-                        </p>
-                      </div>
-                      <span className="font-semibold text-green-600">
-                        $
-                        {onboardingSettings.defaultCoupon.discountType === "PERCENTAGE"
-                          ? (pricing.monthlyPrice * (1 - onboardingSettings.defaultCoupon.discountValue / 100)).toFixed(2)
-                          : onboardingSettings.defaultCoupon.discountType === "FIXED_AMOUNT"
-                          ? Math.max(0, pricing.monthlyPrice - onboardingSettings.defaultCoupon.discountValue / 100).toFixed(2)
-                          : pricing.monthlyPrice.toFixed(2)}
-                        /month
-                      </span>
-                    </div>
-                  )}
-                  {pricing.monthlyPrice && pricing.monthlyPrice !== pricing.recurringPrice && (
-                    <div className="flex justify-between">
-                      <span className="text-teal-700">Monthly Total:</span>
-                      <span className="font-semibold text-teal-900">${pricing.monthlyPrice}/month</span>
-                    </div>
-                  )}
-                  {pricing.initialCleanupFee > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-teal-700">Initial Cleanup Fee:</span>
-                      <span className="font-semibold text-teal-900">${pricing.initialCleanupFee}</span>
-                    </div>
-                  )}
-                  {/* Show optional add-ons (excluding initial cleanup which is shown above) */}
-                  {crossSells
-                    .filter(cs => selectedCrossSells.includes(cs.id) && !(cs.name || '').toLowerCase().includes('initial'))
-                    .length > 0 && (
-                    <>
-                      <div className="border-t border-teal-200 pt-2 mt-2">
-                        <span className="text-teal-700 text-xs font-medium uppercase">Add-ons:</span>
-                      </div>
-                      {crossSells
-                        .filter(cs => selectedCrossSells.includes(cs.id) && !(cs.name || '').toLowerCase().includes('initial'))
-                        .map(cs => (
-                          <div key={cs.id} className="flex justify-between">
-                            <span className="text-teal-700">{cs.name}:</span>
-                            <span className="font-semibold text-teal-900">${cs.unit_amount}</span>
-                          </div>
-                        ))
-                      }
-                    </>
-                  )}
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {error && (
               <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm">
