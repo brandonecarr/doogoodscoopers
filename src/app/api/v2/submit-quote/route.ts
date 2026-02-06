@@ -299,6 +299,8 @@ async function submitInServiceAreaQuote(data: QuoteSubmission) {
         frequency: dbFrequency,
         price_per_visit_cents: pricePerVisitCents,
         next_service_date: getNextServiceDate(),
+        initial_cleanup_required: true,
+        initial_cleanup_completed: false,
       })
       .select("id")
       .single() as { data: { id: string } | null; error: Error | null };

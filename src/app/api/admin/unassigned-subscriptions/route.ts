@@ -1,10 +1,12 @@
 /**
  * Unassigned Subscriptions API
  *
- * Returns subscriptions that need tech/route assignment.
- * A subscription is "unassigned" if:
- * 1. It needs initial cleanup (initial_cleanup_required=true AND initial_cleanup_completed=false)
- * 2. OR it has upcoming scheduled jobs without a route assignment
+ * Returns locations that need tech/route assignment.
+ * A location is "unassigned" if:
+ * 1. It has an active subscription needing initial cleanup (initial_cleanup_required=true AND initial_cleanup_completed=false)
+ * 2. OR it has an active subscription with upcoming scheduled jobs without a route assignment
+ * 3. OR it has an active subscription with NO jobs at all (newly created)
+ * 4. OR it has no active subscription at all (admin-created client with a location)
  *
  * Requires subscriptions:read permission.
  */
@@ -53,9 +55,7 @@ export async function GET(request: NextRequest) {
   const today = new Date().toISOString().split("T")[0];
 
   try {
-    // Get all active subscriptions
-    // Note: subscriptions table doesn't have assigned_to column
-    // We determine "unassigned" based on jobs without routes or pending initial cleanup
+    // --- Part 1: Subscriptions-based unassigned locations ---
     const { data: subscriptions, error: subscriptionsError } = await supabase
       .from("subscriptions")
       .select(`
@@ -94,39 +94,49 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get jobs without route assignment for these subscriptions
-    const { data: unassignedJobs, error: jobsError } = await supabase
-      .from("jobs")
-      .select("subscription_id")
-      .eq("org_id", orgId)
-      .eq("status", "SCHEDULED")
-      .gte("scheduled_date", today)
-      .is("route_id", null)
-      .not("subscription_id", "is", null);
+    // Get ALL jobs for active subscriptions to check assignment status
+    const subIds = (subscriptions || []).map((s) => s.id);
+    const { data: allJobs, error: jobsError } = subIds.length > 0
+      ? await supabase
+          .from("jobs")
+          .select("subscription_id, route_id, status, scheduled_date")
+          .eq("org_id", orgId)
+          .in("subscription_id", subIds)
+      : { data: [] as { subscription_id: string; route_id: string | null; status: string; scheduled_date: string }[], error: null };
 
     if (jobsError) {
-      console.error("Error fetching unassigned jobs:", jobsError);
+      console.error("Error fetching jobs:", jobsError);
       return NextResponse.json(
         { error: "Failed to fetch job data" },
         { status: 500 }
       );
     }
 
-    // Build set of subscription IDs with unassigned jobs
-    const subscriptionsWithUnassignedJobs = new Set(
-      (unassignedJobs || []).map((j) => j.subscription_id)
-    );
+    // Build maps: which subscriptions have ANY jobs, and which have unassigned scheduled jobs
+    const subscriptionsWithJobs = new Set<string>();
+    const subscriptionsWithUnassignedJobs = new Set<string>();
+    for (const job of allJobs || []) {
+      if (job.subscription_id) {
+        subscriptionsWithJobs.add(job.subscription_id);
+        if (job.status === "SCHEDULED" && job.scheduled_date >= today && !job.route_id) {
+          subscriptionsWithUnassignedJobs.add(job.subscription_id);
+        }
+      }
+    }
 
-    // Filter to only unassigned subscriptions and transform
+    // A subscription is unassigned if:
+    // 1. Needs initial cleanup
+    // 2. Has scheduled jobs without route
+    // 3. Has NO jobs at all (brand new subscription)
     const unassignedSubscriptions: UnassignedSubscription[] = (subscriptions || [])
       .filter((sub) => {
         const needsInitialCleanup =
           sub.initial_cleanup_required && !sub.initial_cleanup_completed;
         const needsRouteAssignment = subscriptionsWithUnassignedJobs.has(sub.id);
-        return needsInitialCleanup || needsRouteAssignment;
+        const hasNoJobs = !subscriptionsWithJobs.has(sub.id);
+        return needsInitialCleanup || needsRouteAssignment || hasNoJobs;
       })
       .map((sub) => {
-        // Supabase returns the relation as a single object when using !inner
         const client = sub.client as unknown as {
           id: string;
           first_name: string | null;
@@ -142,7 +152,6 @@ export async function GET(request: NextRequest) {
         };
         const plan = sub.plan as unknown as { id: string; name: string } | null;
 
-        // Build client name
         let clientName = "";
         if (client.company_name) {
           clientName = client.company_name;
@@ -164,13 +173,90 @@ export async function GET(request: NextRequest) {
           hasPaymentMethod: !!client.stripe_customer_id,
           needsInitialCleanup:
             sub.initial_cleanup_required && !sub.initial_cleanup_completed,
-          needsRouteAssignment: subscriptionsWithUnassignedJobs.has(sub.id),
+          needsRouteAssignment:
+            subscriptionsWithUnassignedJobs.has(sub.id) || !subscriptionsWithJobs.has(sub.id),
         };
       });
 
+    // --- Part 2: Locations without any active subscription (admin-created clients) ---
+    // Track location IDs that already have active subscriptions
+    const locationIdsWithSubscriptions = new Set(
+      (subscriptions || []).map((s) => {
+        const loc = s.location as unknown as { id: string };
+        return loc.id;
+      })
+    );
+
+    // Find active locations that have NO active subscription
+    const { data: allLocations, error: locationsError } = await supabase
+      .from("locations")
+      .select(`
+        id,
+        address_line1,
+        city,
+        zip_code,
+        created_at,
+        client:clients!inner (
+          id,
+          first_name,
+          last_name,
+          company_name,
+          stripe_customer_id,
+          status
+        )
+      `)
+      .eq("org_id", orgId)
+      .eq("is_active", true)
+      .order("created_at", { ascending: false });
+
+    if (locationsError) {
+      console.error("Error fetching locations:", locationsError);
+      // Non-fatal — we still return subscription-based results
+    }
+
+    const orphanedLocations: UnassignedSubscription[] = (allLocations || [])
+      .filter((loc) => {
+        const client = loc.client as unknown as { status: string };
+        return !locationIdsWithSubscriptions.has(loc.id) && client.status === "ACTIVE";
+      })
+      .map((loc) => {
+        const client = loc.client as unknown as {
+          id: string;
+          first_name: string | null;
+          last_name: string | null;
+          company_name: string | null;
+          stripe_customer_id: string | null;
+        };
+
+        let clientName = "";
+        if (client.company_name) {
+          clientName = client.company_name;
+        } else if (client.first_name || client.last_name) {
+          clientName = `${client.first_name || ""} ${client.last_name || ""}`.trim();
+        }
+
+        return {
+          id: `loc-${loc.id}`, // Prefix to distinguish from subscription IDs
+          clientId: client.id,
+          clientName,
+          locationId: loc.id,
+          address: loc.address_line1,
+          city: loc.city,
+          zipCode: loc.zip_code,
+          planName: null,
+          frequency: "N/A",
+          signUpDate: loc.created_at,
+          hasPaymentMethod: !!client.stripe_customer_id,
+          needsInitialCleanup: true,
+          needsRouteAssignment: true,
+        };
+      });
+
+    const allUnassigned = [...unassignedSubscriptions, ...orphanedLocations];
+
     return NextResponse.json({
-      subscriptions: unassignedSubscriptions,
-      total: unassignedSubscriptions.length,
+      subscriptions: allUnassigned,
+      total: allUnassigned.length,
     });
   } catch (error) {
     console.error("Error in unassigned subscriptions API:", error);
