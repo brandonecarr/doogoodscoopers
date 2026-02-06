@@ -39,6 +39,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
     }
 
+    // Check env vars are present
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      console.error("Magic link: Supabase env vars missing");
+      return NextResponse.json(
+        { error: "Server configuration error. Please try password login." },
+        { status: 500 }
+      );
+    }
+
     const supabase = getSupabase();
 
     // Generate the magic link via Supabase Admin API
@@ -50,8 +59,23 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    if (error || !data?.properties?.action_link) {
-      console.error("Failed to generate magic link:", error?.message);
+    if (error) {
+      console.error("Failed to generate magic link:", error.message);
+      // If user doesn't exist in auth, provide a helpful message
+      if (error.message.includes("not found") || error.message.includes("User not found")) {
+        return NextResponse.json(
+          { error: "No account found with that email. Please sign up first or try password login." },
+          { status: 404 }
+        );
+      }
+      return NextResponse.json(
+        { error: `Failed to generate login link: ${error.message}` },
+        { status: 500 }
+      );
+    }
+
+    if (!data?.properties?.action_link) {
+      console.error("Magic link: generateLink returned no action_link", JSON.stringify(data));
       return NextResponse.json(
         { error: "Failed to generate login link. Please try password login." },
         { status: 500 }
@@ -60,14 +84,25 @@ export async function POST(request: NextRequest) {
 
     const magicLink = data.properties.action_link;
 
-    // Send the email via our own SMTP
+    // Send the email via our own SMTP, or fall back to Supabase OTP
     const transporter = createTransporter();
     if (!transporter) {
-      console.error("SMTP not configured - cannot send magic link email");
-      return NextResponse.json(
-        { error: "Email service not configured. Please try password login." },
-        { status: 500 }
-      );
+      console.warn("Magic link: SMTP not configured, falling back to Supabase OTP email");
+      // Fall back to Supabase's built-in email delivery
+      const { error: otpError } = await supabase.auth.signInWithOtp({
+        email: email.toLowerCase(),
+        options: {
+          emailRedirectTo: redirectTo || `${process.env.NEXT_PUBLIC_SITE_URL || "https://doogoodscoopers.com"}/auth/callback`,
+        },
+      });
+      if (otpError) {
+        console.error("Supabase OTP fallback failed:", otpError.message);
+        return NextResponse.json(
+          { error: `Failed to send login email: ${otpError.message}` },
+          { status: 500 }
+        );
+      }
+      return NextResponse.json({ success: true });
     }
 
     const fromEmail = process.env.SMTP_FROM || SITE_CONFIG.email;
