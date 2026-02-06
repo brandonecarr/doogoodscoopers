@@ -2,19 +2,12 @@
 
 import { useEffect, useState } from "react";
 import {
-  Calendar,
-  CreditCard,
   Dog,
-  ArrowRight,
   Loader2,
   MapPin,
   Phone,
   Mail,
   MessageSquare,
-  Bell,
-  Heart,
-  RefreshCw,
-  FileText,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -127,226 +120,151 @@ export default function ClientDashboard() {
   return (
     <div className="space-y-6">
       {/* Welcome Banner */}
-      <div className="bg-white rounded-xl shadow-sm p-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">
-              Welcome, {data.client.firstName} {data.client.lastName}
+      <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+          <div className="flex-1">
+            <h1 className="text-2xl font-semibold text-gray-900">
+              Welcome {data.client.firstName} {data.client.lastName}
             </h1>
-            <p className="text-gray-500 mt-1">
-              Here&apos;s an overview of your account
+            <p className="text-gray-500 mt-2 text-sm leading-relaxed">
+              Client portal allows you to manage your contact info as well as details about your location, yard, dogs, schedule, billing and notification preferences. You may also add multiple credit cards or request subscription changes.
             </p>
           </div>
-          <div className="flex gap-4 sm:gap-6">
-            <div className="text-left sm:text-right">
-              <p className="text-xs text-gray-500 uppercase tracking-wide">Open Balance</p>
-              <p className={`text-xl font-bold ${data.balance.openBalance > 0 ? "text-gray-900" : "text-gray-400"}`}>
+          <div className="flex gap-0 flex-shrink-0">
+            <div className="border-l-2 border-green-500 pl-3 pr-5">
+              <p className="text-xs text-gray-500">Open Balance</p>
+              <p className="text-lg font-bold text-gray-900">
                 {formatCurrency(data.balance.openBalance)}
               </p>
             </div>
-            {data.balance.overdueBalance > 0 && (
-              <div className="text-left sm:text-right">
-                <p className="text-xs text-red-500 uppercase tracking-wide">Overdue</p>
-                <p className="text-xl font-bold text-red-600">
-                  {formatCurrency(data.balance.overdueBalance)}
-                </p>
-              </div>
-            )}
+            <div className="border-l-2 border-red-400 pl-3">
+              <p className="text-xs text-gray-500">Overdue</p>
+              <p className="text-lg font-bold text-gray-900">
+                {formatCurrency(data.balance.overdueBalance)}
+              </p>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Request Service CTA (only if no active subscription) */}
       {!data.subscription && (
-        <div className="bg-teal-50 border border-teal-200 rounded-xl p-6 flex flex-col sm:flex-row items-center gap-4">
-          <div className="w-14 h-14 bg-teal-100 rounded-full flex items-center justify-center flex-shrink-0">
-            <Dog className="w-7 h-7 text-teal-600" />
+        <div className="bg-white rounded-lg border border-gray-200 py-10 px-6 text-center">
+          <div className="flex justify-center mb-4">
+            <Dog className="w-12 h-12 text-gray-400" />
           </div>
-          <div className="flex-1 text-center sm:text-left">
-            <h2 className="text-lg font-semibold text-teal-900">Request Service</h2>
-            <p className="text-sm text-teal-700 mt-1">
-              Ready to get started? Get a quote for pet waste removal service.
-            </p>
-          </div>
+          <h2 className="text-xl font-semibold text-gray-900">Request Service</h2>
+          <p className="text-gray-500 mt-2 text-sm max-w-md mx-auto">
+            You&apos;re just a few clicks away from a beautiful, waste-free yard!
+          </p>
+          <p className="text-gray-500 text-sm">
+            Please provide any missing info to get a free quote and request service!
+          </p>
           <Link
             href="/quote"
-            className="inline-flex items-center gap-2 bg-teal-600 text-white px-5 py-2.5 rounded-lg font-medium hover:bg-teal-700 transition-colors flex-shrink-0"
+            className="inline-block mt-4 bg-green-500 text-white px-6 py-2.5 rounded font-medium text-sm uppercase tracking-wide hover:bg-green-600 transition-colors"
           >
-            Get a Quote
-            <ArrowRight className="w-4 h-4" />
+            Request Service
           </Link>
         </div>
       )}
 
-      {/* Quick Links Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <QuickLinkCard
-          href="/app/client/subscription"
-          icon={<RefreshCw className="w-5 h-5 text-teal-600" />}
-          iconBg="bg-teal-100"
-          title="Subscriptions"
-          description="Manage your service plan"
-        />
-        <QuickLinkCard
-          href="/app/client/schedule"
-          icon={<Calendar className="w-5 h-5 text-blue-600" />}
-          iconBg="bg-blue-100"
-          title="Cleanups"
-          description={
-            data.stats.recentJobsCount > 0
-              ? `${data.stats.recentJobsCount} services in last 30 days`
-              : "View upcoming services"
-          }
-        />
-        <QuickLinkCard
-          href="/app/client/billing"
-          icon={<FileText className="w-5 h-5 text-indigo-600" />}
-          iconBg="bg-indigo-100"
-          title="Invoices"
-          description="View and pay invoices"
-        />
-        <QuickLinkCard
-          href="/app/client/dogs"
-          icon={<Dog className="w-5 h-5 text-purple-600" />}
-          iconBg="bg-purple-100"
-          title="Dog Info"
-          description="Manage your pets"
-        />
-        <QuickLinkCard
-          href="/app/client/billing"
-          icon={<CreditCard className="w-5 h-5 text-green-600" />}
-          iconBg="bg-green-100"
-          title="Payment Methods"
-          description="Update payment info"
-        />
-        <QuickLinkCard
-          href="/app/client/settings"
-          icon={<Bell className="w-5 h-5 text-amber-600" />}
-          iconBg="bg-amber-100"
-          title="Notification Settings"
-          description="Manage your preferences"
-        />
-        <QuickLinkCard
-          href="/app/client/referrals"
-          icon={<Heart className="w-5 h-5 text-rose-600" />}
-          iconBg="bg-rose-100"
-          title="Refer a Friend"
-          description={
-            data.referrals.converted > 0
-              ? `${data.referrals.converted} successful referrals`
-              : "Earn credit for referrals"
-          }
-        />
+      {/* Quick Links */}
+      <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Links</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
+          <Link href="/app/client/subscription" className="text-teal-600 hover:text-teal-700 text-sm font-medium">
+            Subscriptions &rarr;
+          </Link>
+          <Link href="/app/client/schedule" className="text-teal-600 hover:text-teal-700 text-sm font-medium">
+            Cleanups &rarr;
+          </Link>
+          <Link href="/app/client/billing" className="text-teal-600 hover:text-teal-700 text-sm font-medium">
+            Invoices &rarr;
+          </Link>
+          <Link href="/app/client/dogs" className="text-teal-600 hover:text-teal-700 text-sm font-medium">
+            Dog Info &rarr;
+          </Link>
+          <Link href="/app/client/billing" className="text-teal-600 hover:text-teal-700 text-sm font-medium">
+            Payment Methods &rarr;
+          </Link>
+          <Link href="/app/client/settings" className="text-teal-600 hover:text-teal-700 text-sm font-medium">
+            Notification Settings &rarr;
+          </Link>
+          <Link href="/app/client/referrals" className="text-teal-600 hover:text-teal-700 text-sm font-medium">
+            Refer a Friend &rarr;
+          </Link>
+        </div>
       </div>
 
       {/* Business Info Footer */}
       {hasContactInfo && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {hasAddress && org.address && (
-            <div className="bg-white rounded-xl shadow-sm p-5">
-              <div className="flex items-start gap-3">
-                <div className="w-9 h-9 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
-                  <MapPin className="w-4 h-4 text-gray-600" />
+        <div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">{org.name} info</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {hasAddress && org.address && (
+              <div className="bg-white rounded-lg border border-gray-200 p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <MapPin className="w-5 h-5 text-teal-600" />
+                  <h3 className="font-semibold text-gray-900">Address</h3>
                 </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-900">Address</p>
-                  <p className="text-sm text-gray-500 mt-1">
-                    {org.address.line1}
-                    {org.address.line2 && <><br />{org.address.line2}</>}
-                    {(org.address.city || org.address.state) && (
-                      <><br />{[org.address.city, org.address.state].filter(Boolean).join(", ")} {org.address.zipCode}</>
-                    )}
-                  </p>
-                </div>
+                <p className="text-sm text-gray-500 leading-relaxed">
+                  {org.address.line1}
+                  {org.address.line2 && <><br />{org.address.line2}</>}
+                  {(org.address.city || org.address.state) && (
+                    <><br />{[org.address.city, org.address.state].filter(Boolean).join(", ")} {org.address.zipCode}</>
+                  )}
+                </p>
               </div>
-            </div>
-          )}
+            )}
 
-          {org.phone && (
-            <div className="bg-white rounded-xl shadow-sm p-5">
-              <div className="flex items-start gap-3">
-                <div className="w-9 h-9 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
-                  <Phone className="w-4 h-4 text-gray-600" />
+            {org.phone && (
+              <div className="bg-white rounded-lg border border-gray-200 p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <Phone className="w-5 h-5 text-teal-600" />
+                  <h3 className="font-semibold text-gray-900">Phone Number</h3>
                 </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-900">Phone</p>
-                  <p className="text-sm text-gray-500 mt-1">{org.phone}</p>
-                  <div className="flex gap-3 mt-2">
-                    {org.canCall && (
-                      <a
-                        href={`tel:${org.phone}`}
-                        className="text-xs font-medium text-teal-600 hover:text-teal-700"
-                      >
-                        Call Us
-                      </a>
-                    )}
-                    {org.canText && (
-                      <a
-                        href={`sms:${org.phone}`}
-                        className="inline-flex items-center gap-1 text-xs font-medium text-teal-600 hover:text-teal-700"
-                      >
-                        <MessageSquare className="w-3 h-3" />
-                        Text Us
-                      </a>
-                    )}
-                  </div>
+                <p className="text-sm text-gray-500">{org.phone}</p>
+                <div className="flex items-center gap-4 mt-3">
+                  {org.canCall && (
+                    <a
+                      href={`tel:${org.phone}`}
+                      className="inline-flex items-center gap-1.5 text-sm font-medium text-teal-600 hover:text-teal-700"
+                    >
+                      <Phone className="w-3.5 h-3.5" />
+                      Call Us
+                    </a>
+                  )}
+                  {org.canText && (
+                    <a
+                      href={`sms:${org.phone}`}
+                      className="inline-flex items-center gap-1.5 text-sm font-medium text-teal-600 hover:text-teal-700"
+                    >
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      Text Us
+                    </a>
+                  )}
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {org.email && (
-            <div className="bg-white rounded-xl shadow-sm p-5">
-              <div className="flex items-start gap-3">
-                <div className="w-9 h-9 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
-                  <Mail className="w-4 h-4 text-gray-600" />
+            {org.email && (
+              <div className="bg-white rounded-lg border border-gray-200 p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <Mail className="w-5 h-5 text-teal-600" />
+                  <h3 className="font-semibold text-gray-900">Email Address</h3>
                 </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-900">Email</p>
-                  <a
-                    href={`mailto:${org.email}`}
-                    className="text-sm text-teal-600 hover:text-teal-700 mt-1 inline-block"
-                  >
-                    {org.email}
-                  </a>
-                </div>
+                <a
+                  href={`mailto:${org.email}`}
+                  className="text-sm text-teal-600 hover:text-teal-700"
+                >
+                  {org.email}
+                </a>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       )}
     </div>
-  );
-}
-
-function QuickLinkCard({
-  href,
-  icon,
-  iconBg,
-  title,
-  description,
-}: {
-  href: string;
-  icon: React.ReactNode;
-  iconBg: string;
-  title: string;
-  description: string;
-}) {
-  return (
-    <Link
-      href={href}
-      className="bg-white rounded-xl shadow-sm p-4 flex items-center justify-between hover:shadow-md transition-shadow group"
-    >
-      <div className="flex items-center gap-3">
-        <div className={`w-10 h-10 ${iconBg} rounded-full flex items-center justify-center`}>
-          {icon}
-        </div>
-        <div>
-          <p className="font-medium text-gray-900">{title}</p>
-          <p className="text-sm text-gray-500">{description}</p>
-        </div>
-      </div>
-      <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-teal-600 transition-colors flex-shrink-0" />
-    </Link>
   );
 }
