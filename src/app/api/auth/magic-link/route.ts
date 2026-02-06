@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = getSupabase();
-    const resolvedRedirect = redirectTo || `${process.env.NEXT_PUBLIC_SITE_URL || "https://doogoodscoopers.com"}/auth/callback`;
+    const resolvedRedirect = redirectTo || `${process.env.NEXT_PUBLIC_SITE_URL || "http://doogoodscoopers.vercel.app"}/auth/callback`;
 
     // Check if SMTP is available BEFORE generating a link
     const transporter = createTransporter();
