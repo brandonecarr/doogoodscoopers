@@ -45,6 +45,20 @@ function CallbackHandler() {
     }
 
     async function processCallback() {
+      // 0) Check for error in hash fragment (e.g. expired magic link)
+      const hash = window.location.hash.substring(1);
+      const hashParams = new URLSearchParams(hash);
+      const hashError = hashParams.get("error_description") || hashParams.get("error");
+      if (hashError) {
+        const friendly =
+          hashError.includes("expired") ? "This magic link has expired. Please request a new one." :
+          hashError.includes("denied") ? "Access was denied. Please try again." :
+          `Authentication error: ${hashError}`;
+        setError(friendly);
+        timeoutId = setTimeout(() => router.push("/login"), 3000);
+        return;
+      }
+
       // 1) PKCE flow: exchange auth code for session
       const code = searchParams.get("code");
       if (code) {
