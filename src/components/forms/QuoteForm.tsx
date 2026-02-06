@@ -2327,6 +2327,15 @@ function QuoteFormInner() {
                 return sum + cs.unit_amount * sessionsPerMonth;
               }, 0);
               const baseMonthly = pricing.monthlyPrice || pricing.recurringPrice;
+              const hasCoupon = !!(pricing.monthlyPrice && onboardingSettings.defaultCoupon && serviceData?.couponCode === onboardingSettings.defaultCoupon.code);
+              const coupon = onboardingSettings.defaultCoupon;
+              const applyDiscount = (amount: number) => {
+                if (!hasCoupon || !coupon) return amount;
+                if (coupon.discountType === "PERCENTAGE") return amount * (1 - coupon.discountValue / 100);
+                if (coupon.discountType === "FIXED_AMOUNT") return Math.max(0, amount - coupon.discountValue / 100);
+                return amount;
+              };
+              const firstMonthTotal = applyDiscount(baseMonthly + addOnsMonthlyTotal);
               const afterPromoTotal = baseMonthly + addOnsMonthlyTotal;
 
               return (
@@ -2340,48 +2349,36 @@ function QuoteFormInner() {
                       <span className="text-teal-700">Per Cleanup:</span>
                       <span className="font-semibold text-teal-900">${pricing.recurringPrice}/visit</span>
                     </div>
-                    {pricing.monthlyPrice && onboardingSettings.defaultCoupon && serviceData?.couponCode === onboardingSettings.defaultCoupon.code && (
+                    {/* Selected add-ons listed below Per Cleanup */}
+                    {selectedAddOns.map(cs => {
+                      const freq = crossSellFrequencies[cs.id] || "weekly";
+                      const sessionsPerMonth = freq === "weekly" ? 4 : 2;
+                      const monthlyAddonCost = cs.unit_amount * sessionsPerMonth;
+                      return (
+                        <div key={cs.id} className="flex justify-between">
+                          <span className="text-teal-700">
+                            {cs.name}
+                            <span className="text-teal-600/60 text-xs ml-1">
+                              (${cs.unit_amount} × {sessionsPerMonth}/mo)
+                            </span>
+                          </span>
+                          <span className="font-semibold text-teal-900">${monthlyAddonCost.toFixed(2)}/mo</span>
+                        </div>
+                      );
+                    })}
+                    {/* First Month with coupon applied to base + add-ons */}
+                    {hasCoupon && coupon && (
                       <div className="flex justify-between">
                         <div>
                           <span className="text-teal-700">First Month:</span>
                           <p className="text-xs text-teal-600/70">
-                            with &quot;{onboardingSettings.defaultCoupon.code}&quot;
+                            with &quot;{coupon.code}&quot;
                           </p>
                         </div>
                         <span className="font-semibold text-green-600">
-                          $
-                          {onboardingSettings.defaultCoupon.discountType === "PERCENTAGE"
-                            ? (pricing.monthlyPrice * (1 - onboardingSettings.defaultCoupon.discountValue / 100)).toFixed(2)
-                            : onboardingSettings.defaultCoupon.discountType === "FIXED_AMOUNT"
-                            ? Math.max(0, pricing.monthlyPrice - onboardingSettings.defaultCoupon.discountValue / 100).toFixed(2)
-                            : pricing.monthlyPrice.toFixed(2)}
-                          /month
+                          ${firstMonthTotal.toFixed(2)}/month
                         </span>
                       </div>
-                    )}
-                    {/* Add-ons below First Month */}
-                    {selectedAddOns.length > 0 && (
-                      <>
-                        <div className="pt-1">
-                          <span className="text-teal-700 text-xs font-medium uppercase">Add-ons:</span>
-                        </div>
-                        {selectedAddOns.map(cs => {
-                          const freq = crossSellFrequencies[cs.id] || "weekly";
-                          const sessionsPerMonth = freq === "weekly" ? 4 : 2;
-                          const monthlyAddonCost = cs.unit_amount * sessionsPerMonth;
-                          return (
-                            <div key={cs.id} className="flex justify-between">
-                              <span className="text-teal-700">
-                                {cs.name}
-                                <span className="text-teal-600/60 text-xs ml-1">
-                                  (${cs.unit_amount} × {sessionsPerMonth}/mo)
-                                </span>
-                              </span>
-                              <span className="font-semibold text-teal-900">${monthlyAddonCost.toFixed(2)}/mo</span>
-                            </div>
-                          );
-                        })}
-                      </>
                     )}
                     {pricing.initialCleanupFee > 0 && (
                       <div className="flex justify-between">
