@@ -177,15 +177,15 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Get cross-sells from onboarding settings (where admin configures them)
-    const { data: onboardingSettings } = await supabase
-      .from("onboarding_settings")
+    // Get cross-sells from organization settings (where admin configures them)
+    const { data: orgSettings } = await supabase
+      .from("organizations")
       .select("settings")
-      .eq("org_id", org.id)
-      .single<{ settings: { residentialCrossSells?: { items?: Array<{ id: string; name: string; description: string; pricePerUnit: number; unit: string }>; placement?: string } } }>();
+      .eq("id", org.id)
+      .single<{ settings: { residentialCrossSells?: { items?: Array<{ id: string; name: string; description: string; pricePerUnit: number; unit: string }>; placement?: string } } | null }>();
 
     // Extract cross-sells from settings, respecting the placement setting
-    const crossSellsSettings = onboardingSettings?.settings?.residentialCrossSells;
+    const crossSellsSettings = orgSettings?.settings?.residentialCrossSells;
     const crossSellsPlacement = crossSellsSettings?.placement || "BOTTOM";
 
     // Only include cross-sells if placement is not "DONT_SHOW"
