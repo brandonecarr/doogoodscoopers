@@ -41,8 +41,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Client not found" }, { status: 404 });
     }
 
-    // Get subscription with details
-    const { data: subscription } = await supabase
+    // Get ALL subscriptions (not just active)
+    const { data: subscriptions } = await supabase
       .from("subscriptions")
       .select(`
         id,
@@ -51,9 +51,10 @@ export async function GET(request: NextRequest) {
         price_per_visit_cents,
         preferred_day,
         next_service_date,
-        paused_until,
-        cancel_at_period_end,
+        pause_start_date,
+        pause_end_date,
         canceled_at,
+        cancel_reason,
         created_at,
         plan:plan_id (
           id,
@@ -68,71 +69,68 @@ export async function GET(request: NextRequest) {
         )
       `)
       .eq("client_id", client.id)
-      .in("status", ["ACTIVE", "PAUSED", "PENDING_CANCEL"])
-      .limit(1)
-      .single();
+      .order("created_at", { ascending: false });
 
-    if (!subscription) {
-      return NextResponse.json({ subscription: null });
-    }
+    // Get add-ons for each subscription
+    const subscriptionIds = (subscriptions || []).map((s) => s.id);
+    const { data: allAddOns } = subscriptionIds.length > 0
+      ? await supabase
+          .from("subscription_add_ons")
+          .select(`
+            id,
+            subscription_id,
+            quantity,
+            price_cents,
+            add_on:add_on_id (
+              id,
+              name,
+              price_cents
+            )
+          `)
+          .in("subscription_id", subscriptionIds)
+      : { data: [] };
 
-    // Get subscription add-ons
-    const { data: addOns } = await supabase
-      .from("subscription_add_ons")
-      .select(`
-        id,
-        add_on:add_on_id (
-          id,
-          name,
-          price_cents
-        )
-      `)
-      .eq("subscription_id", subscription.id);
-
-    return NextResponse.json({
-      subscription: {
-        id: subscription.id,
-        status: subscription.status,
-        frequency: subscription.frequency,
-        pricePerVisit: subscription.price_per_visit_cents,
-        preferredDay: subscription.preferred_day,
-        nextServiceDate: subscription.next_service_date,
-        pausedUntil: subscription.paused_until,
-        cancelAtPeriodEnd: subscription.cancel_at_period_end,
-        canceledAt: subscription.canceled_at,
-        createdAt: subscription.created_at,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result = (subscriptions || []).map((sub: any) => ({
+      id: sub.id,
+      status: sub.status,
+      frequency: sub.frequency,
+      pricePerVisit: sub.price_per_visit_cents,
+      preferredDay: sub.preferred_day,
+      nextServiceDate: sub.next_service_date,
+      pauseStartDate: sub.pause_start_date,
+      pauseEndDate: sub.pause_end_date,
+      canceledAt: sub.canceled_at,
+      cancelReason: sub.cancel_reason,
+      createdAt: sub.created_at,
+      plan: sub.plan
+        ? { id: sub.plan.id, name: sub.plan.name }
+        : null,
+      location: sub.location
+        ? {
+            id: sub.location.id,
+            addressLine1: sub.location.address_line1,
+            city: sub.location.city,
+            state: sub.location.state,
+            zipCode: sub.location.zip_code,
+          }
+        : null,
+      addOns: (allAddOns || [])
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        plan: (subscription.plan as any)
-          ? {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              id: (subscription.plan as any).id,
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              name: (subscription.plan as any).name,
-            }
-          : null,
+        .filter((ao: any) => ao.subscription_id === sub.id)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        location: (subscription.location as any)
-          ? {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              id: (subscription.location as any).id,
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              addressLine1: (subscription.location as any).address_line1,
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              city: (subscription.location as any).city,
-            }
-          : null,
-        addOns: (addOns || []).map((ao) => ({
+        .map((ao: any) => ({
           id: ao.id,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          name: (ao.add_on as any)?.name,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          priceCents: (ao.add_on as any)?.price_cents,
+          name: ao.add_on?.name,
+          priceCents: ao.price_cents,
+          quantity: ao.quantity,
         })),
-      },
-    });
+    }));
+
+    return NextResponse.json({ subscriptions: result });
   } catch (error) {
-    console.error("Error fetching subscription:", error);
-    return NextResponse.json({ error: "Failed to fetch subscription" }, { status: 500 });
+    console.error("Error fetching subscriptions:", error);
+    return NextResponse.json({ error: "Failed to fetch subscriptions" }, { status: 500 });
   }
 }
 
@@ -150,7 +148,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { action, pauseUntil, reason, frequency } = body;
+    const { action, subscriptionId, pauseUntil, reason, frequency } = body;
 
     if (!action) {
       return NextResponse.json({ error: "Action required" }, { status: 400 });
@@ -167,16 +165,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Client not found" }, { status: 404 });
     }
 
-    // Get active subscription
-    const { data: subscription } = await supabase
+    // Get the subscription (verify ownership)
+    const query = supabase
       .from("subscriptions")
       .select("id, status")
-      .eq("client_id", client.id)
-      .in("status", ["ACTIVE", "PAUSED"])
-      .single();
+      .eq("client_id", client.id);
+
+    if (subscriptionId) {
+      query.eq("id", subscriptionId);
+    } else {
+      query.in("status", ["ACTIVE", "PAUSED"]);
+    }
+
+    const { data: subscription } = await query.single();
 
     if (!subscription) {
-      return NextResponse.json({ error: "No active subscription found" }, { status: 404 });
+      return NextResponse.json({ error: "No subscription found" }, { status: 404 });
     }
 
     switch (action) {
@@ -193,7 +197,8 @@ export async function POST(request: NextRequest) {
           .from("subscriptions")
           .update({
             status: "PAUSED",
-            paused_until: pauseUntil,
+            pause_start_date: new Date().toISOString().split("T")[0],
+            pause_end_date: pauseUntil,
           })
           .eq("id", subscription.id);
 
@@ -201,7 +206,6 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ error: "Failed to pause subscription" }, { status: 500 });
         }
 
-        // Log activity
         await supabase.from("activity_logs").insert({
           org_id: client.org_id,
           user_id: auth.user.id,
@@ -223,7 +227,8 @@ export async function POST(request: NextRequest) {
           .from("subscriptions")
           .update({
             status: "ACTIVE",
-            paused_until: null,
+            pause_start_date: null,
+            pause_end_date: null,
           })
           .eq("id", subscription.id);
 
@@ -231,7 +236,6 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ error: "Failed to resume subscription" }, { status: 500 });
         }
 
-        // Log activity
         await supabase.from("activity_logs").insert({
           org_id: client.org_id,
           user_id: auth.user.id,
@@ -247,9 +251,9 @@ export async function POST(request: NextRequest) {
         const { error: cancelError } = await supabase
           .from("subscriptions")
           .update({
-            status: "PENDING_CANCEL",
-            cancel_at_period_end: true,
+            status: "CANCELED",
             canceled_at: new Date().toISOString(),
+            cancel_reason: reason || null,
           })
           .eq("id", subscription.id);
 
@@ -257,7 +261,6 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ error: "Failed to cancel subscription" }, { status: 500 });
         }
 
-        // Log activity
         await supabase.from("activity_logs").insert({
           org_id: client.org_id,
           user_id: auth.user.id,
@@ -269,7 +272,7 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json({
           success: true,
-          message: "Cancellation requested. Service will continue until current period ends.",
+          message: "Subscription has been canceled.",
         });
       }
 
@@ -278,7 +281,6 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ error: "Invalid frequency" }, { status: 400 });
         }
 
-        // Get the old frequency for logging
         const { data: currentSub } = await supabase
           .from("subscriptions")
           .select("frequency")
@@ -287,7 +289,6 @@ export async function POST(request: NextRequest) {
 
         const oldFrequency = currentSub?.frequency;
 
-        // Update the frequency
         const { error: freqError } = await supabase
           .from("subscriptions")
           .update({
@@ -300,7 +301,6 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ error: "Failed to change frequency" }, { status: 500 });
         }
 
-        // Log activity
         await supabase.from("activity_logs").insert({
           org_id: client.org_id,
           user_id: auth.user.id,
@@ -315,11 +315,10 @@ export async function POST(request: NextRequest) {
           BIWEEKLY: "Every 2 Weeks",
           MONTHLY: "Monthly",
         };
-        const freqLabel = freqLabels[frequency] || frequency;
 
         return NextResponse.json({
           success: true,
-          message: `Frequency changed to ${freqLabel}. This will take effect on your next billing cycle.`,
+          message: `Frequency changed to ${freqLabels[frequency] || frequency}. This will take effect on your next billing cycle.`,
         });
       }
 
