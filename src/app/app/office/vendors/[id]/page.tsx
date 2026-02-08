@@ -44,19 +44,6 @@ interface VendorService {
   isActive: boolean;
 }
 
-interface AddOnLink {
-  id: string;
-  addOnId: string;
-  addOnName: string | null;
-  addOnPriceCents: number | null;
-  vendorServiceId: string | null;
-  vendorServiceName: string | null;
-  vendorCostCents: number;
-  isDefault: boolean;
-  serviceAreaNotes: string | null;
-  isActive: boolean;
-}
-
 interface CrossSellLink {
   id: string;
   crossSellId: string;
@@ -90,7 +77,6 @@ export default function VendorDetailPage({ params }: { params: Promise<{ id: str
   const [loading, setLoading] = useState(true);
   const [vendor, setVendor] = useState<VendorDetail | null>(null);
   const [services, setServices] = useState<VendorService[]>([]);
-  const [addOnLinks, setAddOnLinks] = useState<AddOnLink[]>([]);
   const [crossSellLinks, setCrossSellLinks] = useState<CrossSellLink[]>([]);
   const [crossSellNames, setCrossSellNames] = useState<Record<string, string>>({});
   const [payouts, setPayouts] = useState<Payout[]>([]);
@@ -106,18 +92,6 @@ export default function VendorDetailPage({ params }: { params: Promise<{ id: str
     vendorCostCents: "",
     costType: "FIXED" as string,
     isActive: true,
-  });
-
-  // Link modal
-  const [showLinkModal, setShowLinkModal] = useState(false);
-  const [savingLink, setSavingLink] = useState(false);
-  const [availableAddOns, setAvailableAddOns] = useState<{ id: string; name: string; priceCents: number }[]>([]);
-  const [linkForm, setLinkForm] = useState({
-    addOnId: "",
-    vendorServiceId: "",
-    vendorCostCents: "",
-    isDefault: false,
-    serviceAreaNotes: "",
   });
 
   // Cross-sell link modal
@@ -146,7 +120,6 @@ export default function VendorDetailPage({ params }: { params: Promise<{ id: str
       if (res.ok) {
         setVendor(data.vendor);
         setServices(data.services || []);
-        setAddOnLinks(data.addOnLinks || []);
         setCrossSellLinks(data.crossSellLinks || []);
         setPayouts(data.payouts || []);
 
@@ -176,22 +149,6 @@ export default function VendorDetailPage({ params }: { params: Promise<{ id: str
       setError("Failed to load vendor");
     } finally {
       setLoading(false);
-    }
-  }
-
-  async function fetchAddOns() {
-    try {
-      const res = await fetch("/api/admin/add-ons?active=true");
-      const data = await res.json();
-      if (res.ok) {
-        setAvailableAddOns((data.addOns || []).map((a: { id: string; name: string; priceCents: number }) => ({
-          id: a.id,
-          name: a.name,
-          priceCents: a.priceCents,
-        })));
-      }
-    } catch (err) {
-      console.error("Error fetching add-ons:", err);
     }
   }
 
@@ -259,58 +216,6 @@ export default function VendorDetailPage({ params }: { params: Promise<{ id: str
       if (res.ok) fetchVendor();
     } catch (err) {
       console.error("Error deleting service:", err);
-    }
-  }
-
-  // Link CRUD
-  function openCreateLink() {
-    setLinkForm({ addOnId: "", vendorServiceId: "", vendorCostCents: "", isDefault: false, serviceAreaNotes: "" });
-    setShowLinkModal(true);
-    setError(null);
-    fetchAddOns();
-  }
-
-  async function handleSaveLink(e: React.FormEvent) {
-    e.preventDefault();
-    setSavingLink(true);
-    setError(null);
-
-    try {
-      const res = await fetch("/api/admin/add-on-vendor-links", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          addOnId: linkForm.addOnId,
-          vendorId: id,
-          vendorServiceId: linkForm.vendorServiceId || null,
-          vendorCostCents: Math.round(parseFloat(linkForm.vendorCostCents) * 100),
-          isDefault: linkForm.isDefault,
-          serviceAreaNotes: linkForm.serviceAreaNotes || null,
-        }),
-      });
-
-      const data = await res.json();
-      if (res.ok) {
-        setShowLinkModal(false);
-        fetchVendor();
-      } else {
-        setError(data.error || "Failed to create link");
-      }
-    } catch (err) {
-      console.error("Error creating link:", err);
-      setError("Failed to create link");
-    } finally {
-      setSavingLink(false);
-    }
-  }
-
-  async function handleDeleteLink(linkId: string) {
-    if (!confirm("Remove this add-on link?")) return;
-    try {
-      const res = await fetch(`/api/admin/add-on-vendor-links?id=${linkId}`, { method: "DELETE" });
-      if (res.ok) fetchVendor();
-    } catch (err) {
-      console.error("Error deleting link:", err);
     }
   }
 
@@ -542,61 +447,6 @@ export default function VendorDetailPage({ params }: { params: Promise<{ id: str
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Linked Add-Ons Section */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-100">
-        <div className="p-4 border-b border-gray-100 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Link2 className="w-5 h-5 text-teal-600" />
-            <h2 className="text-lg font-semibold text-gray-900">Linked Add-Ons</h2>
-            <span className="text-sm text-gray-500">({addOnLinks.length})</span>
-          </div>
-          <button
-            onClick={openCreateLink}
-            className="flex items-center gap-1 px-3 py-1.5 bg-teal-600 text-white rounded-lg hover:bg-teal-700 text-sm"
-          >
-            <Plus className="w-3.5 h-3.5" /> Link Add-On
-          </button>
-        </div>
-
-        {addOnLinks.length === 0 ? (
-          <div className="p-8 text-center text-gray-500 text-sm">
-            No add-ons linked. Link this vendor to an add-on to assign them for fulfillment.
-          </div>
-        ) : (
-          <div className="divide-y divide-gray-100">
-            {addOnLinks.map((link) => (
-              <div key={link.id} className={`flex items-center gap-4 p-4 ${!link.isActive ? "opacity-60" : ""}`}>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="font-medium text-gray-900">{link.addOnName || "Unknown Add-On"}</p>
-                    {link.isDefault && (
-                      <span className="px-2 py-0.5 text-xs bg-teal-100 text-teal-700 rounded-full">Default</span>
-                    )}
-                  </div>
-                  {link.vendorServiceName && (
-                    <p className="text-sm text-gray-500">Service: {link.vendorServiceName}</p>
-                  )}
-                  {link.serviceAreaNotes && (
-                    <p className="text-xs text-gray-400 mt-0.5">{link.serviceAreaNotes}</p>
-                  )}
-                </div>
-                <div className="text-right">
-                  <p className="text-sm text-gray-500">
-                    Client pays: <span className="font-medium text-gray-900">{formatCurrency(link.addOnPriceCents || 0)}</span>
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    Vendor cost: <span className="font-medium text-gray-900">{formatCurrency(link.vendorCostCents)}</span>
-                  </p>
-                </div>
-                <button onClick={() => handleDeleteLink(link.id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg">
-                  <Trash2 className="w-4 h-4" />
-                </button>
               </div>
             ))}
           </div>
@@ -899,103 +749,6 @@ export default function VendorDetailPage({ params }: { params: Promise<{ id: str
         </div>
       )}
 
-      {/* Link Add-On Modal */}
-      {showLinkModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4">
-            <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900">Link Add-On to Vendor</h2>
-              <button onClick={() => setShowLinkModal(false)} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <form onSubmit={handleSaveLink} className="p-6 space-y-4">
-              {error && (
-                <div className="flex items-center gap-2 p-3 bg-red-50 text-red-700 rounded-lg text-sm">
-                  <AlertCircle className="w-4 h-4" /> {error}
-                </div>
-              )}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Add-On *</label>
-                <select
-                  value={linkForm.addOnId}
-                  onChange={(e) => setLinkForm({ ...linkForm, addOnId: e.target.value })}
-                  required
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                >
-                  <option value="">Select an add-on...</option>
-                  {availableAddOns.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name} ({formatCurrency(a.priceCents)})
-                    </option>
-                  ))}
-                </select>
-              </div>
-              {services.length > 0 && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Vendor Service (optional)</label>
-                  <select
-                    value={linkForm.vendorServiceId}
-                    onChange={(e) => setLinkForm({ ...linkForm, vendorServiceId: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                  >
-                    <option value="">None</option>
-                    {services.filter((s) => s.isActive).map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name} ({formatCurrency(s.vendorCostCents)})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Vendor Cost ($) *</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={linkForm.vendorCostCents}
-                  onChange={(e) => setLinkForm({ ...linkForm, vendorCostCents: e.target.value })}
-                  placeholder="What you pay the vendor"
-                  required
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Service Area Notes</label>
-                <input
-                  type="text"
-                  value={linkForm.serviceAreaNotes}
-                  onChange={(e) => setLinkForm({ ...linkForm, serviceAreaNotes: e.target.value })}
-                  placeholder="e.g., North side only"
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                />
-              </div>
-              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div>
-                  <p className="font-medium text-gray-900">Default Vendor</p>
-                  <p className="text-sm text-gray-500">Preferred vendor for this add-on</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setLinkForm({ ...linkForm, isDefault: !linkForm.isDefault })}
-                  className={`relative w-11 h-6 rounded-full transition-colors ${linkForm.isDefault ? "bg-teal-600" : "bg-gray-300"}`}
-                >
-                  <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${linkForm.isDefault ? "translate-x-5" : ""}`} />
-                </button>
-              </div>
-              <div className="flex gap-3 pt-4">
-                <button type="button" onClick={() => setShowLinkModal(false)} className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">
-                  Cancel
-                </button>
-                <button type="submit" disabled={savingLink} className="flex-1 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50">
-                  {savingLink ? "Linking..." : "Link Add-On"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
