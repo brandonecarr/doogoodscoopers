@@ -125,6 +125,42 @@ export default function EditInvoicePage({
     }
   }
 
+  // Round to nearest 50 cents: 0-24¢ → .00, 25-74¢ → .50, 75-99¢ → next dollar
+  function roundToNearest50Cents(cents: number): number {
+    const remainder = cents % 100;
+    const base = Math.floor(cents / 100) * 100;
+    if (remainder < 25) return base;
+    if (remainder < 75) return base + 50;
+    return base + 100;
+  }
+
+  // Convert per-visit price to monthly rate
+  function toMonthlyCents(perVisitCents: number, frequency: string): number {
+    const multipliers: Record<string, number> = {
+      SEVEN_TIMES_A_WEEK: 365,
+      SIX_TIMES_A_WEEK: 312,
+      FIVE_TIMES_A_WEEK: 260,
+      FOUR_TIMES_A_WEEK: 208,
+      THREE_TIMES_A_WEEK: 156,
+      TWO_TIMES_A_WEEK: 104,
+      TWICE_WEEKLY: 104,
+      ONCE_A_WEEK: 52,
+      WEEKLY: 52,
+      BI_WEEKLY: 26,
+      BIWEEKLY: 26,
+      EVERY_THREE_WEEKS: 17,
+      EVERY_FOUR_WEEKS: 13,
+      TWICE_PER_MONTH: 24,
+      ONCE_A_MONTH: 12,
+      MONTHLY: 12,
+      ONE_TIME: 1,
+      ONETIME: 1,
+    };
+    const mult = multipliers[frequency] || 12;
+    const annualCents = perVisitCents * mult;
+    return roundToNearest50Cents(Math.round(annualCents / 12));
+  }
+
   async function fetchClientServices(clientId: string) {
     const options: ServiceOption[] = [];
 
@@ -137,16 +173,26 @@ export default function EditInvoicePage({
 
       if (clientRes.ok) {
         const clientData = await clientRes.json();
-        const subscriptions = clientData.client?.subscriptions || [];
+        const client = clientData.client;
+        const subscriptions = client?.subscriptions || [];
+        const activeDogs = (client?.dogs || []).filter(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (d: any) => d.isActive
+        ).length;
+        const dogLabel = activeDogs === 1 ? "1 Dog" : `${activeDogs} Dogs`;
+
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         subscriptions.forEach((sub: any) => {
           if (sub.status === "ACTIVE") {
-            const planName = sub.plan?.name || sub.frequency || "Subscription";
-            const priceCents = sub.pricePerVisitCents || 0;
+            const freq = sub.frequency || "MONTHLY";
+            const perVisitCents = sub.pricePerVisitCents || 0;
+            const monthlyCents = toMonthlyCents(perVisitCents, freq);
+            const label = `${freq} - ${dogLabel} (${formatCurrency(perVisitCents)}/visit)`;
+
             options.push({
-              label: `Subscription: ${planName}`,
-              description: `${planName} - ${formatCurrency(priceCents)}/visit`,
-              unitPriceCents: priceCents,
+              label,
+              description: `${label} → ${formatCurrency(monthlyCents)}/mo`,
+              unitPriceCents: monthlyCents,
               quantity: 1,
               category: "Subscriptions",
             });
