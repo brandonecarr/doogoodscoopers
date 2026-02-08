@@ -57,6 +57,24 @@ interface AddOnLink {
   isActive: boolean;
 }
 
+interface CrossSellLink {
+  id: string;
+  crossSellId: string;
+  crossSellType: string;
+  vendorServiceId: string | null;
+  vendorServiceName: string | null;
+  vendorCostCents: number;
+  isDefault: boolean;
+  serviceAreaNotes: string | null;
+  isActive: boolean;
+}
+
+interface CrossSellItem {
+  id: string;
+  name: string;
+  pricePerUnit: number;
+}
+
 interface Payout {
   id: string;
   amountCents: number;
@@ -73,6 +91,8 @@ export default function VendorDetailPage({ params }: { params: Promise<{ id: str
   const [vendor, setVendor] = useState<VendorDetail | null>(null);
   const [services, setServices] = useState<VendorService[]>([]);
   const [addOnLinks, setAddOnLinks] = useState<AddOnLink[]>([]);
+  const [crossSellLinks, setCrossSellLinks] = useState<CrossSellLink[]>([]);
+  const [crossSellNames, setCrossSellNames] = useState<Record<string, string>>({});
   const [payouts, setPayouts] = useState<Payout[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -100,6 +120,19 @@ export default function VendorDetailPage({ params }: { params: Promise<{ id: str
     serviceAreaNotes: "",
   });
 
+  // Cross-sell link modal
+  const [showCrossSellLinkModal, setShowCrossSellLinkModal] = useState(false);
+  const [savingCrossSellLink, setSavingCrossSellLink] = useState(false);
+  const [availableCrossSells, setAvailableCrossSells] = useState<CrossSellItem[]>([]);
+  const [crossSellLinkForm, setCrossSellLinkForm] = useState({
+    crossSellId: "",
+    crossSellType: "RESIDENTIAL" as string,
+    vendorServiceId: "",
+    vendorCostCents: "",
+    isDefault: false,
+    serviceAreaNotes: "",
+  });
+
   useEffect(() => {
     fetchVendor();
   }, [id]);
@@ -114,7 +147,27 @@ export default function VendorDetailPage({ params }: { params: Promise<{ id: str
         setVendor(data.vendor);
         setServices(data.services || []);
         setAddOnLinks(data.addOnLinks || []);
+        setCrossSellLinks(data.crossSellLinks || []);
         setPayouts(data.payouts || []);
+
+        // Fetch cross-sell names from onboarding settings
+        if ((data.crossSellLinks || []).length > 0) {
+          try {
+            const settingsRes = await fetch("/api/admin/onboarding-settings");
+            if (settingsRes.ok) {
+              const settingsData = await settingsRes.json();
+              const names: Record<string, string> = {};
+              const residential = settingsData.settings?.residentialCrossSells?.items || [];
+              const commercial = settingsData.settings?.commercialCrossSells?.items || [];
+              for (const item of [...residential, ...commercial]) {
+                names[item.id] = item.name;
+              }
+              setCrossSellNames(names);
+            }
+          } catch {
+            // non-critical, just won't show names
+          }
+        }
       } else {
         setError(data.error || "Failed to load vendor");
       }
@@ -258,6 +311,77 @@ export default function VendorDetailPage({ params }: { params: Promise<{ id: str
       if (res.ok) fetchVendor();
     } catch (err) {
       console.error("Error deleting link:", err);
+    }
+  }
+
+  // Cross-sell link CRUD
+  async function fetchCrossSells(type: string) {
+    try {
+      const res = await fetch("/api/admin/onboarding-settings");
+      if (res.ok) {
+        const data = await res.json();
+        const key = type === "RESIDENTIAL" ? "residentialCrossSells" : "commercialCrossSells";
+        const items = data.settings?.[key]?.items || [];
+        setAvailableCrossSells(items.map((item: { id: string; name: string; pricePerUnit: number }) => ({
+          id: item.id,
+          name: item.name,
+          pricePerUnit: item.pricePerUnit,
+        })));
+      }
+    } catch (err) {
+      console.error("Error fetching cross-sells:", err);
+    }
+  }
+
+  function openCreateCrossSellLink() {
+    setCrossSellLinkForm({ crossSellId: "", crossSellType: "RESIDENTIAL", vendorServiceId: "", vendorCostCents: "", isDefault: false, serviceAreaNotes: "" });
+    setShowCrossSellLinkModal(true);
+    setError(null);
+    fetchCrossSells("RESIDENTIAL");
+  }
+
+  async function handleSaveCrossSellLink(e: React.FormEvent) {
+    e.preventDefault();
+    setSavingCrossSellLink(true);
+    setError(null);
+
+    try {
+      const res = await fetch("/api/admin/cross-sell-vendor-links", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          crossSellId: crossSellLinkForm.crossSellId,
+          crossSellType: crossSellLinkForm.crossSellType,
+          vendorId: id,
+          vendorServiceId: crossSellLinkForm.vendorServiceId || null,
+          vendorCostCents: Math.round(parseFloat(crossSellLinkForm.vendorCostCents) * 100),
+          isDefault: crossSellLinkForm.isDefault,
+          serviceAreaNotes: crossSellLinkForm.serviceAreaNotes || null,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setShowCrossSellLinkModal(false);
+        fetchVendor();
+      } else {
+        setError(data.error || "Failed to link cross-sell");
+      }
+    } catch (err) {
+      console.error("Error linking cross-sell:", err);
+      setError("Failed to link cross-sell");
+    } finally {
+      setSavingCrossSellLink(false);
+    }
+  }
+
+  async function handleDeleteCrossSellLink(linkId: string) {
+    if (!confirm("Remove this cross-sell link?")) return;
+    try {
+      const res = await fetch(`/api/admin/cross-sell-vendor-links?id=${linkId}`, { method: "DELETE" });
+      if (res.ok) fetchVendor();
+    } catch (err) {
+      console.error("Error deleting cross-sell link:", err);
     }
   }
 
@@ -479,6 +603,67 @@ export default function VendorDetailPage({ params }: { params: Promise<{ id: str
         )}
       </div>
 
+      {/* Linked Cross-Sells Section */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-100">
+        <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Link2 className="w-5 h-5 text-teal-600" />
+            <h2 className="text-lg font-semibold text-gray-900">Linked Cross-Sells</h2>
+            <span className="text-sm text-gray-500">({crossSellLinks.length})</span>
+          </div>
+          <button
+            onClick={openCreateCrossSellLink}
+            className="flex items-center gap-1 px-3 py-1.5 bg-teal-600 text-white rounded-lg hover:bg-teal-700 text-sm"
+          >
+            <Plus className="w-3.5 h-3.5" /> Link Cross-Sell
+          </button>
+        </div>
+
+        {crossSellLinks.length === 0 ? (
+          <div className="p-8 text-center text-gray-500 text-sm">
+            No cross-sells linked. Link this vendor to a residential or commercial cross-sell.
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-100">
+            {crossSellLinks.map((link) => (
+              <div key={link.id} className={`flex items-center gap-4 p-4 ${!link.isActive ? "opacity-60" : ""}`}>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <Link
+                      href={`/app/office/settings/${link.crossSellType.toLowerCase()}-cross-sells/${link.crossSellId}`}
+                      className="font-medium text-teal-600 hover:text-teal-700 hover:underline"
+                    >
+                      {crossSellNames[link.crossSellId] || link.crossSellId}
+                    </Link>
+                    <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                      link.crossSellType === "RESIDENTIAL" ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"
+                    }`}>
+                      {link.crossSellType}
+                    </span>
+                    {link.isDefault && (
+                      <span className="px-2 py-0.5 text-xs bg-teal-100 text-teal-700 rounded-full">Default</span>
+                    )}
+                  </div>
+                  {link.vendorServiceName && (
+                    <p className="text-sm text-gray-500">Service: {link.vendorServiceName}</p>
+                  )}
+                  {link.serviceAreaNotes && (
+                    <p className="text-xs text-gray-400 mt-0.5">{link.serviceAreaNotes}</p>
+                  )}
+                </div>
+                <div className="text-right">
+                  <p className="font-semibold text-gray-900">{formatCurrency(link.vendorCostCents)}</p>
+                  <p className="text-xs text-gray-500">vendor cost</p>
+                </div>
+                <button onClick={() => handleDeleteCrossSellLink(link.id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg">
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* Recent Payouts Section */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-100">
         <div className="p-4 border-b border-gray-100 flex items-center justify-between">
@@ -595,6 +780,118 @@ export default function VendorDetailPage({ params }: { params: Promise<{ id: str
                 </button>
                 <button type="submit" disabled={savingService} className="flex-1 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50">
                   {savingService ? "Saving..." : editingService ? "Update" : "Create"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Link Cross-Sell Modal */}
+      {showCrossSellLinkModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4">
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900">Link Cross-Sell to Vendor</h2>
+              <button onClick={() => setShowCrossSellLinkModal(false)} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleSaveCrossSellLink} className="p-6 space-y-4">
+              {error && (
+                <div className="flex items-center gap-2 p-3 bg-red-50 text-red-700 rounded-lg text-sm">
+                  <AlertCircle className="w-4 h-4" /> {error}
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Cross-Sell Type *</label>
+                <select
+                  value={crossSellLinkForm.crossSellType}
+                  onChange={(e) => {
+                    setCrossSellLinkForm({ ...crossSellLinkForm, crossSellType: e.target.value, crossSellId: "" });
+                    fetchCrossSells(e.target.value);
+                  }}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                >
+                  <option value="RESIDENTIAL">Residential</option>
+                  <option value="COMMERCIAL">Commercial</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Cross-Sell *</label>
+                <select
+                  value={crossSellLinkForm.crossSellId}
+                  onChange={(e) => setCrossSellLinkForm({ ...crossSellLinkForm, crossSellId: e.target.value })}
+                  required
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                >
+                  <option value="">Select a cross-sell...</option>
+                  {availableCrossSells.map((cs) => (
+                    <option key={cs.id} value={cs.id}>
+                      {cs.name} ({formatCurrency(cs.pricePerUnit)})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {services.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Vendor Service (optional)</label>
+                  <select
+                    value={crossSellLinkForm.vendorServiceId}
+                    onChange={(e) => setCrossSellLinkForm({ ...crossSellLinkForm, vendorServiceId: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                  >
+                    <option value="">None</option>
+                    {services.filter((s) => s.isActive).map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} ({formatCurrency(s.vendorCostCents)})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Vendor Cost ($) *</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={crossSellLinkForm.vendorCostCents}
+                  onChange={(e) => setCrossSellLinkForm({ ...crossSellLinkForm, vendorCostCents: e.target.value })}
+                  placeholder="What you pay the vendor"
+                  required
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Service Area Notes</label>
+                <input
+                  type="text"
+                  value={crossSellLinkForm.serviceAreaNotes}
+                  onChange={(e) => setCrossSellLinkForm({ ...crossSellLinkForm, serviceAreaNotes: e.target.value })}
+                  placeholder="e.g., North side only"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                />
+              </div>
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div>
+                  <p className="font-medium text-gray-900">Default Vendor</p>
+                  <p className="text-sm text-gray-500">Preferred vendor for this cross-sell</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setCrossSellLinkForm({ ...crossSellLinkForm, isDefault: !crossSellLinkForm.isDefault })}
+                  className={`relative w-11 h-6 rounded-full transition-colors ${crossSellLinkForm.isDefault ? "bg-teal-600" : "bg-gray-300"}`}
+                >
+                  <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${crossSellLinkForm.isDefault ? "translate-x-5" : ""}`} />
+                </button>
+              </div>
+              <div className="flex gap-3 pt-4">
+                <button type="button" onClick={() => setShowCrossSellLinkModal(false)} className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">
+                  Cancel
+                </button>
+                <button type="submit" disabled={savingCrossSellLink} className="flex-1 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50">
+                  {savingCrossSellLink ? "Linking..." : "Link Cross-Sell"}
                 </button>
               </div>
             </form>

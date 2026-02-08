@@ -27,6 +27,7 @@ export type PayoutMethod = "CHECK" | "ACH" | "VENMO" | "PAYPAL" | "OTHER";
 export type CommissionType = "PERCENTAGE" | "FIXED_AMOUNT";
 export type VendorCostType = "FIXED" | "PER_VISIT";
 export type VendorPayoutStatus = "PENDING" | "PAID" | "CANCELED";
+export type CrossSellType = "RESIDENTIAL" | "COMMERCIAL";
 
 export interface Database {
   public: {
@@ -916,6 +917,50 @@ export interface Database {
           description?: string;
           amount_cents?: number;
           created_at?: string;
+        };
+      };
+      cross_sell_vendor_links: {
+        Row: {
+          id: string;
+          org_id: string;
+          cross_sell_id: string;
+          cross_sell_type: CrossSellType;
+          vendor_id: string;
+          vendor_service_id: string | null;
+          vendor_cost_cents: number;
+          is_default: boolean;
+          service_area_notes: string | null;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          cross_sell_id: string;
+          cross_sell_type: CrossSellType;
+          vendor_id: string;
+          vendor_service_id?: string | null;
+          vendor_cost_cents: number;
+          is_default?: boolean;
+          service_area_notes?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          cross_sell_id?: string;
+          cross_sell_type?: CrossSellType;
+          vendor_id?: string;
+          vendor_service_id?: string | null;
+          vendor_cost_cents?: number;
+          is_default?: boolean;
+          service_area_notes?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
         };
       };
     };

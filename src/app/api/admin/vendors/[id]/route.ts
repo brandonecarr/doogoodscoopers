@@ -52,8 +52,8 @@ export async function GET(
     );
   }
 
-  // Fetch services, links, and recent payouts in parallel
-  const [servicesRes, linksRes, payoutsRes] = await Promise.all([
+  // Fetch services, links, cross-sell links, and recent payouts in parallel
+  const [servicesRes, linksRes, crossSellLinksRes, payoutsRes] = await Promise.all([
     supabase
       .from("vendor_services")
       .select("*")
@@ -64,6 +64,14 @@ export async function GET(
       .select(`
         *,
         add_on:add_on_id (id, name, price_cents),
+        vendor_service:vendor_service_id (id, name)
+      `)
+      .eq("vendor_id", id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("cross_sell_vendor_links")
+      .select(`
+        *,
         vendor_service:vendor_service_id (id, name)
       `)
       .eq("vendor_id", id)
@@ -94,6 +102,21 @@ export async function GET(
     addOnId: l.add_on_id,
     addOnName: l.add_on?.name ?? null,
     addOnPriceCents: l.add_on?.price_cents ?? null,
+    vendorServiceId: l.vendor_service_id,
+    vendorServiceName: l.vendor_service?.name ?? null,
+    vendorCostCents: l.vendor_cost_cents,
+    isDefault: l.is_default,
+    serviceAreaNotes: l.service_area_notes,
+    isActive: l.is_active,
+    createdAt: l.created_at,
+    updatedAt: l.updated_at,
+  }));
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const crossSellLinks = (crossSellLinksRes.data || []).map((l: any) => ({
+    id: l.id,
+    crossSellId: l.cross_sell_id,
+    crossSellType: l.cross_sell_type,
     vendorServiceId: l.vendor_service_id,
     vendorServiceName: l.vendor_service?.name ?? null,
     vendorCostCents: l.vendor_cost_cents,
@@ -138,6 +161,7 @@ export async function GET(
     },
     services,
     addOnLinks,
+    crossSellLinks,
     payouts,
   });
 }

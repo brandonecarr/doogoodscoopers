@@ -14,6 +14,11 @@ interface CrossSell {
   taxable: boolean;
 }
 
+interface VendorLink {
+  crossSellId: string;
+  vendorName: string;
+}
+
 interface CrossSellsSettings {
   items: CrossSell[];
   placement: "TOP" | "BOTTOM" | "DONT_SHOW";
@@ -30,6 +35,7 @@ const defaultCrossSell: Omit<CrossSell, "id"> = {
 
 export default function ResidentialCrossSellsPage() {
   const [crossSells, setCrossSells] = useState<CrossSell[]>([]);
+  const [vendorLinks, setVendorLinks] = useState<VendorLink[]>([]);
   const [placement, setPlacement] = useState<"TOP" | "BOTTOM" | "DONT_SHOW">("BOTTOM");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -43,12 +49,24 @@ export default function ResidentialCrossSellsPage() {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch("/api/admin/onboarding-settings");
-      if (response.ok) {
-        const data = await response.json();
+      const [settingsRes, linksRes] = await Promise.all([
+        fetch("/api/admin/onboarding-settings"),
+        fetch("/api/admin/cross-sell-vendor-links?crossSellType=RESIDENTIAL"),
+      ]);
+      if (settingsRes.ok) {
+        const data = await settingsRes.json();
         const crossSellsSettings = data.settings?.residentialCrossSells || {};
         setCrossSells(crossSellsSettings.items || []);
         setPlacement(crossSellsSettings.placement || "BOTTOM");
+      }
+      if (linksRes.ok) {
+        const linksData = await linksRes.json();
+        setVendorLinks(
+          (linksData.links || []).map((l: { cross_sell_id?: string; crossSellId?: string; vendor_name?: string; vendorName?: string }) => ({
+            crossSellId: l.crossSellId || l.cross_sell_id,
+            vendorName: l.vendorName || l.vendor_name || "Unknown",
+          }))
+        );
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load data");
@@ -195,6 +213,7 @@ export default function ResidentialCrossSellsPage() {
               <tr className="border-b border-gray-200">
                 <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Name</th>
                 <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Description</th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Vendor</th>
                 <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Unit</th>
                 <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Price per Unit</th>
                 <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Type</th>
@@ -205,7 +224,7 @@ export default function ResidentialCrossSellsPage() {
             <tbody>
               {paginatedCrossSells.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-gray-500">
+                  <td colSpan={8} className="py-8 text-center text-gray-500">
                     No data available
                   </td>
                 </tr>
@@ -215,6 +234,20 @@ export default function ResidentialCrossSellsPage() {
                     <td className="py-3 px-4 text-sm text-gray-900">{crossSell.name}</td>
                     <td className="py-3 px-4 text-sm text-gray-900 max-w-md truncate">
                       {crossSell.description}
+                    </td>
+                    <td className="py-3 px-4">
+                      <div className="flex flex-wrap gap-1">
+                        {vendorLinks
+                          .filter((vl) => vl.crossSellId === crossSell.id)
+                          .map((vl, i) => (
+                            <span
+                              key={i}
+                              className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-teal-100 text-teal-700 rounded-full"
+                            >
+                              {vl.vendorName}
+                            </span>
+                          ))}
+                      </div>
                     </td>
                     <td className="py-3 px-4 text-sm text-gray-900">{crossSell.unit}</td>
                     <td className="py-3 px-4 text-sm text-gray-900">
