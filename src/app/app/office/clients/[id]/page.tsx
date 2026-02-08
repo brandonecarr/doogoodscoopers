@@ -84,6 +84,31 @@ interface CrossSellItem {
   taxable: boolean;
 }
 
+interface ClientCrossSell {
+  id: string;
+  clientId: string;
+  crossSellId: string;
+  crossSellType: string;
+  name: string;
+  description: string | null;
+  unit: string | null;
+  pricePerUnitCents: number;
+  quantity: number;
+  vendorId: string | null;
+  vendorName: string | null;
+  vendorCostCents: number | null;
+  status: string;
+  notes: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface VendorOption {
+  id: string;
+  name: string;
+}
+
 interface Subscription {
   id: string;
   status: string;
@@ -512,6 +537,19 @@ export default function ClientDetailPage({ params }: PageProps) {
     specialNote: "",
   });
   const [savingGiftCert, setSavingGiftCert] = useState(false);
+
+  // Client cross-sells state
+  const [clientCrossSells, setClientCrossSells] = useState<ClientCrossSell[]>([]);
+  const [loadingCrossSells, setLoadingCrossSells] = useState(false);
+  const [showAddCrossSellModal, setShowAddCrossSellModal] = useState(false);
+  const [addCrossSellForm, setAddCrossSellForm] = useState({ crossSellId: "", quantity: "1" });
+  const [savingCrossSell, setSavingCrossSell] = useState(false);
+  const [showAssignVendorModal, setShowAssignVendorModal] = useState(false);
+  const [assignVendorTarget, setAssignVendorTarget] = useState<ClientCrossSell | null>(null);
+  const [assignVendorForm, setAssignVendorForm] = useState({ vendorId: "", vendorCostCents: "" });
+  const [savingVendorAssign, setSavingVendorAssign] = useState(false);
+  const [vendorOptions, setVendorOptions] = useState<VendorOption[]>([]);
+  const [loadingVendors, setLoadingVendors] = useState(false);
 
   const resetSubscriptionForm = () => {
     setSubscriptionForm({
@@ -1157,6 +1195,153 @@ export default function ClientDetailPage({ params }: PageProps) {
       setSavingGiftCert(false);
     }
   };
+
+  // === Client Cross-Sells ===
+  const fetchClientCrossSells = async () => {
+    setLoadingCrossSells(true);
+    try {
+      const res = await fetch(`/api/admin/clients/${id}/cross-sells`);
+      if (res.ok) {
+        const data = await res.json();
+        setClientCrossSells(data.crossSells || []);
+      }
+    } catch (err) {
+      console.error("Error fetching client cross-sells:", err);
+    } finally {
+      setLoadingCrossSells(false);
+    }
+  };
+
+  const fetchVendors = async () => {
+    setLoadingVendors(true);
+    try {
+      const res = await fetch("/api/admin/vendors?active=true");
+      if (res.ok) {
+        const data = await res.json();
+        setVendorOptions((data.vendors || []).map((v: VendorOption) => ({ id: v.id, name: v.name })));
+      }
+    } catch (err) {
+      console.error("Error fetching vendors:", err);
+    } finally {
+      setLoadingVendors(false);
+    }
+  };
+
+  const handleAddCrossSell = async () => {
+    if (!addCrossSellForm.crossSellId) return;
+    const crossSell = residentialCrossSells.find((cs) => cs.id === addCrossSellForm.crossSellId);
+    if (!crossSell) return;
+
+    setSavingCrossSell(true);
+    try {
+      const res = await fetch(`/api/admin/clients/${id}/cross-sells`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          crossSellId: crossSell.id,
+          crossSellType: crossSell.type || "RESIDENTIAL",
+          name: crossSell.name,
+          description: crossSell.description || null,
+          unit: crossSell.unit || null,
+          pricePerUnitCents: crossSell.pricePerUnit,
+          quantity: parseInt(addCrossSellForm.quantity) || 1,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setClientCrossSells((prev) => [data.crossSell, ...prev]);
+        setShowAddCrossSellModal(false);
+        setAddCrossSellForm({ crossSellId: "", quantity: "1" });
+      } else {
+        const data = await res.json();
+        alert(data.error || "Failed to add cross-sell");
+      }
+    } catch (err) {
+      console.error("Error adding cross-sell:", err);
+      alert("Failed to add cross-sell");
+    } finally {
+      setSavingCrossSell(false);
+    }
+  };
+
+  const handleAssignVendor = async () => {
+    if (!assignVendorTarget) return;
+    setSavingVendorAssign(true);
+    try {
+      const res = await fetch(`/api/admin/clients/${id}/cross-sells`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: assignVendorTarget.id,
+          vendorId: assignVendorForm.vendorId || null,
+          vendorCostCents: assignVendorForm.vendorCostCents
+            ? Math.round(parseFloat(assignVendorForm.vendorCostCents) * 100)
+            : null,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setClientCrossSells((prev) =>
+          prev.map((cs) => (cs.id === data.crossSell.id ? data.crossSell : cs))
+        );
+        setShowAssignVendorModal(false);
+        setAssignVendorTarget(null);
+        setAssignVendorForm({ vendorId: "", vendorCostCents: "" });
+      } else {
+        const data = await res.json();
+        alert(data.error || "Failed to assign vendor");
+      }
+    } catch (err) {
+      console.error("Error assigning vendor:", err);
+      alert("Failed to assign vendor");
+    } finally {
+      setSavingVendorAssign(false);
+    }
+  };
+
+  const handleRemoveCrossSell = async (crossSellRowId: string) => {
+    if (!confirm("Are you sure you want to remove this cross-sell?")) return;
+    try {
+      const res = await fetch(`/api/admin/clients/${id}/cross-sells?id=${crossSellRowId}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        setClientCrossSells((prev) => prev.filter((cs) => cs.id !== crossSellRowId));
+      } else {
+        const data = await res.json();
+        alert(data.error || "Failed to remove cross-sell");
+      }
+    } catch (err) {
+      console.error("Error removing cross-sell:", err);
+      alert("Failed to remove cross-sell");
+    }
+  };
+
+  const openAssignVendor = (cs: ClientCrossSell) => {
+    setAssignVendorTarget(cs);
+    setAssignVendorForm({
+      vendorId: cs.vendorId || "",
+      vendorCostCents: cs.vendorCostCents ? String(cs.vendorCostCents / 100) : "",
+    });
+    setShowAssignVendorModal(true);
+    if (vendorOptions.length === 0) {
+      fetchVendors();
+    }
+  };
+
+  // Fetch client cross-sells when client loads
+  useEffect(() => {
+    if (client) {
+      fetchClientCrossSells();
+      // Also load cross-sell options if not already loaded
+      if (residentialCrossSells.length === 0) {
+        fetchServicePlans();
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [client?.id]);
 
   // Fetch payment methods when cards tab is selected
   useEffect(() => {
@@ -1837,17 +2022,73 @@ export default function ClientDetailPage({ params }: PageProps) {
                 <th className="pb-3 font-medium">Description</th>
                 <th className="pb-3 font-medium">Unit</th>
                 <th className="pb-3 font-medium">Price per Unit</th>
+                <th className="pb-3 font-medium">Vendor</th>
                 <th className="pb-3 font-medium">Actions</th>
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td colSpan={5} className="py-8 text-center text-gray-400">No data available</td>
-              </tr>
+              {loadingCrossSells ? (
+                <tr>
+                  <td colSpan={6} className="py-8 text-center text-gray-400">Loading...</td>
+                </tr>
+              ) : clientCrossSells.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-8 text-center text-gray-400">No data available</td>
+                </tr>
+              ) : (
+                clientCrossSells.map((cs) => (
+                  <tr key={cs.id} className="border-b border-gray-50">
+                    <td className="py-3 text-gray-900">{cs.name}</td>
+                    <td className="py-3 text-gray-600">{cs.description || "—"}</td>
+                    <td className="py-3 text-gray-600">{cs.unit || "—"}</td>
+                    <td className="py-3 text-gray-900">{formatCurrency(cs.pricePerUnitCents)}</td>
+                    <td className="py-3">
+                      {cs.vendorName ? (
+                        <span className="px-2 py-1 text-xs rounded bg-teal-50 text-teal-700">{cs.vendorName}</span>
+                      ) : (
+                        <button
+                          onClick={() => openAssignVendor(cs)}
+                          className="text-xs text-teal-600 hover:text-teal-700 underline"
+                        >
+                          Assign
+                        </button>
+                      )}
+                    </td>
+                    <td className="py-3">
+                      <div className="flex items-center gap-2">
+                        {cs.vendorName && (
+                          <button
+                            onClick={() => openAssignVendor(cs)}
+                            className="text-xs text-teal-600 hover:text-teal-700"
+                            title="Change vendor"
+                          >
+                            <Edit className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleRemoveCrossSell(cs.id)}
+                          className="text-xs text-red-500 hover:text-red-600"
+                          title="Remove"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
           <div className="flex justify-end mt-4">
-            <button className="text-sm font-medium text-teal-600 hover:text-teal-700">ADD NEW</button>
+            <button
+              onClick={() => {
+                setShowAddCrossSellModal(true);
+                if (residentialCrossSells.length === 0) fetchServicePlans();
+              }}
+              className="text-sm font-medium text-teal-600 hover:text-teal-700"
+            >
+              ADD NEW
+            </button>
           </div>
         </div>
       </div>
@@ -3052,6 +3293,169 @@ export default function ClientDetailPage({ params }: PageProps) {
                   className="px-6 py-2 text-sm font-medium text-white bg-teal-600 rounded hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {savingGiftCert ? "SAVING..." : "SAVE"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add New Cross-Sell Modal */}
+      {showAddCrossSellModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                Add New Cross-Sell
+              </h2>
+
+              <div className="bg-blue-50 border border-blue-100 rounded p-3 mb-4">
+                <div className="flex items-start gap-2">
+                  <Info className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                  <p className="text-xs text-blue-700">
+                    Cross-sell frequency matches the cleanup frequency and is postpaid.
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-teal-600 mb-1">
+                    Cross-Sell
+                  </label>
+                  <select
+                    value={addCrossSellForm.crossSellId}
+                    onChange={(e) => setAddCrossSellForm({ ...addCrossSellForm, crossSellId: e.target.value })}
+                    className="w-full px-3 py-2 border-b border-gray-300 focus:border-teal-500 focus:ring-0 text-sm bg-white"
+                  >
+                    <option value="">Please Select</option>
+                    {residentialCrossSells.map((crossSell) => (
+                      <option key={crossSell.id} value={crossSell.id}>
+                        {crossSell.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {addCrossSellForm.crossSellId && (() => {
+                  const selected = residentialCrossSells.find((cs) => cs.id === addCrossSellForm.crossSellId);
+                  if (!selected) return null;
+                  return (
+                    <div className="bg-gray-50 rounded p-3 text-sm space-y-1">
+                      <p><span className="text-gray-500">Unit:</span> <span className="font-medium">{selected.unit || "—"}</span></p>
+                      <p><span className="text-gray-500">Price per Unit:</span> <span className="font-medium">{formatCurrency(selected.pricePerUnit)}</span></p>
+                      {selected.description && (
+                        <p><span className="text-gray-500">Description:</span> <span className="font-medium">{selected.description}</span></p>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                <div>
+                  <label className="block text-sm font-medium text-teal-600 mb-1">
+                    Quantity
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={addCrossSellForm.quantity}
+                    onChange={(e) => setAddCrossSellForm({ ...addCrossSellForm, quantity: e.target.value })}
+                    className="w-full px-0 py-2 border-0 border-b border-gray-300 focus:border-teal-500 focus:ring-0 text-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-center gap-3 mt-8">
+                <button
+                  onClick={() => {
+                    setShowAddCrossSellModal(false);
+                    setAddCrossSellForm({ crossSellId: "", quantity: "1" });
+                  }}
+                  className="px-6 py-2 text-sm font-medium text-teal-600 hover:text-teal-700"
+                >
+                  CANCEL
+                </button>
+                <button
+                  onClick={handleAddCrossSell}
+                  disabled={savingCrossSell || !addCrossSellForm.crossSellId}
+                  className="px-6 py-2 text-sm font-medium text-white bg-teal-600 rounded hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {savingCrossSell ? "SAVING..." : "SAVE"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Assign Vendor Modal */}
+      {showAssignVendorModal && assignVendorTarget && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-1">
+                Assign Vendor
+              </h2>
+              <p className="text-sm text-gray-500 mb-4">
+                {assignVendorTarget.name}
+              </p>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-teal-600 mb-1">
+                    Vendor
+                  </label>
+                  <select
+                    value={assignVendorForm.vendorId}
+                    onChange={(e) => setAssignVendorForm({ ...assignVendorForm, vendorId: e.target.value })}
+                    className="w-full px-3 py-2 border-b border-gray-300 focus:border-teal-500 focus:ring-0 text-sm bg-white"
+                    disabled={loadingVendors}
+                  >
+                    <option value="">
+                      {loadingVendors ? "Loading..." : "No Vendor (Unassign)"}
+                    </option>
+                    {vendorOptions.map((v) => (
+                      <option key={v.id} value={v.id}>{v.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-teal-600 mb-1">
+                    Vendor Cost
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-0 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={assignVendorForm.vendorCostCents}
+                      onChange={(e) => setAssignVendorForm({ ...assignVendorForm, vendorCostCents: e.target.value })}
+                      className="w-full pl-4 px-0 py-2 border-0 border-b border-gray-300 focus:border-teal-500 focus:ring-0 text-sm"
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-center gap-3 mt-8">
+                <button
+                  onClick={() => {
+                    setShowAssignVendorModal(false);
+                    setAssignVendorTarget(null);
+                    setAssignVendorForm({ vendorId: "", vendorCostCents: "" });
+                  }}
+                  className="px-6 py-2 text-sm font-medium text-teal-600 hover:text-teal-700"
+                >
+                  CANCEL
+                </button>
+                <button
+                  onClick={handleAssignVendor}
+                  disabled={savingVendorAssign}
+                  className="px-6 py-2 text-sm font-medium text-white bg-teal-600 rounded hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {savingVendorAssign ? "SAVING..." : "SAVE"}
                 </button>
               </div>
             </div>

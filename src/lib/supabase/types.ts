@@ -919,6 +919,65 @@ export interface Database {
           created_at?: string;
         };
       };
+      client_cross_sells: {
+        Row: {
+          id: string;
+          org_id: string;
+          client_id: string;
+          cross_sell_id: string;
+          cross_sell_type: CrossSellType;
+          name: string;
+          description: string | null;
+          unit: string | null;
+          price_per_unit_cents: number;
+          quantity: number;
+          vendor_id: string | null;
+          vendor_cost_cents: number | null;
+          status: "ACTIVE" | "PAUSED" | "CANCELED";
+          notes: string | null;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          client_id: string;
+          cross_sell_id: string;
+          cross_sell_type?: CrossSellType;
+          name: string;
+          description?: string | null;
+          unit?: string | null;
+          price_per_unit_cents: number;
+          quantity?: number;
+          vendor_id?: string | null;
+          vendor_cost_cents?: number | null;
+          status?: "ACTIVE" | "PAUSED" | "CANCELED";
+          notes?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          client_id?: string;
+          cross_sell_id?: string;
+          cross_sell_type?: CrossSellType;
+          name?: string;
+          description?: string | null;
+          unit?: string | null;
+          price_per_unit_cents?: number;
+          quantity?: number;
+          vendor_id?: string | null;
+          vendor_cost_cents?: number | null;
+          status?: "ACTIVE" | "PAUSED" | "CANCELED";
+          notes?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
       cross_sell_vendor_links: {
         Row: {
           id: string;
