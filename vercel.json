@@ -3,6 +3,10 @@
     {
       "path": "/api/v2/cron/mark-abandoned",
       "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/v2/cron/generate-monthly-invoices",
+      "schedule": "0 6 1 * *"
     }
   ]
 }
