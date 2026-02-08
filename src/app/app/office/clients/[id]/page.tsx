@@ -1239,7 +1239,7 @@ export default function ClientDetailPage({ params }: PageProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           crossSellId: crossSell.id,
-          crossSellType: crossSell.type || "RESIDENTIAL",
+          crossSellType: "RESIDENTIAL",
           name: crossSell.name,
           description: crossSell.description || null,
           unit: crossSell.unit || null,
