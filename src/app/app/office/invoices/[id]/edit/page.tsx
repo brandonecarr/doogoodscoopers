@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, useRef, use } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, ChevronDown } from "lucide-react";
 
 interface InvoiceItem {
   id?: string;
@@ -33,6 +33,14 @@ interface Invoice {
     address?: string | null;
   } | null;
   items: InvoiceItem[];
+}
+
+interface ServiceOption {
+  label: string;
+  description: string;
+  unitPriceCents: number;
+  quantity: number;
+  category: string;
 }
 
 function formatCurrency(cents: number) {
@@ -67,9 +75,28 @@ export default function EditInvoicePage({
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [noteToClient, setNoteToClient] = useState("");
 
+  // Service options for auto-populate
+  const [serviceOptions, setServiceOptions] = useState<ServiceOption[]>([]);
+  const [openDropdownIndex, setOpenDropdownIndex] = useState<number | null>(null);
+  const dropdownRefs = useRef<(HTMLDivElement | null)[]>([]);
+
   useEffect(() => {
     fetchInvoice();
   }, [id]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (openDropdownIndex !== null) {
+        const ref = dropdownRefs.current[openDropdownIndex];
+        if (ref && !ref.contains(e.target as Node)) {
+          setOpenDropdownIndex(null);
+        }
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [openDropdownIndex]);
 
   async function fetchInvoice() {
     setLoading(true);
@@ -82,6 +109,11 @@ export default function EditInvoicePage({
         // Initialize editable state
         setItems(data.invoice.items || []);
         setNoteToClient(data.invoice.notes || "");
+
+        // Fetch client services for auto-populate
+        if (data.invoice.client?.id) {
+          fetchClientServices(data.invoice.client.id);
+        }
       } else {
         setError(data.error || "Failed to load invoice");
       }
@@ -91,6 +123,55 @@ export default function EditInvoicePage({
     } finally {
       setLoading(false);
     }
+  }
+
+  async function fetchClientServices(clientId: string) {
+    const options: ServiceOption[] = [];
+
+    try {
+      // Fetch client data (subscriptions) and cross-sells in parallel
+      const [clientRes, crossSellsRes] = await Promise.all([
+        fetch(`/api/admin/clients/${clientId}`),
+        fetch(`/api/admin/clients/${clientId}/cross-sells`),
+      ]);
+
+      if (clientRes.ok) {
+        const clientData = await clientRes.json();
+        const subscriptions = clientData.client?.subscriptions || [];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        subscriptions.forEach((sub: any) => {
+          if (sub.status === "ACTIVE") {
+            const planName = sub.plan?.name || sub.frequency || "Subscription";
+            const priceCents = sub.pricePerVisitCents || 0;
+            options.push({
+              label: `Subscription: ${planName}`,
+              description: `${planName} - ${formatCurrency(priceCents)}/visit`,
+              unitPriceCents: priceCents,
+              quantity: 1,
+              category: "Subscriptions",
+            });
+          }
+        });
+      }
+
+      if (crossSellsRes.ok) {
+        const crossSellData = await crossSellsRes.json();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (crossSellData.crossSells || []).forEach((cs: any) => {
+          options.push({
+            label: cs.name,
+            description: `${cs.name}${cs.unit ? ` (${cs.unit})` : ""} - ${formatCurrency(cs.pricePerUnitCents)}`,
+            unitPriceCents: cs.pricePerUnitCents,
+            quantity: cs.quantity || 1,
+            category: "Cross-Sells",
+          });
+        });
+      }
+    } catch (err) {
+      console.error("Error fetching client services:", err);
+    }
+
+    setServiceOptions(options);
   }
 
   function addNewItem() {
@@ -116,6 +197,19 @@ export default function EditInvoicePage({
     }
 
     setItems(updated);
+  }
+
+  function selectService(index: number, option: ServiceOption) {
+    const updated = [...items];
+    updated[index] = {
+      ...updated[index],
+      description: option.label,
+      quantity: option.quantity,
+      unit_price_cents: option.unitPriceCents,
+      total_cents: option.quantity * option.unitPriceCents,
+    };
+    setItems(updated);
+    setOpenDropdownIndex(null);
   }
 
   function removeItem(index: number) {
@@ -214,6 +308,13 @@ export default function EditInvoicePage({
     ? `${invoice.client.firstName} ${invoice.client.lastName}`.trim()
     : "Unknown Client";
 
+  // Group service options by category
+  const groupedOptions: Record<string, ServiceOption[]> = {};
+  serviceOptions.forEach((opt) => {
+    if (!groupedOptions[opt.category]) groupedOptions[opt.category] = [];
+    groupedOptions[opt.category].push(opt);
+  });
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -296,13 +397,57 @@ export default function EditInvoicePage({
             {items.map((item, index) => (
               <tr key={index}>
                 <td className="px-4 py-2">
-                  <input
-                    type="text"
-                    value={item.description}
-                    onChange={(e) => updateItem(index, "description", e.target.value)}
-                    placeholder="Item description"
-                    className="w-full px-2 py-1 border border-gray-200 rounded focus:outline-none focus:border-teal-500"
-                  />
+                  <div
+                    className="relative"
+                    ref={(el) => { dropdownRefs.current[index] = el; }}
+                  >
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={item.description}
+                        onChange={(e) => updateItem(index, "description", e.target.value)}
+                        onFocus={() => {
+                          if (serviceOptions.length > 0) setOpenDropdownIndex(index);
+                        }}
+                        placeholder="Item description"
+                        className="w-full px-2 py-1 pr-7 border border-gray-200 rounded focus:outline-none focus:border-teal-500"
+                      />
+                      {serviceOptions.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setOpenDropdownIndex(openDropdownIndex === index ? null : index)}
+                          className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5 text-gray-400 hover:text-gray-600"
+                          tabIndex={-1}
+                        >
+                          <ChevronDown className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                    {openDropdownIndex === index && serviceOptions.length > 0 && (
+                      <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                        {Object.entries(groupedOptions).map(([category, options]) => (
+                          <div key={category}>
+                            <div className="px-3 py-1.5 text-xs font-semibold text-gray-400 uppercase bg-gray-50 sticky top-0">
+                              {category}
+                            </div>
+                            {options.map((option, optIdx) => (
+                              <button
+                                key={optIdx}
+                                type="button"
+                                onClick={() => selectService(index, option)}
+                                className="w-full px-3 py-2 text-left hover:bg-teal-50 flex items-center justify-between gap-2"
+                              >
+                                <span className="text-sm text-gray-900 truncate">{option.label}</span>
+                                <span className="text-xs text-gray-500 flex-shrink-0">
+                                  {formatCurrency(option.unitPriceCents)}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </td>
                 <td className="px-4 py-2">
                   <input
