@@ -62,20 +62,40 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  // Fetch vendor links for all add-ons
+  const addOnIds = (addOns || []).map((a: { id: string }) => a.id);
+  const { data: vendorLinks } = addOnIds.length > 0
+    ? await supabase
+        .from("add_on_vendor_links")
+        .select("add_on_id, vendor:vendor_id (name)")
+        .in("add_on_id", addOnIds)
+        .eq("org_id", auth.user.orgId)
+        .eq("is_active", true)
+    : { data: [] };
+
   // Transform to camelCase for frontend
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const formattedAddOns = (addOns || []).map((addOn: any) => ({
-    id: addOn.id,
-    name: addOn.name,
-    description: addOn.description,
-    priceCents: addOn.price_cents,
-    priceType: addOn.price_type,
-    isRecurring: addOn.is_recurring,
-    isActive: addOn.is_active,
-    sortOrder: addOn.sort_order,
-    createdAt: addOn.created_at,
-    updatedAt: addOn.updated_at,
-  }));
+  const formattedAddOns = (addOns || []).map((addOn: any) => {
+    const vendors = (vendorLinks || [])
+      .filter((vl: { add_on_id: string }) => vl.add_on_id === addOn.id)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .map((vl: any) => vl.vendor?.name)
+      .filter(Boolean);
+
+    return {
+      id: addOn.id,
+      name: addOn.name,
+      description: addOn.description,
+      priceCents: addOn.price_cents,
+      priceType: addOn.price_type,
+      isRecurring: addOn.is_recurring,
+      isActive: addOn.is_active,
+      sortOrder: addOn.sort_order,
+      createdAt: addOn.created_at,
+      updatedAt: addOn.updated_at,
+      vendorNames: vendors,
+    };
+  });
 
   return NextResponse.json({ addOns: formattedAddOns });
 }

@@ -23,6 +23,10 @@ export type LeadSource = "QUOTE_FORM" | "OUT_OF_AREA" | "COMMERCIAL" | "AD_LEAD"
 export type Frequency = "TWICE_WEEKLY" | "WEEKLY" | "BIWEEKLY" | "MONTHLY" | "ONETIME";
 export type NotificationType = "ON_THE_WAY" | "DAY_AHEAD" | "COMPLETED" | "SKIPPED" | "OFF_SCHEDULE" | "PAYMENT_FAILED" | "WELCOME" | "REMARKETING_SMS" | "REMARKETING_EMAIL";
 export type Channel = "SMS" | "EMAIL";
+export type PayoutMethod = "CHECK" | "ACH" | "VENMO" | "PAYPAL" | "OTHER";
+export type CommissionType = "PERCENTAGE" | "FIXED_AMOUNT";
+export type VendorCostType = "FIXED" | "PER_VISIT";
+export type VendorPayoutStatus = "PENDING" | "PAID" | "CANCELED";
 
 export interface Database {
   public: {
@@ -701,6 +705,217 @@ export interface Database {
           completed_yards?: number;
           five_star_reviews?: number;
           computed_at?: string;
+        };
+      };
+      vendors: {
+        Row: {
+          id: string;
+          org_id: string;
+          name: string;
+          contact_name: string | null;
+          email: string | null;
+          phone: string | null;
+          website: string | null;
+          address: Json;
+          payout_method: PayoutMethod;
+          payout_details: Json;
+          commission_type: CommissionType;
+          commission_value: number;
+          notes: string | null;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          name: string;
+          contact_name?: string | null;
+          email?: string | null;
+          phone?: string | null;
+          website?: string | null;
+          address?: Json;
+          payout_method?: PayoutMethod;
+          payout_details?: Json;
+          commission_type?: CommissionType;
+          commission_value?: number;
+          notes?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          name?: string;
+          contact_name?: string | null;
+          email?: string | null;
+          phone?: string | null;
+          website?: string | null;
+          address?: Json;
+          payout_method?: PayoutMethod;
+          payout_details?: Json;
+          commission_type?: CommissionType;
+          commission_value?: number;
+          notes?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      vendor_services: {
+        Row: {
+          id: string;
+          org_id: string;
+          vendor_id: string;
+          name: string;
+          description: string | null;
+          vendor_cost_cents: number;
+          cost_type: VendorCostType;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          vendor_id: string;
+          name: string;
+          description?: string | null;
+          vendor_cost_cents: number;
+          cost_type?: VendorCostType;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          vendor_id?: string;
+          name?: string;
+          description?: string | null;
+          vendor_cost_cents?: number;
+          cost_type?: VendorCostType;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      add_on_vendor_links: {
+        Row: {
+          id: string;
+          org_id: string;
+          add_on_id: string;
+          vendor_id: string;
+          vendor_service_id: string | null;
+          vendor_cost_cents: number;
+          is_default: boolean;
+          service_area_notes: string | null;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          add_on_id: string;
+          vendor_id: string;
+          vendor_service_id?: string | null;
+          vendor_cost_cents: number;
+          is_default?: boolean;
+          service_area_notes?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          add_on_id?: string;
+          vendor_id?: string;
+          vendor_service_id?: string | null;
+          vendor_cost_cents?: number;
+          is_default?: boolean;
+          service_area_notes?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      vendor_payouts: {
+        Row: {
+          id: string;
+          org_id: string;
+          vendor_id: string;
+          amount_cents: number;
+          status: VendorPayoutStatus;
+          payout_method: string | null;
+          reference_number: string | null;
+          period_start: string;
+          period_end: string;
+          notes: string | null;
+          paid_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          vendor_id: string;
+          amount_cents: number;
+          status?: VendorPayoutStatus;
+          payout_method?: string | null;
+          reference_number?: string | null;
+          period_start: string;
+          period_end: string;
+          notes?: string | null;
+          paid_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          vendor_id?: string;
+          amount_cents?: number;
+          status?: VendorPayoutStatus;
+          payout_method?: string | null;
+          reference_number?: string | null;
+          period_start?: string;
+          period_end?: string;
+          notes?: string | null;
+          paid_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      vendor_payout_items: {
+        Row: {
+          id: string;
+          org_id: string;
+          vendor_payout_id: string;
+          job_add_on_id: string | null;
+          description: string;
+          amount_cents: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          vendor_payout_id: string;
+          job_add_on_id?: string | null;
+          description: string;
+          amount_cents: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          vendor_payout_id?: string;
+          job_add_on_id?: string | null;
+          description?: string;
+          amount_cents?: number;
+          created_at?: string;
         };
       };
     };

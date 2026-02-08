@@ -10,6 +10,7 @@ import {
   UserCog,
   Calendar,
   CreditCard,
+  Store,
   DollarSign,
   BarChart3,
   Settings,
@@ -89,6 +90,15 @@ const navigation: NavItem[] = [
       { name: "Gift Certificates", href: "/app/office/gift-cards" },
       { name: "Payouts", href: "/app/office/payouts" },
       { name: "Sales Tax Report", href: "/app/office/reports/sales-tax" },
+    ],
+  },
+  {
+    name: "Vendors",
+    icon: Store,
+    permission: "vendors:read",
+    children: [
+      { name: "Vendor List", href: "/app/office/vendors" },
+      { name: "Vendor Payouts", href: "/app/office/vendors/payouts" },
     ],
   },
   {

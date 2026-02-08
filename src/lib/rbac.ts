@@ -64,7 +64,10 @@ export type Permission =
   | "gift_certificates:write"
   // Referrals
   | "referrals:read"
-  | "referrals:write";
+  | "referrals:write"
+  // Vendor management
+  | "vendors:read"
+  | "vendors:write";
 
 // Role permission mappings
 const rolePermissions: Record<UserRole, Permission[]> = {
@@ -88,6 +91,7 @@ const rolePermissions: Record<UserRole, Permission[]> = {
     "marketing:read", "marketing:write",
     "gift_certificates:read", "gift_certificates:write",
     "referrals:read", "referrals:write",
+    "vendors:read", "vendors:write",
   ],
   MANAGER: [
     // Near-full access except critical settings
@@ -109,6 +113,7 @@ const rolePermissions: Record<UserRole, Permission[]> = {
     "marketing:read", "marketing:write",
     "gift_certificates:read", "gift_certificates:write",
     "referrals:read", "referrals:write",
+    "vendors:read", "vendors:write",
   ],
   OFFICE: [
     // Office operations
@@ -128,6 +133,7 @@ const rolePermissions: Record<UserRole, Permission[]> = {
     "reports:read",
     "gift_certificates:read", "gift_certificates:write",
     "referrals:read", "referrals:write",
+    "vendors:read",
   ],
   CREW_LEAD: [
     // Field operations with some management
@@ -158,6 +164,7 @@ const rolePermissions: Record<UserRole, Permission[]> = {
     "pricing:read",
     "reports:read", "reports:export",
     "gift_certificates:read",
+    "vendors:read",
   ],
   CLIENT: [
     // Self-service only (client portal)

@@ -25,6 +25,7 @@ interface AddOn {
   isActive: boolean;
   sortOrder: number;
   subscriptionCount?: number;
+  vendorNames?: string[];
 }
 
 export default function AddOnsPage() {
@@ -302,6 +303,11 @@ export default function AddOnsPage() {
                         Inactive
                       </span>
                     )}
+                    {addOn.vendorNames && addOn.vendorNames.length > 0 && addOn.vendorNames.map((vn) => (
+                      <span key={vn} className="px-2 py-0.5 text-xs font-medium bg-teal-100 text-teal-700 rounded-full">
+                        {vn}
+                      </span>
+                    ))}
                   </div>
                   {addOn.description && (
                     <p className="text-sm text-gray-500 truncate">{addOn.description}</p>
