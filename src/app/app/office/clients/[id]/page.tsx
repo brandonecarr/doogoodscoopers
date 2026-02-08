@@ -109,6 +109,11 @@ interface VendorOption {
   name: string;
 }
 
+interface CrossSellVendorLink {
+  vendorId: string;
+  vendorCostCents: number;
+}
+
 interface Subscription {
   id: string;
   status: string;
@@ -550,6 +555,7 @@ export default function ClientDetailPage({ params }: PageProps) {
   const [savingVendorAssign, setSavingVendorAssign] = useState(false);
   const [vendorOptions, setVendorOptions] = useState<VendorOption[]>([]);
   const [loadingVendors, setLoadingVendors] = useState(false);
+  const [crossSellVendorLinks, setCrossSellVendorLinks] = useState<CrossSellVendorLink[]>([]);
 
   const resetSubscriptionForm = () => {
     setSubscriptionForm({
@@ -1319,7 +1325,7 @@ export default function ClientDetailPage({ params }: PageProps) {
     }
   };
 
-  const openAssignVendor = (cs: ClientCrossSell) => {
+  const openAssignVendor = async (cs: ClientCrossSell) => {
     setAssignVendorTarget(cs);
     setAssignVendorForm({
       vendorId: cs.vendorId || "",
@@ -1328,6 +1334,20 @@ export default function ClientDetailPage({ params }: PageProps) {
     setShowAssignVendorModal(true);
     if (vendorOptions.length === 0) {
       fetchVendors();
+    }
+    // Fetch vendor links for this cross-sell to auto-fill cost
+    try {
+      const res = await fetch(`/api/admin/cross-sell-vendor-links?crossSellId=${cs.crossSellId}&active=true`);
+      if (res.ok) {
+        const data = await res.json();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setCrossSellVendorLinks((data.links || []).map((l: any) => ({
+          vendorId: l.vendorId,
+          vendorCostCents: l.vendorCostCents,
+        })));
+      }
+    } catch (err) {
+      console.error("Error fetching cross-sell vendor links:", err);
     }
   };
 
@@ -3407,7 +3427,14 @@ export default function ClientDetailPage({ params }: PageProps) {
                   </label>
                   <select
                     value={assignVendorForm.vendorId}
-                    onChange={(e) => setAssignVendorForm({ ...assignVendorForm, vendorId: e.target.value })}
+                    onChange={(e) => {
+                      const selectedVendorId = e.target.value;
+                      const link = crossSellVendorLinks.find((l) => l.vendorId === selectedVendorId);
+                      setAssignVendorForm({
+                        vendorId: selectedVendorId,
+                        vendorCostCents: link ? String(link.vendorCostCents / 100) : "",
+                      });
+                    }}
                     className="w-full px-3 py-2 border-b border-gray-300 focus:border-teal-500 focus:ring-0 text-sm bg-white"
                     disabled={loadingVendors}
                   >
