@@ -251,6 +251,19 @@ model AdLead {
 }
 
 // =====================
+// ADMIN PUSH SUBSCRIPTIONS
+// =====================
+// Web Push subscriptions for admin followup notifications
+model AdminPushSubscription {
+  id        String   @id @default(cuid())
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// =====================
 // ADMIN USERS
 // =====================
 model AdminUser {

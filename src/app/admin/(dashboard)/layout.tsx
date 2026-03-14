@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { AdminHeader } from "@/components/admin/AdminHeader";
+import { AdminPushProvider } from "@/components/admin/AdminPushProvider";
 
 export default async function AdminDashboardLayout({
   children,
@@ -16,6 +17,7 @@ export default async function AdminDashboardLayout({
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <AdminPushProvider />
       <AdminSidebar />
       <div className="lg:pl-64">
         <AdminHeader email={session.email} />
