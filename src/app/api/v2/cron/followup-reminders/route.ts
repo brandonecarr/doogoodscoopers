@@ -11,6 +11,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { type LeadStatus } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { sendAdminPush } from "@/lib/web-push";
 
@@ -54,14 +55,14 @@ export async function GET(req: NextRequest) {
   const overdueFilter = {
     followupDate: { lt: now },
     archived: false,
-    status: { notIn: ["CONVERTED", "LOST"] as const },
+    status: { notIn: ["CONVERTED", "LOST"] as LeadStatus[] },
   };
 
   // Due soon filter
   const dueSoonFilter = {
     followupDate: { gte: windowStart, lte: windowEnd },
     archived: false,
-    status: { notIn: ["CONVERTED", "LOST"] as const },
+    status: { notIn: ["CONVERTED", "LOST"] as LeadStatus[] },
   };
 
   const [
@@ -81,7 +82,7 @@ export async function GET(req: NextRequest) {
       where: {
         followupDate: dueSoonFilter.followupDate,
         archived: false,
-        status: { notIn: ["CONVERTED", "LOST"] as const },
+        status: { notIn: ["CONVERTED", "LOST"] as LeadStatus[] },
       },
       select: { id: true, contactName: true },
     }),
@@ -89,7 +90,7 @@ export async function GET(req: NextRequest) {
       where: {
         followupDate: overdueFilter.followupDate,
         archived: false,
-        status: { notIn: ["CONVERTED", "LOST"] as const },
+        status: { notIn: ["CONVERTED", "LOST"] as LeadStatus[] },
       },
       select: { id: true, contactName: true },
     }),
