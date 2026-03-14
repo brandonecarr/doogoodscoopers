@@ -85,7 +85,6 @@ export function AdminPushProvider() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ endpoint: json.endpoint, keys: json.keys }),
     });
-    setShowBanner(false);
   }
 
   // Called by the button — runs inside a user gesture so iOS will show the prompt
@@ -94,13 +93,15 @@ export function AdminPushProvider() {
     setSubscribing(true);
     try {
       const permission = await Notification.requestPermission();
+      // Hide the banner as soon as the user responds to the prompt,
+      // regardless of whether the subscription step succeeds.
+      setShowBanner(false);
       if (permission === "granted") {
         await doSubscribe(reg);
-      } else {
-        setShowBanner(false); // denied — hide button
       }
     } catch (err) {
       console.error("[AdminPush] Permission request failed:", err);
+      setShowBanner(false);
     } finally {
       setSubscribing(false);
     }
