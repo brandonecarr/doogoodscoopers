@@ -31,10 +31,10 @@ const LEAD_TYPE_PATHS: Record<string, string> = {
   adlead: "/admin/ad-leads",
 };
 
-type LeadRow = { id: string; firstName: string; lastName?: string | null };
+type LeadRow = { id: string; firstName?: string | null; lastName?: string | null };
 
 function fullName(lead: LeadRow): string {
-  return [lead.firstName, lead.lastName].filter(Boolean).join(" ");
+  return [lead.firstName, lead.lastName].filter(Boolean).join(" ") || "Unknown";
 }
 
 export async function GET(req: NextRequest) {
