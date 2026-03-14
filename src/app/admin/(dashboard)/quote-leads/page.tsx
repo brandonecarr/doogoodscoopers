@@ -119,29 +119,29 @@ export default function QuoteLeadsPage() {
           </h1>
           <p className="text-navy-600 mt-1">{total} {showArchived ? "archived" : "active"} leads</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           {!showArchived && (
             <Link
               href="/admin/quote-leads/new"
-              className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors text-sm font-medium"
             >
-              <Plus className="w-4 h-4" />
-              Add New
+              <Plus className="w-4 h-4 flex-shrink-0" />
+              <span>Add New</span>
             </Link>
           )}
           <Link
             href={showArchived ? "/admin/quote-leads" : "/admin/quote-leads?archived=true"}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors text-sm font-medium ${
               showArchived
                 ? "bg-teal-600 text-white hover:bg-teal-700"
                 : "bg-gray-100 text-gray-700 hover:bg-gray-200"
             }`}
           >
-            <Archive className="w-4 h-4" />
-            {showArchived ? "View Active" : "View Archived"}
+            <Archive className="w-4 h-4 flex-shrink-0" />
+            <span>{showArchived ? "Active" : "Archived"}</span>
           </Link>
-          <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center">
-            <FileText className="w-6 h-6 text-blue-600" />
+          <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
+            <FileText className="w-5 h-5 text-blue-600" />
           </div>
         </div>
       </div>
