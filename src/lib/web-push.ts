@@ -1,12 +1,6 @@
 import webPush from "web-push";
 import prisma from "@/lib/prisma";
 
-webPush.setVapidDetails(
-  "mailto:service@doogoodscoopers.com",
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!
-);
-
 export interface PushPayload {
   title: string;
   body: string;
@@ -20,6 +14,14 @@ export interface PushPayload {
  * Automatically removes expired/invalid subscriptions (HTTP 410/404).
  */
 export async function sendAdminPush(payload: PushPayload) {
+  // Initialize lazily so env vars are read at runtime, not build time
+  const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+  const privateKey = process.env.VAPID_PRIVATE_KEY;
+  if (!publicKey || !privateKey) {
+    console.warn("[web-push] VAPID keys not configured — skipping push");
+    return { sent: 0, failed: 0 };
+  }
+  webPush.setVapidDetails("mailto:service@doogoodscoopers.com", publicKey, privateKey);
   const subs = await prisma.adminPushSubscription.findMany();
 
   if (subs.length === 0) return { sent: 0, failed: 0 };
