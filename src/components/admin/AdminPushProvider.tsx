@@ -2,17 +2,6 @@
 
 import { useEffect } from "react";
 
-function urlBase64ToUint8Array(base64String: string): Uint8Array {
-  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
-  const rawData = atob(base64);
-  const output = new Uint8Array(rawData.length);
-  for (let i = 0; i < rawData.length; i++) {
-    output[i] = rawData.charCodeAt(i);
-  }
-  return output;
-}
-
 export function AdminPushProvider() {
   useEffect(() => {
     if (
@@ -42,10 +31,11 @@ export function AdminPushProvider() {
         const permission = await Notification.requestPermission();
         if (permission !== "granted") return;
 
-        // Subscribe
+        // Subscribe — pass VAPID key as a string; the browser accepts
+        // both base64url strings and BufferSource for applicationServerKey
         const subscription = await reg.pushManager.subscribe({
           userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(vapidKey!),
+          applicationServerKey: vapidKey as string,
         });
 
         // Save to server
