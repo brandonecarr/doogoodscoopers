@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
+import { sendAdminPush } from "@/lib/web-push";
 
 // Zapier Webhook endpoint to receive leads from Facebook Lead Ads
 //
@@ -126,6 +127,14 @@ export async function POST(request: NextRequest) {
     });
 
     console.log(`[Zapier Webhook] New lead created: ${lead.id} - ${fullName || email || phone}`);
+
+    // Fire-and-forget push notification — don't let push failure block the response
+    sendAdminPush({
+      title: "📣 New Ad Lead",
+      body: `${fullName || phone || email || "Unknown"} — ${campaignName || "Meta Ad"}`,
+      url: `/admin/ad-leads/${lead.id}`,
+      tag: `ad-lead-${lead.id}`,
+    }).catch((err) => console.error("[Zapier Webhook] Push notification failed:", err));
 
     return NextResponse.json({
       success: true,
