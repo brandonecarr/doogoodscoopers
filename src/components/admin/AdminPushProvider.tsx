@@ -34,7 +34,14 @@ export function AdminPushProvider() {
         const existing = await registration.pushManager.getSubscription();
 
         if (existing) {
-          // Already subscribed — ensure server has it saved
+          // Already subscribed in browser — always sync to server in case the
+          // DB record is missing (e.g. first enable failed, or table was recreated)
+          const json = existing.toJSON();
+          await fetch("/api/admin/push/subscribe", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ endpoint: json.endpoint, keys: json.keys }),
+          });
           return;
         }
 
