@@ -253,15 +253,15 @@ export default async function AdLeadDetailPage({ params }: PageProps) {
                   Send Email
                 </a>
               )}
-              <a
-                href={`https://doogoodscoopers.com/sng/doogoodscoopers-obc2w-client-onboarding/${typedLead.zipCode ? `?zip_code=${encodeURIComponent(typedLead.zipCode)}` : ""}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-navy-600 text-white rounded-lg hover:bg-navy-700 transition-colors"
-              >
-                <ClipboardList className="w-4 h-4" />
-                Send Onboarding
-              </a>
+              {typedLead.phone && (
+                <a
+                  href={`sms:${typedLead.phone}&body=${encodeURIComponent(`https://doogoodscoopers.com/sng/doogoodscoopers-obc2w-client-onboarding/${typedLead.zipCode ? `?zip_code=${typedLead.zipCode}` : ""}`)}`}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-navy-600 text-white rounded-lg hover:bg-navy-700 transition-colors"
+                >
+                  <ClipboardList className="w-4 h-4" />
+                  Send Onboarding
+                </a>
+              )}
             </div>
           </div>
         </div>
