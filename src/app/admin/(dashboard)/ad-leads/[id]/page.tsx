@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Megaphone, Mail, Phone, MapPin, Calendar, Tag } from "lucide-react";
+import { ArrowLeft, Megaphone, Mail, Phone, MapPin, Calendar, Tag, ClipboardList } from "lucide-react";
 import prisma from "@/lib/prisma";
 import StatusUpdateForm from "@/components/admin/StatusUpdateForm";
 import type { AdLead } from "@/types/leads";
@@ -253,6 +253,15 @@ export default async function AdLeadDetailPage({ params }: PageProps) {
                   Send Email
                 </a>
               )}
+              <a
+                href={`https://doogoodscoopers.com/sng/doogoodscoopers-obc2w-client-onboarding/${typedLead.zipCode ? `?zip_code=${encodeURIComponent(typedLead.zipCode)}` : ""}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-navy-600 text-white rounded-lg hover:bg-navy-700 transition-colors"
+              >
+                <ClipboardList className="w-4 h-4" />
+                Send Onboarding
+              </a>
             </div>
           </div>
         </div>
