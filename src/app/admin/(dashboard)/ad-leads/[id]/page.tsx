@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Megaphone, Mail, Phone, MapPin, Calendar, Tag, ClipboardList } from "lucide-react";
 import prisma from "@/lib/prisma";
 import StatusUpdateForm from "@/components/admin/StatusUpdateForm";
+import { LeadUpdates } from "@/components/admin/LeadUpdates";
 import type { AdLead } from "@/types/leads";
 
 interface PageProps {
@@ -36,15 +37,29 @@ function getDisplayName(lead: AdLead) {
   return "Unknown";
 }
 
+async function getLeadUpdates(leadId: string) {
+  return prisma.leadUpdate.findMany({
+    where: { leadId, leadType: "AD_LEAD" },
+    orderBy: { createdAt: "desc" },
+  });
+}
+
 export default async function AdLeadDetailPage({ params }: PageProps) {
   const { id } = await params;
-  const lead = await getAdLead(id);
+  const [lead, updates] = await Promise.all([getAdLead(id), getLeadUpdates(id)]);
 
   if (!lead) {
     notFound();
   }
 
   const typedLead = lead as AdLead;
+  const typedUpdates = updates.map((u) => ({
+    id: u.id,
+    createdAt: u.createdAt.toISOString(),
+    message: u.message || "",
+    communicationType: u.communicationType || "",
+    adminEmail: u.adminEmail || "",
+  }));
 
   return (
     <div className="space-y-6 pb-20 lg:pb-0">
@@ -212,6 +227,13 @@ export default async function AdLeadDetailPage({ params }: PageProps) {
               </pre>
             </details>
           ) : null}
+
+          {/* Updates */}
+          <LeadUpdates
+            leadId={typedLead.id}
+            leadType="adlead"
+            updates={typedUpdates}
+          />
         </div>
 
         {/* Sidebar */}
