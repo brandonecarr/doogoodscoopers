@@ -228,7 +228,7 @@ export async function GET(request: NextRequest) {
                 org_id: org.id,
                 client_id: clientId,
                 invoice_number: invoiceNumber,
-                status: "DRAFT",
+                status: "OPEN",
                 subtotal_cents: subtotalCents,
                 tax_cents: 0,
                 discount_cents: 0,

@@ -28,7 +28,7 @@ export async function POST(request: Request) {
 
     // Validate status if provided
     if (status) {
-      const validStatuses: LeadStatus[] = ["NEW", "CONTACTED", "QUALIFIED", "CONVERTED", "LOST"];
+      const validStatuses: LeadStatus[] = ["NEW", "CONTACTED", "NO_ANSWER", "NOT_INTERESTED", "WAITING_FOR_SIGNUP", "CONVERTED"];
       if (!validStatuses.includes(status)) {
         return NextResponse.json(
           { success: false, message: "Invalid status" },

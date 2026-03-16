@@ -1,0 +1,677 @@
+{
+  "version": "0.4",
+  "title": "Get a Quote",
+  "type": "page",
+  "content": [
+    {
+      "id": "00000008",
+      "elType": "section",
+      "isInner": false,
+      "settings": {
+        "stretch_section": "section-stretched",
+        "background_background": "gradient",
+        "background_color": "#f0fafa",
+        "background_color_b": "#ffffff",
+        "background_gradient_type": "linear",
+        "background_gradient_angle": {
+          "unit": "deg",
+          "size": 180
+        },
+        "padding": {
+          "unit": "px",
+          "top": "80",
+          "right": "20",
+          "bottom": "80",
+          "left": "20",
+          "isLinked": false
+        }
+      },
+      "elements": [
+        {
+          "id": "00000007",
+          "elType": "column",
+          "settings": {
+            "_column_size": 100,
+            "_inline_size": null
+          },
+          "elements": [
+            {
+              "id": "00000001",
+              "elType": "widget",
+              "widgetType": "html",
+              "settings": {
+                "html": "<div style=\"text-align:center;\"><span style=\"display:inline-block;background:#5ab3a9;color:#fff;padding:6px 20px;border-radius:9999px;font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;font-family:Montserrat,sans-serif;\">No Obligation — 100% Free</span></div>"
+              }
+            },
+            {
+              "id": "00000002",
+              "elType": "widget",
+              "widgetType": "spacer",
+              "settings": {
+                "space": {
+                  "unit": "px",
+                  "size": 12
+                }
+              }
+            },
+            {
+              "id": "00000003",
+              "elType": "widget",
+              "widgetType": "heading",
+              "settings": {
+                "title": "Get Your Free Quote",
+                "header_size": "h1",
+                "align": "center",
+                "title_color": "#002842",
+                "typography_typography": "custom",
+                "typography_font_family": "Bebas Neue",
+                "typography_font_size": {
+                  "unit": "px",
+                  "size": 56
+                },
+                "typography_font_weight": "400",
+                "typography_letter_spacing": {
+                  "unit": "px",
+                  "size": 2
+                },
+                "typography_line_height": {
+                  "unit": "em",
+                  "size": 1
+                }
+              }
+            },
+            {
+              "id": "00000004",
+              "elType": "widget",
+              "widgetType": "spacer",
+              "settings": {
+                "space": {
+                  "unit": "px",
+                  "size": 8
+                }
+              }
+            },
+            {
+              "id": "00000005",
+              "elType": "widget",
+              "widgetType": "text-editor",
+              "settings": {
+                "editor": "<p style=\"color:#4b5563;font-size:17px;\">Tell us about your yard and dogs. Instant, transparent price — no hidden fees.</p>",
+                "align": "center"
+              }
+            },
+            {
+              "id": "00000006",
+              "elType": "widget",
+              "widgetType": "spacer",
+              "settings": {
+                "space": {
+                  "unit": "px",
+                  "size": 10
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "00000020",
+      "elType": "section",
+      "isInner": false,
+      "settings": {
+        "stretch_section": "section-stretched",
+        "background_background": "classic",
+        "background_color": "#f9fafb",
+        "padding": {
+          "unit": "px",
+          "top": "50",
+          "right": "20",
+          "bottom": "50",
+          "left": "20",
+          "isLinked": false
+        }
+      },
+      "elements": [
+        {
+          "id": "0000000d",
+          "elType": "column",
+          "settings": {
+            "_column_size": 34,
+            "_inline_size": null
+          },
+          "elements": [
+            {
+              "id": "00000009",
+              "elType": "widget",
+              "widgetType": "heading",
+              "settings": {
+                "title": "Why Choose Us?",
+                "header_size": "h3",
+                "align": "center",
+                "title_color": "#002842"
+              }
+            },
+            {
+              "id": "0000000a",
+              "elType": "widget",
+              "widgetType": "spacer",
+              "settings": {
+                "space": {
+                  "unit": "px",
+                  "size": 6
+                }
+              }
+            },
+            {
+              "id": "0000000b",
+              "elType": "widget",
+              "widgetType": "text-editor",
+              "settings": {
+                "editor": "<p style=\"color:#4b5563;\">Local, family-owned, 5.0 stars on Google. We show up on time and treat every yard as our own.</p>",
+                "align": "center"
+              }
+            },
+            {
+              "id": "0000000c",
+              "elType": "widget",
+              "widgetType": "spacer",
+              "settings": {
+                "space": {
+                  "unit": "px",
+                  "size": 10
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "00000015",
+          "elType": "column",
+          "settings": {
+            "_column_size": 33,
+            "_inline_size": null
+          },
+          "elements": [
+            {
+              "id": "0000000e",
+              "elType": "widget",
+              "widgetType": "heading",
+              "settings": {
+                "title": "What You Get",
+                "header_size": "h3",
+                "align": "center",
+                "title_color": "#002842"
+              }
+            },
+            {
+              "id": "0000000f",
+              "elType": "widget",
+              "widgetType": "spacer",
+              "settings": {
+                "space": {
+                  "unit": "px",
+                  "size": 6
+                }
+              }
+            },
+            {
+              "id": "00000013",
+              "elType": "widget",
+              "widgetType": "icon-list",
+              "settings": {
+                "icon_list": [
+                  {
+                    "_id": "00000010",
+                    "text": "Quote in 2 minutes",
+                    "icon": {
+                      "value": "fa fa-check",
+                      "library": "fa-solid"
+                    }
+                  },
+                  {
+                    "_id": "00000011",
+                    "text": "Zero pressure",
+                    "icon": {
+                      "value": "fa fa-check",
+                      "library": "fa-solid"
+                    }
+                  },
+                  {
+                    "_id": "00000012",
+                    "text": "25% off first month",
+                    "icon": {
+                      "value": "fa fa-check",
+                      "library": "fa-solid"
+                    }
+                  }
+                ],
+                "icon_color": "#5ab3a9",
+                "text_color": "#002842",
+                "text_indent": {
+                  "unit": "px",
+                  "size": 8
+                },
+                "icon_size": {
+                  "unit": "px",
+                  "size": 14
+                }
+              }
+            },
+            {
+              "id": "00000014",
+              "elType": "widget",
+              "widgetType": "spacer",
+              "settings": {
+                "space": {
+                  "unit": "px",
+                  "size": 10
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "0000001f",
+          "elType": "column",
+          "settings": {
+            "_column_size": 33,
+            "_inline_size": null
+          },
+          "elements": [
+            {
+              "id": "00000016",
+              "elType": "widget",
+              "widgetType": "heading",
+              "settings": {
+                "title": "What's Included",
+                "header_size": "h3",
+                "align": "center",
+                "title_color": "#002842"
+              }
+            },
+            {
+              "id": "00000017",
+              "elType": "widget",
+              "widgetType": "spacer",
+              "settings": {
+                "space": {
+                  "unit": "px",
+                  "size": 6
+                }
+              }
+            },
+            {
+              "id": "0000001d",
+              "elType": "widget",
+              "widgetType": "icon-list",
+              "settings": {
+                "icon_list": [
+                  {
+                    "_id": "00000018",
+                    "text": "Full yard inspection",
+                    "icon": {
+                      "value": "fa fa-check",
+                      "library": "fa-solid"
+                    }
+                  },
+                  {
+                    "_id": "00000019",
+                    "text": "Complete waste removal",
+                    "icon": {
+                      "value": "fa fa-check",
+                      "library": "fa-solid"
+                    }
+                  },
+                  {
+                    "_id": "0000001a",
+                    "text": "Tool disinfection",
+                    "icon": {
+                      "value": "fa fa-check",
+                      "library": "fa-solid"
+                    }
+                  },
+                  {
+                    "_id": "0000001b",
+                    "text": "Flexible scheduling",
+                    "icon": {
+                      "value": "fa fa-check",
+                      "library": "fa-solid"
+                    }
+                  },
+                  {
+                    "_id": "0000001c",
+                    "text": "Satisfaction guarantee",
+                    "icon": {
+                      "value": "fa fa-check",
+                      "library": "fa-solid"
+                    }
+                  }
+                ],
+                "icon_color": "#5ab3a9",
+                "text_color": "#002842",
+                "text_indent": {
+                  "unit": "px",
+                  "size": 8
+                },
+                "icon_size": {
+                  "unit": "px",
+                  "size": 14
+                }
+              }
+            },
+            {
+              "id": "0000001e",
+              "elType": "widget",
+              "widgetType": "spacer",
+              "settings": {
+                "space": {
+                  "unit": "px",
+                  "size": 10
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "00000024",
+      "elType": "section",
+      "isInner": false,
+      "settings": {
+        "stretch_section": "section-stretched",
+        "background_background": "classic",
+        "background_color": "#ffffff",
+        "padding": {
+          "unit": "px",
+          "top": "60",
+          "right": "20",
+          "bottom": "60",
+          "left": "20",
+          "isLinked": false
+        }
+      },
+      "elements": [
+        {
+          "id": "00000023",
+          "elType": "column",
+          "settings": {
+            "_column_size": 100,
+            "_inline_size": null
+          },
+          "elements": [
+            {
+              "id": "00000021",
+              "elType": "widget",
+              "widgetType": "html",
+              "settings": {
+                "html": "<div style=\"background:#fff;border-radius:20px;padding:48px;max-width:760px;margin:0 auto;box-shadow:0 8px 40px rgba(0,40,66,0.1);font-family:Montserrat,sans-serif;\">\n      <h2 style=\"font-size:26px;font-weight:700;color:#002842;text-align:center;margin:0 0 6px;\">Request Your Free Quote</h2>\n      <p style=\"font-size:14px;color:#4b5563;text-align:center;margin:0 0 28px;\">Fill out the form — we'll get back to you within minutes.</p>\n      <div style=\"background:#f0fafa;border:2px dashed #9CD5CF;border-radius:12px;padding:40px;text-align:center;color:#3b7872;font-weight:600;font-size:15px;\">\n        📋 Place your Quote Form widget here<br>\n        <span style=\"font-size:13px;font-weight:400;color:#4b5563;\">(Drag in an Elementor Form widget, or paste a WPForms / CF7 shortcode)</span>\n      </div>\n    </div>"
+              }
+            },
+            {
+              "id": "00000022",
+              "elType": "widget",
+              "widgetType": "spacer",
+              "settings": {
+                "space": {
+                  "unit": "px",
+                  "size": 20
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "00000037",
+      "elType": "section",
+      "isInner": false,
+      "settings": {
+        "stretch_section": "section-stretched",
+        "background_background": "gradient",
+        "background_color": "#002842",
+        "background_color_b": "#001a2e",
+        "background_gradient_type": "linear",
+        "background_gradient_angle": {
+          "unit": "deg",
+          "size": 180
+        },
+        "padding": {
+          "unit": "px",
+          "top": "60",
+          "right": "20",
+          "bottom": "60",
+          "left": "20",
+          "isLinked": false
+        }
+      },
+      "elements": [
+        {
+          "id": "0000002a",
+          "elType": "column",
+          "settings": {
+            "_column_size": 30,
+            "_inline_size": null
+          },
+          "elements": [
+            {
+              "id": "00000025",
+              "elType": "widget",
+              "widgetType": "image",
+              "settings": {
+                "image": {
+                  "url": "https://doogoodscoopers.com/logo-dark.webp",
+                  "id": "",
+                  "alt": "DooGoodScoopers"
+                },
+                "image_size": "full",
+                "align": "left",
+                "caption_source": "none"
+              }
+            },
+            {
+              "id": "00000026",
+              "elType": "widget",
+              "widgetType": "spacer",
+              "settings": {
+                "space": {
+                  "unit": "px",
+                  "size": 12
+                }
+              }
+            },
+            {
+              "id": "00000027",
+              "elType": "widget",
+              "widgetType": "text-editor",
+              "settings": {
+                "editor": "<p style=\"color:rgba(255,255,255,0.7);font-size:14px;text-align:left;\">Professional dog waste removal service serving the Inland Empire. Take back control of your lawn with our reliable service.</p>",
+                "align": "left"
+              }
+            },
+            {
+              "id": "00000028",
+              "elType": "widget",
+              "widgetType": "spacer",
+              "settings": {
+                "space": {
+                  "unit": "px",
+                  "size": 12
+                }
+              }
+            },
+            {
+              "id": "00000029",
+              "elType": "widget",
+              "widgetType": "html",
+              "settings": {
+                "html": "<div style=\"display:flex;gap:12px;\">\n      <a href=\"#\" style=\"display:inline-flex;width:36px;height:36px;background:rgba(255,255,255,0.1);border-radius:50%;align-items:center;justify-content:center;color:#fff;text-decoration:none;font-size:16px;\">f</a>\n      <a href=\"#\" style=\"display:inline-flex;width:36px;height:36px;background:rgba(255,255,255,0.1);border-radius:50%;align-items:center;justify-content:center;color:#fff;text-decoration:none;font-size:16px;\">in</a>\n    </div>"
+              }
+            }
+          ]
+        },
+        {
+          "id": "0000002e",
+          "elType": "column",
+          "settings": {
+            "_column_size": 20,
+            "_inline_size": null
+          },
+          "elements": [
+            {
+              "id": "0000002b",
+              "elType": "widget",
+              "widgetType": "heading",
+              "settings": {
+                "title": "Quick Links",
+                "header_size": "h4",
+                "align": "left",
+                "title_color": "#9CD5CF"
+              }
+            },
+            {
+              "id": "0000002c",
+              "elType": "widget",
+              "widgetType": "spacer",
+              "settings": {
+                "space": {
+                  "unit": "px",
+                  "size": 10
+                }
+              }
+            },
+            {
+              "id": "0000002d",
+              "elType": "widget",
+              "widgetType": "html",
+              "settings": {
+                "html": "<ul style=\"list-style:none;padding:0;margin:0;font-family:Montserrat,sans-serif;\">\n      <li style=\"margin-bottom:8px;\"><a href=\"/residential-services\" style=\"color:rgba(255,255,255,0.75);text-decoration:none;font-size:14px;\">Residential</a></li><li style=\"margin-bottom:8px;\"><a href=\"/commercial-services\" style=\"color:rgba(255,255,255,0.75);text-decoration:none;font-size:14px;\">Commercial</a></li><li style=\"margin-bottom:8px;\"><a href=\"/about-doogoodscoopers\" style=\"color:rgba(255,255,255,0.75);text-decoration:none;font-size:14px;\">About</a></li><li style=\"margin-bottom:8px;\"><a href=\"/quote\" style=\"color:rgba(255,255,255,0.75);text-decoration:none;font-size:14px;\">Get a Quote</a></li><li style=\"margin-bottom:8px;\"><a href=\"/faq\" style=\"color:rgba(255,255,255,0.75);text-decoration:none;font-size:14px;\">FAQ</a></li><li style=\"margin-bottom:8px;\"><a href=\"/careers\" style=\"color:rgba(255,255,255,0.75);text-decoration:none;font-size:14px;\">Careers</a></li>\n    </ul>"
+              }
+            }
+          ]
+        },
+        {
+          "id": "00000032",
+          "elType": "column",
+          "settings": {
+            "_column_size": 25,
+            "_inline_size": null
+          },
+          "elements": [
+            {
+              "id": "0000002f",
+              "elType": "widget",
+              "widgetType": "heading",
+              "settings": {
+                "title": "Contact Us",
+                "header_size": "h4",
+                "align": "left",
+                "title_color": "#9CD5CF"
+              }
+            },
+            {
+              "id": "00000030",
+              "elType": "widget",
+              "widgetType": "spacer",
+              "settings": {
+                "space": {
+                  "unit": "px",
+                  "size": 10
+                }
+              }
+            },
+            {
+              "id": "00000031",
+              "elType": "widget",
+              "widgetType": "html",
+              "settings": {
+                "html": "<div style=\"font-family:Montserrat,sans-serif;font-size:14px;color:rgba(255,255,255,0.75);line-height:2;\">\n      <div>📞 <a href=\"tel:9093663744\" style=\"color:rgba(255,255,255,0.75);text-decoration:none;\">(909) 366-3744</a></div>\n      <div>✉️ <a href=\"mailto:service@doogoodscoopers.com\" style=\"color:rgba(255,255,255,0.75);text-decoration:none;\">service@doogoodscoopers.com</a></div>\n      <div>📍 11799 Sebastian Way, Suite 103<br>&nbsp;&nbsp;&nbsp;&nbsp;Rancho Cucamonga, CA 91730</div>\n      <div>🕐 Mon–Fri: 7:30 AM – 6:00 PM<br>&nbsp;&nbsp;&nbsp;&nbsp;Sat–Sun: 9:00 AM – 5:00 PM</div>\n    </div>"
+              }
+            }
+          ]
+        },
+        {
+          "id": "00000036",
+          "elType": "column",
+          "settings": {
+            "_column_size": 25,
+            "_inline_size": null
+          },
+          "elements": [
+            {
+              "id": "00000033",
+              "elType": "widget",
+              "widgetType": "heading",
+              "settings": {
+                "title": "Service Areas",
+                "header_size": "h4",
+                "align": "left",
+                "title_color": "#9CD5CF"
+              }
+            },
+            {
+              "id": "00000034",
+              "elType": "widget",
+              "widgetType": "spacer",
+              "settings": {
+                "space": {
+                  "unit": "px",
+                  "size": 10
+                }
+              }
+            },
+            {
+              "id": "00000035",
+              "elType": "widget",
+              "widgetType": "html",
+              "settings": {
+                "html": "<div style=\"font-family:Montserrat,sans-serif;font-size:14px;color:rgba(255,255,255,0.75);line-height:1.9;\">\n      <div>Fontana</div><div>Rancho Cucamonga</div><div>Ontario</div><div>Upland</div><div>Claremont</div><div>Montclair</div><div>Pomona</div><div>Chino</div><div>Chino Hills</div><div>Diamond Bar</div>\n      <div style=\"color:#7ac4bc;font-weight:600;margin-top:4px;\">+10 more</div>\n      <div style=\"margin-top:8px;font-size:13px;color:rgba(255,255,255,0.5);\">Serving 90+ zip codes throughout the Inland Empire</div>\n    </div>"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0000003a",
+      "elType": "section",
+      "isInner": false,
+      "settings": {
+        "stretch_section": "section-stretched",
+        "background_background": "classic",
+        "background_color": "#001a2e",
+        "padding": {
+          "unit": "px",
+          "top": "16",
+          "right": "20",
+          "bottom": "16",
+          "left": "20",
+          "isLinked": false
+        }
+      },
+      "elements": [
+        {
+          "id": "00000039",
+          "elType": "column",
+          "settings": {
+            "_column_size": 100,
+            "_inline_size": null
+          },
+          "elements": [
+            {
+              "id": "00000038",
+              "elType": "widget",
+              "widgetType": "html",
+              "settings": {
+                "html": "<div style=\"display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;font-family:Montserrat,sans-serif;font-size:13px;color:rgba(255,255,255,0.5);\">\n    <span>© 2026 DooGoodScoopers. All rights reserved.</span>\n    <span><a href=\"/privacy-policy\" style=\"color:rgba(255,255,255,0.5);text-decoration:none;margin-right:16px;\">Privacy Policy</a><a href=\"/terms-of-service\" style=\"color:rgba(255,255,255,0.5);text-decoration:none;\">Terms of Service</a></span>\n  </div>"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "page_settings": {}
+}

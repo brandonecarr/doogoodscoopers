@@ -1,0 +1,1358 @@
+{
+  "version": "0.4",
+  "title": "About",
+  "type": "page",
+  "content": [
+    {
+      "id": "0000000a",
+      "elType": "section",
+      "isInner": false,
+      "settings": {
+        "stretch_section": "section-stretched",
+        "background_background": "gradient",
+        "background_color": "#f0fafa",
+        "background_color_b": "#ffffff",
+        "background_gradient_type": "linear",
+        "background_gradient_angle": {
+          "unit": "deg",
+          "size": 180
+        },
+        "padding": {
+          "unit": "px",
+          "top": "100",
+          "right": "20",
+          "bottom": "100",
+          "left": "20",
+          "isLinked": false
+        }
+      },
+      "elements": [
+        {
+          "id": "00000009",
+          "elType": "column",
+          "settings": {
+            "_column_size": 100,
+            "_inline_size": null
+          },
+          "elements": [
+            {
+              "id": "00000001",
+              "elType": "widget",
+              "widgetType": "html",
+              "settings": {
+                "html": "<div style=\"text-align:center;\"><span style=\"display:inline-block;background:#5ab3a9;color:#fff;padding:6px 20px;border-radius:9999px;font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;font-family:Montserrat,sans-serif;\">About DooGoodScoopers</span></div>"
+              }
+            },
+            {
+              "id": "00000002",
+              "elType": "widget",
+              "widgetType": "spacer",
+              "settings": {
+                "space": {
+                  "unit": "px",
+                  "size": 14
+                }
+              }
+            },
+            {
+              "id": "00000003",
+              "elType": "widget",
+              "widgetType": "heading",
+              "settings": {
+                "title": "Meet the Team Behind Your Clean Yard",
+                "header_size": "h1",
+                "align": "center",
+                "title_color": "#002842",
+                "typography_typography": "custom",
+                "typography_font_family": "Bebas Neue",
+                "typography_font_size": {
+                  "unit": "px",
+                  "size": 60
+                },
+                "typography_font_weight": "400",
+                "typography_letter_spacing": {
+                  "unit": "px",
+                  "size": 2
+                },
+                "typography_line_height": {
+                  "unit": "em",
+                  "size": 1
+                }
+              }
+            },
+            {
+              "id": "00000004",
+              "elType": "widget",
+              "widgetType": "spacer",
+              "settings": {
+                "space": {
+                  "unit": "px",
+                  "size": 10
+                }
+              }
+            },
+            {
+              "id": "00000005",
+              "elType": "widget",
+              "widgetType": "text-editor",
+              "settings": {
+                "editor": "<p style=\"color:#4b5563;font-size:18px;\">Founded in 2024 by a husband-and-wife team who believe every family deserves a clean, safe outdoor space.</p>",
+                "align": "center"
+              }
+            },
+            {
+              "id": "00000006",
+              "elType": "widget",
+              "widgetType": "spacer",
+              "settings": {
+                "space": {
+                  "unit": "px",
+                  "size": 22
+                }
+              }
+            },
+            {
+              "id": "00000007",
+              "elType": "widget",
+              "widgetType": "button",
+              "settings": {
+                "text": "Get My Free Quote",
+                "link": {
+                  "url": "/quote",
+                  "is_external": false,
+                  "nofollow": false
+                },
+                "align": "center",
+                "size": "lg",
+                "background_color": "#5ab3a9",
+                "text_color": "#ffffff",
+                "border_radius": {
+                  "unit": "px",
+                  "top": "50",
+                  "right": "50",
+                  "bottom": "50",
+                  "left": "50",
+                  "isLinked": false
+                }
+              }
+            },
+            {
+              "id": "00000008",
+              "elType": "widget",
+              "widgetType": "spacer",
+              "settings": {
+                "space": {
+                  "unit": "px",
+                  "size": 10
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0000001a",
+      "elType": "section",
+      "isInner": false,
+      "settings": {
+        "stretch_section": "section-stretched",
+        "background_background": "classic",
+        "background_color": "#ffffff",
+        "padding": {
+          "unit": "px",
+          "top": "70",
+          "right": "20",
+          "bottom": "70",
+          "left": "20",
+          "isLinked": false
+        }
+      },
+      "elements": [
+        {
+          "id": "0000000d",
+          "elType": "column",
+          "settings": {
+            "_column_size": 50,
+            "_inline_size": null
+          },
+          "elements": [
+            {
+              "id": "0000000b",
+              "elType": "widget",
+              "widgetType": "html",
+              "settings": {
+                "html": "<div style=\"position:relative;padding:20px;min-height:300px;\">\n        <div style=\"position:absolute;top:0;left:0;width:75%;transform:rotate(-6deg);border-radius:8px;overflow:hidden;box-shadow:0 8px 30px rgba(0,40,66,0.2);\">\n          <div style=\"background-image:url(https://doogoodscoopers.com/images/residential/yard-cleanup.webp);background-size:cover;background-position:center;height:200px;opacity:0.7;border-radius:8px;\"></div>\n        </div>\n        <div style=\"position:relative;margin-top:30px;margin-left:20%;border-radius:8px;overflow:hidden;box-shadow:0 8px 30px rgba(0,40,66,0.25);\">\n          <div style=\"background-image:url(https://doogoodscoopers.com/images/about/dream-team.webp);background-size:cover;background-position:center;height:260px;border-radius:8px 8px 0 0;\"></div>\n          <div style=\"background:#002842;color:#fff;padding:10px 16px;font-family:Montserrat,sans-serif;font-size:13px;font-weight:600;text-align:center;\">Brandon &amp; Valerie — Co-founders</div>\n        </div>\n      </div>"
+              }
+            },
+            {
+              "id": "0000000c",
+              "elType": "widget",
+              "widgetType": "spacer",
+              "settings": {
+                "space": {
+                  "unit": "px",
+                  "size": 10
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "00000019",
+          "elType": "column",
+          "settings": {
+            "_column_size": 50,
+            "_inline_size": null
+          },
+          "elements": [
+            {
+              "id": "0000000e",
+              "elType": "widget",
+              "widgetType": "spacer",
+              "settings": {
+                "space": {
+                  "unit": "px",
+                  "size": 10
+                }
+              }
+            },
+            {
+              "id": "0000000f",
+              "elType": "widget",
+              "widgetType": "html",
+              "settings": {
+                "html": "<div style=\"text-align:center;\"><span style=\"display:inline-block;background:#5ab3a9;color:#fff;padding:6px 20px;border-radius:9999px;font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;font-family:Montserrat,sans-serif;\">Our Story</span></div>"
+              }
+            },
+            {
+              "id": "00000010",
+              "elType": "widget",
+              "widgetType": "spacer",
+              "settings": {
+                "space": {
+                  "unit": "px",
+                  "size": 10
+                }
+              }
+            },
+            {
+              "id": "00000011",
+              "elType": "widget",
+              "widgetType": "heading",
+              "settings": {
+                "title": "Built on a Simple Idea",
+                "header_size": "h2",
+                "align": "left",
+                "title_color": "#002842"
+              }
+            },
+            {
+              "id": "00000012",
+              "elType": "widget",
+              "widgetType": "spacer",
+              "settings": {
+                "space": {
+                  "unit": "px",
+                  "size": 8
+                }
+              }
+            },
+            {
+              "id": "00000013",
+              "elType": "widget",
+              "widgetType": "text-editor",
+              "settings": {
+                "editor": "<p style=\"color:#4b5563;text-align:left;line-height:1.85;\">DooGoodScoopers was founded in 2024 by Brandon and Valerie — a husband-and-wife team from the Inland Empire who were tired of seeing neighbors struggle with one of the most dreaded yard chores.</p>",
+                "align": "left"
+              }
+            },
+            {
+              "id": "00000014",
+              "elType": "widget",
+              "widgetType": "spacer",
+              "settings": {
+                "space": {
+                  "unit": "px",
+                  "size": 8
+                }
+              }
+            },
+            {
+              "id": "00000015",
+              "elType": "widget",
+              "widgetType": "text-editor",
+              "settings": {
+                "editor": "<p style=\"color:#4b5563;text-align:left;line-height:1.85;\">We started small in Rancho Cucamonga. Within months, word spread across the region. Today we proudly serve 90+ ZIP codes across San Bernardino and Los Angeles counties.</p>",
+                "align": "left"
+              }
+            },
+            {
+              "id": "00000016",
+              "elType": "widget",
+              "widgetType": "spacer",
+              "settings": {
+                "space": {
+                  "unit": "px",
+                  "size": 14
+                }
+              }
+            },
+            {
+              "id": "00000017",
+              "elType": "widget",
+              "widgetType": "html",
+              "settings": {
+                "html": "<div style=\"display:flex;gap:24px;font-family:Montserrat,sans-serif;\">\n        \n          <div style=\"text-align:center;\">\n            <div style=\"font-size:24px;font-weight:800;color:#5ab3a9;\">2024</div>\n            <div style=\"font-size:12px;color:#4b5563;margin-top:2px;\">Founded</div>\n          </div>\n          <div style=\"text-align:center;\">\n            <div style=\"font-size:24px;font-weight:800;color:#5ab3a9;\">521+</div>\n            <div style=\"font-size:12px;color:#4b5563;margin-top:2px;\">Families Served</div>\n          </div>\n          <div style=\"text-align:center;\">\n            <div style=\"font-size:24px;font-weight:800;color:#5ab3a9;\">5.0★</div>\n            <div style=\"font-size:12px;color:#4b5563;margin-top:2px;\">Google Rating</div>\n          </div>\n      </div>"
+              }
+            },
+            {
+              "id": "00000018",
+              "elType": "widget",
+              "widgetType": "spacer",
+              "settings": {
+                "space": {
+                  "unit": "px",
+                  "size": 10
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0000001e",
+      "elType": "section",
+      "isInner": false,
+      "settings": {
+        "stretch_section": "section-stretched",
+        "background_background": "classic",
+        "background_color": "#f9fafb",
+        "padding": {
+          "unit": "px",
+          "top": "60",
+          "right": "20",
+          "bottom": "0",
+          "left": "20",
+          "isLinked": false
+        }
+      },
+      "elements": [
+        {
+          "id": "0000001d",
+          "elType": "column",
+          "settings": {
+            "_column_size": 100,
+            "_inline_size": null
+          },
+          "elements": [
+            {
+              "id": "0000001b",
+              "elType": "widget",
+              "widgetType": "heading",
+              "settings": {
+                "title": "Mission &amp; Vision",
+                "header_size": "h2",
+                "align": "center",
+                "title_color": "#002842"
+              }
+            },
+            {
+              "id": "0000001c",
+              "elType": "widget",
+              "widgetType": "spacer",
+              "settings": {
+                "space": {
+                  "unit": "px",
+                  "size": 8
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "00000025",
+      "elType": "section",
+      "isInner": false,
+      "settings": {
+        "stretch_section": "section-stretched",
+        "background_background": "classic",
+        "background_color": "#f9fafb",
+        "padding": {
+          "unit": "px",
+          "top": "10",
+          "right": "20",
+          "bottom": "60",
+          "left": "20",
+          "isLinked": false
+        }
+      },
+      "elements": [
+        {
+          "id": "00000021",
+          "elType": "column",
+          "settings": {
+            "_column_size": 50,
+            "_inline_size": null
+          },
+          "elements": [
+            {
+              "id": "0000001f",
+              "elType": "widget",
+              "widgetType": "icon-box",
+              "settings": {
+                "icon": {
+                  "value": "fa-bullseye",
+                  "library": "fa-solid"
+                },
+                "title_text": "Our Mission",
+                "description_text": "To provide dependable, professional pet waste removal that gives families back their time and creates healthier outdoor environments across the Inland Empire.",
+                "position": "top",
+                "title_size": "h3",
+                "icon_color": "#5ab3a9",
+                "icon_size": {
+                  "unit": "px",
+                  "size": 46
+                }
+              }
+            },
+            {
+              "id": "00000020",
+              "elType": "widget",
+              "widgetType": "spacer",
+              "settings": {
+                "space": {
+                  "unit": "px",
+                  "size": 10
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "00000024",
+          "elType": "column",
+          "settings": {
+            "_column_size": 50,
+            "_inline_size": null
+          },
+          "elements": [
+            {
+              "id": "00000022",
+              "elType": "widget",
+              "widgetType": "icon-box",
+              "settings": {
+                "icon": {
+                  "value": "fa-eye",
+                  "library": "fa-solid"
+                },
+                "title_text": "Our Vision",
+                "description_text": "To become the most trusted pet waste management company in Southern California — known for reliability, professionalism, and genuine commitment to every yard.",
+                "position": "top",
+                "title_size": "h3",
+                "icon_color": "#004d73",
+                "icon_size": {
+                  "unit": "px",
+                  "size": 46
+                }
+              }
+            },
+            {
+              "id": "00000023",
+              "elType": "widget",
+              "widgetType": "spacer",
+              "settings": {
+                "space": {
+                  "unit": "px",
+                  "size": 10
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "00000035",
+      "elType": "section",
+      "isInner": false,
+      "settings": {
+        "stretch_section": "section-stretched",
+        "background_background": "classic",
+        "background_color": "#ffffff",
+        "padding": {
+          "unit": "px",
+          "top": "70",
+          "right": "20",
+          "bottom": "70",
+          "left": "20",
+          "isLinked": false
+        }
+      },
+      "elements": [
+        {
+          "id": "00000028",
+          "elType": "column",
+          "settings": {
+            "_column_size": 50,
+            "_inline_size": null
+          },
+          "elements": [
+            {
+              "id": "00000026",
+              "elType": "widget",
+              "widgetType": "image",
+              "settings": {
+                "image": {
+                  "url": "https://doogoodscoopers.com/images/residential/scooper-professional.webp",
+                  "id": "",
+                  "alt": "Professional scooper team"
+                },
+                "image_size": "full",
+                "align": "center",
+                "caption_source": "none"
+              }
+            },
+            {
+              "id": "00000027",
+              "elType": "widget",
+              "widgetType": "spacer",
+              "settings": {
+                "space": {
+                  "unit": "px",
+                  "size": 10
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "00000034",
+          "elType": "column",
+          "settings": {
+            "_column_size": 50,
+            "_inline_size": null
+          },
+          "elements": [
+            {
+              "id": "00000029",
+              "elType": "widget",
+              "widgetType": "spacer",
+              "settings": {
+                "space": {
+                  "unit": "px",
+                  "size": 10
+                }
+              }
+            },
+            {
+              "id": "0000002a",
+              "elType": "widget",
+              "widgetType": "heading",
+              "settings": {
+                "title": "Dedicated to Five-Star Service",
+                "header_size": "h2",
+                "align": "left",
+                "title_color": "#002842"
+              }
+            },
+            {
+              "id": "0000002b",
+              "elType": "widget",
+              "widgetType": "spacer",
+              "settings": {
+                "space": {
+                  "unit": "px",
+                  "size": 8
+                }
+              }
+            },
+            {
+              "id": "0000002c",
+              "elType": "widget",
+              "widgetType": "text-editor",
+              "settings": {
+                "editor": "<p style=\"color:#4b5563;text-align:left;line-height:1.85;\">Every team member is background-checked, trained, and passionate about making your yard a better place. We don't cut corners — on every visit we give 100%.</p>",
+                "align": "left"
+              }
+            },
+            {
+              "id": "0000002d",
+              "elType": "widget",
+              "widgetType": "spacer",
+              "settings": {
+                "space": {
+                  "unit": "px",
+                  "size": 12
+                }
+              }
+            },
+            {
+              "id": "00000032",
+              "elType": "widget",
+              "widgetType": "icon-list",
+              "settings": {
+                "icon_list": [
+                  {
+                    "_id": "0000002e",
+                    "text": "Background Checked",
+                    "icon": {
+                      "value": "fa fa-check",
+                      "library": "fa-solid"
+                    }
+                  },
+                  {
+                    "_id": "0000002f",
+                    "text": "Fully Insured",
+                    "icon": {
+                      "value": "fa fa-check",
+                      "library": "fa-solid"
+                    }
+                  },
+                  {
+                    "_id": "00000030",
+                    "text": "Pet-Friendly",
+                    "icon": {
+                      "value": "fa fa-check",
+                      "library": "fa-solid"
+                    }
+                  },
+                  {
+                    "_id": "00000031",
+                    "text": "Professionally Trained",
+                    "icon": {
+                      "value": "fa fa-check",
+                      "library": "fa-solid"
+                    }
+                  }
+                ],
+                "icon_color": "#5ab3a9",
+                "text_color": "#002842",
+                "text_indent": {
+                  "unit": "px",
+                  "size": 8
+                },
+                "icon_size": {
+                  "unit": "px",
+                  "size": 14
+                }
+              }
+            },
+            {
+              "id": "00000033",
+              "elType": "widget",
+              "widgetType": "spacer",
+              "settings": {
+                "space": {
+                  "unit": "px",
+                  "size": 10
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "00000039",
+      "elType": "section",
+      "isInner": false,
+      "settings": {
+        "stretch_section": "section-stretched",
+        "background_background": "classic",
+        "background_color": "#002842",
+        "padding": {
+          "unit": "px",
+          "top": "60",
+          "right": "20",
+          "bottom": "0",
+          "left": "20",
+          "isLinked": false
+        }
+      },
+      "elements": [
+        {
+          "id": "00000038",
+          "elType": "column",
+          "settings": {
+            "_column_size": 100,
+            "_inline_size": null
+          },
+          "elements": [
+            {
+              "id": "00000036",
+              "elType": "widget",
+              "widgetType": "heading",
+              "settings": {
+                "title": "Our Core Values",
+                "header_size": "h2",
+                "align": "center",
+                "title_color": "#ffffff"
+              }
+            },
+            {
+              "id": "00000037",
+              "elType": "widget",
+              "widgetType": "spacer",
+              "settings": {
+                "space": {
+                  "unit": "px",
+                  "size": 8
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "00000046",
+      "elType": "section",
+      "isInner": false,
+      "settings": {
+        "stretch_section": "section-stretched",
+        "background_background": "classic",
+        "background_color": "#002842",
+        "padding": {
+          "unit": "px",
+          "top": "10",
+          "right": "20",
+          "bottom": "60",
+          "left": "20",
+          "isLinked": false
+        }
+      },
+      "elements": [
+        {
+          "id": "0000003c",
+          "elType": "column",
+          "settings": {
+            "_column_size": 25,
+            "_inline_size": null
+          },
+          "elements": [
+            {
+              "id": "0000003a",
+              "elType": "widget",
+              "widgetType": "icon-box",
+              "settings": {
+                "icon": {
+                  "value": "fa-star",
+                  "library": "fa-solid"
+                },
+                "title_text": "Excellence",
+                "description_text": "Highest standards on every visit.",
+                "position": "top",
+                "title_size": "h3",
+                "icon_color": "#7ac4bc",
+                "icon_size": {
+                  "unit": "px",
+                  "size": 46
+                }
+              }
+            },
+            {
+              "id": "0000003b",
+              "elType": "widget",
+              "widgetType": "spacer",
+              "settings": {
+                "space": {
+                  "unit": "px",
+                  "size": 8
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "0000003f",
+          "elType": "column",
+          "settings": {
+            "_column_size": 25,
+            "_inline_size": null
+          },
+          "elements": [
+            {
+              "id": "0000003d",
+              "elType": "widget",
+              "widgetType": "icon-box",
+              "settings": {
+                "icon": {
+                  "value": "fa-heart",
+                  "library": "fa-solid"
+                },
+                "title_text": "Care",
+                "description_text": "We treat every property as our own.",
+                "position": "top",
+                "title_size": "h3",
+                "icon_color": "#7ac4bc",
+                "icon_size": {
+                  "unit": "px",
+                  "size": 46
+                }
+              }
+            },
+            {
+              "id": "0000003e",
+              "elType": "widget",
+              "widgetType": "spacer",
+              "settings": {
+                "space": {
+                  "unit": "px",
+                  "size": 8
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "00000042",
+          "elType": "column",
+          "settings": {
+            "_column_size": 25,
+            "_inline_size": null
+          },
+          "elements": [
+            {
+              "id": "00000040",
+              "elType": "widget",
+              "widgetType": "icon-box",
+              "settings": {
+                "icon": {
+                  "value": "fa-leaf",
+                  "library": "fa-solid"
+                },
+                "title_text": "Eco-Friendly",
+                "description_text": "Environmentally conscious disposal.",
+                "position": "top",
+                "title_size": "h3",
+                "icon_color": "#7ac4bc",
+                "icon_size": {
+                  "unit": "px",
+                  "size": 46
+                }
+              }
+            },
+            {
+              "id": "00000041",
+              "elType": "widget",
+              "widgetType": "spacer",
+              "settings": {
+                "space": {
+                  "unit": "px",
+                  "size": 8
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "00000045",
+          "elType": "column",
+          "settings": {
+            "_column_size": 25,
+            "_inline_size": null
+          },
+          "elements": [
+            {
+              "id": "00000043",
+              "elType": "widget",
+              "widgetType": "icon-box",
+              "settings": {
+                "icon": {
+                  "value": "fa-lock",
+                  "library": "fa-solid"
+                },
+                "title_text": "Reliability",
+                "description_text": "Consistent schedules you can count on.",
+                "position": "top",
+                "title_size": "h3",
+                "icon_color": "#7ac4bc",
+                "icon_size": {
+                  "unit": "px",
+                  "size": 46
+                }
+              }
+            },
+            {
+              "id": "00000044",
+              "elType": "widget",
+              "widgetType": "spacer",
+              "settings": {
+                "space": {
+                  "unit": "px",
+                  "size": 8
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "00000050",
+      "elType": "section",
+      "isInner": false,
+      "settings": {
+        "stretch_section": "section-stretched",
+        "background_background": "gradient",
+        "background_color": "#9CD5CF",
+        "background_color_b": "#008EFF",
+        "background_gradient_type": "linear",
+        "background_gradient_angle": {
+          "unit": "deg",
+          "size": 135
+        },
+        "padding": {
+          "unit": "px",
+          "top": "60",
+          "right": "20",
+          "bottom": "10",
+          "left": "20",
+          "isLinked": false
+        }
+      },
+      "elements": [
+        {
+          "id": "0000004f",
+          "elType": "column",
+          "settings": {
+            "_column_size": 100,
+            "_inline_size": null
+          },
+          "elements": [
+            {
+              "id": "00000047",
+              "elType": "widget",
+              "widgetType": "html",
+              "settings": {
+                "html": "<div style=\"text-align:center;\"><span style=\"display:inline-block;background:#002842;color:#9CD5CF;padding:6px 20px;border-radius:9999px;font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;font-family:Montserrat,sans-serif;\">Limited Time Offer</span></div>"
+              }
+            },
+            {
+              "id": "00000048",
+              "elType": "widget",
+              "widgetType": "spacer",
+              "settings": {
+                "space": {
+                  "unit": "px",
+                  "size": 14
+                }
+              }
+            },
+            {
+              "id": "00000049",
+              "elType": "widget",
+              "widgetType": "heading",
+              "settings": {
+                "title": "Ready to Reclaim Your Yard?",
+                "header_size": "h2",
+                "align": "center",
+                "title_color": "#ffffff"
+              }
+            },
+            {
+              "id": "0000004a",
+              "elType": "widget",
+              "widgetType": "spacer",
+              "settings": {
+                "space": {
+                  "unit": "px",
+                  "size": 10
+                }
+              }
+            },
+            {
+              "id": "0000004b",
+              "elType": "widget",
+              "widgetType": "text-editor",
+              "settings": {
+                "editor": "<p style=\"color:rgba(255,255,255,0.85);\">Join 500+ families across the Inland Empire who trust DooGoodScoopers.</p>",
+                "align": "center"
+              }
+            },
+            {
+              "id": "0000004c",
+              "elType": "widget",
+              "widgetType": "spacer",
+              "settings": {
+                "space": {
+                  "unit": "px",
+                  "size": 8
+                }
+              }
+            },
+            {
+              "id": "0000004d",
+              "elType": "widget",
+              "widgetType": "text-editor",
+              "settings": {
+                "editor": "<p style=\"font-size:13px;color:rgba(255,255,255,0.6);\">✓ 100% Satisfaction Guaranteed &nbsp;•&nbsp; ✓ No Contracts &nbsp;•&nbsp; ✓ Cancel Anytime</p>",
+                "align": "center"
+              }
+            },
+            {
+              "id": "0000004e",
+              "elType": "widget",
+              "widgetType": "spacer",
+              "settings": {
+                "space": {
+                  "unit": "px",
+                  "size": 16
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "00000055",
+      "elType": "section",
+      "isInner": false,
+      "settings": {
+        "stretch_section": "section-stretched",
+        "background_background": "gradient",
+        "background_color": "#9CD5CF",
+        "background_color_b": "#008EFF",
+        "background_gradient_type": "linear",
+        "background_gradient_angle": {
+          "unit": "deg",
+          "size": 135
+        },
+        "padding": {
+          "unit": "px",
+          "top": "10",
+          "right": "20",
+          "bottom": "60",
+          "left": "20",
+          "isLinked": false
+        }
+      },
+      "elements": [
+        {
+          "id": "00000052",
+          "elType": "column",
+          "settings": {
+            "_column_size": 50,
+            "_inline_size": null
+          },
+          "elements": [
+            {
+              "id": "00000051",
+              "elType": "widget",
+              "widgetType": "button",
+              "settings": {
+                "text": "Get Your Free Quote",
+                "link": {
+                  "url": "/quote",
+                  "is_external": false,
+                  "nofollow": false
+                },
+                "align": "center",
+                "size": "lg",
+                "background_color": "#ffffff",
+                "text_color": "#002842",
+                "border_radius": {
+                  "unit": "px",
+                  "top": "50",
+                  "right": "50",
+                  "bottom": "50",
+                  "left": "50",
+                  "isLinked": false
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "00000054",
+          "elType": "column",
+          "settings": {
+            "_column_size": 50,
+            "_inline_size": null
+          },
+          "elements": [
+            {
+              "id": "00000053",
+              "elType": "widget",
+              "widgetType": "button",
+              "settings": {
+                "text": "Call (909) 366-3744",
+                "link": {
+                  "url": "tel:9093663744",
+                  "is_external": false,
+                  "nofollow": false
+                },
+                "align": "center",
+                "size": "lg",
+                "background_color": "transparent",
+                "text_color": "#ffffff",
+                "border_radius": {
+                  "unit": "px",
+                  "top": "50",
+                  "right": "50",
+                  "bottom": "50",
+                  "left": "50",
+                  "isLinked": false
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "00000068",
+      "elType": "section",
+      "isInner": false,
+      "settings": {
+        "stretch_section": "section-stretched",
+        "background_background": "gradient",
+        "background_color": "#002842",
+        "background_color_b": "#001a2e",
+        "background_gradient_type": "linear",
+        "background_gradient_angle": {
+          "unit": "deg",
+          "size": 180
+        },
+        "padding": {
+          "unit": "px",
+          "top": "60",
+          "right": "20",
+          "bottom": "60",
+          "left": "20",
+          "isLinked": false
+        }
+      },
+      "elements": [
+        {
+          "id": "0000005b",
+          "elType": "column",
+          "settings": {
+            "_column_size": 30,
+            "_inline_size": null
+          },
+          "elements": [
+            {
+              "id": "00000056",
+              "elType": "widget",
+              "widgetType": "image",
+              "settings": {
+                "image": {
+                  "url": "https://doogoodscoopers.com/logo-dark.webp",
+                  "id": "",
+                  "alt": "DooGoodScoopers"
+                },
+                "image_size": "full",
+                "align": "left",
+                "caption_source": "none"
+              }
+            },
+            {
+              "id": "00000057",
+              "elType": "widget",
+              "widgetType": "spacer",
+              "settings": {
+                "space": {
+                  "unit": "px",
+                  "size": 12
+                }
+              }
+            },
+            {
+              "id": "00000058",
+              "elType": "widget",
+              "widgetType": "text-editor",
+              "settings": {
+                "editor": "<p style=\"color:rgba(255,255,255,0.7);font-size:14px;text-align:left;\">Professional dog waste removal service serving the Inland Empire. Take back control of your lawn with our reliable service.</p>",
+                "align": "left"
+              }
+            },
+            {
+              "id": "00000059",
+              "elType": "widget",
+              "widgetType": "spacer",
+              "settings": {
+                "space": {
+                  "unit": "px",
+                  "size": 12
+                }
+              }
+            },
+            {
+              "id": "0000005a",
+              "elType": "widget",
+              "widgetType": "html",
+              "settings": {
+                "html": "<div style=\"display:flex;gap:12px;\">\n      <a href=\"#\" style=\"display:inline-flex;width:36px;height:36px;background:rgba(255,255,255,0.1);border-radius:50%;align-items:center;justify-content:center;color:#fff;text-decoration:none;font-size:16px;\">f</a>\n      <a href=\"#\" style=\"display:inline-flex;width:36px;height:36px;background:rgba(255,255,255,0.1);border-radius:50%;align-items:center;justify-content:center;color:#fff;text-decoration:none;font-size:16px;\">in</a>\n    </div>"
+              }
+            }
+          ]
+        },
+        {
+          "id": "0000005f",
+          "elType": "column",
+          "settings": {
+            "_column_size": 20,
+            "_inline_size": null
+          },
+          "elements": [
+            {
+              "id": "0000005c",
+              "elType": "widget",
+              "widgetType": "heading",
+              "settings": {
+                "title": "Quick Links",
+                "header_size": "h4",
+                "align": "left",
+                "title_color": "#9CD5CF"
+              }
+            },
+            {
+              "id": "0000005d",
+              "elType": "widget",
+              "widgetType": "spacer",
+              "settings": {
+                "space": {
+                  "unit": "px",
+                  "size": 10
+                }
+              }
+            },
+            {
+              "id": "0000005e",
+              "elType": "widget",
+              "widgetType": "html",
+              "settings": {
+                "html": "<ul style=\"list-style:none;padding:0;margin:0;font-family:Montserrat,sans-serif;\">\n      <li style=\"margin-bottom:8px;\"><a href=\"/residential-services\" style=\"color:rgba(255,255,255,0.75);text-decoration:none;font-size:14px;\">Residential</a></li><li style=\"margin-bottom:8px;\"><a href=\"/commercial-services\" style=\"color:rgba(255,255,255,0.75);text-decoration:none;font-size:14px;\">Commercial</a></li><li style=\"margin-bottom:8px;\"><a href=\"/about-doogoodscoopers\" style=\"color:rgba(255,255,255,0.75);text-decoration:none;font-size:14px;\">About</a></li><li style=\"margin-bottom:8px;\"><a href=\"/quote\" style=\"color:rgba(255,255,255,0.75);text-decoration:none;font-size:14px;\">Get a Quote</a></li><li style=\"margin-bottom:8px;\"><a href=\"/faq\" style=\"color:rgba(255,255,255,0.75);text-decoration:none;font-size:14px;\">FAQ</a></li><li style=\"margin-bottom:8px;\"><a href=\"/careers\" style=\"color:rgba(255,255,255,0.75);text-decoration:none;font-size:14px;\">Careers</a></li>\n    </ul>"
+              }
+            }
+          ]
+        },
+        {
+          "id": "00000063",
+          "elType": "column",
+          "settings": {
+            "_column_size": 25,
+            "_inline_size": null
+          },
+          "elements": [
+            {
+              "id": "00000060",
+              "elType": "widget",
+              "widgetType": "heading",
+              "settings": {
+                "title": "Contact Us",
+                "header_size": "h4",
+                "align": "left",
+                "title_color": "#9CD5CF"
+              }
+            },
+            {
+              "id": "00000061",
+              "elType": "widget",
+              "widgetType": "spacer",
+              "settings": {
+                "space": {
+                  "unit": "px",
+                  "size": 10
+                }
+              }
+            },
+            {
+              "id": "00000062",
+              "elType": "widget",
+              "widgetType": "html",
+              "settings": {
+                "html": "<div style=\"font-family:Montserrat,sans-serif;font-size:14px;color:rgba(255,255,255,0.75);line-height:2;\">\n      <div>📞 <a href=\"tel:9093663744\" style=\"color:rgba(255,255,255,0.75);text-decoration:none;\">(909) 366-3744</a></div>\n      <div>✉️ <a href=\"mailto:service@doogoodscoopers.com\" style=\"color:rgba(255,255,255,0.75);text-decoration:none;\">service@doogoodscoopers.com</a></div>\n      <div>📍 11799 Sebastian Way, Suite 103<br>&nbsp;&nbsp;&nbsp;&nbsp;Rancho Cucamonga, CA 91730</div>\n      <div>🕐 Mon–Fri: 7:30 AM – 6:00 PM<br>&nbsp;&nbsp;&nbsp;&nbsp;Sat–Sun: 9:00 AM – 5:00 PM</div>\n    </div>"
+              }
+            }
+          ]
+        },
+        {
+          "id": "00000067",
+          "elType": "column",
+          "settings": {
+            "_column_size": 25,
+            "_inline_size": null
+          },
+          "elements": [
+            {
+              "id": "00000064",
+              "elType": "widget",
+              "widgetType": "heading",
+              "settings": {
+                "title": "Service Areas",
+                "header_size": "h4",
+                "align": "left",
+                "title_color": "#9CD5CF"
+              }
+            },
+            {
+              "id": "00000065",
+              "elType": "widget",
+              "widgetType": "spacer",
+              "settings": {
+                "space": {
+                  "unit": "px",
+                  "size": 10
+                }
+              }
+            },
+            {
+              "id": "00000066",
+              "elType": "widget",
+              "widgetType": "html",
+              "settings": {
+                "html": "<div style=\"font-family:Montserrat,sans-serif;font-size:14px;color:rgba(255,255,255,0.75);line-height:1.9;\">\n      <div>Fontana</div><div>Rancho Cucamonga</div><div>Ontario</div><div>Upland</div><div>Claremont</div><div>Montclair</div><div>Pomona</div><div>Chino</div><div>Chino Hills</div><div>Diamond Bar</div>\n      <div style=\"color:#7ac4bc;font-weight:600;margin-top:4px;\">+10 more</div>\n      <div style=\"margin-top:8px;font-size:13px;color:rgba(255,255,255,0.5);\">Serving 90+ zip codes throughout the Inland Empire</div>\n    </div>"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0000006b",
+      "elType": "section",
+      "isInner": false,
+      "settings": {
+        "stretch_section": "section-stretched",
+        "background_background": "classic",
+        "background_color": "#001a2e",
+        "padding": {
+          "unit": "px",
+          "top": "16",
+          "right": "20",
+          "bottom": "16",
+          "left": "20",
+          "isLinked": false
+        }
+      },
+      "elements": [
+        {
+          "id": "0000006a",
+          "elType": "column",
+          "settings": {
+            "_column_size": 100,
+            "_inline_size": null
+          },
+          "elements": [
+            {
+              "id": "00000069",
+              "elType": "widget",
+              "widgetType": "html",
+              "settings": {
+                "html": "<div style=\"display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;font-family:Montserrat,sans-serif;font-size:13px;color:rgba(255,255,255,0.5);\">\n    <span>© 2026 DooGoodScoopers. All rights reserved.</span>\n    <span><a href=\"/privacy-policy\" style=\"color:rgba(255,255,255,0.5);text-decoration:none;margin-right:16px;\">Privacy Policy</a><a href=\"/terms-of-service\" style=\"color:rgba(255,255,255,0.5);text-decoration:none;\">Terms of Service</a></span>\n  </div>"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "page_settings": {}
+}

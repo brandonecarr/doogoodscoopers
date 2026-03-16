@@ -55,14 +55,14 @@ export async function GET(req: NextRequest) {
   const overdueFilter = {
     followupDate: { lt: now },
     archived: false,
-    status: { notIn: ["CONVERTED", "LOST"] as LeadStatus[] },
+    status: { notIn: ["CONVERTED", "NOT_INTERESTED"] as LeadStatus[] },
   };
 
   // Due soon filter
   const dueSoonFilter = {
     followupDate: { gte: windowStart, lte: windowEnd },
     archived: false,
-    status: { notIn: ["CONVERTED", "LOST"] as LeadStatus[] },
+    status: { notIn: ["CONVERTED", "NOT_INTERESTED"] as LeadStatus[] },
   };
 
   const [
@@ -82,7 +82,7 @@ export async function GET(req: NextRequest) {
       where: {
         followupDate: dueSoonFilter.followupDate,
         archived: false,
-        status: { notIn: ["CONVERTED", "LOST"] as LeadStatus[] },
+        status: { notIn: ["CONVERTED", "NOT_INTERESTED"] as LeadStatus[] },
       },
       select: { id: true, contactName: true },
     }),
@@ -90,7 +90,7 @@ export async function GET(req: NextRequest) {
       where: {
         followupDate: overdueFilter.followupDate,
         archived: false,
-        status: { notIn: ["CONVERTED", "LOST"] as LeadStatus[] },
+        status: { notIn: ["CONVERTED", "NOT_INTERESTED"] as LeadStatus[] },
       },
       select: { id: true, contactName: true },
     }),

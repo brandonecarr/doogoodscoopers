@@ -28,18 +28,28 @@ function formatDate(date: Date) {
   });
 }
 
+const statusLabels: Record<LeadStatus, string> = {
+  NEW: "New",
+  CONTACTED: "Contacted",
+  NO_ANSWER: "No Answer",
+  NOT_INTERESTED: "Not Interested",
+  WAITING_FOR_SIGNUP: "Waiting for Signup",
+  CONVERTED: "Converted",
+};
+
 function getStatusBadge(status: LeadStatus) {
   const styles: Record<LeadStatus, string> = {
     NEW: "bg-teal-100 text-teal-800",
     CONTACTED: "bg-blue-100 text-blue-800",
-    QUALIFIED: "bg-purple-100 text-purple-800",
+    NO_ANSWER: "bg-orange-100 text-orange-800",
+    NOT_INTERESTED: "bg-gray-100 text-gray-800",
+    WAITING_FOR_SIGNUP: "bg-purple-100 text-purple-800",
     CONVERTED: "bg-green-100 text-green-800",
-    LOST: "bg-gray-100 text-gray-800",
   };
 
   return (
     <span className={`px-3 py-1 text-sm font-medium rounded-full ${styles[status]}`}>
-      {status}
+      {statusLabels[status]}
     </span>
   );
 }

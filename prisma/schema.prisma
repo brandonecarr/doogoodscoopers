@@ -13,9 +13,10 @@ datasource db {
 enum LeadStatus {
   NEW
   CONTACTED
-  QUALIFIED
+  NO_ANSWER
+  NOT_INTERESTED
+  WAITING_FOR_SIGNUP
   CONVERTED
-  LOST
 }
 
 // Lead source to track where leads come from

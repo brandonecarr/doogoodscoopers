@@ -14,9 +14,10 @@ interface StatusUpdateFormProps {
 const statusOptions: { value: LeadStatus; label: string; color: string }[] = [
   { value: "NEW", label: "New", color: "bg-teal-500" },
   { value: "CONTACTED", label: "Contacted", color: "bg-blue-500" },
-  { value: "QUALIFIED", label: "Qualified", color: "bg-purple-500" },
+  { value: "NO_ANSWER", label: "No Answer", color: "bg-orange-500" },
+  { value: "NOT_INTERESTED", label: "Not Interested", color: "bg-gray-500" },
+  { value: "WAITING_FOR_SIGNUP", label: "Waiting for Signup", color: "bg-purple-500" },
   { value: "CONVERTED", label: "Converted", color: "bg-green-500" },
-  { value: "LOST", label: "Lost", color: "bg-gray-500" },
 ];
 
 export default function StatusUpdateForm({
