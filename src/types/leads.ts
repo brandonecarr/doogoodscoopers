@@ -94,4 +94,7 @@ export interface AdLead extends BaseModel {
   privyrLeadId: string | null;
   customFields: unknown;
   rawPayload: unknown;
+  followupDate: Date | null;
+  grade: string | null;
+  archived: boolean;
 }

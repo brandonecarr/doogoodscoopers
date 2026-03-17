@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Megaphone, Mail, Phone, MapPin, Calendar, Tag, ClipboardList } from "lucide-react";
+import { ArrowLeft, Megaphone, Mail, Phone, MapPin, Calendar, Clock, Tag, ClipboardList } from "lucide-react";
 import prisma from "@/lib/prisma";
 import StatusUpdateForm from "@/components/admin/StatusUpdateForm";
 import { LeadUpdates } from "@/components/admin/LeadUpdates";
+import { FollowupGrade } from "@/components/admin/FollowupGrade";
+import { LeadActions } from "@/components/admin/LeadActions";
 import type { AdLead } from "@/types/leads";
 
 interface PageProps {
@@ -243,6 +245,46 @@ export default async function AdLeadDetailPage({ params }: PageProps) {
             leadType="adlead"
             currentStatus={typedLead.status}
             notes={typedLead.notes}
+          />
+
+          <FollowupGrade
+            leadId={typedLead.id}
+            leadType="adlead"
+            currentFollowupDate={typedLead.followupDate?.toISOString()}
+            currentGrade={typedLead.grade}
+          />
+
+          {/* Timeline */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <h2 className="text-lg font-semibold text-navy-900 mb-4">Timeline</h2>
+            <div className="space-y-4">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-full bg-teal-100 flex items-center justify-center flex-shrink-0">
+                  <Calendar className="w-4 h-4 text-teal-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-navy-900">Lead Received</p>
+                  <p className="text-xs text-gray-500">{formatDate(typedLead.createdAt)}</p>
+                </div>
+              </div>
+              {typedLead.updatedAt > typedLead.createdAt && (
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                    <Clock className="w-4 h-4 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-navy-900">Last Updated</p>
+                    <p className="text-xs text-gray-500">{formatDate(typedLead.updatedAt)}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <LeadActions
+            leadId={typedLead.id}
+            leadType="adlead"
+            isArchived={typedLead.archived}
           />
 
           {/* Quick Actions */}
