@@ -5,22 +5,20 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
-  FileText,
+  Users2,
   MapPinOff,
   Briefcase,
   Building2,
-  Megaphone,
   Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navigation = [
-  { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
-  { name: "Quote Leads", href: "/admin/quote-leads", icon: FileText },
+  { name: "Dashboard",            href: "/admin",            icon: LayoutDashboard },
+  { name: "Leads",                href: "/admin/leads",      icon: Users2 },
   { name: "Commercial Inquiries", href: "/admin/commercial", icon: Building2 },
-  { name: "Ad Leads", href: "/admin/ad-leads", icon: Megaphone },
-  { name: "Out of Area", href: "/admin/out-of-area", icon: MapPinOff },
-  { name: "Career Applications", href: "/admin/careers", icon: Briefcase },
+  { name: "Out of Area",          href: "/admin/out-of-area", icon: MapPinOff },
+  { name: "Career Applications",  href: "/admin/careers",    icon: Briefcase },
 ];
 
 export function AdminSidebar() {
@@ -47,7 +45,12 @@ export function AdminSidebar() {
           {/* Navigation */}
           <nav className="mt-8 flex-1 px-2 space-y-1">
             {navigation.map((item) => {
-              const isActive = pathname === item.href;
+              const isActive =
+                pathname === item.href ||
+                (item.href === "/admin/leads" &&
+                  (pathname.startsWith("/admin/leads") ||
+                    pathname.startsWith("/admin/quote-leads") ||
+                    pathname.startsWith("/admin/ad-leads")));
               return (
                 <Link
                   key={item.name}
@@ -85,7 +88,12 @@ export function AdminSidebar() {
       <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-navy-900 border-t border-white/10 z-50">
         <nav className="flex justify-around py-2">
           {navigation.slice(0, 5).map((item) => {
-            const isActive = pathname === item.href;
+            const isActive =
+              pathname === item.href ||
+              (item.href === "/admin/leads" &&
+                (pathname.startsWith("/admin/leads") ||
+                  pathname.startsWith("/admin/quote-leads") ||
+                  pathname.startsWith("/admin/ad-leads")));
             return (
               <Link
                 key={item.name}
