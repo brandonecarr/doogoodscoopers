@@ -42,16 +42,29 @@ import { sendAdminPush } from "@/lib/web-push";
 const WEBHOOK_SECRET = process.env.SWEEPANDGO_WEBHOOK_SECRET;
 
 function parseName(data: Record<string, unknown>) {
+  // Try every common Sweep&Go / API field name variation
   const firstName =
-    (data.first_name as string) || null;
+    (data.first_name as string) ||
+    (data.firstName as string) ||
+    (data.fname as string) ||
+    null;
+
   const lastName =
-    (data.last_name as string) || null;
+    (data.last_name as string) ||
+    (data.lastName as string) ||
+    (data.lname as string) ||
+    null;
+
   const fullName =
     (data.name as string) ||
     (data.full_name as string) ||
-    (firstName && lastName ? `${firstName} ${lastName}` : firstName || lastName || null);
+    (data.fullName as string) ||
+    (data.client_name as string) ||
+    (data.contact_name as string) ||
+    (data.customer_name as string) ||
+    (firstName && lastName ? `${firstName} ${lastName}`.trim() : firstName || lastName || null);
 
-  // If only fullName available, split it
+  // If only fullName available, split it into first/last
   if (fullName && !firstName) {
     const parts = fullName.trim().split(/\s+/);
     return {
@@ -67,8 +80,12 @@ function extractPhone(data: Record<string, unknown>): string | null {
   return (
     (data.phone as string) ||
     (data.cell_phone as string) ||
+    (data.cellPhone as string) ||
     (data.home_phone as string) ||
+    (data.homePhone as string) ||
     (data.phone_number as string) ||
+    (data.phoneNumber as string) ||
+    (data.mobile as string) ||
     null
   );
 }
@@ -89,10 +106,11 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
 
     // Sweep&Go wraps payload under `data`, but handle flat payloads too
-    const event: string = body.event || "free:quote";
+    const event: string = body.event || "";
     const data: Record<string, unknown> = body.data ?? body;
 
-    console.log(`[SweepAndGo] Received event: ${event}`);
+    // Log the full raw payload so we can see exactly what Sweep&Go sends
+    console.log(`[SweepAndGo] Event: ${event}`, JSON.stringify(body, null, 2));
 
     const { firstName, lastName, fullName } = parseName(data);
     const phone = extractPhone(data);
@@ -134,13 +152,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, lead_id: lead.id, type: "out_of_area" });
     }
 
+    // ── Ignore all other event types ─────────────────────────────────────────
+    if (event !== "free:quote" && event !== "lead:in_service_area" && event !== "") {
+      console.log(`[SweepAndGo] Ignoring event type: ${event}`);
+      return NextResponse.json({ success: true, ignored: true, event });
+    }
+
     // ── Quote lead (free:quote or lead:in_service_area) ───────────────────────
-    if (
-      event === "free:quote" ||
-      event === "lead:in_service_area" ||
-      // Fallback: handle unknown events as quote leads
-      true
-    ) {
+    if (event === "free:quote" || event === "lead:in_service_area" || event === "") {
       const displayName = fullName || firstName || "Unknown";
 
       // Pull any extra fields not already mapped
