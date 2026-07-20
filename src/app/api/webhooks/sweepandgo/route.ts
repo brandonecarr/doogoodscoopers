@@ -147,8 +147,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Sweep&Go wraps payload under `data`, but handle flat payloads too
-    const event: string = body.event || "";
+    // Sweep&Go wraps payload under `data`, but handle flat payloads too.
+    // The event type may arrive as `event` or `type` (Sweep&Go uses `type`).
+    const event: string = body.event || body.type || "";
     const data: Record<string, unknown> = body.data ?? body;
 
     // Log the full raw payload so we can see exactly what Sweep&Go sends
@@ -194,14 +195,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, lead_id: lead.id, type: "out_of_area" });
     }
 
-    // ── Ignore all other event types ─────────────────────────────────────────
-    if (event !== "free:quote" && event !== "lead:in_service_area" && event !== "") {
-      console.log(`[SweepAndGo] Ignoring event type: ${event}`);
+    // ── Ignore everything that isn't an explicit quote event ─────────────────
+    // Only free:quote / lead:in_service_area create quote leads. An empty/unknown
+    // event is NOT a quote (Sweep&Go fires job, payroll, notification, and client
+    // events here too — those must never become leads). The API-poll cron
+    // (/api/v2/cron/sync-sweepandgo) is the reliable source for quote leads.
+    if (event !== "free:quote" && event !== "lead:in_service_area") {
+      console.log(`[SweepAndGo] Ignoring event type: ${event || "(empty)"}`);
       return NextResponse.json({ success: true, ignored: true, event });
     }
 
     // ── Quote lead (free:quote or lead:in_service_area) ───────────────────────
-    if (event === "free:quote" || event === "lead:in_service_area" || event === "") {
+    if (event === "free:quote" || event === "lead:in_service_area") {
       const displayName = fullName || firstName || "Unknown";
 
       // Pull any extra fields not already mapped
