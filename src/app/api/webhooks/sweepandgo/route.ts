@@ -80,12 +80,22 @@ function extractPhone(data: Record<string, unknown>): string | null {
   return (
     (data.phone as string) ||
     (data.cell_phone as string) ||
+    (data.cell_phone_number as string) || // Sweep&Go free:quote payload
     (data.cellPhone as string) ||
     (data.home_phone as string) ||
     (data.homePhone as string) ||
     (data.phone_number as string) ||
     (data.phoneNumber as string) ||
     (data.mobile as string) ||
+    null
+  );
+}
+
+function extractEmail(data: Record<string, unknown>): string | null {
+  return (
+    (data.email as string) ||
+    (data.your_email_address as string) || // Sweep&Go free:quote payload
+    (data.email_address as string) ||
     null
   );
 }
@@ -114,7 +124,7 @@ export async function POST(request: NextRequest) {
 
     const { firstName, lastName, fullName } = parseName(data);
     const phone = extractPhone(data);
-    const email = (data.email as string) || null;
+    const email = extractEmail(data);
     const address = (data.address as string) || null;
     const city = (data.city as string) || null;
     const state = (data.state as string) || null;
@@ -164,11 +174,16 @@ export async function POST(request: NextRequest) {
 
       // Pull any extra fields not already mapped
       const knownFields = [
-        "event", "name", "full_name", "first_name", "last_name",
-        "email", "phone", "cell_phone", "home_phone", "phone_number",
+        "event", "name", "full_name", "fullName", "first_name", "last_name",
+        "firstName", "lastName", "fname", "lname",
+        "email", "your_email_address", "email_address",
+        "phone", "cell_phone", "cell_phone_number", "cellPhone",
+        "home_phone", "homePhone", "phone_number", "phoneNumber", "mobile",
         "address", "city", "state", "zip_code", "zip", "postal_code",
         "number_of_dogs", "num_dogs", "dogs",
-        "frequency", "service_frequency",
+        "frequency", "clean_up_frequency", "service_frequency",
+        "last_cleaned", "last_time_yard_was_thoroughly_cleaned",
+        "marketing_allowed", "created_at",
         "notes", "message",
       ];
       const extraNotes: string[] = [];
@@ -193,13 +208,18 @@ export async function POST(request: NextRequest) {
           city: city || null,
           zipCode: zipCode || "",
           numberOfDogs:
-            (data.number_of_dogs as string) ||
+            (data.number_of_dogs != null ? String(data.number_of_dogs) : null) ||
             (data.num_dogs as string) ||
             (data.dogs as string) ||
             null,
           frequency:
             (data.frequency as string) ||
+            (data.clean_up_frequency as string) || // Sweep&Go free:quote payload
             (data.service_frequency as string) ||
+            null,
+          lastCleaned:
+            (data.last_cleaned as string) ||
+            (data.last_time_yard_was_thoroughly_cleaned as string) || // Sweep&Go free:quote payload
             null,
           notes,
           lastStep: "Sweep&Go Quote Form",
