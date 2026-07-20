@@ -61,10 +61,21 @@ if (beta) {
   });
 } else {
   // Legacy: one subscription per resource type, all pointing at the same URL.
-  await post("/v1/webhooks/messages", { url });
-  await post("/v1/webhooks/calls", { url });
-  await post("/v1/webhooks/call-summaries", { url });
-  await post("/v1/webhooks/call-transcripts", { url });
+  // resourceIds ["*"] = every phone number in the workspace.
+  await post("/v1/webhooks/messages", {
+    url,
+    events: ["message.received", "message.delivered"],
+    resourceIds: ["*"],
+    label: "DooGoodScoopers inbound SMS",
+  });
+  await post("/v1/webhooks/calls", {
+    url,
+    events: ["call.completed", "call.missed", "call.recording.completed"],
+    resourceIds: ["*"],
+    label: "DooGoodScoopers calls",
+  });
+  await post("/v1/webhooks/call-summaries", { url, resourceIds: ["*"], label: "DooGoodScoopers call summaries" });
+  await post("/v1/webhooks/call-transcripts", { url, resourceIds: ["*"], label: "DooGoodScoopers call transcripts" });
 }
 
 console.log("\nDone. Verify in the Quo dashboard, then send a test text to your Quo number.");
