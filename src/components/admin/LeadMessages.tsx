@@ -50,14 +50,30 @@ export function LeadMessages({ leadId, leadType, phone, initialMessages }: LeadM
     }
   }, [leadId, leadType]);
 
-  // Load templates once; poll the thread for inbound replies.
+  // Load templates once.
   useEffect(() => {
     fetch("/api/admin/message-templates")
       .then((r) => (r.ok ? r.json() : { templates: [] }))
       .then((d) => setTemplates(d.templates || []))
       .catch(() => {});
-    const interval = setInterval(fetchMessages, 20000);
-    return () => clearInterval(interval);
+  }, []);
+
+  // Near-real-time thread: poll every 5s while the tab is visible, and refresh
+  // immediately when it regains focus. No page reload needed.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") fetchMessages();
+    }, 5000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") fetchMessages();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
   }, [fetchMessages]);
 
   useEffect(() => {
