@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { sendSms, isQuoConfigured } from "@/lib/quo";
 import { renderTemplate } from "@/lib/resend";
+import { optedOutKeys, optOutKey } from "@/lib/sms-optout";
 
 // Drains queued campaign recipients and sends via Quo. Runs on a cron.
 // Batch + spacing keep us well under Quo's 10 req/s limit.
@@ -47,8 +48,20 @@ export async function GET(request: NextRequest) {
 
   let sent = 0;
   let failed = 0;
+  let skipped = 0;
+  const optedOut = await optedOutKeys();
 
   for (const r of pending) {
+    // Never message a number that replied STOP.
+    if (optedOut.has(optOutKey(r.phone) ?? "")) {
+      await prisma.campaignRecipient.update({
+        where: { id: r.id },
+        data: { status: "SKIPPED", error: "opted out (STOP)", sentAt: new Date() },
+      });
+      skipped++;
+      continue;
+    }
+
     const firstName = (r.name || "").trim().split(/\s+/)[0] || "";
     const body = renderTemplate(campaign.body, { firstName, name: r.name || "" });
     const result = await sendSms({ to: r.phone, body });
@@ -101,6 +114,7 @@ export async function GET(request: NextRequest) {
     processed: pending.length,
     sent,
     failed,
+    skipped,
     remaining,
     totalSent: updated.sentCount,
   });

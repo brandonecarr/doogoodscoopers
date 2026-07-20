@@ -15,6 +15,7 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import prisma from "@/lib/prisma";
 import type { LeadSource } from "@prisma/client";
 import { sendAdminPush } from "@/lib/web-push";
+import { isOptOutMessage, recordOptOut } from "@/lib/sms-optout";
 import {
   verifyQuoWebhook,
   parseInboundMessage,
@@ -259,6 +260,28 @@ async function handleInbound(supabase: SupabaseClient, payload: unknown) {
         }).catch(console.error);
       }
     }
+  }
+
+  // Opt-out: a lead replied STOP → add to do-not-contact and archive every
+  // lead with that phone. They're dead and can no longer be messaged.
+  if (normalizedFrom && isOptOutMessage(msg.body)) {
+    const keyword = msg.body.trim().toUpperCase().split(/\s+/)[0];
+    await recordOptOut(normalizedFrom, keyword);
+    const candidates = phoneCandidates(normalizedFrom);
+    const results = await Promise.all([
+      prisma.quoteLead.updateMany({ where: { phone: { in: candidates } }, data: { archived: true } }),
+      prisma.adLead.updateMany({ where: { phone: { in: candidates } }, data: { archived: true } }),
+      prisma.outOfAreaLead.updateMany({ where: { phone: { in: candidates } }, data: { archived: true } }),
+      prisma.commercialLead.updateMany({ where: { phone: { in: candidates } }, data: { archived: true } }),
+    ]);
+    const archived = results.reduce((n, r) => n + r.count, 0);
+    console.log(`[Quo] Opt-out (${keyword}) from ${normalizedFrom} — archived ${archived} lead(s)`);
+    sendAdminPush({
+      title: "🚫 Lead opted out (STOP)",
+      body: `${normalizedFrom} replied ${keyword} — archived ${archived} lead${archived === 1 ? "" : "s"}`,
+      url: "/admin/leads",
+      tag: `optout-${normalizedFrom}`,
+    }).catch(console.error);
   }
 
   // Reply forwarding (e.g. email a staffer).

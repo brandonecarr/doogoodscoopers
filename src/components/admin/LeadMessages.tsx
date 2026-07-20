@@ -23,6 +23,7 @@ interface LeadMessagesProps {
   leadType: "quote" | "outofarea" | "career" | "commercial" | "adlead";
   phone: string | null;
   initialMessages: LeadMessage[];
+  optedOut?: boolean;
 }
 
 function formatTime(dateString: string) {
@@ -34,7 +35,8 @@ function formatTime(dateString: string) {
   });
 }
 
-export function LeadMessages({ leadId, leadType, phone, initialMessages }: LeadMessagesProps) {
+export function LeadMessages({ leadId, leadType, phone, initialMessages, optedOut }: LeadMessagesProps) {
+  const canSend = !!phone && !optedOut;
   const [messages, setMessages] = useState<LeadMessage[]>(initialMessages);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [body, setBody] = useState("");
@@ -130,6 +132,13 @@ export function LeadMessages({ leadId, leadType, phone, initialMessages }: LeadM
         </div>
       )}
 
+      {optedOut && (
+        <div className="flex items-center gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-4">
+          <AlertCircle className="w-4 h-4" />
+          This lead replied STOP and opted out — messaging is disabled.
+        </div>
+      )}
+
       {/* Thread */}
       <div ref={feedRef} className="max-h-96 overflow-y-auto space-y-2 mb-4 pr-1">
         {messages.length === 0 ? (
@@ -173,9 +182,15 @@ export function LeadMessages({ leadId, leadType, phone, initialMessages }: LeadM
           <textarea
             value={body}
             onChange={(e) => setBody(e.target.value)}
-            placeholder={phone ? "Type a message…  (use {{firstName}} to personalize)" : "Add a phone number first"}
+            placeholder={
+              optedOut
+                ? "This lead opted out (STOP)"
+                : phone
+                  ? "Type a message…  (use {{firstName}} to personalize)"
+                  : "Add a phone number first"
+            }
             rows={3}
-            disabled={!phone}
+            disabled={!canSend}
             className="w-full px-4 py-3 text-sm resize-none border-0 focus:ring-0 focus:outline-none disabled:bg-gray-50"
           />
           <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border-t border-gray-200">
@@ -202,7 +217,7 @@ export function LeadMessages({ leadId, leadType, phone, initialMessages }: LeadM
             </div>
             <button
               type="submit"
-              disabled={!phone || !body.trim() || sending}
+              disabled={!canSend || !body.trim() || sending}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               <Send className="w-3.5 h-3.5" />

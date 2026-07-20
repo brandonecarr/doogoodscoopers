@@ -6,6 +6,7 @@ import StatusUpdateForm from "@/components/admin/StatusUpdateForm";
 import { LeadUpdates } from "@/components/admin/LeadUpdates";
 import { LeadMessages } from "@/components/admin/LeadMessages";
 import { DuplicateBanner } from "@/components/admin/DuplicateBanner";
+import { isOptedOut } from "@/lib/sms-optout";
 import { FollowupGrade } from "@/components/admin/FollowupGrade";
 import { LeadActions } from "@/components/admin/LeadActions";
 import type { AdLead } from "@/types/leads";
@@ -68,6 +69,7 @@ export default async function AdLeadDetailPage({ params }: PageProps) {
   }
 
   const typedLead = lead as AdLead;
+  const optedOut = await isOptedOut(typedLead.phone);
   const typedUpdates = updates.map((u) => ({
     id: u.id,
     createdAt: u.createdAt.toISOString(),
@@ -251,6 +253,7 @@ export default async function AdLeadDetailPage({ params }: PageProps) {
             leadId={typedLead.id}
             leadType="adlead"
             phone={typedLead.phone}
+            optedOut={optedOut}
             initialMessages={messages.map((m) => ({
               id: m.id,
               createdAt: m.createdAt.toISOString(),

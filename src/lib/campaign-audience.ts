@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma";
 import { normalizePhoneNumber } from "@/lib/quo";
+import { optedOutKeys, optOutKey } from "@/lib/sms-optout";
 import type { LeadSource } from "@prisma/client";
 
 /**
@@ -139,12 +140,16 @@ export async function buildRecipients(filters: AudienceFilter): Promise<Recipien
     );
   }
 
-  // De-dupe by normalized phone (one text per person), keep the first occurrence.
+  // De-dupe by normalized phone (one text per person), and drop anyone who has
+  // opted out (replied STOP) — they must never receive a campaign.
+  const optedOut = await optedOutKeys();
   const seen = new Set<string>();
   const deduped: Recipient[] = [];
   for (const r of out) {
     const key = normalizePhoneNumber(r.phone);
     if (!key || seen.has(key)) continue;
+    const ooKey = optOutKey(r.phone);
+    if (ooKey && optedOut.has(ooKey)) continue;
     seen.add(key);
     deduped.push(r);
   }

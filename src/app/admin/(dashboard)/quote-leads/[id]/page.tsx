@@ -7,6 +7,7 @@ import StatusUpdateForm from "@/components/admin/StatusUpdateForm";
 import { LeadUpdates } from "@/components/admin/LeadUpdates";
 import { LeadMessages } from "@/components/admin/LeadMessages";
 import { DuplicateBanner } from "@/components/admin/DuplicateBanner";
+import { isOptedOut } from "@/lib/sms-optout";
 import { LeadActions } from "@/components/admin/LeadActions";
 import { FollowupGrade } from "@/components/admin/FollowupGrade";
 
@@ -156,6 +157,8 @@ export default async function QuoteLeadDetailPage({ params }: PageProps) {
   if (!lead) {
     notFound();
   }
+
+  const optedOut = await isOptedOut(lead.phone);
 
   const dogsInfo = lead.dogsInfo as Array<{
     name: string;
@@ -328,6 +331,7 @@ export default async function QuoteLeadDetailPage({ params }: PageProps) {
             leadId={lead.id}
             leadType="quote"
             phone={lead.phone}
+            optedOut={optedOut}
             initialMessages={messages.map((m) => ({
               id: m.id,
               createdAt: m.createdAt.toISOString(),

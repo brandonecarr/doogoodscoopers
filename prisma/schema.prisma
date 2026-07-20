@@ -394,6 +394,20 @@ model Campaign {
   @@index([createdAt])
 }
 
+// =====================
+// SMS OPT-OUT (do-not-contact)
+// =====================
+// A phone that replied STOP. Persistent + phone-keyed so we never message them
+// again, even if a new lead with the same number arrives later.
+model SmsOptOut {
+  id        String   @id @default(cuid())
+  phone     String   @unique // normalized last-10 digits
+  keyword   String? // the opt-out word received (STOP, UNSUBSCRIBE, ...)
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
 // Per-lead send queue for a campaign (drained by the process-campaigns cron).
 model CampaignRecipient {
   id           String     @id @default(cuid())

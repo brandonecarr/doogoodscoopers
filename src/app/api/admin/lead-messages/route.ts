@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { sendSms, isQuoConfigured } from "@/lib/quo";
 import { renderTemplate } from "@/lib/resend";
+import { isOptedOut } from "@/lib/sms-optout";
 import type { LeadSource } from "@prisma/client";
 
 const leadTypeMap: Record<string, LeadSource> = {
@@ -77,6 +78,12 @@ export async function POST(request: Request) {
   const contact = await getLeadContact(mapped, leadId);
   if (!contact) return NextResponse.json({ error: "Lead not found" }, { status: 404 });
   if (!contact.phone) return NextResponse.json({ error: "Lead has no phone number" }, { status: 400 });
+  if (await isOptedOut(contact.phone)) {
+    return NextResponse.json(
+      { error: "This lead replied STOP and can no longer be messaged.", optedOut: true },
+      { status: 409 }
+    );
+  }
 
   // Render {{firstName}}/{{lastName}} against the lead.
   const rendered = renderTemplate(body, {
