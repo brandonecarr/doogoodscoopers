@@ -13,7 +13,7 @@ export interface AudienceFilter {
   leadTypes: string[]; // "quote" | "manual" | "meta" | "outofarea" | "commercial"
   statuses?: string[]; // LeadStatus values
   grades?: string[]; // "A".."F"
-  olderThanDays?: number; // only leads created before now - N days
+  withinDays?: number; // only leads created within the last N days
 }
 
 export interface Recipient {
@@ -30,8 +30,8 @@ function commonWhere(filters: AudienceFilter) {
   const where: Record<string, unknown> = { archived: false };
   if (filters.statuses?.length) where.status = { in: filters.statuses };
   if (filters.grades?.length) where.grade = { in: filters.grades };
-  if (filters.olderThanDays && filters.olderThanDays > 0) {
-    where.createdAt = { lte: new Date(Date.now() - filters.olderThanDays * 24 * 3600 * 1000) };
+  if (filters.withinDays && filters.withinDays > 0) {
+    where.createdAt = { gte: new Date(Date.now() - filters.withinDays * 24 * 3600 * 1000) };
   }
   return where;
 }
