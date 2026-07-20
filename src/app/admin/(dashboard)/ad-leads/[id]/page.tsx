@@ -5,6 +5,7 @@ import prisma from "@/lib/prisma";
 import StatusUpdateForm from "@/components/admin/StatusUpdateForm";
 import { LeadUpdates } from "@/components/admin/LeadUpdates";
 import { LeadMessages } from "@/components/admin/LeadMessages";
+import { DuplicateBanner } from "@/components/admin/DuplicateBanner";
 import { FollowupGrade } from "@/components/admin/FollowupGrade";
 import { LeadActions } from "@/components/admin/LeadActions";
 import type { AdLead } from "@/types/leads";
@@ -77,6 +78,9 @@ export default async function AdLeadDetailPage({ params }: PageProps) {
 
   return (
     <div className="space-y-6 pb-20 lg:pb-0">
+      {/* Duplicate leads banner */}
+      <DuplicateBanner leadId={typedLead.id} leadType="adlead" />
+
       {/* Header */}
       <div className="flex items-center gap-4">
         <Link

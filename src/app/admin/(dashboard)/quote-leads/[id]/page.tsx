@@ -6,6 +6,7 @@ import type { LeadStatus } from "@/types/leads";
 import StatusUpdateForm from "@/components/admin/StatusUpdateForm";
 import { LeadUpdates } from "@/components/admin/LeadUpdates";
 import { LeadMessages } from "@/components/admin/LeadMessages";
+import { DuplicateBanner } from "@/components/admin/DuplicateBanner";
 import { LeadActions } from "@/components/admin/LeadActions";
 import { FollowupGrade } from "@/components/admin/FollowupGrade";
 
@@ -165,6 +166,9 @@ export default async function QuoteLeadDetailPage({ params }: PageProps) {
 
   return (
     <div className="space-y-6 pb-20 lg:pb-0">
+      {/* Duplicate leads banner */}
+      <DuplicateBanner leadId={lead.id} leadType="quote" />
+
       {/* Archived Banner */}
       {lead.archived && (
         <div className="flex items-center gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl">
