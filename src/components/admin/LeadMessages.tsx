@@ -58,8 +58,9 @@ export function LeadMessages({ leadId, leadType, phone, initialMessages }: LeadM
       .catch(() => {});
   }, []);
 
-  // Near-real-time thread: poll every 5s while the tab is visible, and refresh
-  // immediately when it regains focus. No page reload needed.
+  // Near-real-time thread: poll every 5s while the tab is visible, refresh
+  // immediately on focus, and re-fetch when another component (e.g. a merge)
+  // signals a change. No page reload needed.
   useEffect(() => {
     const interval = setInterval(() => {
       if (document.visibilityState === "visible") fetchMessages();
@@ -69,10 +70,12 @@ export function LeadMessages({ leadId, leadType, phone, initialMessages }: LeadM
     };
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("focus", onVisible);
+    window.addEventListener("lead:refresh", fetchMessages);
     return () => {
       clearInterval(interval);
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", onVisible);
+      window.removeEventListener("lead:refresh", fetchMessages);
     };
   }, [fetchMessages]);
 

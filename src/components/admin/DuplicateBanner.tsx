@@ -59,8 +59,16 @@ export function DuplicateBanner({ leadId, leadType }: { leadId: string; leadType
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ leadType, survivorId: leadId, mergeIds: mergeable.map((d) => d.id) }),
       });
-      if (res.ok) router.refresh();
-      else {
+      if (res.ok) {
+        // Update this banner immediately, tell the message thread to pull the
+        // moved-in messages, and refresh server-rendered lead data — no reload.
+        const fresh = await fetch(`/api/admin/lead-duplicates?leadId=${leadId}&leadType=${leadType}`)
+          .then((r) => (r.ok ? r.json() : { duplicates: [] }))
+          .catch(() => ({ duplicates: [] }));
+        setDupes(fresh.duplicates || []);
+        window.dispatchEvent(new Event("lead:refresh"));
+        router.refresh();
+      } else {
         const data = await res.json();
         alert(data.error || "Merge failed");
       }
