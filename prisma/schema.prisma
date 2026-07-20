@@ -326,3 +326,90 @@ model ActivityLog {
   @@index([leadType, leadId])
   @@index([createdAt])
 }
+
+// =====================
+// MESSAGE TEMPLATES
+// =====================
+// Reusable SMS templates for the per-lead compose box and campaigns.
+model MessageTemplate {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  name        String
+  body        String   @db.Text
+  category    String?  // "general" | "campaign"
+  adminEmail  String
+
+  @@index([category])
+  @@index([createdAt])
+}
+
+// =====================
+// LEAD MESSAGES
+// =====================
+// 2-way SMS conversation with a lead (via Quo). Polymorphic by leadType+leadId.
+model LeadMessage {
+  id           String     @id @default(cuid())
+  createdAt    DateTime   @default(now())
+
+  leadType     LeadSource
+  leadId       String
+
+  direction    String     // "INBOUND" | "OUTBOUND"
+  body         String     @db.Text
+  phone        String
+  provider     String     @default("quo")
+  quoMessageId String?    @unique
+  status       String?    // QUEUED | SENT | DELIVERED | FAILED
+  adminEmail   String?    // null for inbound / system
+  campaignId   String?    // set when sent as part of a campaign
+
+  @@index([leadType, leadId])
+  @@index([createdAt])
+  @@index([quoMessageId])
+  @@index([campaignId])
+}
+
+// =====================
+// CAMPAIGNS
+// =====================
+// Bulk SMS blasts to a filtered segment of leads.
+model Campaign {
+  id              String   @id @default(cuid())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  name            String
+  body            String   @db.Text
+  status          String   @default("DRAFT") // DRAFT | QUEUED | SENDING | SENT
+  audienceFilter  Json?    // the segment criteria used to build recipients
+  adminEmail      String
+
+  totalRecipients Int      @default(0)
+  sentCount       Int      @default(0)
+  failedCount     Int      @default(0)
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+// Per-lead send queue for a campaign (drained by the process-campaigns cron).
+model CampaignRecipient {
+  id           String     @id @default(cuid())
+  createdAt    DateTime   @default(now())
+
+  campaignId   String
+  leadType     LeadSource
+  leadId       String
+  phone        String
+  name         String?
+
+  status       String     @default("PENDING") // PENDING | SENT | FAILED | SKIPPED
+  quoMessageId String?
+  error        String?
+  sentAt       DateTime?
+
+  @@index([campaignId])
+  @@index([status])
+}

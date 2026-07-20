@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import prisma from "@/lib/prisma";
+import { sendAdminPush } from "@/lib/web-push";
 import {
   verifyQuoWebhook,
   parseInboundMessage,
@@ -187,6 +188,50 @@ async function handleInbound(supabase: SupabaseClient, payload: unknown) {
       .eq("id", matchedConversationId);
   }
 
+  // No client match → attach the reply to a LEAD (the /admin CRM). Matches
+  // QuoteLead first, then AdLead, by phone; logs a LeadMessage + notifies admins.
+  if (!matchedClientId && normalizedFrom && msg.messageId) {
+    const already = await prisma.leadMessage.findUnique({ where: { quoMessageId: msg.messageId } });
+    if (!already) {
+      const candidates = phoneCandidates(normalizedFrom);
+      const quote = await prisma.quoteLead.findFirst({
+        where: { phone: { in: candidates } },
+        select: { id: true, firstName: true },
+      });
+      const adl = quote
+        ? null
+        : await prisma.adLead.findFirst({
+            where: { phone: { in: candidates } },
+            select: { id: true, firstName: true, fullName: true },
+          });
+      const match = quote
+        ? { type: "QUOTE_FORM" as const, id: quote.id, name: quote.firstName, path: "quote-leads" }
+        : adl
+          ? { type: "AD_LEAD" as const, id: adl.id, name: adl.firstName || adl.fullName, path: "ad-leads" }
+          : null;
+      if (match) {
+        await prisma.leadMessage.create({
+          data: {
+            leadType: match.type,
+            leadId: match.id,
+            direction: "INBOUND",
+            body: msg.body,
+            phone: normalizedFrom,
+            provider: "quo",
+            quoMessageId: msg.messageId,
+            status: "DELIVERED",
+          },
+        });
+        sendAdminPush({
+          title: "💬 Lead replied",
+          body: `${match.name || normalizedFrom}: ${msg.body.slice(0, 60)}`,
+          url: `/admin/${match.path}/${match.id}`,
+          tag: `lead-msg-${match.id}`,
+        }).catch(console.error);
+      }
+    }
+  }
+
   // Reply forwarding (e.g. email a staffer).
   const { data: forwardRules } = await supabase
     .from("reply_forwarding_rules")
@@ -237,6 +282,9 @@ async function handleDeliveryStatus(
       ...(status === "DELIVERED" ? { delivered_at: nowIso } : {}),
     })
     .eq("provider_id", msg.messageId);
+
+  // Admin/CRM lead messages (Prisma) — same provider message id.
+  await prisma.leadMessage.updateMany({ where: { quoMessageId: msg.messageId }, data: { status } });
 
   return NextResponse.json({ success: true, status });
 }

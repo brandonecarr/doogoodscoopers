@@ -5,6 +5,7 @@ import prisma from "@/lib/prisma";
 import type { LeadStatus } from "@/types/leads";
 import StatusUpdateForm from "@/components/admin/StatusUpdateForm";
 import { LeadUpdates } from "@/components/admin/LeadUpdates";
+import { LeadMessages } from "@/components/admin/LeadMessages";
 import { LeadActions } from "@/components/admin/LeadActions";
 import { FollowupGrade } from "@/components/admin/FollowupGrade";
 
@@ -30,6 +31,13 @@ async function getLeadUpdates(leadId: string) {
   });
 
   return updates;
+}
+
+async function getLeadMessages(leadId: string) {
+  return prisma.leadMessage.findMany({
+    where: { leadId, leadType: "QUOTE_FORM" },
+    orderBy: { createdAt: "asc" },
+  });
 }
 
 // Format frequency values like "bi_weekly" → "Bi-Weekly"
@@ -138,9 +146,10 @@ function getGradeBadge(grade: string | null) {
 
 export default async function QuoteLeadDetailPage({ params }: PageProps) {
   const { id } = await params;
-  const [lead, updates] = await Promise.all([
+  const [lead, updates, messages] = await Promise.all([
     getQuoteLead(id),
     getLeadUpdates(id),
+    getLeadMessages(id),
   ]);
 
   if (!lead) {
@@ -309,6 +318,21 @@ export default async function QuoteLeadDetailPage({ params }: PageProps) {
               </div>
             </div>
           )}
+
+          {/* Messages (2-way SMS via Quo) */}
+          <LeadMessages
+            leadId={lead.id}
+            leadType="quote"
+            phone={lead.phone}
+            initialMessages={messages.map((m) => ({
+              id: m.id,
+              createdAt: m.createdAt.toISOString(),
+              direction: m.direction,
+              body: m.body,
+              status: m.status,
+              adminEmail: m.adminEmail,
+            }))}
+          />
 
           {/* Updates */}
           <LeadUpdates

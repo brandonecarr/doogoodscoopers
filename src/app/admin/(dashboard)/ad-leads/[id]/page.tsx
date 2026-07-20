@@ -4,6 +4,7 @@ import { ArrowLeft, Megaphone, Mail, Phone, MapPin, Calendar, Clock, Tag, Clipbo
 import prisma from "@/lib/prisma";
 import StatusUpdateForm from "@/components/admin/StatusUpdateForm";
 import { LeadUpdates } from "@/components/admin/LeadUpdates";
+import { LeadMessages } from "@/components/admin/LeadMessages";
 import { FollowupGrade } from "@/components/admin/FollowupGrade";
 import { LeadActions } from "@/components/admin/LeadActions";
 import type { AdLead } from "@/types/leads";
@@ -46,9 +47,20 @@ async function getLeadUpdates(leadId: string) {
   });
 }
 
+async function getLeadMessages(leadId: string) {
+  return prisma.leadMessage.findMany({
+    where: { leadId, leadType: "AD_LEAD" },
+    orderBy: { createdAt: "asc" },
+  });
+}
+
 export default async function AdLeadDetailPage({ params }: PageProps) {
   const { id } = await params;
-  const [lead, updates] = await Promise.all([getAdLead(id), getLeadUpdates(id)]);
+  const [lead, updates, messages] = await Promise.all([
+    getAdLead(id),
+    getLeadUpdates(id),
+    getLeadMessages(id),
+  ]);
 
   if (!lead) {
     notFound();
@@ -230,6 +242,21 @@ export default async function AdLeadDetailPage({ params }: PageProps) {
             </details>
           ) : null}
 
+          {/* Messages (2-way SMS via Quo) */}
+          <LeadMessages
+            leadId={typedLead.id}
+            leadType="adlead"
+            phone={typedLead.phone}
+            initialMessages={messages.map((m) => ({
+              id: m.id,
+              createdAt: m.createdAt.toISOString(),
+              direction: m.direction,
+              body: m.body,
+              status: m.status,
+              adminEmail: m.adminEmail,
+            }))}
+          />
+
           {/* Updates */}
           <LeadUpdates
             leadId={typedLead.id}
@@ -299,12 +326,6 @@ export default async function AdLeadDetailPage({ params }: PageProps) {
                   >
                     <Phone className="w-4 h-4" />
                     Call Lead
-                  </a>
-                  <a
-                    href={`sms:${typedLead.phone}`}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-gray-200 text-navy-900 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    Send SMS
                   </a>
                 </>
               )}
