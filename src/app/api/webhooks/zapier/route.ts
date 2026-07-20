@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { syncContactToQuo } from "@/lib/quo";
 import { Prisma } from "@prisma/client";
 import { sendAdminPush } from "@/lib/web-push";
 
@@ -124,6 +125,15 @@ export async function POST(request: NextRequest) {
           : Prisma.JsonNull,
         rawPayload: payload as Prisma.InputJsonValue,
       },
+    });
+
+    syncContactToQuo({
+      externalId: `adlead:${lead.id}`,
+      firstName: lead.firstName || lead.fullName || "Ad Lead",
+      lastName: lead.lastName,
+      email: lead.email,
+      phone: lead.phone,
+      source: "DooGoodScoopers Ad",
     });
 
     console.log(`[Zapier Webhook] New lead created: ${lead.id} - ${fullName || email || phone}`);

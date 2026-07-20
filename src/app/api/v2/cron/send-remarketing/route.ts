@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { sendSms, isTwilioConfigured, normalizePhoneNumber } from "@/lib/twilio";
+import { sendSms, isQuoConfigured, normalizePhoneNumber } from "@/lib/quo";
 import { sendEmail, isResendConfigured, wrapEmailHtml } from "@/lib/resend";
 
 function getSupabase() {
@@ -172,7 +172,7 @@ export async function GET(request: NextRequest) {
       let messageSent = false;
 
       // Try SMS first if we have phone
-      if (smsTemplate && session.contact_phone && isTwilioConfigured()) {
+      if (smsTemplate && session.contact_phone && isQuoConfigured()) {
         const normalizedPhone = normalizePhoneNumber(session.contact_phone);
         if (normalizedPhone) {
           const body = renderTemplate(smsTemplate.body, variables);

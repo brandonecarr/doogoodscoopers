@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { authenticateRequest, errorResponse } from "@/lib/api-auth";
-import { sendSms, isTwilioConfigured, normalizePhoneNumber } from "@/lib/twilio";
+import { sendSms, isQuoConfigured, normalizePhoneNumber } from "@/lib/quo";
 import { sendEmail, isResendConfigured, wrapEmailHtml } from "@/lib/resend";
 
 function getSupabase() {
@@ -217,7 +217,7 @@ export async function POST(
         conversation_id: conversationId,
         direction: "OUTBOUND",
         body: message,
-        status: "PENDING",
+        status: "QUEUED",
         sent_by: auth.user.id,
       })
       .select()
@@ -231,7 +231,7 @@ export async function POST(
     // Send the message
     let sendResult;
     if (conversation.channel === "SMS") {
-      if (!isTwilioConfigured()) {
+      if (!isQuoConfigured()) {
         await supabase
           .from("messages")
           .update({ status: "FAILED" })
@@ -248,14 +248,10 @@ export async function POST(
         return NextResponse.json({ error: "Invalid phone number" }, { status: 400 });
       }
 
-      const webhookUrl = process.env.NEXT_PUBLIC_SITE_URL
-        ? `${process.env.NEXT_PUBLIC_SITE_URL}/api/webhooks/twilio/status`
-        : undefined;
-
+      // Quo reports delivery status via /api/webhooks/quo (no per-message callback).
       sendResult = await sendSms({
         to: normalizedPhone,
         body: message,
-        statusCallback: webhookUrl,
       });
     } else {
       if (!isResendConfigured()) {
@@ -279,9 +275,8 @@ export async function POST(
         .from("messages")
         .update({
           status: "SENT",
-          provider: conversation.channel === "SMS" ? "twilio" : "resend",
-          provider_message_id: sendResult.messageId,
-          updated_at: new Date().toISOString(),
+          provider: conversation.channel === "SMS" ? "quo" : "resend",
+          provider_id: sendResult.messageId,
         })
         .eq("id", newMessage.id);
 

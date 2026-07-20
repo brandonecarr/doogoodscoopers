@@ -36,7 +36,10 @@ function phoneKey(raw) {
   if (!raw) return null;
   const digits = String(raw).replace(/\D/g, "");
   if (digits.length < 10) return null;
-  return digits.slice(-10);
+  const key = digits.slice(-10);
+  // Reject obvious test/junk numbers (all identical digits, e.g. 8888888888).
+  if (/^(\d)\1{9}$/.test(key)) return null;
+  return key;
 }
 
 async function main() {

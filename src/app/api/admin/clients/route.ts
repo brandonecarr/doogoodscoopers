@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { authenticateWithPermission, errorResponse } from "@/lib/api-auth";
 import type { ClientStatus } from "@/lib/supabase/types";
+import { syncContactToQuo } from "@/lib/quo";
 
 function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -281,6 +282,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    syncContactToQuo({
+      externalId: `client:${newClient.id}`,
+      firstName: newClient.first_name,
+      lastName: newClient.last_name,
+      email: newClient.email,
+      phone: newClient.phone,
+      company: newClient.company_name,
+      source: "DooGoodScoopers Client",
+    });
+
     // Create location if provided
     if (location && location.addressLine1) {
       const { error: locationError } = await supabase.from("locations").insert({
@@ -437,6 +448,16 @@ export async function PUT(request: NextRequest) {
         { status: 500 }
       );
     }
+
+    syncContactToQuo({
+      externalId: `client:${updatedClient.id}`,
+      firstName: updatedClient.first_name,
+      lastName: updatedClient.last_name,
+      email: updatedClient.email,
+      phone: updatedClient.phone,
+      company: updatedClient.company_name,
+      source: "DooGoodScoopers Client",
+    });
 
     // Log activity
     await supabase.from("activity_logs").insert({

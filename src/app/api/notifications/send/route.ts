@@ -90,15 +90,15 @@ export async function POST(request: NextRequest) {
       // If not scheduled, send immediately
       if (!scheduledFor) {
         // Import the actual sending functions
-        const { sendSms, isTwilioConfigured } = await import("@/lib/twilio");
+        const { sendSms, isQuoConfigured } = await import("@/lib/quo");
         const { sendEmail, isResendConfigured, wrapEmailHtml } = await import("@/lib/resend");
 
         let result;
         if (channel === "SMS") {
-          if (!isTwilioConfigured()) {
+          if (!isQuoConfigured()) {
             await supabase
               .from("notifications")
-              .update({ status: "FAILED", error_message: "Twilio not configured" })
+              .update({ status: "FAILED", error_message: "Quo not configured" })
               .eq("id", notification.id);
             return NextResponse.json({ error: "SMS sending not configured" }, { status: 500 });
           }

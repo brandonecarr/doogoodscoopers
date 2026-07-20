@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { sendAdminPush } from "@/lib/web-push";
+import { syncContactToQuo } from "@/lib/quo";
 
 // Poll the Sweep&Go API for new free quotes and insert them into QuoteLead.
 //
@@ -121,6 +122,14 @@ export async function GET(request: NextRequest) {
         lastStep: "Sweep&Go Quote Form",
         createdAt: new Date(q.created_at),
       },
+    });
+    syncContactToQuo({
+      externalId: `quotelead:${lead.id}`,
+      firstName: lead.firstName,
+      lastName: lead.lastName,
+      email: lead.email,
+      phone: lead.phone,
+      source: "DooGoodScoopers Quote",
     });
     sendAdminPush({
       title: "📋 New Quote Lead",

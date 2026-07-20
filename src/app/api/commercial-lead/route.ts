@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { syncContactToQuo } from "@/lib/quo";
 
 interface CommercialLeadData {
   name: string;
@@ -39,6 +40,15 @@ export async function POST(request: Request) {
         zipCode: data.zipCode,
         inquiry: data.notes || null,
       },
+    });
+
+    syncContactToQuo({
+      externalId: `commerciallead:${lead.id}`,
+      firstName: lead.contactName,
+      email: lead.email,
+      phone: lead.phone,
+      company: lead.propertyName,
+      source: "DooGoodScoopers Commercial",
     });
 
     // Send notification email via webhook (if configured)

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { syncContactToQuo } from "@/lib/quo";
 
 interface QuoteLeadData {
   // Contact info
@@ -78,6 +79,15 @@ export async function POST(request: NextRequest) {
         },
       });
 
+      syncContactToQuo({
+        externalId: `quotelead:${existingLead.id}`,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email,
+        phone: data.phone,
+        source: "DooGoodScoopers Quote",
+      });
+
       return NextResponse.json({
         success: true,
         message: "Lead updated",
@@ -103,6 +113,15 @@ export async function POST(request: NextRequest) {
         lastStep: data.lastStep,
         dogsInfo: data.dogsInfo ? JSON.parse(JSON.stringify(data.dogsInfo)) : undefined,
       },
+    });
+
+    syncContactToQuo({
+      externalId: `quotelead:${lead.id}`,
+      firstName: lead.firstName,
+      lastName: lead.lastName,
+      email: lead.email,
+      phone: lead.phone,
+      source: "DooGoodScoopers Quote",
     });
 
     return NextResponse.json({

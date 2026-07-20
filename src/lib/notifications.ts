@@ -1,11 +1,11 @@
 /**
  * Unified Notification Service
  *
- * Send notifications via SMS (Twilio) or Email (Resend) using templates.
+ * Send notifications via SMS (Quo) or Email (Resend) using templates.
  */
 
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { sendSms, isTwilioConfigured, normalizePhoneNumber } from "./twilio";
+import { sendSms, isQuoConfigured, normalizePhoneNumber } from "./quo";
 import { sendEmail, isResendConfigured, renderTemplate, wrapEmailHtml } from "./resend";
 
 export type NotificationChannel = "SMS" | "EMAIL";
@@ -185,20 +185,14 @@ async function sendSmsNotification(
   body: string,
   supabase: SupabaseClient
 ): Promise<SendNotificationResult> {
-  if (!isTwilioConfigured()) {
-    await updateNotificationStatus(supabase, notificationId, "FAILED", "Twilio not configured");
-    return { success: false, error: "Twilio not configured" };
+  if (!isQuoConfigured()) {
+    await updateNotificationStatus(supabase, notificationId, "FAILED", "Quo not configured");
+    return { success: false, error: "Quo not configured" };
   }
 
-  const webhookUrl = process.env.NEXT_PUBLIC_SITE_URL
-    ? `${process.env.NEXT_PUBLIC_SITE_URL}/api/webhooks/twilio/status`
-    : undefined;
-
-  const result = await sendSms({
-    to,
-    body,
-    statusCallback: webhookUrl,
-  });
+  // Quo reports delivery status via the /api/webhooks/quo webhook, not a
+  // per-message status callback.
+  const result = await sendSms({ to, body });
 
   if (result.success) {
     await updateNotificationStatus(supabase, notificationId, "SENT", undefined, result.messageId);

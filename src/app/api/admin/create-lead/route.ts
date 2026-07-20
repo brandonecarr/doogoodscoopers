@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { syncContactToQuo } from "@/lib/quo";
 import type { LeadStatus } from "@/types/leads";
 
 interface CreateLeadData {
@@ -62,6 +63,15 @@ export async function POST(request: Request) {
         dogsInfo: data.dogsInfo || undefined,
         lastStep: "Manual Entry",
       },
+    });
+
+    syncContactToQuo({
+      externalId: `quotelead:${lead.id}`,
+      firstName: lead.firstName,
+      lastName: lead.lastName,
+      email: lead.email,
+      phone: lead.phone,
+      source: "DooGoodScoopers Manual",
     });
 
     // Log the activity

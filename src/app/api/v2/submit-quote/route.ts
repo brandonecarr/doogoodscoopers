@@ -5,6 +5,7 @@ import Stripe from "stripe";
 import { sendWelcomeEmail, sendNewCustomerNotificationEmail } from "@/lib/email";
 import { getStripe } from "@/lib/stripe";
 import { queueMarketingSync } from "@/lib/marketing-sync";
+import { syncContactToQuo } from "@/lib/quo";
 
 function getServiceSupabase() {
   return createSupabaseClient(
@@ -227,6 +228,15 @@ async function submitInServiceAreaQuote(data: QuoteSubmission) {
         { status: 500 }
       );
     }
+
+    syncContactToQuo({
+      externalId: `client:${client.id}`,
+      firstName: data.firstName,
+      lastName: data.lastName,
+      email: data.email,
+      phone: data.phone,
+      source: "DooGoodScoopers Client",
+    });
 
     // 3a. Create Supabase Auth user + users record for client portal login
     try {

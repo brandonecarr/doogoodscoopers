@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { sendAdminPush } from "@/lib/web-push";
+import { syncContactToQuo } from "@/lib/quo";
 
 // Sweep&Go Webhook — receives quote and lead events
 //
@@ -286,11 +287,28 @@ export async function POST(request: NextRequest) {
             email: email || existingLead.email || null,
           },
         });
+        syncContactToQuo({
+          externalId: `quotelead:${lead.id}`,
+          firstName: lead.firstName,
+          lastName: lead.lastName,
+          email: lead.email,
+          phone: lead.phone,
+          source: "DooGoodScoopers Quote",
+        });
         console.log(`[SweepAndGo] Quote lead deduped/updated: ${lead.id} — ${displayName}`);
         return NextResponse.json({ success: true, lead_id: lead.id, type: "quote", deduped: true });
       }
 
       const lead = await prisma.quoteLead.create({ data: leadData });
+
+      syncContactToQuo({
+        externalId: `quotelead:${lead.id}`,
+        firstName: lead.firstName,
+        lastName: lead.lastName,
+        email: lead.email,
+        phone: lead.phone,
+        source: "DooGoodScoopers Quote",
+      });
 
       sendAdminPush({
         title: "📋 New Quote Lead",

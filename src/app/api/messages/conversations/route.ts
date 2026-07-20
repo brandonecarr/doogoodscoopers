@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { authenticateRequest, errorResponse } from "@/lib/api-auth";
+import { getQuoFromNumber } from "@/lib/quo";
 
 function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -217,7 +218,7 @@ export async function POST(request: NextRequest) {
     // Verify client belongs to org
     const { data: client } = await supabase
       .from("clients")
-      .select("id")
+      .select("id, phone, email")
       .eq("id", clientId)
       .eq("org_id", auth.user.orgId)
       .single();
@@ -242,6 +243,16 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // participant_our/participant_their are NOT NULL. For SMS, "our" side is the
+    // Quo number; for EMAIL it's the org's from-address. "their" side is the
+    // client's phone/email.
+    const participantOur =
+      channel === "SMS"
+        ? getQuoFromNumber()
+        : process.env.RESEND_FROM_EMAIL || process.env.SMTP_FROM || "";
+    const participantTheir =
+      (channel === "SMS" ? client.phone : client.email) || "";
+
     // Create new conversation
     const { data: conversation, error: createError } = await supabase
       .from("message_conversations")
@@ -252,6 +263,8 @@ export async function POST(request: NextRequest) {
         job_id: jobId || null,
         location_id: locationId || null,
         status: "OPEN",
+        participant_our: participantOur,
+        participant_their: participantTheir,
       })
       .select()
       .single();
