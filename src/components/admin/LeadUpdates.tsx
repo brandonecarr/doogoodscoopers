@@ -143,7 +143,7 @@ export function LeadUpdates({ leadId, leadType, updates }: LeadUpdatesProps) {
                       {getCommunicationLabel(update.communicationType)}
                     </span>
                     <span className="text-xs text-gray-400">•</span>
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-gray-500" suppressHydrationWarning>
                       {formatUpdateDate(update.createdAt)}
                     </span>
                   </div>

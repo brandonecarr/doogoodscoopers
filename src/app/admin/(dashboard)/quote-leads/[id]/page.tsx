@@ -380,7 +380,7 @@ export default async function QuoteLeadDetailPage({ params }: PageProps) {
                 </div>
                 <div>
                   <p className="text-sm font-medium text-navy-900">Lead Created</p>
-                  <p className="text-xs text-gray-500">{formatDate(lead.createdAt)}</p>
+                  <p className="text-xs text-gray-500" suppressHydrationWarning>{formatDate(lead.createdAt)}</p>
                 </div>
               </div>
 
@@ -391,7 +391,7 @@ export default async function QuoteLeadDetailPage({ params }: PageProps) {
                   </div>
                   <div>
                     <p className="text-sm font-medium text-navy-900">Last Updated</p>
-                    <p className="text-xs text-gray-500">{formatDate(lead.updatedAt)}</p>
+                    <p className="text-xs text-gray-500" suppressHydrationWarning>{formatDate(lead.updatedAt)}</p>
                   </div>
                 </div>
               )}

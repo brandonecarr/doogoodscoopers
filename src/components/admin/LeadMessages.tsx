@@ -146,7 +146,7 @@ export function LeadMessages({ leadId, leadType, phone, initialMessages }: LeadM
                   >
                     {m.body}
                   </div>
-                  <span className="text-[11px] text-gray-400 mt-0.5 px-1">
+                  <span className="text-[11px] text-gray-400 mt-0.5 px-1" suppressHydrationWarning>
                     {formatTime(m.createdAt)}
                     {outbound && m.status ? ` · ${m.status.toLowerCase()}` : ""}
                   </span>

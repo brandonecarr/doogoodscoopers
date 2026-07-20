@@ -181,7 +181,7 @@ export default async function AdLeadDetailPage({ params }: PageProps) {
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Received</p>
-                  <p className="font-medium text-navy-900">{formatDate(typedLead.createdAt)}</p>
+                  <p className="font-medium text-navy-900" suppressHydrationWarning>{formatDate(typedLead.createdAt)}</p>
                 </div>
               </div>
 
@@ -295,7 +295,7 @@ export default async function AdLeadDetailPage({ params }: PageProps) {
                 </div>
                 <div>
                   <p className="text-sm font-medium text-navy-900">Lead Received</p>
-                  <p className="text-xs text-gray-500">{formatDate(typedLead.createdAt)}</p>
+                  <p className="text-xs text-gray-500" suppressHydrationWarning>{formatDate(typedLead.createdAt)}</p>
                 </div>
               </div>
               {typedLead.updatedAt > typedLead.createdAt && (
@@ -305,7 +305,7 @@ export default async function AdLeadDetailPage({ params }: PageProps) {
                   </div>
                   <div>
                     <p className="text-sm font-medium text-navy-900">Last Updated</p>
-                    <p className="text-xs text-gray-500">{formatDate(typedLead.updatedAt)}</p>
+                    <p className="text-xs text-gray-500" suppressHydrationWarning>{formatDate(typedLead.updatedAt)}</p>
                   </div>
                 </div>
               )}
