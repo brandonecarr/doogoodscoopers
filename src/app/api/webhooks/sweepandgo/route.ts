@@ -272,9 +272,19 @@ export async function POST(request: NextRequest) {
         : null;
 
       if (existingLead) {
+        // Enrich, never erase: the API-poll cron creates the lead fast without a
+        // zip (the free_quotes API omits it); the webhook carries zip/address/
+        // city, so fill those in — but keep whatever we already have if this
+        // particular delivery is missing them.
         const lead = await prisma.quoteLead.update({
           where: { id: existingLead.id },
-          data: leadData,
+          data: {
+            ...leadData,
+            zipCode: zipCode || existingLead.zipCode || "",
+            address: address || existingLead.address || null,
+            city: city || existingLead.city || null,
+            email: email || existingLead.email || null,
+          },
         });
         console.log(`[SweepAndGo] Quote lead deduped/updated: ${lead.id} — ${displayName}`);
         return NextResponse.json({ success: true, lead_id: lead.id, type: "quote", deduped: true });
