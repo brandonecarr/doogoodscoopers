@@ -229,33 +229,58 @@ export async function POST(request: NextRequest) {
         (data.notes as string) || (data.message as string) || null;
       const notes = [formNotes, ...extraNotes].filter(Boolean).join("\n") || null;
 
-      const lead = await prisma.quoteLead.create({
-        data: {
-          firstName: firstName || "Unknown",
-          lastName: lastName || null,
-          email,
-          phone: phone || "",
-          address: address || null,
-          city: city || null,
-          zipCode: zipCode || "",
-          numberOfDogs:
-            (data.number_of_dogs != null ? String(data.number_of_dogs) : null) ||
-            (data.num_dogs as string) ||
-            (data.dogs as string) ||
-            null,
-          frequency:
-            (data.frequency as string) ||
-            (data.clean_up_frequency as string) || // Sweep&Go free:quote payload
-            (data.service_frequency as string) ||
-            null,
-          lastCleaned:
-            (data.last_cleaned as string) ||
-            (data.last_time_yard_was_thoroughly_cleaned as string) || // Sweep&Go free:quote payload
-            null,
-          notes,
-          lastStep: "Sweep&Go Quote Form",
-        },
-      });
+      const leadData = {
+        firstName: firstName || "Unknown",
+        lastName: lastName || null,
+        email,
+        phone: phone || "",
+        address: address || null,
+        city: city || null,
+        zipCode: zipCode || "",
+        numberOfDogs:
+          (data.number_of_dogs != null ? String(data.number_of_dogs) : null) ||
+          (data.num_dogs as string) ||
+          (data.dogs as string) ||
+          null,
+        frequency:
+          (data.frequency as string) ||
+          (data.clean_up_frequency as string) || // Sweep&Go free:quote payload
+          (data.service_frequency as string) ||
+          null,
+        lastCleaned:
+          (data.last_cleaned as string) ||
+          (data.last_time_yard_was_thoroughly_cleaned as string) || // Sweep&Go free:quote payload
+          null,
+        notes,
+        lastStep: "Sweep&Go Quote Form",
+      };
+
+      // Dedup: Sweep&Go delivers the SAME quote several times (and retries in
+      // ~10-min batches). If we already have a recent, non-archived lead with
+      // this phone, update it instead of creating another row — and only send a
+      // push notification when it's genuinely new, so one quote = one alert.
+      const hasPhone = (phone || "").replace(/\D/g, "").length >= 10;
+      const existingLead = hasPhone
+        ? await prisma.quoteLead.findFirst({
+            where: {
+              phone: phone as string,
+              archived: false,
+              createdAt: { gte: new Date(Date.now() - 30 * 24 * 3600 * 1000) },
+            },
+            orderBy: { createdAt: "desc" },
+          })
+        : null;
+
+      if (existingLead) {
+        const lead = await prisma.quoteLead.update({
+          where: { id: existingLead.id },
+          data: leadData,
+        });
+        console.log(`[SweepAndGo] Quote lead deduped/updated: ${lead.id} — ${displayName}`);
+        return NextResponse.json({ success: true, lead_id: lead.id, type: "quote", deduped: true });
+      }
+
+      const lead = await prisma.quoteLead.create({ data: leadData });
 
       sendAdminPush({
         title: "📋 New Quote Lead",
