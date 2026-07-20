@@ -102,18 +102,49 @@ function extractEmail(data: Record<string, unknown>): string | null {
 
 export async function POST(request: NextRequest) {
   try {
-    // Optional secret check — supports both Authorization header and ?secret= query param
+    const url = new URL(request.url);
+    const body = await request.json();
+
+    // ── Auth ──────────────────────────────────────────────────────────────────
+    // Sweep&Go does not document how it signs webhook deliveries, so gather every
+    // place a shared secret/token could arrive, compare against WEBHOOK_SECRET,
+    // and — for now — LOG the outcome instead of rejecting. This unblocks intake
+    // and surfaces (in the Vercel function logs) exactly where SNG puts its token,
+    // so we can flip back to strict rejection once we know the scheme.
+    // We log only WHERE a candidate was found, never the secret value itself.
+    const authHeaderRaw = request.headers.get("authorization") || "";
+    const secretCandidates = [
+      authHeaderRaw.replace(/^Bearer\s+/i, "").trim(),
+      authHeaderRaw.trim(),
+      url.searchParams.get("secret") || "",
+      url.searchParams.get("token") || "",
+      url.searchParams.get("access_token") || "",
+      request.headers.get("x-sng-token") || "",
+      request.headers.get("x-webhook-token") || "",
+      request.headers.get("token") || "",
+      (body?.access_token as string) || "",
+      (body?.token as string) || "",
+    ].filter(Boolean);
+
+    const authLocations = {
+      authorizationHeader: !!authHeaderRaw,
+      querySecret: url.searchParams.has("secret"),
+      queryToken: url.searchParams.has("token"),
+      queryAccessToken: url.searchParams.has("access_token"),
+      bodyAccessToken: body?.access_token != null,
+      bodyToken: body?.token != null,
+    };
+
     if (WEBHOOK_SECRET) {
-      const authHeader = request.headers.get("authorization");
-      const headerSecret = authHeader?.replace("Bearer ", "").trim();
-      const querySecret = new URL(request.url).searchParams.get("secret");
-      if (headerSecret !== WEBHOOK_SECRET && querySecret !== WEBHOOK_SECRET) {
-        console.error("[SweepAndGo] Invalid webhook secret");
-        return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+      if (secretCandidates.includes(WEBHOOK_SECRET)) {
+        console.log("[SweepAndGo] Webhook secret verified.");
+      } else {
+        console.warn(
+          "[SweepAndGo] Secret NOT matched — processing anyway (temporary). Auth seen at:",
+          JSON.stringify(authLocations)
+        );
       }
     }
-
-    const body = await request.json();
 
     // Sweep&Go wraps payload under `data`, but handle flat payloads too
     const event: string = body.event || "";
