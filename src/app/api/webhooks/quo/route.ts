@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import prisma from "@/lib/prisma";
+import type { LeadSource } from "@prisma/client";
 import { sendAdminPush } from "@/lib/web-push";
 import {
   verifyQuoWebhook,
@@ -194,21 +195,40 @@ async function handleInbound(supabase: SupabaseClient, payload: unknown) {
     const already = await prisma.leadMessage.findUnique({ where: { quoMessageId: msg.messageId } });
     if (!already) {
       const candidates = phoneCandidates(normalizedFrom);
-      const quote = await prisma.quoteLead.findFirst({
+
+      // Prefer the lead we're already conversing with on this phone (the most
+      // recent existing message thread), so a reply joins the active
+      // conversation instead of landing on a stale duplicate lead. Fall back to
+      // the most-recently-created lead for the phone.
+      let match: { type: LeadSource; id: string; path: string } | null = null;
+      const thread = await prisma.leadMessage.findFirst({
         where: { phone: { in: candidates } },
-        select: { id: true, firstName: true },
+        orderBy: { createdAt: "desc" },
+        select: { leadType: true, leadId: true },
       });
-      const adl = quote
-        ? null
-        : await prisma.adLead.findFirst({
+      if (thread) {
+        match = {
+          type: thread.leadType,
+          id: thread.leadId,
+          path: thread.leadType === "AD_LEAD" ? "ad-leads" : "quote-leads",
+        };
+      } else {
+        const quote = await prisma.quoteLead.findFirst({
+          where: { phone: { in: candidates } },
+          orderBy: { createdAt: "desc" },
+          select: { id: true },
+        });
+        if (quote) match = { type: "QUOTE_FORM", id: quote.id, path: "quote-leads" };
+        else {
+          const adl = await prisma.adLead.findFirst({
             where: { phone: { in: candidates } },
-            select: { id: true, firstName: true, fullName: true },
+            orderBy: { createdAt: "desc" },
+            select: { id: true },
           });
-      const match = quote
-        ? { type: "QUOTE_FORM" as const, id: quote.id, name: quote.firstName, path: "quote-leads" }
-        : adl
-          ? { type: "AD_LEAD" as const, id: adl.id, name: adl.firstName || adl.fullName, path: "ad-leads" }
-          : null;
+          if (adl) match = { type: "AD_LEAD", id: adl.id, path: "ad-leads" };
+        }
+      }
+
       if (match) {
         await prisma.leadMessage.create({
           data: {
@@ -222,9 +242,18 @@ async function handleInbound(supabase: SupabaseClient, payload: unknown) {
             status: "DELIVERED",
           },
         });
+        // Look up the lead's name for the push notification.
+        const nameRow =
+          match.type === "AD_LEAD"
+            ? await prisma.adLead.findUnique({ where: { id: match.id }, select: { firstName: true, fullName: true } })
+            : await prisma.quoteLead.findUnique({ where: { id: match.id }, select: { firstName: true } });
+        const name =
+          (nameRow as { firstName?: string | null } | null)?.firstName ||
+          (nameRow as { fullName?: string | null } | null)?.fullName ||
+          normalizedFrom;
         sendAdminPush({
           title: "💬 Lead replied",
-          body: `${match.name || normalizedFrom}: ${msg.body.slice(0, 60)}`,
+          body: `${name}: ${msg.body.slice(0, 60)}`,
           url: `/admin/${match.path}/${match.id}`,
           tag: `lead-msg-${match.id}`,
         }).catch(console.error);
