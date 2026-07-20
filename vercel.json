@@ -1,6 +1,10 @@
 {
   "crons": [
     {
+      "path": "/api/v2/cron/sync-sweepandgo",
+      "schedule": "*/2 * * * *"
+    },
+    {
       "path": "/api/v2/cron/mark-abandoned",
       "schedule": "*/15 * * * *"
     },
