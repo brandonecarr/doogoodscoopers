@@ -202,7 +202,12 @@ export interface QuoInboundMessage {
  * shape. Quo (beta) wraps the resource under `data`; be tolerant of shape.
  */
 export function parseInboundMessage(payload: unknown): QuoInboundMessage {
-  const obj = unwrap(payload);
+  // Quo/OpenPhone nests the resource under data.object; fall back to data, then
+  // the top level, so we tolerate all shapes.
+  const p = (payload && typeof payload === "object" ? payload : {}) as Record<string, unknown>;
+  const d = (p.data && typeof p.data === "object" ? (p.data as Record<string, unknown>) : p);
+  const obj =
+    d.object && typeof d.object === "object" ? (d.object as Record<string, unknown>) : d;
   const toRaw = obj.to;
   const to = Array.isArray(toRaw) ? String(toRaw[0] ?? "") : String(toRaw ?? "");
   const media = obj.media as Array<{ url?: string }> | string[] | undefined;
