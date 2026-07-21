@@ -114,6 +114,9 @@ export default async function CampaignsPage() {
                     </>
                   )}
                   <p className="text-xs text-gray-400" suppressHydrationWarning>{formatDate(c.createdAt)}</p>
+                  <Link href={`/admin/campaigns/${c.id}/edit`} className="text-xs text-teal-600 hover:underline">
+                    Edit
+                  </Link>
                 </div>
               </div>
             );
