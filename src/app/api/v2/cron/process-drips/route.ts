@@ -4,6 +4,7 @@ import { sendSms, isQuoConfigured } from "@/lib/quo";
 import { renderTemplate } from "@/lib/resend";
 import { optedOutKeys, optOutKey } from "@/lib/sms-optout";
 import { findDripCandidates, isLeadArchived } from "@/lib/drip";
+import { getLeadPersonalization } from "@/lib/personalization";
 
 // Drives DRIP campaigns: enrolls new matching leads and sends each recipient's
 // next step when due. Stops a recipient on reply / opt-out / archive.
@@ -89,8 +90,13 @@ export async function GET(request: NextRequest) {
         continue;
       }
 
-      const firstName = (r.name || "").trim().split(/\s+/)[0] || "";
-      const body = renderTemplate(step.body, { firstName, name: r.name || "" });
+      const vars = await getLeadPersonalization(r.leadType, r.leadId);
+      // Fall back to the recipient's stored name if the lead record is gone.
+      if (!vars.name && r.name) {
+        vars.name = r.name;
+        vars.firstName = r.name.trim().split(/\s+/)[0] || "";
+      }
+      const body = renderTemplate(step.body, vars);
       const result = await sendSms({ to: r.phone, body });
 
       await prisma.leadMessage.create({

@@ -101,7 +101,7 @@ export default function TemplatesPage() {
             value={body}
             onChange={(e) => setBody(e.target.value)}
             rows={4}
-            placeholder="Message…  Use {{firstName}} to personalize."
+            placeholder="Message…  Use {{firstName}}, {{zipCode}} or {{numberOfDogs}} to personalize."
             className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg resize-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
           />
           <div className="flex gap-2">

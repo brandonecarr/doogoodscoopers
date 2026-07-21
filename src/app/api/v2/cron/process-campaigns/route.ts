@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { sendSms, isQuoConfigured } from "@/lib/quo";
 import { renderTemplate } from "@/lib/resend";
 import { optedOutKeys, optOutKey } from "@/lib/sms-optout";
+import { getLeadPersonalization } from "@/lib/personalization";
 
 // Drains queued campaign recipients and sends via Quo. Runs on a cron.
 // Batch + spacing keep us well under Quo's 10 req/s limit.
@@ -62,8 +63,13 @@ export async function GET(request: NextRequest) {
       continue;
     }
 
-    const firstName = (r.name || "").trim().split(/\s+/)[0] || "";
-    const body = renderTemplate(campaign.body, { firstName, name: r.name || "" });
+    const vars = await getLeadPersonalization(r.leadType, r.leadId);
+    // Fall back to the recipient's stored name if the lead record is gone.
+    if (!vars.name && r.name) {
+      vars.name = r.name;
+      vars.firstName = r.name.trim().split(/\s+/)[0] || "";
+    }
+    const body = renderTemplate(campaign.body, vars);
     const result = await sendSms({ to: r.phone, body });
 
     await prisma.campaignRecipient.update({
