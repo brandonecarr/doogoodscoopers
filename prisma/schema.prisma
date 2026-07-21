@@ -406,11 +406,11 @@ model CampaignStep {
   id         String   @id @default(cuid())
   createdAt  DateTime @default(now())
 
-  campaignId String
-  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  stepOrder  Int
-  body       String   @db.Text
-  delayHours Int      @default(0)
+  campaignId   String
+  campaign     Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  stepOrder    Int
+  body         String   @db.Text
+  delayMinutes Int      @default(0) // wait before this step, relative to the previous (step 0 = 0)
 
   @@index([campaignId])
 }

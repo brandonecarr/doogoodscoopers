@@ -21,7 +21,7 @@ interface CreateBody {
   recipients?: Array<{ leadType: LeadSource; leadId: string; phone: string; name?: string | null }>;
   // drip
   leadTypes?: string[];
-  steps?: Array<{ body: string; delayDays?: number }>;
+  steps?: Array<{ body: string; delayMinutes?: number }>;
   stopOnReply?: boolean;
 }
 
@@ -57,7 +57,7 @@ export async function POST(request: Request) {
           create: steps.map((s, i) => ({
             stepOrder: i,
             body: s.body.trim(),
-            delayHours: i === 0 ? 0 : Math.max(0, Math.round((s.delayDays || 0) * 24)),
+            delayMinutes: i === 0 ? 0 : Math.max(0, Math.round(s.delayMinutes || 0)),
           })),
         },
       },

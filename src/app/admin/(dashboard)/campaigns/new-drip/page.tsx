@@ -10,10 +10,13 @@ interface Template {
   name: string;
   body: string;
 }
+type DelayUnit = "minutes" | "hours" | "days";
 interface Step {
   body: string;
-  delayDays: number;
+  delayValue: number;
+  delayUnit: DelayUnit;
 }
+const UNIT_MINUTES: Record<DelayUnit, number> = { minutes: 1, hours: 60, days: 1440 };
 
 const LEAD_TYPES = [
   { value: "quote", label: "Quote Form" },
@@ -32,7 +35,7 @@ export default function NewDripPage() {
   const [name, setName] = useState("");
   const [leadTypes, setLeadTypes] = useState<string[]>(["quote"]);
   const [stopOnReply, setStopOnReply] = useState(true);
-  const [steps, setSteps] = useState<Step[]>([{ body: "", delayDays: 0 }]);
+  const [steps, setSteps] = useState<Step[]>([{ body: "", delayValue: 0, delayUnit: "days" }]);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,7 +49,7 @@ export default function NewDripPage() {
 
   const updateStep = (i: number, patch: Partial<Step>) =>
     setSteps((s) => s.map((st, idx) => (idx === i ? { ...st, ...patch } : st)));
-  const addStep = () => setSteps((s) => [...s, { body: "", delayDays: 3 }]);
+  const addStep = () => setSteps((s) => [...s, { body: "", delayValue: 3, delayUnit: "days" }]);
   const removeStep = (i: number) => setSteps((s) => s.filter((_, idx) => idx !== i));
 
   const save = async () => {
@@ -64,7 +67,9 @@ export default function NewDripPage() {
           name: name.trim(),
           leadTypes,
           stopOnReply,
-          steps: steps.filter((s) => s.body.trim()).map((s) => ({ body: s.body.trim(), delayDays: s.delayDays })),
+          steps: steps
+            .filter((s) => s.body.trim())
+            .map((s) => ({ body: s.body.trim(), delayMinutes: Math.max(0, Math.round(s.delayValue * UNIT_MINUTES[s.delayUnit])) })),
         }),
       });
       const data = await res.json();
@@ -136,11 +141,20 @@ export default function NewDripPage() {
                     <input
                       type="number"
                       min={0}
-                      value={step.delayDays}
-                      onChange={(e) => updateStep(i, { delayDays: Math.max(0, parseInt(e.target.value || "0", 10)) })}
+                      value={step.delayValue}
+                      onChange={(e) => updateStep(i, { delayValue: Math.max(0, parseInt(e.target.value || "0", 10)) })}
                       className="w-14 px-2 py-0.5 text-xs border border-gray-200 rounded"
                     />
-                    days after the previous
+                    <select
+                      value={step.delayUnit}
+                      onChange={(e) => updateStep(i, { delayUnit: e.target.value as DelayUnit })}
+                      className="px-1.5 py-0.5 text-xs border border-gray-200 rounded bg-white"
+                    >
+                      <option value="minutes">minutes</option>
+                      <option value="hours">hours</option>
+                      <option value="days">days</option>
+                    </select>
+                    after the previous
                   </span>
                 )}
               </span>

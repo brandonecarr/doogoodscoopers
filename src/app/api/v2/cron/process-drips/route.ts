@@ -14,7 +14,7 @@ export const maxDuration = 60;
 const MAX_SENDS = 60; // per run, keeps us well under Quo's 10 req/s with spacing
 const SPACING_MS = 150;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-const HOUR = 3600 * 1000;
+const MINUTE = 60 * 1000;
 
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
             name: c.name,
             status: "ACTIVE",
             currentStep: 0,
-            nextSendAt: new Date(Date.now() + (steps[0].delayHours || 0) * HOUR),
+            nextSendAt: new Date(Date.now() + (steps[0].delayMinutes || 0) * MINUTE),
           },
         });
         enrolled++;
@@ -114,7 +114,7 @@ export async function GET(request: NextRequest) {
         data: {
           currentStep: r.currentStep + 1,
           status: next ? "ACTIVE" : "COMPLETED",
-          nextSendAt: next ? new Date(Date.now() + (next.delayHours || 0) * HOUR) : null,
+          nextSendAt: next ? new Date(Date.now() + (next.delayMinutes || 0) * MINUTE) : null,
           quoMessageId: result.messageId ?? null,
           sentAt: new Date(),
           error: result.success ? null : result.error ?? "send failed",
