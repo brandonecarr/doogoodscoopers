@@ -9,6 +9,10 @@
       "schedule": "* * * * *"
     },
     {
+      "path": "/api/v2/cron/process-drips",
+      "schedule": "* * * * *"
+    },
+    {
       "path": "/api/v2/cron/mark-abandoned",
       "schedule": "*/15 * * * *"
     },

@@ -13,38 +13,76 @@ export async function GET() {
 }
 
 interface CreateBody {
+  type?: "blast" | "drip";
   name: string;
-  body: string;
+  // blast
+  body?: string;
   audienceFilter?: unknown;
-  recipients: Array<{ leadType: LeadSource; leadId: string; phone: string; name?: string | null }>;
+  recipients?: Array<{ leadType: LeadSource; leadId: string; phone: string; name?: string | null }>;
+  // drip
+  leadTypes?: string[];
+  steps?: Array<{ body: string; delayDays?: number }>;
+  stopOnReply?: boolean;
 }
 
-// POST → create a campaign + its recipient queue (status QUEUED; drained by cron)
+// POST → create a blast (queued recipients) or a drip (trigger + steps; the
+// process-drips cron enrolls matching leads and sends the sequence over time).
 export async function POST(request: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { name, body, audienceFilter, recipients } = (await request.json()) as CreateBody;
-  if (!name?.trim() || !body?.trim()) {
-    return NextResponse.json({ error: "Name and message are required" }, { status: 400 });
+  const b = (await request.json()) as CreateBody;
+  if (!b.name?.trim()) return NextResponse.json({ error: "Name is required" }, { status: 400 });
+
+  // ── Drip ──────────────────────────────────────────────────────────────────
+  if (b.type === "drip") {
+    if (!b.leadTypes?.length) {
+      return NextResponse.json({ error: "Pick at least one trigger lead type" }, { status: 400 });
+    }
+    const steps = (b.steps || []).filter((s) => s.body?.trim());
+    if (steps.length === 0) return NextResponse.json({ error: "Add at least one message" }, { status: 400 });
+
+    const campaign = await prisma.campaign.create({
+      data: {
+        name: b.name.trim(),
+        body: steps[0].body.trim(), // first message, for list display
+        type: "DRIP",
+        status: "ACTIVE",
+        active: true,
+        stopOnReply: b.stopOnReply !== false,
+        audienceFilter: { leadTypes: b.leadTypes },
+        adminEmail: session.email,
+        totalRecipients: 0,
+        steps: {
+          create: steps.map((s, i) => ({
+            stepOrder: i,
+            body: s.body.trim(),
+            delayHours: i === 0 ? 0 : Math.max(0, Math.round((s.delayDays || 0) * 24)),
+          })),
+        },
+      },
+    });
+    return NextResponse.json({ success: true, campaign });
   }
-  if (!recipients?.length) {
-    return NextResponse.json({ error: "No recipients selected" }, { status: 400 });
-  }
+
+  // ── Blast (default) ─────────────────────────────────────────────────────────
+  if (!b.body?.trim()) return NextResponse.json({ error: "Message is required" }, { status: 400 });
+  if (!b.recipients?.length) return NextResponse.json({ error: "No recipients selected" }, { status: 400 });
 
   const campaign = await prisma.campaign.create({
     data: {
-      name: name.trim(),
-      body: body.trim(),
+      name: b.name.trim(),
+      body: b.body.trim(),
+      type: "BLAST",
       status: "QUEUED",
-      audienceFilter: (audienceFilter ?? undefined) as object | undefined,
+      audienceFilter: (b.audienceFilter ?? undefined) as object | undefined,
       adminEmail: session.email,
-      totalRecipients: recipients.length,
+      totalRecipients: b.recipients.length,
     },
   });
 
   await prisma.campaignRecipient.createMany({
-    data: recipients.map((r) => ({
+    data: b.recipients.map((r) => ({
       campaignId: campaign.id,
       leadType: r.leadType,
       leadId: r.leadId,

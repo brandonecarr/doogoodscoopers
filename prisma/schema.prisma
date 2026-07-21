@@ -381,17 +381,38 @@ model Campaign {
   updatedAt       DateTime @updatedAt
 
   name            String
-  body            String   @db.Text
-  status          String   @default("DRAFT") // DRAFT | QUEUED | SENDING | SENT
-  audienceFilter  Json?    // the segment criteria used to build recipients
+  body            String   @db.Text // BLAST: the single message. DRIP: unused (steps hold the messages).
+  type            String   @default("BLAST") // BLAST | DRIP
+  status          String   @default("DRAFT") // BLAST: DRAFT|QUEUED|SENDING|SENT
+  active          Boolean  @default(true) // DRIP: pause/resume enrollment + sends
+  stopOnReply     Boolean  @default(true) // DRIP: halt a lead's sequence once they reply
+  audienceFilter  Json?    // BLAST: segment criteria. DRIP: trigger { leadTypes: [...] }
   adminEmail      String
 
   totalRecipients Int      @default(0)
   sentCount       Int      @default(0)
   failedCount     Int      @default(0)
 
+  steps           CampaignStep[]
+
   @@index([status])
+  @@index([type])
   @@index([createdAt])
+}
+
+// A single message in a DRIP sequence. delayHours = wait before this step,
+// relative to the previous step (step 0 = 0 = immediate on enrollment).
+model CampaignStep {
+  id         String   @id @default(cuid())
+  createdAt  DateTime @default(now())
+
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  stepOrder  Int
+  body       String   @db.Text
+  delayHours Int      @default(0)
+
+  @@index([campaignId])
 }
 
 // =====================
@@ -419,11 +440,17 @@ model CampaignRecipient {
   phone        String
   name         String?
 
-  status       String     @default("PENDING") // PENDING | SENT | FAILED | SKIPPED
+  status       String     @default("PENDING") // BLAST: PENDING|SENT|FAILED|SKIPPED. DRIP: ACTIVE|COMPLETED|STOPPED
   quoMessageId String?
   error        String?
   sentAt       DateTime?
 
+  // DRIP progress
+  currentStep  Int        @default(0)
+  nextSendAt   DateTime?
+
+  @@unique([campaignId, leadType, leadId])
   @@index([campaignId])
   @@index([status])
+  @@index([nextSendAt])
 }

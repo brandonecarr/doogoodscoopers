@@ -21,3 +21,17 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
   return NextResponse.json({ campaign, counts });
 }
+
+// PATCH → pause/resume a drip (or other campaign fields)
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { id } = await params;
+  const { active } = await request.json();
+  if (typeof active !== "boolean") {
+    return NextResponse.json({ error: "active (boolean) required" }, { status: 400 });
+  }
+  const campaign = await prisma.campaign.update({ where: { id }, data: { active } });
+  return NextResponse.json({ success: true, campaign });
+}
