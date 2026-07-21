@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { sendAdminPush } from "@/lib/web-push";
 import { syncContactToQuo } from "@/lib/quo";
+import { optedOutKeys } from "@/lib/sms-optout";
 
 // Poll the Sweep&Go API for new free quotes and insert them into QuoteLead.
 //
@@ -22,8 +23,6 @@ export const maxDuration = 60;
 const SNG_FREE_QUOTES_URL = "https://openapi.sweepandgo.com/api/v2/free_quotes";
 // Look back further than the poll interval so a missed run can't drop a lead.
 const LOOKBACK_MINUTES = 30;
-// Window for the dedup lookup against existing rows.
-const DEDUP_DAYS = 60;
 
 interface FreeQuote {
   first_name: string | null;
@@ -96,18 +95,64 @@ export async function GET(request: NextRequest) {
     if (!prev || q.created_at > prev.created_at) byPhone.set(k, q);
   }
 
-  // ── Dedup against existing leads (format-agnostic) ──────────────────────────
+  // ── Match against existing leads (format-agnostic, any age) ─────────────────
+  // A repeat quote from a phone we already have RESURFACES that lead instead of
+  // creating a duplicate; a genuinely new phone creates a lead.
   const existing = await prisma.quoteLead.findMany({
-    where: { createdAt: { gte: new Date(Date.now() - DEDUP_DAYS * 24 * 3600 * 1000) } },
-    select: { phone: true },
+    select: { id: true, phone: true, createdAt: true, notes: true, status: true },
   });
-  const have = new Set(existing.map((l) => phoneKey(l.phone)).filter((k): k is string => !!k));
+  const byKey = new Map<string, { id: string; createdAt: Date; notes: string | null; status: string }>();
+  for (const l of existing) {
+    const k = phoneKey(l.phone);
+    if (!k) continue;
+    const prev = byKey.get(k);
+    if (!prev || l.createdAt > prev.createdAt) byKey.set(k, { id: l.id, createdAt: l.createdAt, notes: l.notes, status: l.status });
+  }
+  const optedOut = await optedOutKeys();
 
   let inserted = 0;
+  let bumped = 0;
   const insertedNames: string[] = [];
+
   for (const [k, q] of byPhone) {
-    if (have.has(k)) continue;
-    have.add(k);
+    if (optedOut.has(k)) continue; // opted out (STOP) — never resurface
+
+    const existingLead = byKey.get(k);
+
+    // ── Repeat quote → resurface the existing lead ──────────────────────────
+    if (existingLead) {
+      if (existingLead.status === "CONVERTED") continue; // already a customer; leave it
+      const note = `Re-quoted ${new Date().toLocaleDateString("en-US")}`;
+      const lead = await prisma.quoteLead.update({
+        where: { id: existingLead.id },
+        data: {
+          status: "NEW",
+          archived: false,
+          createdAt: new Date(), // bump to the top of the list + re-eligible for drips
+          lastStep: "Sweep&Go Quote Form",
+          notes: [existingLead.notes, note].filter(Boolean).join("\n"),
+        },
+      });
+      syncContactToQuo({
+        externalId: `quotelead:${lead.id}`,
+        firstName: lead.firstName,
+        lastName: lead.lastName,
+        email: lead.email,
+        phone: lead.phone,
+        source: "DooGoodScoopers Quote",
+      });
+      sendAdminPush({
+        title: "🔁 Lead re-quoted",
+        body: `${lead.firstName}${lead.phone ? ` — ${lead.phone}` : ""}`,
+        url: `/admin/quote-leads/${lead.id}`,
+        tag: `requote-${lead.id}`,
+      }).catch(console.error);
+      byKey.set(k, { id: lead.id, createdAt: lead.createdAt, notes: lead.notes, status: "NEW" });
+      bumped++;
+      continue;
+    }
+
+    // ── New phone → create a fresh lead ─────────────────────────────────────
     const lead = await prisma.quoteLead.create({
       data: {
         firstName: (q.first_name || "").trim() || "Unknown",
@@ -137,6 +182,7 @@ export async function GET(request: NextRequest) {
       url: `/admin/quote-leads/${lead.id}`,
       tag: `quote-lead-${lead.id}`,
     }).catch(console.error);
+    byKey.set(k, { id: lead.id, createdAt: lead.createdAt, notes: lead.notes, status: "NEW" });
     inserted++;
     insertedNames.push(`${lead.firstName} ${lead.phone}`);
   }
@@ -146,6 +192,7 @@ export async function GET(request: NextRequest) {
     lookbackMinutes: LOOKBACK_MINUTES,
     scannedInWindow: byPhone.size,
     inserted,
+    bumped,
     insertedNames,
   });
 }
