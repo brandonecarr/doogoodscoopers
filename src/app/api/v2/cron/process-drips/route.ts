@@ -31,6 +31,8 @@ export async function GET(request: NextRequest) {
   });
 
   const optedOut = await optedOutKeys();
+  // Global {{reviewLink}} token for review-request drips (the Google "leave a review" link).
+  const reviewLink = (await prisma.appSetting.findUnique({ where: { key: "reviews.google.writeUrl" } }))?.value || "";
   let enrolled = 0;
   let sent = 0;
   let stopped = 0;
@@ -96,7 +98,7 @@ export async function GET(request: NextRequest) {
         vars.name = r.name;
         vars.firstName = r.name.trim().split(/\s+/)[0] || "";
       }
-      const body = renderTemplate(step.body, vars);
+      const body = renderTemplate(step.body, { ...vars, reviewLink });
       const result = await sendSms({ to: r.phone, body });
 
       await prisma.leadMessage.create({

@@ -26,6 +26,7 @@ enum LeadSource {
   CAREERS          // Job application
   COMMERCIAL       // Commercial service inquiry
   AD_LEAD          // Meta/Facebook ads via Privyr
+  CUSTOMER         // Active Sweep&Go customer (for review-request / customer drips)
 }
 
 // =====================

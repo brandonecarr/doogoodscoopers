@@ -55,6 +55,21 @@ export async function findDripCandidates(campaign: DripCampaign): Promise<DripCa
     const rows = await prisma.commercialLead.findMany({ where: base, select: { id: true, phone: true, contactName: true } });
     for (const r of rows) out.push({ leadType: "COMMERCIAL", leadId: r.id, phone: r.phone, name: r.contactName });
   }
+  // Sweep&Go customers (for review-request / customer drips). Enrolls customers
+  // that appeared in the mirror after the campaign started; delay steps mean the
+  // request lands a set time after they became a customer (≈ after first cleanup).
+  if (types.has("customers")) {
+    const rows = await prisma.sweepandgoCustomer.findMany({
+      where: { active: true, firstSeenAt: { gt: since } },
+      select: { id: true, cellPhone: true, homePhone: true, firstName: true, lastName: true },
+    });
+    for (const r of rows) out.push({
+      leadType: "CUSTOMER",
+      leadId: r.id,
+      phone: r.cellPhone || r.homePhone || "",
+      name: [r.firstName, r.lastName].filter(Boolean).join(" ") || null,
+    });
+  }
 
   // Exclude already-enrolled, phone-less, and opted-out.
   const enrolled = await prisma.campaignRecipient.findMany({ where: { campaignId: campaign.id }, select: { leadType: true, leadId: true } });
@@ -69,6 +84,11 @@ export async function findDripCandidates(campaign: DripCampaign): Promise<DripCa
 
 /** Whether a lead has been archived (drip should stop). */
 export async function isLeadArchived(leadType: LeadSource, leadId: string): Promise<boolean> {
+  if (leadType === "CUSTOMER") {
+    // A customer that cancelled (active=false) or vanished from the mirror stops the drip.
+    const row = await prisma.sweepandgoCustomer.findUnique({ where: { id: leadId }, select: { active: true } });
+    return row ? !row.active : true;
+  }
   const sel = { select: { archived: true } };
   let row: { archived: boolean } | null = null;
   if (leadType === "QUOTE_FORM") row = await prisma.quoteLead.findUnique({ where: { id: leadId }, ...sel });

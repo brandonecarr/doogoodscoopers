@@ -31,6 +31,7 @@ const LEAD_TYPES = [
   { value: "meta", label: "Meta Ads" },
   { value: "outofarea", label: "Out of Area" },
   { value: "commercial", label: "Commercial" },
+  { value: "customers", label: "Customers (review requests)" },
 ];
 
 function toggle(arr: string[], v: string): string[] {
@@ -131,6 +132,11 @@ export function DripForm({ mode, campaignId, initial }: DripFormProps) {
               </button>
             ))}
           </div>
+          {leadTypes.includes("customers") && (
+            <p className="text-xs text-teal-700 bg-teal-50 border border-teal-100 rounded-lg px-3 py-2 mt-2">
+              Enrolls each new Sweep&amp;Go customer once, after the delay you set — great for a review request a few days after their first cleanup. Use <code className="bg-white px-1 rounded">{"{{reviewLink}}"}</code> in the message to drop in your Google review link (set it under Reviews → Review sources).
+            </p>
+          )}
         </div>
         <label className="flex items-center gap-2 text-sm text-gray-700">
           <input type="checkbox" checked={stopOnReply} onChange={(e) => setStopOnReply(e.target.checked)} className="rounded border-gray-300 text-teal-600 focus:ring-teal-500" />
@@ -182,7 +188,7 @@ export function DripForm({ mode, campaignId, initial }: DripFormProps) {
               value={step.body}
               onChange={(e) => updateStep(i, { body: e.target.value })}
               rows={3}
-              placeholder="Message…  Use {{firstName}}, {{zipCode}} or {{dogs}} to personalize."
+              placeholder="Message…  Use {{firstName}}, {{zipCode}}, {{dogs}} or {{reviewLink}} to personalize."
               className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg resize-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
             />
             {templates.length > 0 && (

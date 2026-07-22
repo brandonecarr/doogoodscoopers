@@ -13,6 +13,7 @@ const pathFor: Record<LeadSource, string> = {
   OUT_OF_AREA: "out-of-area",
   COMMERCIAL: "commercial",
   CAREERS: "careers",
+  CUSTOMER: "customers",
 };
 
 function fmt(d: Date | null) {
@@ -161,9 +162,13 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
                   return (
                     <tr key={r.id}>
                       <td className="py-2 pr-4">
-                        <Link href={`/admin/${pathFor[r.leadType]}/${r.leadId}`} className="text-navy-900 hover:text-teal-600 hover:underline">
-                          {r.name || "Unknown"}
-                        </Link>
+                        {r.leadType === "CUSTOMER" ? (
+                          <span className="text-navy-900">{r.name || "Unknown"}</span>
+                        ) : (
+                          <Link href={`/admin/${pathFor[r.leadType]}/${r.leadId}`} className="text-navy-900 hover:text-teal-600 hover:underline">
+                            {r.name || "Unknown"}
+                          </Link>
+                        )}
                       </td>
                       <td className="py-2 pr-4 text-gray-600">{r.phone}</td>
                       <td className="py-2 pr-4">

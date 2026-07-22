@@ -130,6 +130,15 @@ export async function getLeadPersonalization(leadType: LeadSource, leadId: strin
       const name = [l.firstName, l.lastName].filter(Boolean).join(" ");
       return { firstName: l.firstName || firstNameOf(name), lastName: l.lastName || "", name, zipCode: "", ...dogTokens("") };
     }
+    case "CUSTOMER": {
+      const l = await prisma.sweepandgoCustomer.findUnique({
+        where: { id: leadId },
+        select: { firstName: true, lastName: true, zipCode: true },
+      });
+      if (!l) return { ...EMPTY_LEAD_VARS };
+      const name = [l.firstName, l.lastName].filter(Boolean).join(" ");
+      return { firstName: l.firstName || firstNameOf(name), lastName: l.lastName || "", name, zipCode: l.zipCode || "", ...dogTokens("") };
+    }
   }
   return { ...EMPTY_LEAD_VARS };
 }
