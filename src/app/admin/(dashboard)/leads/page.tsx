@@ -170,6 +170,8 @@ export default function LeadsPage() {
 
   const [leads,        setLeads]        = useState<CombinedLead[]>([]);
   const [total,        setTotal]        = useState(0);
+  const [counts,       setCounts]       = useState<Record<string, number>>({});
+  const [loadingMore,  setLoadingMore]  = useState<string | null>(null);
   const [loading,      setLoading]      = useState(true);
   const [view,         setView]         = useState<"list" | "kanban">("list");
   const [searchValue,  setSearchValue]  = useState(searchParams.get("search") || "");
@@ -231,6 +233,7 @@ export default function LeadsPage() {
         const data = await res.json();
         setLeads(data.leads);
         setTotal(data.total);
+        setCounts(data.counts || {});
       }
     } catch (e) {
       console.error(e);
@@ -262,21 +265,49 @@ export default function LeadsPage() {
     saveAssignments(newAssign);
 
     if (col?.statusMapping && col.statusMapping !== lead.status) {
+      const prevStatus = lead.status;
+      const newStatus = col.statusMapping;
       const leadType = lead.type === "quote" ? "quote" : "adlead";
       await fetch("/api/admin/update-lead", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ leadId: lead.id, leadType, status: col.statusMapping }),
+        body: JSON.stringify({ leadId: lead.id, leadType, status: newStatus }),
       });
       setLeads((prev) =>
         prev.map((l) =>
-          l.id === lead.id && l.type === lead.type
-            ? { ...l, status: col.statusMapping! }
-            : l
+          l.id === lead.id && l.type === lead.type ? { ...l, status: newStatus } : l
         )
       );
+      // Keep column totals accurate as cards move between columns.
+      setCounts((c) => ({
+        ...c,
+        [prevStatus]: Math.max(0, (c[prevStatus] || 0) - 1),
+        [newStatus]: (c[newStatus] || 0) + 1,
+      }));
     }
     setOpenCardMenu(null);
+  }
+
+  // Load the next page of cards for one status column (board never loads all at once).
+  async function loadMoreStatus(status: LeadStatus) {
+    setLoadingMore(status);
+    try {
+      const already = leads.filter((l) => l.status === status).length;
+      const params = new URLSearchParams({ view: "kanban", loadStatus: status, offset: String(already) });
+      if (sourceFilter && sourceFilter !== "all") params.set("source", sourceFilter);
+      if (searchValue) params.set("search", searchValue);
+      const res = await fetch(`/api/admin/leads?${params}`);
+      if (res.ok) {
+        const data = await res.json();
+        setLeads((prev) => {
+          const seen = new Set(prev.map(leadKey));
+          const add = ((data.leads as CombinedLead[]) || []).filter((l) => !seen.has(leadKey(l)));
+          return [...prev, ...add];
+        });
+      }
+    } finally {
+      setLoadingMore(null);
+    }
   }
 
   function handleAddColumn() {
@@ -568,7 +599,7 @@ export default function LeadsPage() {
                       <span
                         className={`text-xs font-medium px-1.5 py-0.5 rounded-full bg-white/70 ${c.text}`}
                       >
-                        {colLeads.length}
+                        {col.statusMapping ? (counts[col.statusMapping] ?? colLeads.length) : colLeads.length}
                       </span>
                       <div className="relative">
                         <button
@@ -708,6 +739,24 @@ export default function LeadsPage() {
                         </div>
                       </div>
                     ))}
+
+                    {/* Load more (status columns are paginated so we never load all at once) */}
+                    {(() => {
+                      if (!col.statusMapping) return null;
+                      const loaded = leads.filter((l) => l.status === col.statusMapping).length;
+                      const totalForStatus = counts[col.statusMapping] ?? 0;
+                      const remaining = totalForStatus - loaded;
+                      if (remaining <= 0) return null;
+                      return (
+                        <button
+                          onClick={() => loadMoreStatus(col.statusMapping!)}
+                          disabled={loadingMore === col.statusMapping}
+                          className="w-full mt-1 py-2 text-xs font-medium text-gray-600 bg-white/70 border border-gray-200 rounded-lg hover:bg-white disabled:opacity-50 transition-colors"
+                        >
+                          {loadingMore === col.statusMapping ? "Loading…" : `Load more (${remaining} more)`}
+                        </button>
+                      );
+                    })()}
                   </div>
                 </div>
               );
