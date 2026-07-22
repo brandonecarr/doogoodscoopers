@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/server";
 import { queueMarketingSync } from "@/lib/marketing-sync";
 
 // Abandonment threshold in minutes
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const supabase = await createClient();
+    const supabase = await createServiceClient();
 
     // Calculate the threshold timestamp
     const thresholdDate = new Date();

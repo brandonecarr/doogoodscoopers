@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/server";
 
 // Map frontend frequency values to database values
 const frequencyMap: Record<string, string> = {
@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const supabase = await createClient();
+    const supabase = await createServiceClient();
     const numDogs = parseInt(numberOfDogs) || 1;
     const dbFrequency = frequencyMap[frequency.toLowerCase()] || frequency.toUpperCase();
 

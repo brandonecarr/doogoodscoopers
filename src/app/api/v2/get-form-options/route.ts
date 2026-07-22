@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/server";
 
 // Onboarding settings type definition
 interface OnboardingSettings {
@@ -156,7 +156,7 @@ function buildFormOptions(settings: OnboardingSettings) {
 
 export async function GET() {
   try {
-    const supabase = await createClient();
+    const supabase = await createServiceClient();
 
     // Get organization settings for dynamic configuration
     const { data: org } = await supabase

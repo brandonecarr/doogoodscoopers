@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/server";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import Stripe from "stripe";
 import { sendWelcomeEmail, sendNewCustomerNotificationEmail } from "@/lib/email";
@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
 }
 
 async function submitInServiceAreaQuote(data: QuoteSubmission) {
-  const supabase = await createClient();
+  const supabase = await createServiceClient();
 
   // Validate payment info
   if (!data.creditCardToken || !data.nameOnCard) {
@@ -908,7 +908,7 @@ function getFrequencyLabel(frequency: string): string {
 }
 
 async function submitOutOfServiceAreaLead(data: QuoteSubmission) {
-  const supabase = await createClient();
+  const supabase = await createServiceClient();
 
   // Get organization
   const { data: org } = await supabase

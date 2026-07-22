@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/server";
 
 interface EventData {
   sessionId: string;
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = await createClient();
+    const supabase = await createServiceClient();
 
     // Get the session to verify it exists and get org_id
     const { data: session, error: sessionError } = await supabase
@@ -144,7 +144,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const supabase = await createClient();
+    const supabase = await createServiceClient();
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: events, error } = await (supabase as any)
