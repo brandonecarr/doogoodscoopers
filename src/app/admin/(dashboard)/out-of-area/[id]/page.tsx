@@ -4,6 +4,7 @@ import { ArrowLeft, Phone, Mail, MapPin, Calendar, Clock } from "lucide-react";
 import prisma from "@/lib/prisma";
 import type { LeadStatus } from "@/types/leads";
 import StatusUpdateForm from "@/components/admin/StatusUpdateForm";
+import { LeadQuickActions } from "@/components/admin/LeadQuickActions";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -139,6 +140,13 @@ export default async function OutOfAreaDetailPage({ params }: PageProps) {
 
         {/* Sidebar */}
         <div className="space-y-6">
+          <LeadQuickActions
+            phone={lead.phone}
+            email={lead.email}
+            firstName={lead.firstName}
+            lastName={lead.lastName}
+            zipCode={lead.zipCode}
+          />
           {/* Status Update */}
           <StatusUpdateForm
             leadId={lead.id}

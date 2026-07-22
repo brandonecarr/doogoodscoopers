@@ -4,6 +4,7 @@ import { ArrowLeft, Phone, Mail, MapPin, Dog, Calendar, Clock, Pencil, Archive }
 import prisma from "@/lib/prisma";
 import type { LeadStatus } from "@/types/leads";
 import StatusUpdateForm from "@/components/admin/StatusUpdateForm";
+import { LeadQuickActions } from "@/components/admin/LeadQuickActions";
 import { LeadUpdates } from "@/components/admin/LeadUpdates";
 import { LeadMessages } from "@/components/admin/LeadMessages";
 import { DuplicateBanner } from "@/components/admin/DuplicateBanner";
@@ -358,6 +359,14 @@ export default async function QuoteLeadDetailPage({ params }: PageProps) {
 
         {/* Sidebar */}
         <div className="space-y-6">
+          <LeadQuickActions
+            phone={lead.phone}
+            email={lead.email}
+            firstName={lead.firstName}
+            lastName={lead.lastName}
+            zipCode={lead.zipCode}
+            numberOfDogs={lead.numberOfDogs}
+          />
           {/* Status Update */}
           <StatusUpdateForm
             leadId={lead.id}

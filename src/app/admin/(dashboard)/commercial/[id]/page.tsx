@@ -4,6 +4,7 @@ import { ArrowLeft, Phone, Mail, MapPin, Building2, Calendar, Clock, MessageSqua
 import prisma from "@/lib/prisma";
 import type { LeadStatus } from "@/types/leads";
 import StatusUpdateForm from "@/components/admin/StatusUpdateForm";
+import { LeadQuickActions } from "@/components/admin/LeadQuickActions";
 import { LeadUpdates } from "@/components/admin/LeadUpdates";
 import { LeadActions } from "@/components/admin/LeadActions";
 import { FollowupGrade } from "@/components/admin/FollowupGrade";
@@ -225,6 +226,12 @@ export default async function CommercialDetailPage({ params }: PageProps) {
 
         {/* Sidebar */}
         <div className="space-y-6">
+          <LeadQuickActions
+            phone={lead.phone}
+            email={lead.email}
+            firstName={lead.contactName}
+            zipCode={lead.zipCode}
+          />
           {/* Status Update */}
           <StatusUpdateForm
             leadId={lead.id}

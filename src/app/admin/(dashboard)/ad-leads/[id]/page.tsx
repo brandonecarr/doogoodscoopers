@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Megaphone, Mail, Phone, MapPin, Calendar, Clock, Tag, ClipboardList, Dog } from "lucide-react";
+import { ArrowLeft, Megaphone, Mail, Phone, MapPin, Calendar, Clock, Tag, Dog } from "lucide-react";
+import { LeadQuickActions } from "@/components/admin/LeadQuickActions";
 import prisma from "@/lib/prisma";
 import StatusUpdateForm from "@/components/admin/StatusUpdateForm";
 import { LeadUpdates } from "@/components/admin/LeadUpdates";
@@ -342,40 +343,14 @@ export default async function AdLeadDetailPage({ params }: PageProps) {
           />
 
           {/* Quick Actions */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h2 className="text-lg font-semibold text-navy-900 mb-4">Quick Actions</h2>
-            <div className="space-y-3">
-              {typedLead.phone && (
-                <>
-                  <a
-                    href={`tel:${typedLead.phone}`}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
-                  >
-                    <Phone className="w-4 h-4" />
-                    Call Lead
-                  </a>
-                </>
-              )}
-              {typedLead.email && (
-                <a
-                  href={`mailto:${typedLead.email}`}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-gray-200 text-navy-900 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  <Mail className="w-4 h-4" />
-                  Send Email
-                </a>
-              )}
-              {typedLead.phone && (
-                <a
-                  href={`sms:${typedLead.phone}&body=${encodeURIComponent(`https://doogoodscoopers.com/sng/doogoodscoopers-obc2w-client-onboarding/${typedLead.zipCode ? `?zip_code=${typedLead.zipCode}` : ""}`)}`}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-navy-600 text-white rounded-lg hover:bg-navy-700 transition-colors"
-                >
-                  <ClipboardList className="w-4 h-4" />
-                  Send Onboarding
-                </a>
-              )}
-            </div>
-          </div>
+          <LeadQuickActions
+            phone={typedLead.phone}
+            email={typedLead.email}
+            firstName={typedLead.firstName || typedLead.fullName}
+            lastName={typedLead.lastName}
+            zipCode={typedLead.zipCode}
+            numberOfDogs={numberOfDogs}
+          />
         </div>
       </div>
     </div>
