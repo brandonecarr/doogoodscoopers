@@ -69,17 +69,21 @@ const COLUMN_COLORS: Record<ColorKey, { header: string; border: string; text: st
 
 const COLOR_OPTIONS: ColorKey[] = ["teal", "blue", "orange", "gray", "purple", "green", "red", "yellow", "pink", "indigo"];
 
+// Pipeline stages left→right. Labels are pipeline-friendly; each maps to a real
+// LeadStatus so a drag updates the lead's status everywhere. Columns are
+// customizable (rename/add/remove) and persisted per-browser.
 const DEFAULT_COLUMNS: KanbanColumn[] = [
-  { id: "new",            name: "New",               color: "teal",   statusMapping: "NEW" },
-  { id: "contacted",      name: "Contacted",          color: "blue",   statusMapping: "CONTACTED" },
-  { id: "no_answer",      name: "No Answer",          color: "orange", statusMapping: "NO_ANSWER" },
-  { id: "not_interested", name: "Not Interested",     color: "gray",   statusMapping: "NOT_INTERESTED" },
-  { id: "waiting",        name: "Waiting for Signup", color: "purple", statusMapping: "WAITING_FOR_SIGNUP" },
-  { id: "converted",      name: "Converted",          color: "green",  statusMapping: "CONVERTED" },
+  { id: "new",            name: "New",       color: "teal",   statusMapping: "NEW" },
+  { id: "contacted",      name: "Contacted", color: "blue",   statusMapping: "CONTACTED" },
+  { id: "no_answer",      name: "No Answer", color: "orange", statusMapping: "NO_ANSWER" },
+  { id: "waiting",        name: "Quoted",    color: "purple", statusMapping: "WAITING_FOR_SIGNUP" },
+  { id: "converted",      name: "Won",       color: "green",  statusMapping: "CONVERTED" },
+  { id: "not_interested", name: "Lost",      color: "red",    statusMapping: "NOT_INTERESTED" },
 ];
 
 const LS_COLUMNS     = "dgs_kanban_columns";
 const LS_ASSIGNMENTS = "dgs_kanban_assignments";
+const LS_VIEW        = "dgs_leads_view";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -183,6 +187,15 @@ export default function LeadsPage() {
   const [openCardMenu, setOpenCardMenu] = useState<string | null>(null);
   const [openColMenu,  setOpenColMenu]  = useState<string | null>(null);
 
+  // Drag-and-drop state
+  const [draggedKey,   setDraggedKey]   = useState<string | null>(null);
+  const [dragOverCol,  setDragOverCol]  = useState<string | null>(null);
+
+  function selectView(v: "list" | "kanban") {
+    setView(v);
+    try { localStorage.setItem(LS_VIEW, v); } catch {}
+  }
+
   const currentPage = parseInt(searchParams.get("page") || "1");
   const pageSize    = 20;
 
@@ -196,6 +209,8 @@ export default function LeadsPage() {
       }
       const storedAssign = localStorage.getItem(LS_ASSIGNMENTS);
       if (storedAssign) setAssignments(JSON.parse(storedAssign));
+      const storedView = localStorage.getItem(LS_VIEW);
+      if (storedView === "kanban" || storedView === "list") setView(storedView);
     } catch {}
   }, []);
 
@@ -237,10 +252,15 @@ export default function LeadsPage() {
   }
 
   async function moveLead(lead: CombinedLead, targetColId: string) {
-    const newAssign = { ...assignments, [leadKey(lead)]: targetColId };
+    const col = columns.find((c) => c.id === targetColId);
+
+    // Status columns are driven by the lead's real status, so clear any local
+    // override; custom (non-status) columns are tracked via a local assignment.
+    const newAssign = { ...assignments };
+    if (col?.statusMapping) delete newAssign[leadKey(lead)];
+    else newAssign[leadKey(lead)] = targetColId;
     saveAssignments(newAssign);
 
-    const col = columns.find((c) => c.id === targetColId);
     if (col?.statusMapping && col.statusMapping !== lead.status) {
       const leadType = lead.type === "quote" ? "quote" : "adlead";
       await fetch("/api/admin/update-lead", {
@@ -320,7 +340,7 @@ export default function LeadsPage() {
           {/* View toggle */}
           <div className="flex items-center bg-gray-100 rounded-lg p-1">
             <button
-              onClick={() => setView("list")}
+              onClick={() => selectView("list")}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                 view === "list"
                   ? "bg-white text-navy-900 shadow-sm"
@@ -331,7 +351,7 @@ export default function LeadsPage() {
               <span className="hidden sm:inline">List</span>
             </button>
             <button
-              onClick={() => setView("kanban")}
+              onClick={() => selectView("kanban")}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                 view === "kanban"
                   ? "bg-white text-navy-900 shadow-sm"
@@ -508,6 +528,10 @@ export default function LeadsPage() {
         </div>
       ) : (
         /* ── KANBAN VIEW ────────────────────────────────────────────────── */
+        <>
+        <p className="text-xs text-gray-400 -mt-3">
+          Drag a card between columns to update its status. On mobile, use the ⋯ menu on a card.
+        </p>
         <div className="overflow-x-auto pb-4 -mx-4 px-4">
           <div
             className="flex gap-4 items-start"
@@ -575,19 +599,42 @@ export default function LeadsPage() {
                     </div>
                   </div>
 
-                  {/* Cards */}
+                  {/* Cards (drop zone) */}
                   <div
-                    className={`border-x border-b ${c.border} rounded-b-xl min-h-48 p-2 space-y-2 ${c.bg}`}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = "move";
+                      if (dragOverCol !== col.id) setDragOverCol(col.id);
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      const dropped = leads.find((l) => leadKey(l) === draggedKey);
+                      if (dropped) moveLead(dropped, col.id);
+                      setDraggedKey(null);
+                      setDragOverCol(null);
+                    }}
+                    className={`border-x border-b ${c.border} rounded-b-xl min-h-48 p-2 space-y-2 ${c.bg} transition-all ${
+                      dragOverCol === col.id ? "ring-2 ring-inset ring-teal-400" : ""
+                    }`}
                   >
                     {colLeads.length === 0 && (
                       <div className="flex items-center justify-center h-20 text-xs text-gray-400">
-                        No leads
+                        {dragOverCol === col.id ? "Drop here" : "No leads"}
                       </div>
                     )}
                     {colLeads.map((lead) => (
                       <div
                         key={leadKey(lead)}
-                        className="bg-white rounded-lg border border-gray-200 shadow-sm p-3"
+                        draggable
+                        onDragStart={(e) => {
+                          setDraggedKey(leadKey(lead));
+                          e.dataTransfer.effectAllowed = "move";
+                          e.dataTransfer.setData("text/plain", leadKey(lead));
+                        }}
+                        onDragEnd={() => { setDraggedKey(null); setDragOverCol(null); }}
+                        className={`bg-white rounded-lg border border-gray-200 shadow-sm p-3 cursor-grab active:cursor-grabbing transition-opacity ${
+                          draggedKey === leadKey(lead) ? "opacity-40" : ""
+                        }`}
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
@@ -722,6 +769,7 @@ export default function LeadsPage() {
             </div>
           </div>
         </div>
+        </>
       )}
 
       {/* Overlay to close menus */}
