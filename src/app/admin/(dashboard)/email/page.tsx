@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Mail, Plus, Send, Clock, CheckCircle2, FileText } from "lucide-react";
+import { Mail, Plus, Send, Clock, CheckCircle2, FileText, LayoutTemplate } from "lucide-react";
 import prisma from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -30,10 +30,16 @@ export default async function EmailPage() {
           <h1 className="text-2xl font-bold text-navy-900">Email</h1>
           <p className="text-navy-600 text-sm mt-1">Newsletters &amp; broadcasts to your contacts.</p>
         </div>
-        <Link href="/admin/email/new" className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors text-sm font-medium">
-          <Plus className="w-4 h-4" />
-          New Email
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link href="/admin/email/templates" className="flex items-center gap-1.5 px-4 py-2 border border-gray-200 text-navy-900 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium">
+            <LayoutTemplate className="w-4 h-4" />
+            Templates
+          </Link>
+          <Link href="/admin/email/new" className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors text-sm font-medium">
+            <Plus className="w-4 h-4" />
+            New Email
+          </Link>
+        </div>
       </div>
 
       {campaigns.length === 0 ? (

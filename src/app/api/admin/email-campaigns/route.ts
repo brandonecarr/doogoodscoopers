@@ -48,6 +48,7 @@ export async function POST(request: Request) {
       fromEmail: from.fromEmail,
       replyTo: from.replyTo,
       html: b.html,
+      designJson: b.designJson ?? undefined,
       audienceFilter: filter as object,
       adminEmail: session.email,
       status: action === "draft" ? "DRAFT" : action === "schedule" ? "SCHEDULED" : "QUEUED",

@@ -595,6 +595,7 @@ model EmailCampaign {
   fromEmail        String?
   replyTo          String?
   html             String    @db.Text // compiled email body HTML
+  designJson       Json? // GrapesJS project data, so the design can be re-opened
   audienceFilter   Json? // { leadTypes, withinDays, statuses }
 
   status           String    @default("DRAFT") // DRAFT | SCHEDULED | QUEUED | SENDING | SENT
@@ -637,4 +638,19 @@ model EmailRecipient {
   @@index([campaignId])
   @@index([status])
   @@index([resendId])
+}
+
+// Reusable email design (built in the visual designer).
+model EmailTemplate {
+  id         String   @id @default(cuid())
+  name       String
+  subject    String?
+  html       String   @db.Text
+  designJson Json? // GrapesJS project data for re-editing
+  category   String?
+  adminEmail String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([createdAt])
 }

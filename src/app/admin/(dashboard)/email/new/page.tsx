@@ -1,9 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Loader2, Send, Users, Eye } from "lucide-react";
+import dynamic from "next/dynamic";
+import { ArrowLeft, Loader2, Send, Users, Eye, Paintbrush, LayoutTemplate, X } from "lucide-react";
+import type { EmailBuilderHandle } from "@/components/admin/EmailBuilder";
+
+const EmailBuilder = dynamic(() => import("@/components/admin/EmailBuilder"), {
+  ssr: false,
+  loading: () => <div className="h-full flex items-center justify-center text-gray-400">Loading designer…</div>,
+});
 
 const AUDIENCES = [
   { value: "customers", label: "Customers" },
@@ -37,8 +44,34 @@ export default function NewEmailPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(true);
+  const [designJson, setDesignJson] = useState<object | null>(null);
+  const [showBuilder, setShowBuilder] = useState(false);
+  const [templates, setTemplates] = useState<{ id: string; name: string }[]>([]);
+  const builderRef = useRef<EmailBuilderHandle | null>(null);
 
   const toggle = (v: string) => setLeadTypes((p) => (p.includes(v) ? p.filter((x) => x !== v) : [...p, v]));
+
+  useEffect(() => {
+    fetch("/api/admin/email-templates").then((r) => (r.ok ? r.json() : { templates: [] })).then((d) => setTemplates(d.templates || [])).catch(() => {});
+  }, []);
+
+  async function loadTemplate(id: string) {
+    if (!id) return;
+    const res = await fetch(`/api/admin/email-templates/${id}`);
+    if (!res.ok) return;
+    const d = await res.json();
+    setHtml(d.template.html || html);
+    setDesignJson(d.template.designJson || null);
+    if (!subject && d.template.subject) setSubject(d.template.subject);
+  }
+
+  function applyDesign() {
+    if (builderRef.current) {
+      setHtml(builderRef.current.getHtml());
+      setDesignJson(builderRef.current.getDesign());
+    }
+    setShowBuilder(false);
+  }
 
   const refreshCount = useCallback(async () => {
     setCount(null);
@@ -64,7 +97,7 @@ export default function NewEmailPage() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action, name, subject, fromName, fromEmail: fromEmail || undefined, replyTo: replyTo || undefined,
-          html, testEmail, scheduledAt: scheduledAt || undefined,
+          html, designJson: designJson || undefined, testEmail, scheduledAt: scheduledAt || undefined,
           audienceFilter: { leadTypes, withinDays: withinDays || undefined },
         }),
       });
@@ -113,12 +146,21 @@ export default function NewEmailPage() {
               <input value={replyTo} onChange={(e) => setReplyTo(e.target.value)} placeholder="hello@doogoodscoopers.com" className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500" />
             </div>
             <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="block text-sm font-medium text-gray-700">Content (HTML)</label>
-                <button type="button" onClick={() => setShowPreview((s) => !s)} className="text-xs text-teal-600 hover:underline flex items-center gap-1"><Eye className="w-3.5 h-3.5" /> {showPreview ? "Hide" : "Show"} preview</button>
+              <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
+                <label className="block text-sm font-medium text-gray-700">Content</label>
+                <div className="flex items-center gap-2">
+                  {templates.length > 0 && (
+                    <select onChange={(e) => { loadTemplate(e.target.value); e.target.value = ""; }} defaultValue="" className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white">
+                      <option value="">Start from template…</option>
+                      {templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </select>
+                  )}
+                  <button type="button" onClick={() => setShowBuilder(true)} className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-navy-600 text-white rounded-lg hover:bg-navy-700"><Paintbrush className="w-3.5 h-3.5" /> Design</button>
+                  <button type="button" onClick={() => setShowPreview((s) => !s)} className="text-xs text-teal-600 hover:underline flex items-center gap-1"><Eye className="w-3.5 h-3.5" /> {showPreview ? "Hide" : "Show"} preview</button>
+                </div>
               </div>
-              <textarea value={html} onChange={(e) => setHtml(e.target.value)} rows={12} className="w-full px-3 py-2 text-xs font-mono border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 resize-y" />
-              <p className="text-[11px] text-gray-400 mt-1">Use {"{{firstName}}"} to personalize. A visual drag-and-drop builder is coming next; this HTML editor works in the meantime.</p>
+              <textarea value={html} onChange={(e) => { setHtml(e.target.value); setDesignJson(null); }} rows={10} className="w-full px-3 py-2 text-xs font-mono border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 resize-y" />
+              <p className="text-[11px] text-gray-400 mt-1">Use the <strong>Design</strong> button for the drag-and-drop builder, start from a saved template, or edit the HTML directly. {"{{firstName}}"} personalizes.</p>
             </div>
           </div>
 
@@ -183,6 +225,24 @@ export default function NewEmailPage() {
           </div>
         </div>
       </div>
+
+      {/* Full-screen drag-and-drop designer */}
+      {showBuilder && (
+        <div className="fixed inset-0 z-50 bg-white flex flex-col">
+          <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100">
+            <div className="flex items-center gap-2 text-sm font-medium text-navy-900">
+              <LayoutTemplate className="w-4 h-4 text-teal-600" /> Email designer
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setShowBuilder(false)} className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 rounded-lg border border-gray-200 flex items-center gap-1.5"><X className="w-4 h-4" /> Cancel</button>
+              <button onClick={applyDesign} className="px-4 py-1.5 text-sm bg-teal-600 text-white rounded-lg hover:bg-teal-700 font-medium">Use this design</button>
+            </div>
+          </div>
+          <div className="flex-1 min-h-0">
+            <EmailBuilder initialHtml={html} initialDesign={designJson} onReady={(h) => (builderRef.current = h)} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
