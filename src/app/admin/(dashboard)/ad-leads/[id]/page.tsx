@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Megaphone, Mail, Phone, MapPin, Calendar, Clock, Tag, ClipboardList } from "lucide-react";
+import { ArrowLeft, Megaphone, Mail, Phone, MapPin, Calendar, Clock, Tag, ClipboardList, Dog } from "lucide-react";
 import prisma from "@/lib/prisma";
 import StatusUpdateForm from "@/components/admin/StatusUpdateForm";
 import { LeadUpdates } from "@/components/admin/LeadUpdates";
@@ -70,6 +70,12 @@ export default async function AdLeadDetailPage({ params }: PageProps) {
 
   const typedLead = lead as AdLead;
   const optedOut = await isOptedOut(typedLead.phone);
+
+  // Number of dogs captured from the ad form (webhook normalizes it into
+  // customFields under a key containing "dog"). Displayed in Contact Information.
+  const customFields = (typedLead.customFields ?? null) as Record<string, unknown> | null;
+  const dogEntry = customFields ? Object.entries(customFields).find(([k]) => /dog/i.test(k)) : undefined;
+  const numberOfDogs = dogEntry && dogEntry[1] != null && String(dogEntry[1]).trim() !== "" ? String(dogEntry[1]).trim() : null;
   const typedUpdates = updates.map((u) => ({
     id: u.id,
     createdAt: u.createdAt.toISOString(),
@@ -144,7 +150,7 @@ export default async function AdLeadDetailPage({ params }: PageProps) {
               </div>
 
               {!!(typedLead.city || typedLead.state || typedLead.zipCode) && (
-                <div className="flex items-start gap-3 sm:col-span-2">
+                <div className="flex items-start gap-3">
                   <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
                     <MapPin className="w-5 h-5 text-gray-600" />
                   </div>
@@ -156,6 +162,18 @@ export default async function AdLeadDetailPage({ params }: PageProps) {
                   </div>
                 </div>
               )}
+
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+                  <Dog className="w-5 h-5 text-gray-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Number of Dogs</p>
+                  <p className="font-medium text-navy-900">
+                    {numberOfDogs ?? <span className="text-gray-400">Not provided</span>}
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -220,12 +238,14 @@ export default async function AdLeadDetailPage({ params }: PageProps) {
           {/* Custom Fields */}
           {(() => {
             const fields = typedLead.customFields as Record<string, unknown> | null;
-            if (!fields || Object.keys(fields).length === 0) return null;
+            // Dog count is surfaced in Contact Information above — don't repeat it here.
+            const entries = fields ? Object.entries(fields).filter(([k]) => !/dog/i.test(k)) : [];
+            if (entries.length === 0) return null;
             return (
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
                 <h2 className="text-lg font-semibold text-navy-900 mb-4">Additional Information</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {Object.entries(fields).map(([key, value]) => (
+                  {entries.map(([key, value]) => (
                     <div key={key}>
                       <p className="text-sm text-gray-500 capitalize">{key.replace(/_/g, " ")}</p>
                       <p className="font-medium text-navy-900">{String(value)}</p>
