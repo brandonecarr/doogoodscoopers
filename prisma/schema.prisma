@@ -640,6 +640,18 @@ model EmailRecipient {
   @@index([resendId])
 }
 
+// A saved, reusable audience (filter) for email campaigns.
+model EmailSegment {
+  id         String   @id @default(cuid())
+  name       String
+  filter     Json // { leadTypes, withinDays, statuses }
+  adminEmail String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([createdAt])
+}
+
 // Reusable email design (built in the visual designer).
 model EmailTemplate {
   id         String   @id @default(cuid())

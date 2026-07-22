@@ -47,13 +47,31 @@ export default function NewEmailPage() {
   const [designJson, setDesignJson] = useState<object | null>(null);
   const [showBuilder, setShowBuilder] = useState(false);
   const [templates, setTemplates] = useState<{ id: string; name: string }[]>([]);
+  const [segments, setSegments] = useState<{ id: string; name: string; filter: { leadTypes?: string[]; withinDays?: number } }[]>([]);
   const builderRef = useRef<EmailBuilderHandle | null>(null);
 
   const toggle = (v: string) => setLeadTypes((p) => (p.includes(v) ? p.filter((x) => x !== v) : [...p, v]));
 
   useEffect(() => {
     fetch("/api/admin/email-templates").then((r) => (r.ok ? r.json() : { templates: [] })).then((d) => setTemplates(d.templates || [])).catch(() => {});
+    fetch("/api/admin/email-segments").then((r) => (r.ok ? r.json() : { segments: [] })).then((d) => setSegments(d.segments || [])).catch(() => {});
   }, []);
+
+  function loadSegment(id: string) {
+    const s = segments.find((x) => x.id === id);
+    if (!s) return;
+    setLeadTypes(s.filter?.leadTypes || []);
+    setWithinDays(s.filter?.withinDays || 0);
+  }
+  async function saveSegment() {
+    const name = prompt("Name this segment:");
+    if (!name?.trim()) return;
+    const res = await fetch("/api/admin/email-segments", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: name.trim(), filter: { leadTypes, withinDays: withinDays || undefined } }),
+    });
+    if (res.ok) { const d = await res.json(); setSegments((p) => [d.segment, ...p]); }
+  }
 
   async function loadTemplate(id: string) {
     if (!id) return;
@@ -171,6 +189,17 @@ export default function NewEmailPage() {
               <h2 className="text-sm font-semibold text-navy-900">Audience</h2>
               <span className="ml-auto text-sm text-gray-500">{count === null ? "counting…" : `${count} recipients`}</span>
             </div>
+            {(segments.length > 0 || leadTypes.length > 0) && (
+              <div className="flex items-center gap-2 flex-wrap">
+                {segments.length > 0 && (
+                  <select onChange={(e) => { loadSegment(e.target.value); e.target.value = ""; }} defaultValue="" className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white">
+                    <option value="">Load saved segment…</option>
+                    {segments.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                )}
+                {leadTypes.length > 0 && <button type="button" onClick={saveSegment} className="text-xs text-teal-600 hover:underline">Save as segment</button>}
+              </div>
+            )}
             <div className="flex flex-wrap gap-2">
               {AUDIENCES.map((a) => (
                 <button key={a.value} type="button" onClick={() => toggle(a.value)} className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${leadTypes.includes(a.value) ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-700 hover:bg-gray-50"}`}>{a.label}</button>
