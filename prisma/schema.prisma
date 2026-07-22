@@ -454,3 +454,46 @@ model CampaignRecipient {
   @@index([status])
   @@index([nextSendAt])
 }
+
+// =====================
+// SWEEP&GO CUSTOMER MIRROR
+// =====================
+// Read-only mirror of active Sweep&Go residential customers, refreshed hourly by
+// the sync-customers cron. This is a ONE-WAY copy: the app only ever GETs from
+// Sweep&Go and never writes back, so nothing done here can affect the Sweep&Go
+// customer list. Cancellations are archived (active=false), not deleted.
+model SweepandgoCustomer {
+  id                String    @id @default(cuid())
+  sngId             String    @unique // Sweep&Go client id, e.g. "rcl_2YYGKO9GRVII"
+
+  // Mirrored fields (from GET /api/v1/clients/active)
+  type              String? // e.g. "onboarding"
+  sngStatus         String? // status reported by Sweep&Go, e.g. "active"
+  firstName         String?
+  lastName          String?
+  email             String?
+  address           String?
+  zipCode           String?
+  homePhone         String?
+  cellPhone         String?
+  subscriptionNames String? // comma-joined, e.g. "2d-1xW,Sanitize w/ Regular Service"
+  oneTimeClient     Boolean   @default(false)
+  channel           String?
+  serviceDays       String?
+  assignedTo        String?
+  cleanupFrequency  String?
+
+  // Sync bookkeeping (local only)
+  active            Boolean   @default(true) // present in the latest active pull
+  firstSeenAt       DateTime  @default(now())
+  lastSyncedAt      DateTime  @default(now())
+  removedAt         DateTime? // when it dropped off the active list (archived)
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([active])
+  @@index([zipCode])
+  @@index([lastName])
+  @@index([removedAt])
+}

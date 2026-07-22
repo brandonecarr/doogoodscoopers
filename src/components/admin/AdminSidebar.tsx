@@ -11,12 +11,14 @@ import {
   Building2,
   Users,
   Megaphone,
+  Dog,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navigation = [
   { name: "Dashboard",            href: "/admin",            icon: LayoutDashboard },
   { name: "Leads",                href: "/admin/leads",      icon: Users2 },
+  { name: "Customers",            href: "/admin/customers",  icon: Dog },
   { name: "Campaigns",            href: "/admin/campaigns",  icon: Megaphone },
   { name: "Commercial Inquiries", href: "/admin/commercial", icon: Building2 },
   { name: "Out of Area",          href: "/admin/out-of-area", icon: MapPinOff },
@@ -95,7 +97,8 @@ export function AdminSidebar() {
               (item.href === "/admin/leads" &&
                 (pathname.startsWith("/admin/leads") ||
                   pathname.startsWith("/admin/quote-leads") ||
-                  pathname.startsWith("/admin/ad-leads")));
+                  pathname.startsWith("/admin/ad-leads"))) ||
+              (item.href === "/admin/customers" && pathname.startsWith("/admin/customers"));
             return (
               <Link
                 key={item.name}
