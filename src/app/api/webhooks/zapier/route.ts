@@ -104,6 +104,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Number of dogs — the lead form's dog question can arrive under many names
+    // (number_of_dogs, how_many_dogs, dogs, "How many dogs do you have?", ...).
+    // Normalize whatever carries "dog" into a predictable field so it shows on the
+    // lead and personalizes SMS ({{dogs}} / {{numberOfDogs}}) with no further work.
+    for (const [key, value] of Object.entries(payload)) {
+      if (/dog/i.test(key) && value !== null && value !== undefined && value !== "") {
+        customFields.numberOfDogs = value;
+        break;
+      }
+    }
+
     // Create the lead
     const lead = await prisma.adLead.create({
       data: {
