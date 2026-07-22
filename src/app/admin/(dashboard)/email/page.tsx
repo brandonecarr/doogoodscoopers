@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Mail, Plus, Send, Clock, CheckCircle2, FileText, LayoutTemplate, Users } from "lucide-react";
+import { Mail, Plus, Send, Clock, CheckCircle2, FileText, LayoutTemplate, Users, Zap } from "lucide-react";
 import prisma from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -31,6 +31,10 @@ export default async function EmailPage() {
           <p className="text-navy-600 text-sm mt-1">Newsletters &amp; broadcasts to your contacts.</p>
         </div>
         <div className="flex items-center gap-2">
+          <Link href="/admin/email/automations" className="flex items-center gap-1.5 px-4 py-2 border border-gray-200 text-navy-900 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium">
+            <Zap className="w-4 h-4" />
+            Automations
+          </Link>
           <Link href="/admin/email/contacts" className="flex items-center gap-1.5 px-4 py-2 border border-gray-200 text-navy-900 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium">
             <Users className="w-4 h-4" />
             Contacts

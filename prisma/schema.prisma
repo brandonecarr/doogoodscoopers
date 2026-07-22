@@ -640,6 +640,53 @@ model EmailRecipient {
   @@index([resendId])
 }
 
+// Email automation (drip) — auto-enrolls new contacts and emails them a
+// sequence over time (welcome, nurture, win-back). Mirrors the SMS drip engine.
+model EmailAutomation {
+  id         String   @id @default(cuid())
+  name       String
+  trigger    Json // { types: ["new_subscribers","new_customers","former_customers","quote","ad"] }
+  active     Boolean  @default(true)
+  sentCount  Int      @default(0)
+  adminEmail String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([active])
+}
+
+model EmailAutomationStep {
+  id           String  @id @default(cuid())
+  automationId String
+  stepOrder    Int
+  subject      String
+  templateId   String? // preferred: send a designed template
+  html         String? @db.Text // fallback inline HTML
+  delayMinutes Int     @default(0)
+
+  @@index([automationId])
+}
+
+model EmailAutomationRecipient {
+  id           String    @id @default(cuid())
+  automationId String
+  contactType  String // subscriber | customer | former_customer | quote | ad
+  contactId    String
+  email        String
+  name         String?
+  status       String    @default("ACTIVE") // ACTIVE | COMPLETED | STOPPED
+  currentStep  Int       @default(0)
+  nextSendAt   DateTime?
+  sentAt       DateTime?
+  error        String?
+  createdAt    DateTime  @default(now())
+
+  @@unique([automationId, contactType, contactId])
+  @@index([automationId])
+  @@index([status])
+  @@index([nextSendAt])
+}
+
 // A saved, reusable audience (filter) for email campaigns.
 model EmailSegment {
   id         String   @id @default(cuid())
