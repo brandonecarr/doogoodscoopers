@@ -497,3 +497,39 @@ model SweepandgoCustomer {
   @@index([lastName])
   @@index([removedAt])
 }
+
+// =====================
+// REVIEWS
+// =====================
+// Tracks review requests and their outcomes (e.g. Google reviews). A row is
+// created when we ask a customer for a review (auto after first cleanup, or
+// manually) and updated as they complete / decline it.
+model Review {
+  id             String    @id @default(cuid())
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // Who the review is from
+  customerName   String
+  phone          String?
+  email          String?
+  sngCustomerId  String? // optional link to a Sweep&Go customer (rcl_...)
+
+  // Request + outcome
+  platform       String    @default("google") // google | yelp | facebook
+  status         String    @default("REQUESTED") // PENDING | REQUESTED | COMPLETED | DECLINED
+  rating         Int? // 1–5 once completed
+  reviewText     String?   @db.Text
+  reviewUrl      String? // link to the public review, if known
+
+  requestedAt    DateTime?
+  reviewedAt     DateTime?
+  requestChannel String? // sms | email | manual
+
+  notes          String?   @db.Text
+
+  @@index([status])
+  @@index([platform])
+  @@index([createdAt])
+  @@index([sngCustomerId])
+}
