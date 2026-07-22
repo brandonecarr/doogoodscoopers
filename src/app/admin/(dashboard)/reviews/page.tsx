@@ -3,8 +3,15 @@
 import { useEffect, useState, useCallback } from "react";
 import {
   Star, Plus, Pencil, Trash2, Search, Filter, X, ExternalLink, Loader2,
-  MessageSquareQuote, CheckCircle2, Clock,
+  MessageSquareQuote, CheckCircle2, Clock, Link2, AlertTriangle,
 } from "lucide-react";
+
+const SOURCE_FIELDS: { key: string; label: string; hint?: string }[] = [
+  { key: "reviews.google.url", label: "Google reviews link" },
+  { key: "reviews.google.writeUrl", label: 'Google "leave a review" link', hint: "Used inside review-request texts. Grab it from your Google Business Profile → Ask for reviews." },
+  { key: "reviews.yelp.url", label: "Yelp reviews link" },
+  { key: "reviews.yelp.notRecommendedUrl", label: "Yelp – Not Recommended link" },
+];
 
 interface Review {
   id: string;
@@ -72,6 +79,39 @@ export default function ReviewsPage() {
   const [editing, setEditing] = useState<Review | "new" | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+
+  // Review-source links (settings)
+  const [sources, setSources] = useState<Record<string, string>>({});
+  const [editSources, setEditSources] = useState(false);
+  const [sourceForm, setSourceForm] = useState<Record<string, string>>({});
+  const [savingSources, setSavingSources] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/admin/app-settings?prefix=reviews.")
+      .then((r) => (r.ok ? r.json() : { settings: {} }))
+      .then((d) => setSources(d.settings || {}))
+      .catch(() => {});
+  }, []);
+
+  function startEditSources() {
+    const f: Record<string, string> = {};
+    for (const s of SOURCE_FIELDS) f[s.key] = sources[s.key] || "";
+    setSourceForm(f);
+    setEditSources(true);
+  }
+  async function saveSources() {
+    setSavingSources(true);
+    try {
+      const res = await fetch("/api/admin/app-settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ settings: sourceForm }),
+      });
+      if (res.ok) { setSources((prev) => ({ ...prev, ...sourceForm })); setEditSources(false); }
+    } finally {
+      setSavingSources(false);
+    }
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -152,6 +192,68 @@ export default function ReviewsPage() {
           <Plus className="w-4 h-4" />
           Add Review
         </button>
+      </div>
+
+      {/* Review sources */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold text-navy-900 flex items-center gap-2">
+            <Link2 className="w-4 h-4 text-gray-400" />
+            Review sources
+          </h2>
+          {!editSources && (
+            <button onClick={startEditSources} className="flex items-center gap-1 text-xs text-teal-600 hover:underline">
+              <Pencil className="w-3.5 h-3.5" /> Edit links
+            </button>
+          )}
+        </div>
+
+        {editSources ? (
+          <div className="space-y-3">
+            {SOURCE_FIELDS.map((f) => (
+              <div key={f.key}>
+                <label className="block text-xs font-medium text-gray-600 mb-1">{f.label}</label>
+                <input
+                  value={sourceForm[f.key] ?? ""}
+                  onChange={(e) => setSourceForm({ ...sourceForm, [f.key]: e.target.value })}
+                  placeholder="https://…"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500"
+                />
+                {f.hint && <p className="text-[11px] text-gray-400 mt-1">{f.hint}</p>}
+              </div>
+            ))}
+            <div className="flex items-center gap-2 pt-1">
+              <button onClick={saveSources} disabled={savingSources} className="flex items-center gap-2 px-4 py-1.5 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 text-sm font-medium">
+                {savingSources && <Loader2 className="w-4 h-4 animate-spin" />} Save
+              </button>
+              <button onClick={() => setEditSources(false)} className="px-4 py-1.5 text-sm text-gray-600 hover:bg-gray-50 rounded-lg border border-gray-200">Cancel</button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <div className="flex flex-wrap gap-2">
+              {[
+                { key: "reviews.google.url", label: "View on Google" },
+                { key: "reviews.yelp.url", label: "View on Yelp" },
+                { key: "reviews.yelp.notRecommendedUrl", label: "Yelp – Not Recommended" },
+              ].map((b) =>
+                sources[b.key] ? (
+                  <a key={b.key} href={sources[b.key]} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-lg text-sm text-navy-900 hover:bg-gray-50">
+                    <ExternalLink className="w-3.5 h-3.5 text-gray-400" /> {b.label}
+                  </a>
+                ) : (
+                  <span key={b.key} className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-dashed border-gray-200 rounded-lg text-sm text-gray-400">{b.label} (not set)</span>
+                )
+              )}
+            </div>
+            {!sources["reviews.google.writeUrl"] && (
+              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                Add your Google &quot;leave a review&quot; link (Edit links) so review-request texts can include it.
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Stats */}
