@@ -243,6 +243,26 @@ async function handleInbound(supabase: SupabaseClient, payload: unknown) {
             status: "DELIVERED",
           },
         });
+        // A reply ends any active stop-on-reply drip for this lead — immediately,
+        // instead of waiting for the next scheduled step to come due.
+        const activeRecs = await prisma.campaignRecipient.findMany({
+          where: { leadType: match.type, leadId: match.id, status: "ACTIVE" },
+          select: { id: true, campaignId: true },
+        });
+        if (activeRecs.length) {
+          const stopCampaigns = await prisma.campaign.findMany({
+            where: { id: { in: activeRecs.map((r) => r.campaignId) }, type: "DRIP", stopOnReply: true },
+            select: { id: true },
+          });
+          const stopSet = new Set(stopCampaigns.map((c) => c.id));
+          const stopIds = activeRecs.filter((r) => stopSet.has(r.campaignId)).map((r) => r.id);
+          if (stopIds.length) {
+            await prisma.campaignRecipient.updateMany({
+              where: { id: { in: stopIds } },
+              data: { status: "STOPPED", error: "lead replied", nextSendAt: null },
+            });
+          }
+        }
         // Look up the lead's name for the push notification.
         const nameRow =
           match.type === "AD_LEAD"
