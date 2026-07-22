@@ -16,8 +16,9 @@ interface Props {
 /** Build the prefilled Sweep&Go onboarding URL (only non-empty fields). */
 export function onboardingUrl({ firstName, lastName, email, zipCode, numberOfDogs, phone }: Props): string {
   const p = new URLSearchParams();
-  // Always default the onboarding to weekly service.
-  p.set("clean_up_frequency", "Once a week");
+  // Always default the onboarding to weekly service. The form's frequency slider
+  // uses snake_case values (verified live) — the human "Once a week" is ignored.
+  p.set("clean_up_frequency", "once_a_week");
   if (zipCode) p.set("zip_code", zipCode);
   if (firstName) p.set("first_name", firstName);
   if (lastName) p.set("last_name", lastName);
