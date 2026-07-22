@@ -186,7 +186,7 @@ export function LeadMessages({ leadId, leadType, phone, initialMessages, optedOu
               optedOut
                 ? "This lead opted out (STOP)"
                 : phone
-                  ? "Type a message…  (use {{firstName}}, {{zipCode}} or {{numberOfDogs}})"
+                  ? "Type a message…  (use {{firstName}}, {{zipCode}} or {{dogs}})"
                   : "Add a phone number first"
             }
             rows={3}

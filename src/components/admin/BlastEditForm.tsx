@@ -52,7 +52,7 @@ export function BlastEditForm({ campaignId, initialName, initialBody }: { campai
           value={body}
           onChange={(e) => setBody(e.target.value)}
           rows={4}
-          placeholder="Message…  Use {{firstName}}, {{zipCode}} or {{numberOfDogs}} to personalize."
+          placeholder="Message…  Use {{firstName}}, {{zipCode}} or {{dogs}} to personalize."
           className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg resize-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
         />
         <p className="text-xs text-gray-400">Editing only affects messages not yet sent. Recipients can&apos;t be changed after creation.</p>
