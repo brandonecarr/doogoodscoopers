@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   Star, Plus, Pencil, Trash2, Search, Filter, X, ExternalLink, Loader2,
-  MessageSquareQuote, CheckCircle2, Clock, Link2, AlertTriangle,
+  MessageSquareQuote, CheckCircle2, Clock, Link2, AlertTriangle, RefreshCw, Unlink,
 } from "lucide-react";
 
 const SOURCE_FIELDS: { key: string; label: string; hint?: string }[] = [
@@ -80,18 +81,53 @@ export default function ReviewsPage() {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
 
-  // Review-source links (settings)
+  // App settings (review-source links + Google connection status)
   const [sources, setSources] = useState<Record<string, string>>({});
   const [editSources, setEditSources] = useState(false);
   const [sourceForm, setSourceForm] = useState<Record<string, string>>({});
   const [savingSources, setSavingSources] = useState(false);
+  const [syncingGoogle, setSyncingGoogle] = useState(false);
+  const [syncMsg, setSyncMsg] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetch("/api/admin/app-settings?prefix=reviews.")
+  const searchParams = useSearchParams();
+  const googleParam = searchParams.get("google");
+
+  const loadSettings = useCallback(() => {
+    fetch("/api/admin/app-settings")
       .then((r) => (r.ok ? r.json() : { settings: {} }))
       .then((d) => setSources(d.settings || {}))
       .catch(() => {});
   }, []);
+
+  useEffect(() => { loadSettings(); }, [loadSettings]);
+
+  async function syncGoogle() {
+    setSyncingGoogle(true);
+    setSyncMsg(null);
+    try {
+      const res = await fetch("/api/admin/reviews/sync-google", { method: "POST" });
+      const d = await res.json();
+      if (res.ok) { setSyncMsg(`Imported ${d.imported} Google review${d.imported === 1 ? "" : "s"}.`); await load(); loadSettings(); }
+      else setSyncMsg(d.error || "Sync failed.");
+    } catch {
+      setSyncMsg("Sync failed.");
+    } finally {
+      setSyncingGoogle(false);
+    }
+  }
+
+  async function disconnectGoogle() {
+    if (!confirm("Disconnect Google Business Profile? Imported reviews stay, but syncing stops.")) return;
+    await fetch("/api/admin/app-settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ settings: {
+        "google.oauth.refreshToken": "", "google.bp.connectedEmail": "",
+        "google.bp.accountId": "", "google.bp.locationId": "", "google.bp.locationTitle": "",
+      } }),
+    });
+    loadSettings();
+  }
 
   function startEditSources() {
     const f: Record<string, string> = {};
@@ -177,6 +213,10 @@ export default function ReviewsPage() {
     </div>
   );
 
+  const connectedEmail = sources["google.bp.connectedEmail"];
+  const locationTitle = sources["google.bp.locationTitle"];
+  const lastSynced = sources["google.bp.lastSyncedAt"] ? fmtDate(sources["google.bp.lastSyncedAt"]) : null;
+
   return (
     <div className="space-y-6 pb-20 lg:pb-0">
       {/* Header */}
@@ -254,6 +294,58 @@ export default function ReviewsPage() {
             )}
           </div>
         )}
+      </div>
+
+      {/* Google connect banner */}
+      {googleParam && (
+        <div className={`rounded-xl px-4 py-3 text-sm border ${
+          googleParam === "connected" ? "bg-green-50 border-green-200 text-green-800" :
+          googleParam === "denied" ? "bg-gray-50 border-gray-200 text-gray-600" :
+          googleParam === "notconfigured" ? "bg-amber-50 border-amber-200 text-amber-800" :
+          "bg-red-50 border-red-200 text-red-800"
+        }`}>
+          {googleParam === "connected" ? "Google connected. Click “Sync now” to import your reviews." :
+           googleParam === "denied" ? "Google authorization was cancelled." :
+           googleParam === "state" ? "That sign-in link expired — please connect again." :
+           googleParam === "notconfigured" ? "Set GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET (Vercel env), redeploy, then connect." :
+           "Couldn’t connect to Google. Check your setup and try again."}
+        </div>
+      )}
+
+      {/* Google Business Profile connection */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0"><Star className="w-4 h-4 text-blue-500" /></div>
+            <div>
+              <h2 className="text-sm font-semibold text-navy-900">Google Business Profile</h2>
+              {connectedEmail ? (
+                <p className="text-xs text-gray-500">
+                  Connected as {connectedEmail}{locationTitle ? ` · ${locationTitle}` : ""}{lastSynced ? ` · synced ${lastSynced}` : ""}
+                </p>
+              ) : (
+                <p className="text-xs text-gray-500">Import all your Google reviews automatically.</p>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {connectedEmail ? (
+              <>
+                <button onClick={syncGoogle} disabled={syncingGoogle} className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 text-sm font-medium">
+                  {syncingGoogle ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Sync now
+                </button>
+                <button onClick={disconnectGoogle} className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 text-sm text-gray-600">
+                  <Unlink className="w-4 h-4" /> Disconnect
+                </button>
+              </>
+            ) : (
+              <button onClick={() => { window.location.href = "/api/admin/google/oauth/start"; }} className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">
+                Connect Google
+              </button>
+            )}
+          </div>
+        </div>
+        {syncMsg && <p className="text-xs text-gray-600 mt-2">{syncMsg}</p>}
       </div>
 
       {/* Stats */}

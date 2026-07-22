@@ -514,6 +514,8 @@ model Review {
   phone          String?
   email          String?
   sngCustomerId  String? // optional link to a Sweep&Go customer (rcl_...)
+  externalId     String? @unique // platform review id, e.g. "google:AbC..." for dedup on sync
+  reply          String?  @db.Text // our public reply, if any
 
   // Request + outcome
   platform       String    @default("google") // google | yelp | facebook

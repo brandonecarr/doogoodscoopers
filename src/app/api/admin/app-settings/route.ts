@@ -13,7 +13,9 @@ export async function GET(request: Request) {
   const prefix = searchParams.get("prefix");
   const rows = await prisma.appSetting.findMany({ where: prefix ? { key: { startsWith: prefix } } : undefined });
   const settings: Record<string, string> = {};
-  for (const r of rows) settings[r.key] = r.value;
+  // Never expose secrets (OAuth refresh tokens, secrets) to the browser.
+  const isSecret = (k: string) => /secret|token/i.test(k);
+  for (const r of rows) if (!isSecret(r.key)) settings[r.key] = r.value;
   return NextResponse.json({ settings });
 }
 
