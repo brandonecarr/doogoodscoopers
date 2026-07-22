@@ -484,6 +484,10 @@ model SweepandgoCustomer {
   assignedTo        String?
   cleanupFrequency  String?
 
+  // Customer's Sweep&Go "Created At" (signup) date. Not in the sync feed, so it's
+  // backfilled for existing customers and set to first-seen time for new ones.
+  startDate         DateTime?
+
   // Sync bookkeeping (local only)
   active            Boolean   @default(true) // present in the latest active pull
   firstSeenAt       DateTime  @default(now())
@@ -497,6 +501,7 @@ model SweepandgoCustomer {
   @@index([zipCode])
   @@index([lastName])
   @@index([removedAt])
+  @@index([startDate])
 }
 
 // =====================

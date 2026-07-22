@@ -101,9 +101,9 @@ export default async function ArchivedCustomersPage({ searchParams }: PageProps)
                 customers.map((c) => (
                   <tr key={c.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4">
-                      <div className="font-medium text-navy-900">
+                      <Link href={`/admin/customers/${c.id}`} className="font-medium text-navy-900 hover:text-teal-600 hover:underline">
                         {[c.firstName, c.lastName].filter(Boolean).join(" ") || "Unknown"}
-                      </div>
+                      </Link>
                       {c.email && <div className="text-sm text-gray-500">{c.email}</div>}
                     </td>
                     <td className="px-6 py-4">

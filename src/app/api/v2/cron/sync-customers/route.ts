@@ -115,7 +115,10 @@ export async function GET(request: NextRequest) {
     };
     const result = await prisma.sweepandgoCustomer.upsert({
       where: { sngId: c.client },
-      create: { sngId: c.client, firstSeenAt: now, ...fields },
+      // Sweep&Go's feed has no created-at, so a brand-new customer's startDate is
+      // set to first-seen (they're synced within the hour of signing up). Never
+      // overwritten on later syncs, preserving backfilled dates.
+      create: { sngId: c.client, firstSeenAt: now, startDate: now, ...fields },
       update: fields,
     });
     // upsert doesn't report create-vs-update; approximate via firstSeenAt.
