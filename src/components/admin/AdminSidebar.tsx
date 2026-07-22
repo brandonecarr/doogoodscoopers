@@ -36,7 +36,7 @@ export function AdminSidebar() {
       <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
         <div className="flex flex-col flex-grow bg-navy-900 pt-5 pb-4 overflow-y-auto">
           {/* Logo */}
-          <div className="flex items-center flex-shrink-0 px-4">
+          <div className="flex items-center justify-center flex-shrink-0 px-4">
             <Link href="/admin">
               <Image
                 src="/logo-dark.webp"
