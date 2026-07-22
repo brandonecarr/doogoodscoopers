@@ -40,8 +40,9 @@ const STATUS_STYLES: Record<string, string> = {
   DECLINED: "bg-gray-100 text-gray-600",
 };
 const STATUS_LABELS: Record<string, string> = {
-  PENDING: "Pending", REQUESTED: "Requested", COMPLETED: "Completed", DECLINED: "Declined",
+  PENDING: "Pending", REQUESTED: "Requested", COMPLETED: "Reviewed", DECLINED: "Declined",
 };
+const STATUS_ORDER = ["PENDING", "REQUESTED", "COMPLETED", "DECLINED"];
 const PLATFORM_LABELS: Record<string, string> = { google: "Google", yelp: "Yelp", facebook: "Facebook" };
 
 function fmtDate(d: string | null) {
@@ -201,6 +202,17 @@ export default function ReviewsPage() {
     if (res.ok) await load();
   }
 
+  async function changeStatus(id: string, status: string) {
+    // Optimistic; the API stamps reviewedAt when moving to Reviewed.
+    setReviews((prev) => prev.map((r) => (r.id === id ? { ...r, status } : r)));
+    const res = await fetch(`/api/admin/reviews/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+    if (res.ok) await load(); // refresh stamps + stat counts
+  }
+
   const statCard = (label: string, value: string | number, Icon: typeof Star, tint: string) => (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex items-center gap-3">
       <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${tint}`}>
@@ -351,7 +363,7 @@ export default function ReviewsPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {statCard("Total", stats.total, MessageSquareQuote, "bg-teal-50 text-teal-600")}
-        {statCard("Completed", stats.completed, CheckCircle2, "bg-green-50 text-green-600")}
+        {statCard("Reviewed", stats.completed, CheckCircle2, "bg-green-50 text-green-600")}
         {statCard("Awaiting", stats.requested, Clock, "bg-blue-50 text-blue-600")}
         {statCard("Avg rating", stats.avgRating ?? "—", Star, "bg-amber-50 text-amber-500")}
       </div>
@@ -412,9 +424,16 @@ export default function ReviewsPage() {
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-700">{PLATFORM_LABELS[r.platform] || r.platform}</td>
                     <td className="px-6 py-4">
-                      <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${STATUS_STYLES[r.status] || "bg-gray-100 text-gray-600"}`}>
-                        {STATUS_LABELS[r.status] || r.status}
-                      </span>
+                      <select
+                        value={r.status}
+                        onChange={(e) => changeStatus(r.id, e.target.value)}
+                        title="Change status"
+                        className={`text-xs font-medium rounded-full pl-2.5 pr-6 py-1 border-0 cursor-pointer appearance-none focus:ring-2 focus:ring-teal-500 ${STATUS_STYLES[r.status] || "bg-gray-100 text-gray-600"}`}
+                      >
+                        {STATUS_ORDER.map((s) => (
+                          <option key={s} value={s} className="bg-white text-gray-900">{STATUS_LABELS[s]}</option>
+                        ))}
+                      </select>
                     </td>
                     <td className="px-6 py-4"><Stars rating={r.rating} /></td>
                     <td className="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">{fmtDate(r.requestedAt)}</td>
@@ -475,7 +494,7 @@ export default function ReviewsPage() {
                   <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white">
                     <option value="PENDING">Pending</option>
                     <option value="REQUESTED">Requested</option>
-                    <option value="COMPLETED">Completed</option>
+                    <option value="COMPLETED">Reviewed</option>
                     <option value="DECLINED">Declined</option>
                   </select>
                 </div>

@@ -133,6 +133,26 @@ export async function GET(request: NextRequest) {
         where: { id: campaign.id },
         data: result.success ? { sentCount: { increment: 1 } } : { failedCount: { increment: 1 } },
       });
+
+      // Review request → track it in the Reviews section. Only when we actually
+      // sent a review-ask (the step uses {{reviewLink}}) to a customer. Idempotent
+      // per customer so re-sends / later steps don't reset a manually-set status.
+      if (result.success && r.leadType === "CUSTOMER" && step.body.includes("{{reviewLink}}")) {
+        await prisma.review.upsert({
+          where: { externalId: `reviewreq:${r.leadId}` },
+          create: {
+            externalId: `reviewreq:${r.leadId}`,
+            customerName: r.name || vars.name || "Customer",
+            phone: r.phone,
+            sngCustomerId: r.leadId,
+            platform: "google",
+            status: "REQUESTED",
+            requestChannel: "sms",
+            requestedAt: new Date(),
+          },
+          update: {},
+        }).catch((e) => console.error("[process-drips] review upsert failed", e));
+      }
       sent++;
       await sleep(SPACING_MS);
       if (sent >= MAX_SENDS) break;
