@@ -553,3 +553,88 @@ model AppSetting {
   updatedAt DateTime @updatedAt
   createdAt DateTime @default(now())
 }
+
+// =====================
+// EMAIL MARKETING (newsletters)
+// =====================
+
+// Newsletter subscribers not already in the CRM (site signups, Brevo import).
+model EmailContact {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  firstName String?
+  lastName  String?
+  tags      String[] @default([])
+  source    String? // import | form | manual
+  status    String   @default("SUBSCRIBED") // SUBSCRIBED | UNSUBSCRIBED
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+}
+
+// Suppression list — enforced on every send (CAN-SPAM).
+model EmailUnsubscribe {
+  id        String   @id @default(cuid())
+  email     String   @unique // normalized lowercase
+  reason    String? // unsubscribe | complaint | bounce
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+// A broadcast email (newsletter).
+model EmailCampaign {
+  id               String    @id @default(cuid())
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  name             String
+  subject          String
+  fromName         String?
+  fromEmail        String?
+  replyTo          String?
+  html             String    @db.Text // compiled email body HTML
+  audienceFilter   Json? // { leadTypes, withinDays, statuses }
+
+  status           String    @default("DRAFT") // DRAFT | SCHEDULED | QUEUED | SENDING | SENT
+  scheduledAt      DateTime?
+
+  totalRecipients  Int       @default(0)
+  sentCount        Int       @default(0)
+  failedCount      Int       @default(0)
+  openCount        Int       @default(0)
+  clickCount       Int       @default(0)
+  bounceCount      Int       @default(0)
+  unsubscribeCount Int       @default(0)
+
+  adminEmail       String?
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+// Per-recipient send + engagement row.
+model EmailRecipient {
+  id          String    @id @default(cuid())
+  createdAt   DateTime  @default(now())
+
+  campaignId  String
+  email       String
+  name        String?
+  contactType String? // quote | ad | outofarea | commercial | career | customer | contact
+  contactId   String?
+
+  status      String    @default("PENDING") // PENDING | SENT | FAILED | SKIPPED
+  resendId    String? // Resend email id, for webhook matching
+  error       String?
+  sentAt      DateTime?
+  openedAt    DateTime?
+  clickedAt   DateTime?
+  bouncedAt   DateTime?
+
+  @@unique([campaignId, email])
+  @@index([campaignId])
+  @@index([status])
+  @@index([resendId])
+}

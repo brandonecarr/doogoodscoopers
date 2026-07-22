@@ -13,6 +13,7 @@ import {
   Megaphone,
   Dog,
   Star,
+  Mail,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -22,6 +23,7 @@ const navigation = [
   { name: "Customers",            href: "/admin/customers",  icon: Dog },
   { name: "Reviews",              href: "/admin/reviews",    icon: Star },
   { name: "Campaigns",            href: "/admin/campaigns",  icon: Megaphone },
+  { name: "Email",                href: "/admin/email",      icon: Mail },
   { name: "Commercial Inquiries", href: "/admin/commercial", icon: Building2 },
   { name: "Out of Area",          href: "/admin/out-of-area", icon: MapPinOff },
   { name: "Career Applications",  href: "/admin/careers",    icon: Briefcase },
@@ -101,7 +103,8 @@ export function AdminSidebar() {
                   pathname.startsWith("/admin/quote-leads") ||
                   pathname.startsWith("/admin/ad-leads"))) ||
               (item.href === "/admin/customers" && pathname.startsWith("/admin/customers")) ||
-              (item.href === "/admin/reviews" && pathname.startsWith("/admin/reviews"));
+              (item.href === "/admin/reviews" && pathname.startsWith("/admin/reviews")) ||
+              (item.href === "/admin/email" && pathname.startsWith("/admin/email"));
             return (
               <Link
                 key={item.name}
