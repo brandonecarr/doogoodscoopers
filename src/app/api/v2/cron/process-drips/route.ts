@@ -165,6 +165,13 @@ export async function GET(request: NextRequest) {
           },
           update: {},
         }).catch((e) => console.error("[process-drips] review upsert failed", e));
+
+        // Reflect it on the customer's review status (Customers section). Gated
+        // on NO_REVIEW so a manual "Review Complete" is never overwritten.
+        await prisma.sweepandgoCustomer.updateMany({
+          where: { id: r.leadId, reviewStatus: "NO_REVIEW" },
+          data: { reviewStatus: "REQUEST_SENT" },
+        }).catch((e) => console.error("[process-drips] review status update failed", e));
       }
       sent++;
       await sleep(SPACING_MS);

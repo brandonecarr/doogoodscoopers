@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Dog, Search, Archive, RefreshCw, ArrowUp, ArrowDown } from "lucide-react";
 import type { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
+import { CustomerReviewControl } from "@/components/admin/CustomerReviewControl";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +34,7 @@ const SORTS: Record<string, (dir: "asc" | "desc") => Prisma.SweepandgoCustomerOr
   serviceDay:   (d) => [{ serviceDays: d }],
   frequency:    (d) => [{ cleanupFrequency: d }],
   tech:         (d) => [{ assignedTo: d }],
+  review:       (d) => [{ reviewStatus: d }],
 };
 
 export default async function CustomersPage({ searchParams }: PageProps) {
@@ -137,6 +139,7 @@ export default async function CustomersPage({ searchParams }: PageProps) {
             <option value="serviceDay:asc">Service day</option>
             <option value="frequency:asc">Frequency</option>
             <option value="tech:asc">Tech</option>
+            <option value="review:asc">Review status</option>
           </select>
           <button type="submit" className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors text-sm">Apply</button>
         </form>
@@ -157,12 +160,13 @@ export default async function CustomersPage({ searchParams }: PageProps) {
                 {renderTh("Service Day", "serviceDay")}
                 {renderTh("Frequency", "frequency")}
                 {renderTh("Tech", "tech")}
+                {renderTh("Review", "review")}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {customers.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan={9} className="px-6 py-12 text-center text-gray-500">
                     {search ? "No customers match your search." : "No customers synced yet — the hourly sync will populate this list."}
                   </td>
                 </tr>
@@ -187,6 +191,9 @@ export default async function CustomersPage({ searchParams }: PageProps) {
                     <td className="px-6 py-4 text-sm text-gray-700 whitespace-nowrap">{c.serviceDays || "-"}</td>
                     <td className="px-6 py-4 text-sm text-gray-700">{c.cleanupFrequency || "-"}</td>
                     <td className="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">{c.assignedTo || "-"}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <CustomerReviewControl customerId={c.id} value={c.reviewStatus} />
+                    </td>
                   </tr>
                 ))
               )}

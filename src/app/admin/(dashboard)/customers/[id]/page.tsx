@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Dog, Mail, Phone, MapPin, Calendar, RefreshCw, Repeat, User, Star, MessageSquare } from "lucide-react";
 import prisma from "@/lib/prisma";
+import { CustomerReviewControl } from "@/components/admin/CustomerReviewControl";
 
 export const dynamic = "force-dynamic";
 
@@ -92,22 +93,25 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       </div>
 
       {/* Review status */}
-      {review && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <h2 className="text-lg font-semibold text-navy-900 mb-4 flex items-center gap-2">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <h2 className="text-lg font-semibold text-navy-900 flex items-center gap-2">
             <Star className="w-4 h-4 text-amber-400" /> Review
           </h2>
-          <div className="flex items-center gap-4 text-sm">
-            <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${review.status === "COMPLETED" ? "bg-green-100 text-green-800" : "bg-blue-100 text-blue-800"}`}>
-              {review.status === "COMPLETED" ? "Reviewed" : "Requested"}
-            </span>
+          <CustomerReviewControl customerId={customer.id} value={customer.reviewStatus} size="md" />
+        </div>
+        <p className="text-xs text-gray-400 mt-2">
+          Set to <strong>Request Sent</strong> automatically when a review-request drip texts this customer. Update it here anytime.
+        </p>
+        {review && (
+          <div className="flex items-center gap-4 text-sm mt-4 pt-4 border-t border-gray-100">
             {review.rating ? <span className="text-amber-500">{"★".repeat(review.rating)}{"☆".repeat(5 - review.rating)}</span> : null}
             <span className="text-gray-500" suppressHydrationWarning>
-              {review.status === "COMPLETED" ? `on ${fmtDate(review.reviewedAt)}` : `requested ${fmtDate(review.requestedAt)}`}
+              {review.status === "COMPLETED" ? `Reviewed on ${fmtDate(review.reviewedAt)}` : `Requested ${fmtDate(review.requestedAt)}`}
             </span>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Message history */}
       {messages.length > 0 && (

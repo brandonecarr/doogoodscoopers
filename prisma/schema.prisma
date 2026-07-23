@@ -488,6 +488,10 @@ model SweepandgoCustomer {
   // backfilled for existing customers and set to first-seen time for new ones.
   startDate         DateTime?
 
+  // Review tracking (local only — never synced to Sweep&Go). Set to REQUEST_SENT
+  // automatically when a review-request drip texts the customer; editable by hand.
+  reviewStatus      String    @default("NO_REVIEW") // NO_REVIEW | REQUEST_SENT | REVIEW_COMPLETE
+
   // Sync bookkeeping (local only)
   active            Boolean   @default(true) // present in the latest active pull
   firstSeenAt       DateTime  @default(now())
@@ -502,6 +506,7 @@ model SweepandgoCustomer {
   @@index([lastName])
   @@index([removedAt])
   @@index([startDate])
+  @@index([reviewStatus])
 }
 
 // =====================
