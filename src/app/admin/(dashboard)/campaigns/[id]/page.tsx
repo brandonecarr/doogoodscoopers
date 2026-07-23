@@ -4,6 +4,7 @@ import { ArrowLeft, Zap, Users, CheckCircle2, StopCircle, Clock, Pencil } from "
 import prisma from "@/lib/prisma";
 import type { LeadSource } from "@prisma/client";
 import { CampaignPauseToggle } from "@/components/admin/CampaignPauseToggle";
+import { RecipientStopButton } from "@/components/admin/RecipientStopButton";
 
 export const dynamic = "force-dynamic";
 
@@ -154,6 +155,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
                   ) : (
                     <th className="pb-2 pr-4 font-medium">Sent</th>
                   )}
+                  <th className="pb-2 font-medium"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -189,6 +191,11 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
                       ) : (
                         <td className="py-2 pr-4 text-gray-500" suppressHydrationWarning>{fmt(r.sentAt)}</td>
                       )}
+                      <td className="py-2 text-right">
+                        {r.status === "ACTIVE" || r.status === "PENDING" ? (
+                          <RecipientStopButton campaignId={campaign.id} recipientId={r.id} />
+                        ) : null}
+                      </td>
                     </tr>
                   );
                 })}
