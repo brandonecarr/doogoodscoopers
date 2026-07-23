@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Dog, Mail, Phone, MapPin, Calendar, RefreshCw, Repeat, User, Star, MessageSquare } from "lucide-react";
 import prisma from "@/lib/prisma";
 import { CustomerReviewControl } from "@/components/admin/CustomerReviewControl";
+import { SendReviewRequestButton } from "@/components/admin/SendReviewRequestButton";
 
 export const dynamic = "force-dynamic";
 
@@ -98,10 +99,13 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
           <h2 className="text-lg font-semibold text-navy-900 flex items-center gap-2">
             <Star className="w-4 h-4 text-amber-400" /> Review
           </h2>
-          <CustomerReviewControl customerId={customer.id} value={customer.reviewStatus} size="md" />
+          <div className="flex items-center gap-3">
+            <CustomerReviewControl customerId={customer.id} value={customer.reviewStatus} size="md" />
+            <SendReviewRequestButton customerId={customer.id} hasPhone={!!(customer.cellPhone || customer.homePhone)} />
+          </div>
         </div>
         <p className="text-xs text-gray-400 mt-2">
-          Set to <strong>Request Sent</strong> automatically when a review-request drip texts this customer. Update it here anytime.
+          Sends a Google review-request text to this customer and marks them <strong>Request Sent</strong>. Also set automatically when a review-request drip texts them. Update the status here anytime.
         </p>
         {review && (
           <div className="flex items-center gap-4 text-sm mt-4 pt-4 border-t border-gray-100">
