@@ -33,12 +33,24 @@ function getSupabase(): SupabaseClient {
   return createClient(url, serviceKey);
 }
 
-// Map Quo delivery-status events to the messages.status CHECK values.
-const STATUS_MAP: Record<string, string> = {
-  "message.delivered": "DELIVERED",
-  "message.failed": "FAILED",
-  "message.sent": "SENT",
-};
+// Resolve a Quo delivery event + payload into one of our allowed
+// messages.status CHECK values (DELIVERED | FAILED | SENT), or null to ignore.
+// Robust to event-name variance: "undelivered", "failed", "error", "rejected"
+// all count as a failure, whether they arrive as the event name or the payload's
+// own `status` field. (Quo reports carrier rejections as status "undelivered",
+// which previously fell through unmapped and left the message stuck at "sent".)
+function resolveDeliveryStatus(event: string, payload: unknown): string | null {
+  const p = (payload && typeof payload === "object" ? payload : {}) as Record<string, unknown>;
+  const d = (p.data && typeof p.data === "object" ? (p.data as Record<string, unknown>) : p);
+  const obj = d.object && typeof d.object === "object" ? (d.object as Record<string, unknown>) : d;
+  const payloadStatus = typeof obj.status === "string" ? obj.status : "";
+  const raw = `${payloadStatus} ${event}`.toLowerCase();
+
+  if (/(undeliver|fail|error|reject|invalid)/.test(raw)) return "FAILED";
+  if (/deliver/.test(raw)) return "DELIVERED"; // "delivered" (undelivered already returned above)
+  if (/sent/.test(raw)) return "SENT";
+  return null;
+}
 
 export async function POST(request: NextRequest) {
   const rawBody = await request.text();
@@ -75,8 +87,11 @@ export async function POST(request: NextRequest) {
       return await handleInbound(supabase, payload);
     }
 
-    if (event in STATUS_MAP) {
-      return await handleDeliveryStatus(supabase, payload, STATUS_MAP[event]);
+    // Any other message.* event is a delivery-status update.
+    if (event.startsWith("message.")) {
+      const status = resolveDeliveryStatus(event, payload);
+      if (!status) return NextResponse.json({ success: true, ignored: true, event });
+      return await handleDeliveryStatus(supabase, payload, status);
     }
 
     if (event.startsWith("call.")) {
@@ -358,7 +373,37 @@ async function handleDeliveryStatus(
   // Admin/CRM lead messages (Prisma) — same provider message id.
   await prisma.leadMessage.updateMany({ where: { quoMessageId: msg.messageId }, data: { status } });
 
-  return NextResponse.json({ success: true, status });
+  // A failed/undelivered send ends the drip for that lead: there's no point
+  // firing the remaining steps at a number the carrier won't deliver to.
+  let dripStopped = 0;
+  if (status === "FAILED") {
+    const leadMsgs = await prisma.leadMessage.findMany({
+      where: { quoMessageId: msg.messageId },
+      select: { leadType: true, leadId: true },
+    });
+    for (const lm of leadMsgs) {
+      const active = await prisma.campaignRecipient.findMany({
+        where: { leadType: lm.leadType, leadId: lm.leadId, status: "ACTIVE" },
+        select: { id: true, campaignId: true },
+      });
+      if (!active.length) continue;
+      const dripCampaigns = await prisma.campaign.findMany({
+        where: { id: { in: active.map((r) => r.campaignId) }, type: "DRIP" },
+        select: { id: true },
+      });
+      const dripSet = new Set(dripCampaigns.map((c) => c.id));
+      const stopIds = active.filter((r) => dripSet.has(r.campaignId)).map((r) => r.id);
+      if (stopIds.length) {
+        const res = await prisma.campaignRecipient.updateMany({
+          where: { id: { in: stopIds } },
+          data: { status: "STOPPED", error: "undeliverable (carrier rejected)", nextSendAt: null },
+        });
+        dripStopped += res.count;
+      }
+    }
+  }
+
+  return NextResponse.json({ success: true, status, dripStopped });
 }
 
 // ── Calls → lead/client timeline (Phase 4) ──────────────────────────────────
