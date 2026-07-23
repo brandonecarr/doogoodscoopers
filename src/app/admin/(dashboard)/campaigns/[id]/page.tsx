@@ -5,6 +5,7 @@ import prisma from "@/lib/prisma";
 import type { LeadSource } from "@prisma/client";
 import { CampaignPauseToggle } from "@/components/admin/CampaignPauseToggle";
 import { RecipientStopButton } from "@/components/admin/RecipientStopButton";
+import { loadSendWindow } from "@/lib/send-window";
 
 export const dynamic = "force-dynamic";
 
@@ -17,9 +18,16 @@ const pathFor: Record<LeadSource, string> = {
   CUSTOMER: "customers",
 };
 
-function fmt(d: Date | null) {
+function fmt(d: Date | null, timeZone: string) {
   if (!d) return "—";
-  return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  return new Date(d).toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone,
+    timeZoneName: "short",
+  });
 }
 
 function humanDelay(min: number) {
@@ -48,6 +56,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
   if (!campaign) notFound();
 
   const isDrip = campaign.type === "DRIP";
+  const { timeZone } = await loadSendWindow();
   const [recipients, messages] = await Promise.all([
     prisma.campaignRecipient.findMany({ where: { campaignId: id }, orderBy: { createdAt: "desc" }, take: 300 }),
     prisma.leadMessage.findMany({ where: { campaignId: id }, orderBy: { createdAt: "desc" }, take: 100, select: { id: true, phone: true, body: true, status: true, createdAt: true, direction: true } }),
@@ -185,11 +194,11 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
                             {received} of {totalSteps} received
                           </td>
                           <td className="py-2 pr-4 text-gray-500" suppressHydrationWarning>
-                            {r.status === "ACTIVE" ? fmt(r.nextSendAt) : r.status === "COMPLETED" ? "done" : "—"}
+                            {r.status === "ACTIVE" ? fmt(r.nextSendAt, timeZone) : r.status === "COMPLETED" ? "done" : "—"}
                           </td>
                         </>
                       ) : (
-                        <td className="py-2 pr-4 text-gray-500" suppressHydrationWarning>{fmt(r.sentAt)}</td>
+                        <td className="py-2 pr-4 text-gray-500" suppressHydrationWarning>{fmt(r.sentAt, timeZone)}</td>
                       )}
                       <td className="py-2 text-right">
                         {r.status === "ACTIVE" || r.status === "PENDING" || r.status === "STOPPED" ? (
@@ -217,7 +226,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
           <div className="space-y-2">
             {messages.map((m) => (
               <div key={m.id} className="flex items-start gap-3 text-sm border-b border-gray-50 pb-2">
-                <span className="text-xs text-gray-400 w-28 flex-shrink-0" suppressHydrationWarning>{fmt(m.createdAt)}</span>
+                <span className="text-xs text-gray-400 w-28 flex-shrink-0" suppressHydrationWarning>{fmt(m.createdAt, timeZone)}</span>
                 <span className="text-xs text-gray-500 w-28 flex-shrink-0">{m.phone}</span>
                 <span className="flex-1 text-gray-800 truncate">{m.body}</span>
                 <span className={`text-[11px] px-1.5 py-0.5 rounded ${recStatusStyle[m.status || ""] || "bg-gray-100 text-gray-500"}`}>
