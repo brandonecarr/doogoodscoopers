@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Plus, Megaphone, Send, Clock, CheckCircle2, Zap } from "lucide-react";
 import prisma from "@/lib/prisma";
 import { CampaignPauseToggle } from "@/components/admin/CampaignPauseToggle";
+import { SendingHoursCard } from "@/components/admin/SendingHoursCard";
 
 export const dynamic = "force-dynamic";
 
@@ -55,6 +56,8 @@ export default async function CampaignsPage() {
           </Link>
         </div>
       </div>
+
+      <SendingHoursCard />
 
       {campaigns.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">

@@ -5,6 +5,7 @@ import { renderTemplate } from "@/lib/resend";
 import { optedOutKeys, optOutKey } from "@/lib/sms-optout";
 import { findDripCandidates, isLeadArchived } from "@/lib/drip";
 import { getLeadPersonalization } from "@/lib/personalization";
+import { loadSendWindow, clampToSendWindow, isWithinSendWindow } from "@/lib/send-window";
 
 // Drives DRIP campaigns: enrolls new matching leads and sends each recipient's
 // next step when due. Stops a recipient on reply / opt-out / archive.
@@ -31,6 +32,7 @@ export async function GET(request: NextRequest) {
   });
 
   const optedOut = await optedOutKeys();
+  const sendWindow = await loadSendWindow();
   // Global {{reviewLink}} token for review-request drips (the Google "leave a review" link).
   const reviewLink = (await prisma.appSetting.findUnique({ where: { key: "reviews.google.writeUrl" } }))?.value || "";
   let enrolled = 0;
@@ -57,7 +59,7 @@ export async function GET(request: NextRequest) {
             name: c.name,
             status: "ACTIVE",
             currentStep: 0,
-            nextSendAt: new Date(Date.now() + (steps[0].delayMinutes || 0) * MINUTE),
+            nextSendAt: clampToSendWindow(new Date(Date.now() + (steps[0].delayMinutes || 0) * MINUTE), sendWindow),
           },
         });
         enrolled++;
@@ -92,6 +94,13 @@ export async function GET(request: NextRequest) {
         continue;
       }
 
+      // Quiet hours: don't text in the middle of the night. If this send came
+      // due outside the window, push it to the next window open and skip for now.
+      if (!isWithinSendWindow(new Date(), sendWindow)) {
+        await prisma.campaignRecipient.update({ where: { id: r.id }, data: { nextSendAt: clampToSendWindow(new Date(), sendWindow) } });
+        continue;
+      }
+
       const vars = await getLeadPersonalization(r.leadType, r.leadId);
       // Fall back to the recipient's stored name if the lead record is gone.
       if (!vars.name && r.name) {
@@ -122,7 +131,7 @@ export async function GET(request: NextRequest) {
         data: {
           currentStep: r.currentStep + 1,
           status: next ? "ACTIVE" : "COMPLETED",
-          nextSendAt: next ? new Date(Date.now() + (next.delayMinutes || 0) * MINUTE) : null,
+          nextSendAt: next ? clampToSendWindow(new Date(Date.now() + (next.delayMinutes || 0) * MINUTE), sendWindow) : null,
           quoMessageId: result.messageId ?? null,
           sentAt: new Date(),
           error: result.success ? null : result.error ?? "send failed",
