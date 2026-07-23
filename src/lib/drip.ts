@@ -1,6 +1,6 @@
 import prisma from "@/lib/prisma";
 import { optedOutKeys, optOutKey } from "@/lib/sms-optout";
-import type { LeadSource } from "@prisma/client";
+import { LeadStatus, type LeadSource } from "@prisma/client";
 
 /**
  * Drip-campaign enrollment. A drip auto-enrolls NEW leads (created after the
@@ -80,6 +80,21 @@ export async function findDripCandidates(campaign: DripCampaign): Promise<DripCa
     const k = optOutKey(c.phone);
     return !k || !optedOut.has(k);
   });
+}
+
+/**
+ * Move a lead from NEW → CONTACTED after the drip first reaches them. Gated on
+ * status:NEW so it only ever makes that one transition — a status you've set
+ * manually (No Answer, Converted, etc.) is never overwritten. No-op for
+ * CUSTOMER (no lead status).
+ */
+export async function markLeadContactedIfNew(leadType: LeadSource, leadId: string): Promise<void> {
+  const where = { id: leadId, status: LeadStatus.NEW };
+  const data = { status: LeadStatus.CONTACTED };
+  if (leadType === "QUOTE_FORM") await prisma.quoteLead.updateMany({ where, data });
+  else if (leadType === "AD_LEAD") await prisma.adLead.updateMany({ where, data });
+  else if (leadType === "OUT_OF_AREA") await prisma.outOfAreaLead.updateMany({ where, data });
+  else if (leadType === "COMMERCIAL") await prisma.commercialLead.updateMany({ where, data });
 }
 
 /** Whether a lead has been archived (drip should stop). */

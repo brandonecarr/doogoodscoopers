@@ -3,7 +3,7 @@ import prisma from "@/lib/prisma";
 import { sendSms, isQuoConfigured } from "@/lib/quo";
 import { renderTemplate } from "@/lib/resend";
 import { optedOutKeys, optOutKey } from "@/lib/sms-optout";
-import { findDripCandidates, isLeadArchived } from "@/lib/drip";
+import { findDripCandidates, isLeadArchived, markLeadContactedIfNew } from "@/lib/drip";
 import { getLeadPersonalization } from "@/lib/personalization";
 import { loadSendWindow, clampToSendWindow, isWithinSendWindow } from "@/lib/send-window";
 
@@ -142,6 +142,10 @@ export async function GET(request: NextRequest) {
         where: { id: campaign.id },
         data: result.success ? { sentCount: { increment: 1 } } : { failedCount: { increment: 1 } },
       });
+
+      // First successful drip contact moves a NEW lead → Contacted (won't
+      // overwrite a status you've set by hand). Idempotent on later steps.
+      if (result.success) await markLeadContactedIfNew(r.leadType, r.leadId);
 
       // Review request → track it in the Reviews section. Only when we actually
       // sent a review-ask (the step uses {{reviewLink}}) to a customer. Idempotent
