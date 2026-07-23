@@ -13,26 +13,45 @@ interface Props {
   numberOfDogs?: string | null;
 }
 
-/** Build the prefilled Sweep&Go onboarding URL (only non-empty fields). */
+/** Format a phone the way the generator does: `(909) 434-4706` from 10 digits. */
+function formatCellPhone(phone?: string | null): string | undefined {
+  if (!phone) return undefined;
+  let d = phone.replace(/\D/g, "");
+  if (d.length === 11 && d.startsWith("1")) d = d.slice(1); // drop US country code
+  d = d.slice(0, 10);
+  if (d.length < 3) return d || undefined;
+  if (d.length < 6) return `(${d.slice(0, 3)}) ${d.slice(3)}`;
+  return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
+}
+
+/**
+ * Build the prefilled Sweep&Go onboarding URL.
+ *
+ * Mirrors the quote-skipper generator (sweepandgo.com/quote-gen/generator.html)
+ * exactly: parameters are appended in the form's order (the onboarding page
+ * reads them positionally, so order matters), each value is encodeURIComponent'd
+ * (space → %20, parens stay literal), the phone is formatted `(909) 434-4706`,
+ * and empty fields are skipped.
+ */
 export function onboardingUrl({ firstName, lastName, email, zipCode, numberOfDogs, phone }: Props): string {
-  const p = new URLSearchParams();
-  // Always default the onboarding to weekly service. The form's frequency slider
-  // uses snake_case values (verified live) — the human "Once a week" is ignored.
-  p.set("clean_up_frequency", "once_a_week");
-  if (zipCode) p.set("zip_code", zipCode);
-  if (firstName) p.set("first_name", firstName);
-  if (lastName) p.set("last_name", lastName);
-  if (email) p.set("your_email_address", email);
-  if (numberOfDogs) {
-    const n = String(numberOfDogs).match(/\d+/)?.[0];
-    if (n) p.set("number_of_dogs", n);
-  }
-  if (phone) {
-    const digits = phone.replace(/\D/g, "");
-    if (digits) p.set("cell_phone_number", digits);
-  }
-  const qs = p.toString();
-  return qs ? `${ONBOARDING_BASE}?${qs}` : ONBOARDING_BASE;
+  const params: string[] = [];
+  const add = (key: string, val?: string | null) => {
+    if (val != null && val !== "") params.push(`${key}=${encodeURIComponent(val)}`);
+  };
+
+  add("zip_code", zipCode?.trim());
+  add("number_of_dogs", numberOfDogs ? String(numberOfDogs).match(/\d+/)?.[0] : undefined);
+  // Always default to weekly service — the form's slider uses the snake_case
+  // value (verified live); the human "Once a week" is ignored.
+  add("clean_up_frequency", "once_a_week");
+  add("first_name", firstName?.trim());
+  add("last_name", lastName?.trim());
+  add("your_email_address", email?.trim());
+  add("cell_phone_number", formatCellPhone(phone));
+  // The lead came through our marketing, so mark marketing as allowed.
+  add("marketing_allowed", "true");
+
+  return params.length ? `${ONBOARDING_BASE}?${params.join("&")}` : ONBOARDING_BASE;
 }
 
 export function LeadQuickActions(props: Props) {
