@@ -192,8 +192,8 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
                         <td className="py-2 pr-4 text-gray-500" suppressHydrationWarning>{fmt(r.sentAt)}</td>
                       )}
                       <td className="py-2 text-right">
-                        {r.status === "ACTIVE" || r.status === "PENDING" ? (
-                          <RecipientStopButton campaignId={campaign.id} recipientId={r.id} />
+                        {r.status === "ACTIVE" || r.status === "PENDING" || r.status === "STOPPED" ? (
+                          <RecipientStopButton campaignId={campaign.id} recipientId={r.id} stopped={r.status === "STOPPED"} />
                         ) : null}
                       </td>
                     </tr>
