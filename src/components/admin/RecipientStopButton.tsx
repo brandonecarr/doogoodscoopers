@@ -5,17 +5,20 @@ import { useRouter } from "next/navigation";
 import { Loader2, XCircle, RotateCcw } from "lucide-react";
 
 // Manual stop/restart for a single campaign recipient. STOPPED recipients show
-// "Restart" (put them back in the flow); in-flight recipients show "Stop".
+// "Restart" (resume on the original schedule); in-flight recipients show "Stop".
 export function RecipientStopButton({
   campaignId,
   recipientId,
-  stopped,
+  stopped: initialStopped,
 }: {
   campaignId: string;
   recipientId: string;
   stopped: boolean;
 }) {
   const router = useRouter();
+  // Track state locally so the button flips instantly, without waiting for the
+  // server round-trip / a manual page refresh.
+  const [stopped, setStopped] = useState(initialStopped);
   const [busy, setBusy] = useState(false);
 
   const run = async () => {
@@ -32,9 +35,11 @@ export function RecipientStopButton({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action }),
       });
-      if (res.ok) router.refresh();
-      else setBusy(false);
-    } catch {
+      if (res.ok) {
+        setStopped(!stopped);
+        router.refresh(); // sync the status badge + stats
+      }
+    } finally {
       setBusy(false);
     }
   };
@@ -48,7 +53,7 @@ export function RecipientStopButton({
           ? "border-teal-200 text-teal-600 hover:bg-teal-50"
           : "border-red-200 text-red-600 hover:bg-red-50"
       }`}
-      title={stopped ? "Restart this contact in the campaign" : "Stop this contact and remove them from the campaign"}
+      title={stopped ? "Restart this contact on its original schedule" : "Stop this contact and remove them from the campaign"}
     >
       {busy ? (
         <Loader2 className="w-3 h-3 animate-spin" />
