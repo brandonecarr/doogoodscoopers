@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowLeft, Archive, Search } from "lucide-react";
 import prisma from "@/lib/prisma";
+import { ImportFormerButton } from "@/components/admin/ImportFormerButton";
 
 export const dynamic = "force-dynamic";
 
@@ -56,11 +57,12 @@ export default async function ArchivedCustomersPage({ searchParams }: PageProps)
         </div>
       </div>
 
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
         <p className="text-sm text-gray-600">
-          These customers dropped off your active Sweep&amp;Go list and were archived automatically. If one becomes active
-          again in Sweep&amp;Go, they&apos;ll move back to your Customers list on the next sync. Great candidates for a win-back campaign.
+          Customers who dropped off your active Sweep&amp;Go list, plus any imported <strong>disabled</strong> customers. If one
+          becomes active again in Sweep&amp;Go, they&apos;ll move back to your Customers list on the next sync. Great candidates for a win-back campaign.
         </p>
+        <ImportFormerButton />
       </div>
 
       {/* Search */}
