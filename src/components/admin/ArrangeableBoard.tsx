@@ -40,7 +40,17 @@ function reconcile(saved: Layout | null, cards: ArrangeableCard[]): Layout {
   return { main, side };
 }
 
-export function ArrangeableBoard({ layoutId, cards }: { layoutId: string; cards: ArrangeableCard[] }) {
+export function ArrangeableBoard({
+  layoutId,
+  cards,
+  actions,
+}: {
+  layoutId: string;
+  cards: ArrangeableCard[];
+  // Optional page-specific buttons rendered on the same line as (left of) the
+  // Edit Arrangement toggle — e.g. a page's "Edit" link.
+  actions?: ReactNode;
+}) {
   const storageKey = `arrange:${layoutId}`;
   const [layout, setLayout] = useState<Layout>(() => defaultLayout(cards));
   const [edit, setEdit] = useState(false);
@@ -186,6 +196,7 @@ export function ArrangeableBoard({ layoutId, cards }: { layoutId: string; cards:
   return (
     <div>
       <div className="flex items-center justify-end gap-2 mb-4">
+        {actions}
         {edit && (
           <button
             onClick={reset}

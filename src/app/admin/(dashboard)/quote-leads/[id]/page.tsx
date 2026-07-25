@@ -460,16 +460,21 @@ export default async function QuoteLeadDetailPage({ params }: PageProps) {
             {getStatusBadge(lead.status)}
           </div>
         </div>
-        <Link
-          href={`/admin/quote-leads/${lead.id}/edit`}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-navy-600 text-white rounded-lg hover:bg-navy-700 transition-colors text-sm font-medium flex-shrink-0"
-        >
-          <Pencil className="w-3.5 h-3.5" />
-          Edit
-        </Link>
       </div>
 
-      <ArrangeableBoard layoutId="quotelead" cards={cards} />
+      <ArrangeableBoard
+        layoutId="quotelead"
+        cards={cards}
+        actions={
+          <Link
+            href={`/admin/quote-leads/${lead.id}/edit`}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-navy-600 text-white rounded-lg hover:bg-navy-700 transition-colors text-sm font-medium flex-shrink-0"
+          >
+            <Pencil className="w-3.5 h-3.5" />
+            Edit
+          </Link>
+        }
+      />
     </div>
   );
 }
