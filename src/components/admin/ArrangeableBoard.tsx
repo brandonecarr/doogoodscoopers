@@ -106,8 +106,13 @@ export function ArrangeableBoard({ layoutId, cards }: { layoutId: string; cards:
     setLayout(defaultLayout(cards));
   };
 
+  // When the side zone is empty and we're just viewing, the main zone spans the
+  // full width (single-column pages look natural). In edit mode both zones always
+  // show so cards can be dragged into the side.
+  const sideCollapsed = layout.side.length === 0 && !edit;
+
   const zoneClass = (zone: CardZone) =>
-    `space-y-6 ${zone === "main" ? "lg:col-span-2" : ""} ${
+    `space-y-6 ${zone === "main" && !sideCollapsed ? "lg:col-span-2" : ""} ${
       edit ? "rounded-xl outline-2 outline-dashed outline-gray-200 outline-offset-4 min-h-24" : ""
     }`;
 
@@ -212,9 +217,9 @@ export function ArrangeableBoard({ layoutId, cards }: { layoutId: string; cards:
         </p>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+      <div className={`grid grid-cols-1 gap-6 items-start ${sideCollapsed ? "" : "lg:grid-cols-3"}`}>
         {renderZone("main", layout.main)}
-        {renderZone("side", layout.side)}
+        {(!sideCollapsed || edit) && renderZone("side", layout.side)}
       </div>
     </div>
   );

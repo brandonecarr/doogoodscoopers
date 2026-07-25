@@ -4,6 +4,7 @@ import { ArrowLeft, Dog, Mail, Phone, MapPin, Calendar, RefreshCw, Repeat, User,
 import prisma from "@/lib/prisma";
 import { CustomerReviewControl } from "@/components/admin/CustomerReviewControl";
 import { SendReviewRequestButton } from "@/components/admin/SendReviewRequestButton";
+import { ArrangeableBoard, type ArrangeableCard } from "@/components/admin/ArrangeableBoard";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +49,108 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
     </div>
   );
 
+  const cards: ArrangeableCard[] = [
+    {
+      id: "contact",
+      zone: "main",
+      node: (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <h2 className="text-lg font-semibold text-navy-900 mb-4">Contact</h2>
+          <div className="grid grid-cols-1 @lg:grid-cols-2 gap-4">
+            {field({ icon: Phone, label: "Cell phone", value: fmtPhone(customer.cellPhone), href: customer.cellPhone ? `tel:${customer.cellPhone}` : undefined })}
+            {field({ icon: Phone, label: "Home phone", value: fmtPhone(customer.homePhone), href: customer.homePhone ? `tel:${customer.homePhone}` : undefined })}
+            {field({ icon: Mail, label: "Email", value: customer.email, href: customer.email ? `mailto:${customer.email}` : undefined })}
+            {field({ icon: MapPin, label: "Address", value: [customer.address, customer.zipCode].filter(Boolean).join(", ") })}
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "service",
+      zone: "main",
+      node: (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <h2 className="text-lg font-semibold text-navy-900 mb-4">Service</h2>
+          <div className="grid grid-cols-1 @lg:grid-cols-2 gap-4">
+            {field({ icon: Repeat, label: "Subscription", value: customer.subscriptionNames })}
+            {field({ icon: Calendar, label: "Service day", value: customer.serviceDays })}
+            {field({ icon: RefreshCw, label: "Frequency", value: customer.cleanupFrequency })}
+            {field({ icon: User, label: "Assigned tech", value: customer.assignedTo })}
+            {field({ icon: Calendar, label: "Start date", value: fmtDate(customer.startDate ?? customer.firstSeenAt) })}
+            {field({ icon: Repeat, label: "One-time client", value: customer.oneTimeClient ? "Yes" : "No" })}
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "review",
+      zone: "main",
+      node: (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <h2 className="text-lg font-semibold text-navy-900 flex items-center gap-2">
+              <Star className="w-4 h-4 text-amber-400" /> Review
+            </h2>
+            <div className="flex items-center gap-3">
+              <CustomerReviewControl customerId={customer.id} value={customer.reviewStatus} size="md" />
+              <SendReviewRequestButton customerId={customer.id} hasPhone={!!(customer.cellPhone || customer.homePhone)} />
+            </div>
+          </div>
+          <p className="text-xs text-gray-400 mt-2">
+            Sends a Google review-request text to this customer and marks them <strong>Request Sent</strong>. Also set automatically when a review-request drip texts them. Update the status here anytime.
+          </p>
+          {review && (
+            <div className="flex items-center gap-4 text-sm mt-4 pt-4 border-t border-gray-100">
+              {review.rating ? <span className="text-amber-500">{"★".repeat(review.rating)}{"☆".repeat(5 - review.rating)}</span> : null}
+              <span className="text-gray-500" suppressHydrationWarning>
+                {review.status === "COMPLETED" ? `Reviewed on ${fmtDate(review.reviewedAt)}` : `Requested ${fmtDate(review.requestedAt)}`}
+              </span>
+            </div>
+          )}
+        </div>
+      ),
+    },
+    ...(messages.length > 0
+      ? [
+          {
+            id: "messages",
+            zone: "main" as const,
+            node: (
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <h2 className="text-lg font-semibold text-navy-900 mb-4 flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4 text-gray-400" /> Messages ({messages.length})
+                </h2>
+                <div className="space-y-2">
+                  {messages.map((m) => (
+                    <div key={m.id} className={`flex ${m.direction === "OUTBOUND" ? "justify-end" : "justify-start"}`}>
+                      <div className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${m.direction === "OUTBOUND" ? "bg-teal-600 text-white" : "bg-gray-100 text-navy-900"}`}>
+                        <p className="whitespace-pre-wrap break-words">{m.body}</p>
+                        <p className={`text-[10px] mt-1 ${m.direction === "OUTBOUND" ? "text-teal-100" : "text-gray-400"}`} suppressHydrationWarning>
+                          {fmtDateTime(m.createdAt)}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ),
+          },
+        ]
+      : []),
+    {
+      id: "sync",
+      zone: "main",
+      node: (
+        <div className="bg-gray-50 rounded-xl border border-gray-100 p-4 text-xs text-gray-500 flex flex-wrap gap-x-6 gap-y-1">
+          <span>Sweep&amp;Go ID: <code className="text-gray-600">{customer.sngId}</code></span>
+          <span suppressHydrationWarning>First seen: {fmtDate(customer.firstSeenAt)}</span>
+          <span suppressHydrationWarning>Last synced: {fmtDateTime(customer.lastSyncedAt)}</span>
+          {!customer.active && <span suppressHydrationWarning>Archived: {fmtDate(customer.removedAt)}</span>}
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-6 pb-20 lg:pb-0">
       {/* Header */}
@@ -69,82 +172,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
         </div>
       </div>
 
-      {/* Contact */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <h2 className="text-lg font-semibold text-navy-900 mb-4">Contact</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {field({ icon: Phone, label: "Cell phone", value: fmtPhone(customer.cellPhone), href: customer.cellPhone ? `tel:${customer.cellPhone}` : undefined })}
-          {field({ icon: Phone, label: "Home phone", value: fmtPhone(customer.homePhone), href: customer.homePhone ? `tel:${customer.homePhone}` : undefined })}
-          {field({ icon: Mail, label: "Email", value: customer.email, href: customer.email ? `mailto:${customer.email}` : undefined })}
-          {field({ icon: MapPin, label: "Address", value: [customer.address, customer.zipCode].filter(Boolean).join(", ") })}
-        </div>
-      </div>
-
-      {/* Service */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <h2 className="text-lg font-semibold text-navy-900 mb-4">Service</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {field({ icon: Repeat, label: "Subscription", value: customer.subscriptionNames })}
-          {field({ icon: Calendar, label: "Service day", value: customer.serviceDays })}
-          {field({ icon: RefreshCw, label: "Frequency", value: customer.cleanupFrequency })}
-          {field({ icon: User, label: "Assigned tech", value: customer.assignedTo })}
-          {field({ icon: Calendar, label: "Start date", value: fmtDate(customer.startDate ?? customer.firstSeenAt) })}
-          {field({ icon: Repeat, label: "One-time client", value: customer.oneTimeClient ? "Yes" : "No" })}
-        </div>
-      </div>
-
-      {/* Review status */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <h2 className="text-lg font-semibold text-navy-900 flex items-center gap-2">
-            <Star className="w-4 h-4 text-amber-400" /> Review
-          </h2>
-          <div className="flex items-center gap-3">
-            <CustomerReviewControl customerId={customer.id} value={customer.reviewStatus} size="md" />
-            <SendReviewRequestButton customerId={customer.id} hasPhone={!!(customer.cellPhone || customer.homePhone)} />
-          </div>
-        </div>
-        <p className="text-xs text-gray-400 mt-2">
-          Sends a Google review-request text to this customer and marks them <strong>Request Sent</strong>. Also set automatically when a review-request drip texts them. Update the status here anytime.
-        </p>
-        {review && (
-          <div className="flex items-center gap-4 text-sm mt-4 pt-4 border-t border-gray-100">
-            {review.rating ? <span className="text-amber-500">{"★".repeat(review.rating)}{"☆".repeat(5 - review.rating)}</span> : null}
-            <span className="text-gray-500" suppressHydrationWarning>
-              {review.status === "COMPLETED" ? `Reviewed on ${fmtDate(review.reviewedAt)}` : `Requested ${fmtDate(review.requestedAt)}`}
-            </span>
-          </div>
-        )}
-      </div>
-
-      {/* Message history */}
-      {messages.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <h2 className="text-lg font-semibold text-navy-900 mb-4 flex items-center gap-2">
-            <MessageSquare className="w-4 h-4 text-gray-400" /> Messages ({messages.length})
-          </h2>
-          <div className="space-y-2">
-            {messages.map((m) => (
-              <div key={m.id} className={`flex ${m.direction === "OUTBOUND" ? "justify-end" : "justify-start"}`}>
-                <div className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${m.direction === "OUTBOUND" ? "bg-teal-600 text-white" : "bg-gray-100 text-navy-900"}`}>
-                  <p className="whitespace-pre-wrap break-words">{m.body}</p>
-                  <p className={`text-[10px] mt-1 ${m.direction === "OUTBOUND" ? "text-teal-100" : "text-gray-400"}`} suppressHydrationWarning>
-                    {fmtDateTime(m.createdAt)}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Sync meta */}
-      <div className="bg-gray-50 rounded-xl border border-gray-100 p-4 text-xs text-gray-500 flex flex-wrap gap-x-6 gap-y-1">
-        <span>Sweep&amp;Go ID: <code className="text-gray-600">{customer.sngId}</code></span>
-        <span suppressHydrationWarning>First seen: {fmtDate(customer.firstSeenAt)}</span>
-        <span suppressHydrationWarning>Last synced: {fmtDateTime(customer.lastSyncedAt)}</span>
-        {!customer.active && <span suppressHydrationWarning>Archived: {fmtDate(customer.removedAt)}</span>}
-      </div>
+      <ArrangeableBoard layoutId="customer" cards={cards} />
     </div>
   );
 }

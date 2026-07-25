@@ -8,6 +8,7 @@ import { LeadQuickActions } from "@/components/admin/LeadQuickActions";
 import { LeadUpdates } from "@/components/admin/LeadUpdates";
 import { LeadActions } from "@/components/admin/LeadActions";
 import { FollowupGrade } from "@/components/admin/FollowupGrade";
+import { ArrangeableBoard, type ArrangeableCard } from "@/components/admin/ArrangeableBoard";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -99,6 +100,199 @@ export default async function CommercialDetailPage({ params }: PageProps) {
     notFound();
   }
 
+  const cards: ArrangeableCard[] = [
+    {
+      id: "property",
+      zone: "main",
+      node: (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <h2 className="text-lg font-semibold text-navy-900 mb-4">Property Information</h2>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-12 h-12 rounded-lg bg-teal-50 flex items-center justify-center">
+              <Building2 className="w-6 h-6 text-teal-600" />
+            </div>
+            <div>
+              <p className="text-xl font-semibold text-navy-900">{lead.propertyName}</p>
+              <p className="text-sm text-gray-500">Commercial Property</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-amber-50 flex items-center justify-center">
+              <MapPin className="w-5 h-5 text-amber-600" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Location</p>
+              <p className="text-navy-900">
+                {lead.city}, {lead.state} {lead.zipCode}
+              </p>
+            </div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "contact",
+      zone: "main",
+      node: (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <h2 className="text-lg font-semibold text-navy-900 mb-4">Contact Information</h2>
+          <div className="grid grid-cols-1 @lg:grid-cols-2 gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center">
+                <span className="text-lg font-semibold text-gray-600">
+                  {lead.contactName.charAt(0).toUpperCase()}
+                </span>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Contact Name</p>
+                <p className="font-medium text-navy-900">{lead.contactName}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center">
+                <Phone className="w-5 h-5 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Phone</p>
+                <a href={`tel:${lead.phone}`} className="text-navy-900 hover:text-teal-600">
+                  {lead.phone}
+                </a>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 @lg:col-span-2">
+              <div className="w-10 h-10 rounded-lg bg-purple-50 flex items-center justify-center">
+                <Mail className="w-5 h-5 text-purple-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Email</p>
+                <a href={`mailto:${lead.email}`} className="text-navy-900 hover:text-teal-600">
+                  {lead.email}
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      ),
+    },
+    ...(lead.inquiry
+      ? [
+          {
+            id: "inquiry",
+            zone: "main" as const,
+            node: (
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <h2 className="text-lg font-semibold text-navy-900 mb-4">
+                  <MessageSquare className="w-5 h-5 inline-block mr-2" />
+                  Inquiry Details
+                </h2>
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <p className="text-navy-900 whitespace-pre-wrap">{lead.inquiry}</p>
+                </div>
+              </div>
+            ),
+          },
+        ]
+      : []),
+    {
+      id: "updates",
+      zone: "main",
+      node: (
+        <LeadUpdates
+          leadId={lead.id}
+          leadType="commercial"
+          updates={updates.map((u: { id: string; createdAt: Date; message: string | null; communicationType: string | null; adminEmail: string | null }) => ({
+            id: u.id,
+            createdAt: u.createdAt.toISOString(),
+            message: u.message || "",
+            communicationType: u.communicationType || "",
+            adminEmail: u.adminEmail || "",
+          }))}
+        />
+      ),
+    },
+    {
+      id: "quick",
+      zone: "side",
+      node: (
+        <LeadQuickActions
+          phone={lead.phone}
+          email={lead.email}
+          firstName={lead.contactName}
+          zipCode={lead.zipCode}
+        />
+      ),
+    },
+    {
+      id: "status",
+      zone: "side",
+      node: (
+        <StatusUpdateForm
+          leadId={lead.id}
+          leadType="commercial"
+          currentStatus={lead.status}
+          notes={lead.notes}
+        />
+      ),
+    },
+    {
+      id: "followup",
+      zone: "side",
+      node: (
+        <FollowupGrade
+          leadId={lead.id}
+          leadType="commercial"
+          currentFollowupDate={lead.followupDate?.toISOString()}
+          currentGrade={lead.grade}
+        />
+      ),
+    },
+    {
+      id: "timeline",
+      zone: "side",
+      node: (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <h2 className="text-lg font-semibold text-navy-900 mb-4">Timeline</h2>
+          <div className="space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-full bg-teal-100 flex items-center justify-center flex-shrink-0">
+                <Calendar className="w-4 h-4 text-teal-600" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-navy-900">Inquiry Received</p>
+                <p className="text-xs text-gray-500">{formatDate(lead.createdAt)}</p>
+              </div>
+            </div>
+
+            {lead.updatedAt && lead.updatedAt > lead.createdAt && (
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                  <Clock className="w-4 h-4 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-navy-900">Last Updated</p>
+                  <p className="text-xs text-gray-500">{formatDate(lead.updatedAt)}</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "actions",
+      zone: "side",
+      node: (
+        <LeadActions
+          leadId={lead.id}
+          leadType="commercial"
+          isArchived={lead.archived}
+        />
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-6 pb-20 lg:pb-0">
       {/* Archived Banner */}
@@ -127,163 +321,7 @@ export default async function CommercialDetailPage({ params }: PageProps) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Info */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Property Info */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h2 className="text-lg font-semibold text-navy-900 mb-4">Property Information</h2>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 rounded-lg bg-teal-50 flex items-center justify-center">
-                <Building2 className="w-6 h-6 text-teal-600" />
-              </div>
-              <div>
-                <p className="text-xl font-semibold text-navy-900">{lead.propertyName}</p>
-                <p className="text-sm text-gray-500">Commercial Property</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-amber-50 flex items-center justify-center">
-                <MapPin className="w-5 h-5 text-amber-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Location</p>
-                <p className="text-navy-900">
-                  {lead.city}, {lead.state} {lead.zipCode}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Contact Info */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h2 className="text-lg font-semibold text-navy-900 mb-4">Contact Information</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center">
-                  <span className="text-lg font-semibold text-gray-600">
-                    {lead.contactName.charAt(0).toUpperCase()}
-                  </span>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Contact Name</p>
-                  <p className="font-medium text-navy-900">{lead.contactName}</p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center">
-                  <Phone className="w-5 h-5 text-blue-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Phone</p>
-                  <a href={`tel:${lead.phone}`} className="text-navy-900 hover:text-teal-600">
-                    {lead.phone}
-                  </a>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3 sm:col-span-2">
-                <div className="w-10 h-10 rounded-lg bg-purple-50 flex items-center justify-center">
-                  <Mail className="w-5 h-5 text-purple-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Email</p>
-                  <a href={`mailto:${lead.email}`} className="text-navy-900 hover:text-teal-600">
-                    {lead.email}
-                  </a>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Inquiry */}
-          {lead.inquiry && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <h2 className="text-lg font-semibold text-navy-900 mb-4">
-                <MessageSquare className="w-5 h-5 inline-block mr-2" />
-                Inquiry Details
-              </h2>
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <p className="text-navy-900 whitespace-pre-wrap">{lead.inquiry}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Updates */}
-          <LeadUpdates
-            leadId={lead.id}
-            leadType="commercial"
-            updates={updates.map((u: { id: string; createdAt: Date; message: string | null; communicationType: string | null; adminEmail: string | null }) => ({
-              id: u.id,
-              createdAt: u.createdAt.toISOString(),
-              message: u.message || "",
-              communicationType: u.communicationType || "",
-              adminEmail: u.adminEmail || "",
-            }))}
-          />
-        </div>
-
-        {/* Sidebar */}
-        <div className="space-y-6">
-          <LeadQuickActions
-            phone={lead.phone}
-            email={lead.email}
-            firstName={lead.contactName}
-            zipCode={lead.zipCode}
-          />
-          {/* Status Update */}
-          <StatusUpdateForm
-            leadId={lead.id}
-            leadType="commercial"
-            currentStatus={lead.status}
-            notes={lead.notes}
-          />
-
-          {/* Followup & Grade */}
-          <FollowupGrade
-            leadId={lead.id}
-            leadType="commercial"
-            currentFollowupDate={lead.followupDate?.toISOString()}
-            currentGrade={lead.grade}
-          />
-
-          {/* Timeline */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h2 className="text-lg font-semibold text-navy-900 mb-4">Timeline</h2>
-            <div className="space-y-4">
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-full bg-teal-100 flex items-center justify-center flex-shrink-0">
-                  <Calendar className="w-4 h-4 text-teal-600" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-navy-900">Inquiry Received</p>
-                  <p className="text-xs text-gray-500">{formatDate(lead.createdAt)}</p>
-                </div>
-              </div>
-
-              {lead.updatedAt && lead.updatedAt > lead.createdAt && (
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-                    <Clock className="w-4 h-4 text-blue-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-navy-900">Last Updated</p>
-                    <p className="text-xs text-gray-500">{formatDate(lead.updatedAt)}</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Actions */}
-          <LeadActions
-            leadId={lead.id}
-            leadType="commercial"
-            isArchived={lead.archived}
-          />
-        </div>
-      </div>
+      <ArrangeableBoard layoutId="commercial" cards={cards} />
     </div>
   );
 }
