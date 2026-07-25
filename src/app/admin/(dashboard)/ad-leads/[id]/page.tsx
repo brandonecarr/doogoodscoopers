@@ -10,6 +10,7 @@ import { DuplicateBanner } from "@/components/admin/DuplicateBanner";
 import { isOptedOut } from "@/lib/sms-optout";
 import { FollowupGrade } from "@/components/admin/FollowupGrade";
 import { LeadActions } from "@/components/admin/LeadActions";
+import { ArrangeableBoard, type ArrangeableCard } from "@/components/admin/ArrangeableBoard";
 import type { AdLead } from "@/types/leads";
 
 interface PageProps {
@@ -85,6 +86,285 @@ export default async function AdLeadDetailPage({ params }: PageProps) {
     adminEmail: u.adminEmail || "",
   }));
 
+  const customFieldEntries = (() => {
+    const fields = typedLead.customFields as Record<string, unknown> | null;
+    // Dog count is surfaced in Contact Information above — don't repeat it here.
+    return fields ? Object.entries(fields).filter(([k]) => !/dog/i.test(k)) : [];
+  })();
+
+  const cards: ArrangeableCard[] = [
+    {
+      id: "contact",
+      zone: "main",
+      node: (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <h2 className="text-lg font-semibold text-navy-900 mb-4">Contact Information</h2>
+          <div className="grid grid-cols-1 @lg:grid-cols-2 gap-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+                <Phone className="w-5 h-5 text-gray-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Phone</p>
+                <p className="font-medium text-navy-900">
+                  {typedLead.phone ? (
+                    <a href={`tel:${typedLead.phone}`} className="hover:text-teal-600">
+                      {typedLead.phone}
+                    </a>
+                  ) : (
+                    <span className="text-gray-400">Not provided</span>
+                  )}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+                <Mail className="w-5 h-5 text-gray-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Email</p>
+                <p className="font-medium text-navy-900">
+                  {typedLead.email ? (
+                    <a href={`mailto:${typedLead.email}`} className="hover:text-teal-600">
+                      {typedLead.email}
+                    </a>
+                  ) : (
+                    <span className="text-gray-400">Not provided</span>
+                  )}
+                </p>
+              </div>
+            </div>
+
+            {!!(typedLead.city || typedLead.state || typedLead.zipCode) && (
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+                  <MapPin className="w-5 h-5 text-gray-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Location</p>
+                  <p className="font-medium text-navy-900">
+                    {[typedLead.city, typedLead.state, typedLead.zipCode].filter((x): x is string => Boolean(x)).join(", ") || "-"}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+                <Dog className="w-5 h-5 text-gray-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Number of Dogs</p>
+                <p className="font-medium text-navy-900">
+                  {numberOfDogs ?? <span className="text-gray-400">Not provided</span>}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "campaign",
+      zone: "main",
+      node: (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <h2 className="text-lg font-semibold text-navy-900 mb-4">Campaign Information</h2>
+          <div className="grid grid-cols-1 @lg:grid-cols-2 gap-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-lg bg-pink-50 flex items-center justify-center flex-shrink-0">
+                <Tag className="w-5 h-5 text-pink-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Ad Source</p>
+                <p className="font-medium text-navy-900">
+                  <span className="px-2 py-1 text-xs font-medium rounded-full bg-pink-100 text-pink-800">
+                    {typedLead.adSource || "meta"}
+                  </span>
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+                <Calendar className="w-5 h-5 text-gray-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Received</p>
+                <p className="font-medium text-navy-900" suppressHydrationWarning>{formatDate(typedLead.createdAt)}</p>
+              </div>
+            </div>
+
+            {typedLead.campaignName && (
+              <div>
+                <p className="text-sm text-gray-500">Campaign Name</p>
+                <p className="font-medium text-navy-900">{typedLead.campaignName}</p>
+              </div>
+            )}
+
+            {typedLead.adSetName && (
+              <div>
+                <p className="text-sm text-gray-500">Ad Set</p>
+                <p className="font-medium text-navy-900">{typedLead.adSetName}</p>
+              </div>
+            )}
+
+            {typedLead.adName && (
+              <div>
+                <p className="text-sm text-gray-500">Ad Name</p>
+                <p className="font-medium text-navy-900">{typedLead.adName}</p>
+              </div>
+            )}
+
+            {typedLead.formName && (
+              <div>
+                <p className="text-sm text-gray-500">Form Name</p>
+                <p className="font-medium text-navy-900">{typedLead.formName}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      ),
+    },
+    ...(customFieldEntries.length > 0
+      ? [
+          {
+            id: "additional",
+            zone: "main" as const,
+            node: (
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <h2 className="text-lg font-semibold text-navy-900 mb-4">Additional Information</h2>
+                <div className="grid grid-cols-1 @lg:grid-cols-2 gap-4">
+                  {customFieldEntries.map(([key, value]) => (
+                    <div key={key}>
+                      <p className="text-sm text-gray-500 capitalize">{key.replace(/_/g, " ")}</p>
+                      <p className="font-medium text-navy-900">{String(value)}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ),
+          },
+        ]
+      : []),
+    ...(typedLead.rawPayload
+      ? [
+          {
+            id: "raw",
+            zone: "main" as const,
+            node: (
+              <details className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <summary className="text-lg font-semibold text-navy-900 cursor-pointer">Raw Webhook Data</summary>
+                <pre className="mt-4 p-4 bg-gray-50 rounded-lg text-xs overflow-x-auto">
+                  {JSON.stringify(typedLead.rawPayload, null, 2)}
+                </pre>
+              </details>
+            ),
+          },
+        ]
+      : []),
+    {
+      id: "messages",
+      zone: "main",
+      node: (
+        <LeadMessages
+          leadId={typedLead.id}
+          leadType="adlead"
+          phone={typedLead.phone}
+          optedOut={optedOut}
+          initialMessages={messages.map((m) => ({
+            id: m.id,
+            createdAt: m.createdAt.toISOString(),
+            direction: m.direction,
+            body: m.body,
+            status: m.status,
+            adminEmail: m.adminEmail,
+          }))}
+        />
+      ),
+    },
+    {
+      id: "updates",
+      zone: "main",
+      node: <LeadUpdates leadId={typedLead.id} leadType="adlead" updates={typedUpdates} />,
+    },
+    {
+      id: "status",
+      zone: "side",
+      node: (
+        <StatusUpdateForm
+          leadId={typedLead.id}
+          leadType="adlead"
+          currentStatus={typedLead.status}
+          notes={typedLead.notes}
+        />
+      ),
+    },
+    {
+      id: "followup",
+      zone: "side",
+      node: (
+        <FollowupGrade
+          leadId={typedLead.id}
+          leadType="adlead"
+          currentFollowupDate={typedLead.followupDate?.toISOString()}
+          currentGrade={typedLead.grade}
+        />
+      ),
+    },
+    {
+      id: "timeline",
+      zone: "side",
+      node: (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <h2 className="text-lg font-semibold text-navy-900 mb-4">Timeline</h2>
+          <div className="space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-full bg-teal-100 flex items-center justify-center flex-shrink-0">
+                <Calendar className="w-4 h-4 text-teal-600" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-navy-900">Lead Received</p>
+                <p className="text-xs text-gray-500" suppressHydrationWarning>{formatDate(typedLead.createdAt)}</p>
+              </div>
+            </div>
+            {typedLead.updatedAt > typedLead.createdAt && (
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                  <Clock className="w-4 h-4 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-navy-900">Last Updated</p>
+                  <p className="text-xs text-gray-500" suppressHydrationWarning>{formatDate(typedLead.updatedAt)}</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "actions",
+      zone: "side",
+      node: <LeadActions leadId={typedLead.id} leadType="adlead" isArchived={typedLead.archived} />,
+    },
+    {
+      id: "quick",
+      zone: "side",
+      node: (
+        <LeadQuickActions
+          phone={typedLead.phone}
+          email={typedLead.email}
+          firstName={typedLead.firstName || typedLead.fullName}
+          lastName={typedLead.lastName}
+          zipCode={typedLead.zipCode}
+          numberOfDogs={numberOfDogs}
+        />
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-6 pb-20 lg:pb-0">
       {/* Duplicate leads banner */}
@@ -107,252 +387,7 @@ export default async function AdLeadDetailPage({ params }: PageProps) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Info */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Contact Info */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h2 className="text-lg font-semibold text-navy-900 mb-4">Contact Information</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
-                  <Phone className="w-5 h-5 text-gray-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Phone</p>
-                  <p className="font-medium text-navy-900">
-                    {typedLead.phone ? (
-                      <a href={`tel:${typedLead.phone}`} className="hover:text-teal-600">
-                        {typedLead.phone}
-                      </a>
-                    ) : (
-                      <span className="text-gray-400">Not provided</span>
-                    )}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
-                  <Mail className="w-5 h-5 text-gray-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Email</p>
-                  <p className="font-medium text-navy-900">
-                    {typedLead.email ? (
-                      <a href={`mailto:${typedLead.email}`} className="hover:text-teal-600">
-                        {typedLead.email}
-                      </a>
-                    ) : (
-                      <span className="text-gray-400">Not provided</span>
-                    )}
-                  </p>
-                </div>
-              </div>
-
-              {!!(typedLead.city || typedLead.state || typedLead.zipCode) && (
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
-                    <MapPin className="w-5 h-5 text-gray-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Location</p>
-                    <p className="font-medium text-navy-900">
-                      {[typedLead.city, typedLead.state, typedLead.zipCode].filter((x): x is string => Boolean(x)).join(", ") || "-"}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
-                  <Dog className="w-5 h-5 text-gray-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Number of Dogs</p>
-                  <p className="font-medium text-navy-900">
-                    {numberOfDogs ?? <span className="text-gray-400">Not provided</span>}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Campaign Info */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h2 className="text-lg font-semibold text-navy-900 mb-4">Campaign Information</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-lg bg-pink-50 flex items-center justify-center flex-shrink-0">
-                  <Tag className="w-5 h-5 text-pink-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Ad Source</p>
-                  <p className="font-medium text-navy-900">
-                    <span className="px-2 py-1 text-xs font-medium rounded-full bg-pink-100 text-pink-800">
-                      {typedLead.adSource || "meta"}
-                    </span>
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
-                  <Calendar className="w-5 h-5 text-gray-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Received</p>
-                  <p className="font-medium text-navy-900" suppressHydrationWarning>{formatDate(typedLead.createdAt)}</p>
-                </div>
-              </div>
-
-              {typedLead.campaignName && (
-                <div>
-                  <p className="text-sm text-gray-500">Campaign Name</p>
-                  <p className="font-medium text-navy-900">{typedLead.campaignName}</p>
-                </div>
-              )}
-
-              {typedLead.adSetName && (
-                <div>
-                  <p className="text-sm text-gray-500">Ad Set</p>
-                  <p className="font-medium text-navy-900">{typedLead.adSetName}</p>
-                </div>
-              )}
-
-              {typedLead.adName && (
-                <div>
-                  <p className="text-sm text-gray-500">Ad Name</p>
-                  <p className="font-medium text-navy-900">{typedLead.adName}</p>
-                </div>
-              )}
-
-              {typedLead.formName && (
-                <div>
-                  <p className="text-sm text-gray-500">Form Name</p>
-                  <p className="font-medium text-navy-900">{typedLead.formName}</p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Custom Fields */}
-          {(() => {
-            const fields = typedLead.customFields as Record<string, unknown> | null;
-            // Dog count is surfaced in Contact Information above — don't repeat it here.
-            const entries = fields ? Object.entries(fields).filter(([k]) => !/dog/i.test(k)) : [];
-            if (entries.length === 0) return null;
-            return (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                <h2 className="text-lg font-semibold text-navy-900 mb-4">Additional Information</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {entries.map(([key, value]) => (
-                    <div key={key}>
-                      <p className="text-sm text-gray-500 capitalize">{key.replace(/_/g, " ")}</p>
-                      <p className="font-medium text-navy-900">{String(value)}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })()}
-
-          {/* Raw Payload (collapsible for debugging) */}
-          {typedLead.rawPayload ? (
-            <details className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <summary className="text-lg font-semibold text-navy-900 cursor-pointer">
-                Raw Webhook Data
-              </summary>
-              <pre className="mt-4 p-4 bg-gray-50 rounded-lg text-xs overflow-x-auto">
-                {JSON.stringify(typedLead.rawPayload, null, 2)}
-              </pre>
-            </details>
-          ) : null}
-
-          {/* Messages (2-way SMS via Quo) */}
-          <LeadMessages
-            leadId={typedLead.id}
-            leadType="adlead"
-            phone={typedLead.phone}
-            optedOut={optedOut}
-            initialMessages={messages.map((m) => ({
-              id: m.id,
-              createdAt: m.createdAt.toISOString(),
-              direction: m.direction,
-              body: m.body,
-              status: m.status,
-              adminEmail: m.adminEmail,
-            }))}
-          />
-
-          {/* Updates */}
-          <LeadUpdates
-            leadId={typedLead.id}
-            leadType="adlead"
-            updates={typedUpdates}
-          />
-        </div>
-
-        {/* Sidebar */}
-        <div className="space-y-6">
-          <StatusUpdateForm
-            leadId={typedLead.id}
-            leadType="adlead"
-            currentStatus={typedLead.status}
-            notes={typedLead.notes}
-          />
-
-          <FollowupGrade
-            leadId={typedLead.id}
-            leadType="adlead"
-            currentFollowupDate={typedLead.followupDate?.toISOString()}
-            currentGrade={typedLead.grade}
-          />
-
-          {/* Timeline */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h2 className="text-lg font-semibold text-navy-900 mb-4">Timeline</h2>
-            <div className="space-y-4">
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-full bg-teal-100 flex items-center justify-center flex-shrink-0">
-                  <Calendar className="w-4 h-4 text-teal-600" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-navy-900">Lead Received</p>
-                  <p className="text-xs text-gray-500" suppressHydrationWarning>{formatDate(typedLead.createdAt)}</p>
-                </div>
-              </div>
-              {typedLead.updatedAt > typedLead.createdAt && (
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-                    <Clock className="w-4 h-4 text-blue-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-navy-900">Last Updated</p>
-                    <p className="text-xs text-gray-500" suppressHydrationWarning>{formatDate(typedLead.updatedAt)}</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <LeadActions
-            leadId={typedLead.id}
-            leadType="adlead"
-            isArchived={typedLead.archived}
-          />
-
-          {/* Quick Actions */}
-          <LeadQuickActions
-            phone={typedLead.phone}
-            email={typedLead.email}
-            firstName={typedLead.firstName || typedLead.fullName}
-            lastName={typedLead.lastName}
-            zipCode={typedLead.zipCode}
-            numberOfDogs={numberOfDogs}
-          />
-        </div>
-      </div>
+      <ArrangeableBoard layoutId="adlead" cards={cards} />
     </div>
   );
 }

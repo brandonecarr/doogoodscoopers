@@ -73,7 +73,7 @@ export default function StatusUpdateForm({
         {/* Status Selection */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-          <div className="grid grid-cols-1 gap-2">
+          <div className="grid grid-cols-1 @lg:grid-cols-2 @2xl:grid-cols-3 gap-2">
             {statusOptions.map((option) => (
               <label
                 key={option.value}
