@@ -4,7 +4,7 @@ import prisma from "@/lib/prisma";
 import { sendSms, isQuoConfigured } from "@/lib/quo";
 import { renderTemplate } from "@/lib/resend";
 import { isOptedOut } from "@/lib/sms-optout";
-import { getLeadPersonalization } from "@/lib/personalization";
+import { getLeadPersonalization, firstNameOf } from "@/lib/personalization";
 import type { LeadSource } from "@prisma/client";
 
 const leadTypeMap: Record<string, LeadSource> = {
@@ -88,7 +88,7 @@ export async function POST(request: Request) {
 
   // Render {{firstName}}/{{lastName}}/{{zipCode}}/{{numberOfDogs}} against the lead.
   const vars = await getLeadPersonalization(mapped, leadId);
-  if (!vars.firstName) vars.firstName = contact.firstName || "";
+  if (!vars.firstName) vars.firstName = firstNameOf(contact.firstName || "");
   if (!vars.lastName) vars.lastName = contact.lastName || "";
   const rendered = renderTemplate(body, vars);
 

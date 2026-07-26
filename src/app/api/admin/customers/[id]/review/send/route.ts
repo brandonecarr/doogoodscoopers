@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import { sendSms, isQuoConfigured } from "@/lib/quo";
 import { renderTemplate } from "@/lib/resend";
 import { isOptedOut } from "@/lib/sms-optout";
+import { firstNameOf } from "@/lib/personalization";
 
 // Default review-request text. Editable via AppSetting "reviews.requestMessage";
 // {{firstName}} and {{reviewLink}} are filled in.
@@ -41,7 +42,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
 
   const template = msgRow?.value?.trim() || DEFAULT_MESSAGE;
   const body = renderTemplate(template, {
-    firstName: customer.firstName || "there",
+    firstName: firstNameOf(customer.firstName || "") || "there",
     name: [customer.firstName, customer.lastName].filter(Boolean).join(" ") || "there",
     reviewLink,
   });

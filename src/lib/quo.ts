@@ -301,14 +301,17 @@ export async function upsertQuoContact(
 }
 
 /**
- * Fire-and-forget contact sync for use at lead/client create/update hook points.
- * No-ops when Quo isn't configured or there's no phone (a phone is what makes a
- * Quo contact reachable). Never throws — logs and moves on.
+ * Contact sync hook, called at lead/client create/update points.
+ *
+ * DISABLED per owner request: this app no longer pushes leads or customers into
+ * Quo as contacts (that was creating a named Quo contact for every new lead).
+ * Kept as a no-op so the call sites don't need to change.
+ *
+ * NOTE: Quo may STILL auto-create a bare (name-less) contact for any phone number
+ * it texts — that is a Quo workspace setting ("automatically create contacts"),
+ * not something this app can control via the API. Turn it off in Quo settings to
+ * stop those too.
  */
 export function syncContactToQuo(input: QuoContactInput): void {
-  if (!isQuoConfigured()) return;
-  if (!input.phone || !normalizePhoneNumber(input.phone)) return;
-  upsertQuoContact(input).catch((e) =>
-    console.error(`[Quo] contact sync failed for ${input.externalId}:`, e)
-  );
+  void input; // intentionally unused — contact sync is disabled
 }

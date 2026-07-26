@@ -40,8 +40,13 @@ export const EMPTY_LEAD_VARS: LeadVars = {
   dogWord: "",
 };
 
-function firstNameOf(full: string): string {
-  return full.trim().split(/\s+/)[0] || "";
+/**
+ * First name ONLY — the first whitespace-delimited token. Strips middle initials
+ * and any last name accidentally typed into the first-name field, so texts read
+ * "Hi Robert" not "Hi Robert P" or "Hi Robert P Zeigler".
+ */
+export function firstNameOf(full: string): string {
+  return (full || "").trim().split(/\s+/)[0] || "";
 }
 
 /**
@@ -82,7 +87,7 @@ export async function getLeadPersonalization(leadType: LeadSource, leadId: strin
       if (!l) return { ...EMPTY_LEAD_VARS };
       const name = [l.firstName, l.lastName].filter(Boolean).join(" ");
       return {
-        firstName: l.firstName || firstNameOf(name),
+        firstName: firstNameOf(l.firstName || name),
         lastName: l.lastName || "",
         name,
         zipCode: l.zipCode || "",
@@ -97,7 +102,7 @@ export async function getLeadPersonalization(leadType: LeadSource, leadId: strin
       if (!l) return { ...EMPTY_LEAD_VARS };
       const name = l.fullName || [l.firstName, l.lastName].filter(Boolean).join(" ");
       return {
-        firstName: l.firstName || firstNameOf(name),
+        firstName: firstNameOf(l.firstName || name),
         lastName: l.lastName || "",
         name,
         zipCode: l.zipCode || "",
@@ -111,7 +116,7 @@ export async function getLeadPersonalization(leadType: LeadSource, leadId: strin
       });
       if (!l) return { ...EMPTY_LEAD_VARS };
       const name = [l.firstName, l.lastName].filter(Boolean).join(" ");
-      return { firstName: l.firstName || firstNameOf(name), lastName: l.lastName || "", name, zipCode: l.zipCode || "", ...dogTokens("") };
+      return { firstName: firstNameOf(l.firstName || name), lastName: l.lastName || "", name, zipCode: l.zipCode || "", ...dogTokens("") };
     }
     case "COMMERCIAL": {
       const l = await prisma.commercialLead.findUnique({
@@ -128,7 +133,7 @@ export async function getLeadPersonalization(leadType: LeadSource, leadId: strin
       });
       if (!l) return { ...EMPTY_LEAD_VARS };
       const name = [l.firstName, l.lastName].filter(Boolean).join(" ");
-      return { firstName: l.firstName || firstNameOf(name), lastName: l.lastName || "", name, zipCode: "", ...dogTokens("") };
+      return { firstName: firstNameOf(l.firstName || name), lastName: l.lastName || "", name, zipCode: "", ...dogTokens("") };
     }
     case "CUSTOMER": {
       const l = await prisma.sweepandgoCustomer.findUnique({
@@ -137,7 +142,7 @@ export async function getLeadPersonalization(leadType: LeadSource, leadId: strin
       });
       if (!l) return { ...EMPTY_LEAD_VARS };
       const name = [l.firstName, l.lastName].filter(Boolean).join(" ");
-      return { firstName: l.firstName || firstNameOf(name), lastName: l.lastName || "", name, zipCode: l.zipCode || "", ...dogTokens("") };
+      return { firstName: firstNameOf(l.firstName || name), lastName: l.lastName || "", name, zipCode: l.zipCode || "", ...dogTokens("") };
     }
   }
   return { ...EMPTY_LEAD_VARS };
