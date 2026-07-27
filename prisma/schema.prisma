@@ -560,6 +560,20 @@ model AppSetting {
   createdAt DateTime @default(now())
 }
 
+// One row per Quo call whose transcript we've already run AI notes on.
+// callId is the primary key, so a retried or concurrently-delivered webhook
+// loses the insert race and skips — preventing duplicate leads and duplicate
+// timeline notes for the same call.
+model ProcessedCall {
+  callId    String      @id
+  action    String // created | enriched | noted | skipped
+  leadType  LeadSource?
+  leadId    String?
+  createdAt DateTime    @default(now())
+
+  @@index([createdAt])
+}
+
 // =====================
 // EMAIL MARKETING (newsletters)
 // =====================

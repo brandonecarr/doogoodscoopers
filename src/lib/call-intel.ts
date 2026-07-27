@@ -216,6 +216,26 @@ export async function applyCallIntel(opts: {
   const { phone, intel, callId } = opts;
   const candidates = phoneVariants(phone);
 
+  // Idempotency: claim this callId before doing any writes. The primary key
+  // makes this atomic, so a retried or concurrently-delivered webhook for the
+  // same call loses the race and exits — no duplicate lead, no duplicate note.
+  // A *different* call from the same person has a different callId and proceeds
+  // normally, enriching the lead we already have.
+  try {
+    await prisma.processedCall.create({ data: { callId, action: "processing" } });
+  } catch {
+    return { action: "skipped", fieldsFilled: [], reason: "this call was already processed" };
+  }
+  const record = async (r: ApplyResult): Promise<ApplyResult> => {
+    await prisma.processedCall
+      .update({
+        where: { callId },
+        data: { action: r.action, leadType: r.leadType ?? null, leadId: r.leadId ?? null },
+      })
+      .catch(() => {});
+    return r;
+  };
+
   const note = [
     `📞 Call notes (AI)`,
     intel.summary,
@@ -250,7 +270,7 @@ export async function applyCallIntel(opts: {
     if (filled.length) await prisma.quoteLead.update({ where: { id: quote.id }, data });
     await timeline("QUOTE_FORM", quote.id);
     await markLeadContactedIfNew("QUOTE_FORM", quote.id);
-    return { action: filled.length ? "enriched" : "noted", leadType: "QUOTE_FORM", leadId: quote.id, fieldsFilled: filled };
+    return record({ action: filled.length ? "enriched" : "noted", leadType: "QUOTE_FORM", leadId: quote.id, fieldsFilled: filled });
   }
 
   // 2) Existing ad lead?
@@ -269,12 +289,12 @@ export async function applyCallIntel(opts: {
     if (filled.length) await prisma.adLead.update({ where: { id: ad.id }, data });
     await timeline("AD_LEAD", ad.id);
     await markLeadContactedIfNew("AD_LEAD", ad.id);
-    return { action: filled.length ? "enriched" : "noted", leadType: "AD_LEAD", leadId: ad.id, fieldsFilled: filled };
+    return record({ action: filled.length ? "enriched" : "noted", leadType: "AD_LEAD", leadId: ad.id, fieldsFilled: filled });
   }
 
   // 3) Unknown caller — create a lead only if it was a real service inquiry.
   if (!intel.isServiceInquiry) {
-    return { action: "skipped", fieldsFilled: [], reason: "not a service inquiry" };
+    return record({ action: "skipped", fieldsFilled: [], reason: "not a service inquiry" });
   }
   // An existing customer calling in is not a new lead.
   const customer = await prisma.sweepandgoCustomer.findFirst({
@@ -283,12 +303,12 @@ export async function applyCallIntel(opts: {
   });
   if (customer) {
     await timeline("CUSTOMER", customer.id);
-    return { action: "noted", leadType: "CUSTOMER", leadId: customer.id, fieldsFilled: [], reason: "existing customer" };
+    return record({ action: "noted", leadType: "CUSTOMER", leadId: customer.id, fieldsFilled: [], reason: "existing customer" });
   }
   const createEnabled =
     (await prisma.appSetting.findUnique({ where: { key: "calls.ai.createLeads" } }))?.value === "true";
   if (!createEnabled) {
-    return { action: "skipped", fieldsFilled: [], reason: "lead creation from calls is off" };
+    return record({ action: "skipped", fieldsFilled: [], reason: "lead creation from calls is off" });
   }
 
   const created = await prisma.quoteLead.create({
@@ -309,7 +329,7 @@ export async function applyCallIntel(opts: {
     },
   });
   await timeline("QUOTE_FORM", created.id);
-  return {
+  return record({
     action: "created",
     leadType: "QUOTE_FORM",
     leadId: created.id,
@@ -317,5 +337,5 @@ export async function applyCallIntel(opts: {
       firstName: intel.firstName, lastName: intel.lastName, email: intel.email, zipCode: intel.zipCode,
       address: intel.address, numberOfDogs: intel.numberOfDogs, frequency: intel.frequency,
     }).filter(([, v]) => v.trim()).map(([k]) => k),
-  };
+  });
 }
