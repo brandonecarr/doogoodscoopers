@@ -92,9 +92,18 @@ const CallIntel = z.object({
   numberOfDogs: z
     .string()
     .describe("How many dogs the caller has, as digits only (e.g. '1', '3'). Convert spoken words: 'one' -> '1'. Empty string if never stated."),
+  // These two must be EXACT dropdown values from the lead edit form, or the
+  // saved value matches no <option> and the field renders blank when editing.
   frequency: z
-    .string()
-    .describe("Requested cleanup frequency, one of: 'once a week', 'twice a week', 'every other week', 'one time'. Empty string if not discussed or undecided."),
+    .enum(["", "Once a week", "Twice a week", "Every other week", "One-time cleanup"])
+    .describe(
+      "The cleanup frequency the caller settled on. Use '' when it was not discussed or they did not decide. Map what they said onto the closest option: 'weekly'/'once a week' -> 'Once a week'; 'twice a week'/'two times a week' -> 'Twice a week'; 'biweekly'/'every two weeks'/'every other week' -> 'Every other week'; 'one time'/'just once' -> 'One-time cleanup'."
+    ),
+  lastCleaned: z
+    .enum(["", "Less than a week", "1-2 weeks", "2-4 weeks", "1+ month", "Never/Unknown"])
+    .describe(
+      "How long since the caller's yard was last cleaned. Use '' when they never said. Map what they said onto the closest bucket: 'a few days'/'this week' -> 'Less than a week'; 'a week or two' -> '1-2 weeks'; 'three weeks'/'a few weeks'/'about a month' -> '2-4 weeks'; 'over a month'/'months' -> '1+ month'; 'never'/'I don't know' -> 'Never/Unknown'."
+    ),
   interestLevel: z
     .enum(["hot", "warm", "cold", "not_interested", "unknown"])
     .describe("hot = ready to sign up now; warm = interested, needs follow-up; cold = just gathering info; not_interested = declined; unknown = can't tell."),
@@ -281,6 +290,7 @@ export async function applyCallIntel(opts: {
       address: fill(quote.address, intel.address),
       numberOfDogs: fill(quote.numberOfDogs, intel.numberOfDogs),
       frequency: fill(quote.frequency, intel.frequency),
+      lastCleaned: fill(quote.lastCleaned, intel.lastCleaned),
     };
     const filled = Object.entries(data).filter(([, v]) => v !== undefined).map(([k]) => k);
     if (filled.length) await prisma.quoteLead.update({ where: { id: quote.id }, data });
@@ -337,6 +347,7 @@ export async function applyCallIntel(opts: {
       address: intel.address.trim() || null,
       numberOfDogs: intel.numberOfDogs.trim() || null,
       frequency: intel.frequency.trim() || null,
+      lastCleaned: intel.lastCleaned.trim() || null,
       // Lands in the "Phone Review Leads" column for a human to verify the AI's
       // extraction and fill anything the call didn't cover.
       status: "PHONE_REVIEW",
@@ -352,6 +363,7 @@ export async function applyCallIntel(opts: {
     fieldsFilled: Object.entries({
       firstName: intel.firstName, lastName: intel.lastName, email: intel.email, zipCode: intel.zipCode,
       address: intel.address, numberOfDogs: intel.numberOfDogs, frequency: intel.frequency,
+      lastCleaned: intel.lastCleaned,
     }).filter(([, v]) => v.trim()).map(([k]) => k),
   });
 }

@@ -56,6 +56,11 @@ function formatFrequency(frequency: string | null): string {
     one_time: "One-Time",
     onetime: "One-Time",
     twice_weekly: "Twice Weekly",
+    // Values written by the admin lead form and AI call notes.
+    "once a week": "Once a week",
+    "twice a week": "Twice a week",
+    "every other week": "Every other week",
+    "one-time cleanup": "One-time cleanup",
   };
 
   return frequencyMap[frequency.toLowerCase()] || frequency.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
@@ -76,6 +81,12 @@ function formatLastCleaned(lastCleaned: string | null): string {
     twomonths: "2+ Months Ago",
     never: "Never",
     unknown: "Unknown",
+    // Values written by the admin lead form and AI call notes.
+    "less than a week": "Less than a week",
+    "1-2 weeks": "1-2 weeks",
+    "2-4 weeks": "2-4 weeks",
+    "1+ month": "1+ month",
+    "never/unknown": "Never/Unknown",
   };
 
   return lastCleanedMap[lastCleaned.toLowerCase()] || lastCleaned.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
