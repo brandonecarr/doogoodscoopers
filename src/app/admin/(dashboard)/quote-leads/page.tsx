@@ -23,6 +23,7 @@ const statusLabels: Record<LeadStatus, string> = {
   NOT_INTERESTED: "Not Interested",
   WAITING_FOR_SIGNUP: "Waiting for Signup",
   CONVERTED: "Converted",
+  PHONE_REVIEW: "Phone Review",
 };
 
 function getStatusBadge(status: LeadStatus) {
@@ -33,6 +34,7 @@ function getStatusBadge(status: LeadStatus) {
     NOT_INTERESTED: "bg-gray-100 text-gray-800",
     WAITING_FOR_SIGNUP: "bg-purple-100 text-purple-800",
     CONVERTED: "bg-green-100 text-green-800",
+    PHONE_REVIEW: "bg-yellow-100 text-yellow-800",
   };
 
   return (

@@ -301,7 +301,9 @@ export async function applyCallIntel(opts: {
       address: intel.address.trim() || null,
       numberOfDogs: intel.numberOfDogs.trim() || null,
       frequency: intel.frequency.trim() || null,
-      status: "CONTACTED", // we just spoke with them
+      // Lands in the "Phone Review Leads" column for a human to verify the AI's
+      // extraction and fill anything the call didn't cover.
+      status: "PHONE_REVIEW",
       lastStep: "Phone Call",
       notes: `Created from an inbound call (Quo call ${callId}).`,
     },

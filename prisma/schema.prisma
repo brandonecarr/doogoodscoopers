@@ -17,6 +17,7 @@ enum LeadStatus {
   NOT_INTERESTED
   WAITING_FOR_SIGNUP
   CONVERTED
+  PHONE_REVIEW // created from a phone call by AI call notes — needs a human review
 }
 
 // Lead source to track where leads come from

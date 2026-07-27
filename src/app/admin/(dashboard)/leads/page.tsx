@@ -71,6 +71,7 @@ const COLOR_OPTIONS: ColorKey[] = ["teal", "blue", "orange", "gray", "purple", "
 
 // Pipeline stages left→right. Each maps to a real LeadStatus so a move updates status.
 const DEFAULT_COLUMNS: KanbanColumn[] = [
+  { id: "phone_review",   name: "Phone Review Leads", color: "yellow", statusMapping: "PHONE_REVIEW" },
   { id: "new",            name: "New",       color: "teal",   statusMapping: "NEW" },
   { id: "contacted",      name: "Contacted", color: "blue",   statusMapping: "CONTACTED" },
   { id: "no_answer",      name: "No Answer", color: "orange", statusMapping: "NO_ANSWER" },
@@ -92,6 +93,22 @@ const DOT_WINDOW = 5; // max page-dots shown at once
 
 function leadKey(lead: CombinedLead) {
   return `${lead.type}:${lead.id}`;
+}
+
+/**
+ * Columns live in localStorage, so a board saved before PHONE_REVIEW existed has
+ * no column mapped to it — and a column the user added by hand has no
+ * statusMapping at all, which means server-created phone leads could never land
+ * in it. Reconcile on load: adopt a hand-made "phone review"-ish column by
+ * attaching the mapping, otherwise prepend the default one.
+ */
+function reconcileColumns(stored: KanbanColumn[]): KanbanColumn[] {
+  if (stored.some((c) => c.statusMapping === "PHONE_REVIEW")) return stored;
+  const byName = stored.find((c) => !c.statusMapping && /phone/i.test(c.name));
+  if (byName) {
+    return stored.map((c) => (c.id === byName.id ? { ...c, statusMapping: "PHONE_REVIEW" as LeadStatus } : c));
+  }
+  return [DEFAULT_COLUMNS[0], ...stored];
 }
 
 function getLeadColumnId(lead: CombinedLead, assignments: Record<string, string>, columns: KanbanColumn[]): string {
@@ -135,10 +152,12 @@ function StatusBadge({ status }: { status: LeadStatus }) {
     NOT_INTERESTED: "bg-gray-100 text-gray-800",
     WAITING_FOR_SIGNUP: "bg-purple-100 text-purple-800",
     CONVERTED: "bg-green-100 text-green-800",
+    PHONE_REVIEW: "bg-yellow-100 text-yellow-800",
   };
   const labels: Record<LeadStatus, string> = {
     NEW: "New", CONTACTED: "Contacted", NO_ANSWER: "No Answer",
     NOT_INTERESTED: "Not Interested", WAITING_FOR_SIGNUP: "Waiting for Signup", CONVERTED: "Converted",
+    PHONE_REVIEW: "Phone Review",
   };
   return <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${styles[status]}`}>{labels[status]}</span>;
 }
@@ -196,7 +215,12 @@ export default function LeadsPage() {
       const storedCols = localStorage.getItem(LS_COLUMNS);
       if (storedCols) {
         const parsed = JSON.parse(storedCols) as KanbanColumn[];
-        if (Array.isArray(parsed) && parsed.length > 0) setColumns(parsed);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const reconciled = reconcileColumns(parsed);
+          setColumns(reconciled);
+          // Persist so the phone-review mapping sticks for next load.
+          if (reconciled !== parsed) localStorage.setItem(LS_COLUMNS, JSON.stringify(reconciled));
+        }
       }
       const storedAssign = localStorage.getItem(LS_ASSIGNMENTS);
       if (storedAssign) setAssignments(JSON.parse(storedAssign));
@@ -481,6 +505,7 @@ export default function LeadsPage() {
               className="pl-9 pr-8 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 text-sm appearance-none bg-white"
             >
               <option value="all">All Statuses</option>
+              <option value="PHONE_REVIEW">Phone Review</option>
               <option value="NEW">New</option>
               <option value="CONTACTED">Contacted</option>
               <option value="NO_ANSWER">No Answer</option>
@@ -758,6 +783,7 @@ export default function LeadsPage() {
             className="bg-white/10 text-white text-sm rounded-lg px-2 py-1.5 border border-white/20 focus:ring-2 focus:ring-teal-400"
           >
             <option value="" className="text-gray-900">Move to…</option>
+            <option value="PHONE_REVIEW" className="text-gray-900">Phone Review</option>
             <option value="NEW" className="text-gray-900">New</option>
             <option value="CONTACTED" className="text-gray-900">Contacted</option>
             <option value="NO_ANSWER" className="text-gray-900">No Answer</option>

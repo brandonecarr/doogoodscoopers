@@ -1,6 +1,14 @@
 // Lead status for tracking lead progress
 // This mirrors the Prisma enum to avoid dependency on generated client
-export type LeadStatus = "NEW" | "CONTACTED" | "NO_ANSWER" | "NOT_INTERESTED" | "WAITING_FOR_SIGNUP" | "CONVERTED";
+export type LeadStatus =
+  | "NEW"
+  | "CONTACTED"
+  | "NO_ANSWER"
+  | "NOT_INTERESTED"
+  | "WAITING_FOR_SIGNUP"
+  | "CONVERTED"
+  /** Auto-created from a phone call by AI call notes; awaiting human review. */
+  | "PHONE_REVIEW";
 
 // Lead source to track where leads come from
 export type LeadSource = "QUOTE_FORM" | "OUT_OF_AREA" | "CAREERS" | "COMMERCIAL" | "AD_LEAD";
