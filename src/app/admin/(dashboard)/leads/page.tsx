@@ -22,6 +22,7 @@ import {
   X,
 } from "lucide-react";
 import type { LeadStatus } from "@/types/leads";
+import { CallIntelCard } from "@/components/admin/CallIntelCard";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -456,6 +457,8 @@ export default function LeadsPage() {
           </Link>
         </div>
       </div>
+
+      <CallIntelCard />
 
       {/* Filters */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">

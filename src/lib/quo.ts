@@ -144,6 +144,42 @@ export function normalizePhoneNumber(phone: string): string | null {
   return null;
 }
 
+// ── Calls ───────────────────────────────────────────────────────────────────
+
+let cachedPhoneNumberId: string | null = null;
+
+/** Our Quo phone-number id (PN...), resolved from the API and cached. */
+export async function getQuoPhoneNumberId(): Promise<string | null> {
+  if (cachedPhoneNumberId) return cachedPhoneNumberId;
+  const res = await quoFetch("/phone-numbers");
+  if (!res.ok) return null;
+  const list = ((res.data as { data?: Array<{ id?: string; number?: string }> })?.data) || [];
+  const ours = normalizePhoneNumber(getQuoFromNumber());
+  const match = list.find((p) => ours && normalizePhoneNumber(p.number || "") === ours) || list[0];
+  cachedPhoneNumberId = match?.id || null;
+  return cachedPhoneNumberId;
+}
+
+export interface QuoCall {
+  id: string;
+  direction?: string;
+  duration?: number;
+  status?: string;
+  createdAt?: string;
+}
+
+/** Calls exchanged with a given phone number, most recent first. */
+export async function listCallsWith(phone: string, maxResults = 10): Promise<QuoCall[]> {
+  const pn = await getQuoPhoneNumberId();
+  const to = normalizePhoneNumber(phone);
+  if (!pn || !to) return [];
+  const res = await quoFetch(
+    `/calls?phoneNumberId=${encodeURIComponent(pn)}&participants[]=${encodeURIComponent(to)}&maxResults=${maxResults}`
+  );
+  if (!res.ok) return [];
+  return ((res.data as { data?: QuoCall[] })?.data) || [];
+}
+
 // ── Webhook helpers ─────────────────────────────────────────────────────────
 
 /**

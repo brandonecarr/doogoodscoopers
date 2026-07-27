@@ -23,6 +23,7 @@ import {
   normalizePhoneNumber,
   getQuoFromNumber,
 } from "@/lib/quo";
+import { analyzeCall, applyCallIntel, isCallIntelConfigured } from "@/lib/call-intel";
 
 function getSupabase(): SupabaseClient {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -451,11 +452,51 @@ function callActivityText(event: string, payload: unknown): string {
   }
 }
 
+/** Quo's call id off a call.* webhook payload. */
+function callIdFromPayload(payload: unknown): string | null {
+  const p = (payload && typeof payload === "object" ? payload : {}) as Record<string, unknown>;
+  const d = p.data && typeof p.data === "object" ? (p.data as Record<string, unknown>) : p;
+  const obj = d.object && typeof d.object === "object" ? (d.object as Record<string, unknown>) : d;
+  return (obj.callId as string) || (obj.id as string) || null;
+}
+
+/**
+ * AI call notes. When Quo finishes transcribing a call, pull the transcript,
+ * extract what the caller told us, and write it into the matching lead (filling
+ * blanks only) — or create a lead for an unknown caller. Returns null to fall
+ * back to the plain timeline entry when the AI is off or has nothing to add.
+ */
+async function handleCallTranscript(payload: unknown, external: string) {
+  if (!isCallIntelConfigured()) return null;
+  const setting = await prisma.appSetting.findUnique({ where: { key: "calls.ai.enabled" } });
+  if (setting?.value === "false") return null;
+
+  const callId = callIdFromPayload(payload);
+  if (!callId) return null;
+
+  try {
+    const analyzed = await analyzeCall(callId);
+    if (!analyzed?.intel) return null;
+    const result = await applyCallIntel({ phone: external, intel: analyzed.intel, callId });
+    console.log(`[call-ai] ${callId} → ${result.action} ${result.fieldsFilled.join(",")}`);
+    return NextResponse.json({ success: true, callAi: result });
+  } catch (e) {
+    console.error("[call-ai] failed:", e);
+    return null; // fall through to the plain timeline entry
+  }
+}
+
 async function handleCall(supabase: SupabaseClient, event: string, payload: unknown) {
   const external = callExternalNumber(payload);
   if (!external) return NextResponse.json({ success: true, skipped: "no external number" });
   const candidates = phoneCandidates(external);
   const text = callActivityText(event, payload);
+
+  // Transcript ready → run AI extraction instead of a bare "transcript available" note.
+  if (event === "call.transcript.completed") {
+    const handled = await handleCallTranscript(payload, external);
+    if (handled) return handled;
+  }
 
   // 1) Client → log into the client's conversation timeline (shows in /office/messages).
   const { data: org } = await supabase.from("organizations").select("id").limit(1).single();
