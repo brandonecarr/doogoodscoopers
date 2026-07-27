@@ -101,13 +101,9 @@ export function CallIntelCard() {
         setError(`Server returned ${res.status}. ${raw.slice(0, 140)}`);
         return;
       }
-      if (!res.ok) {
+      // Errors now carry the real cause from the server; show it verbatim.
+      if (!res.ok || !d.intel) {
         setError(d.error || `Request failed (${res.status}).`);
-        return;
-      }
-      if (!d.intel) {
-        // A 200 with no extraction — say so instead of rendering nothing.
-        setError("Got the transcript, but the AI returned no data for it (it may be too short, or ANTHROPIC_API_KEY isn't set).");
         if (d.transcript) setResult({ intel: null, transcript: d.transcript, call: d.call || {} });
         return;
       }

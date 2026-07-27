@@ -476,8 +476,12 @@ async function handleCallTranscript(payload: unknown, external: string) {
 
   try {
     const analyzed = await analyzeCall(callId);
-    if (!analyzed?.intel) return null;
-    const result = await applyCallIntel({ phone: external, intel: analyzed.intel, callId });
+    if (!analyzed) return null;
+    if (!analyzed.result.ok) {
+      console.warn(`[call-ai] ${callId} skipped — ${analyzed.result.reason}: ${analyzed.result.message}`);
+      return null; // fall through to the plain timeline entry
+    }
+    const result = await applyCallIntel({ phone: external, intel: analyzed.result.intel, callId });
     console.log(`[call-ai] ${callId} → ${result.action} ${result.fieldsFilled.join(",")}`);
     return NextResponse.json({ success: true, callAi: result });
   } catch (e) {

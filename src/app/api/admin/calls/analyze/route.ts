@@ -34,11 +34,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "That call has no transcript in Quo yet." }, { status: 404 });
   }
 
+  const call = { id: target.id, duration: target.duration, direction: target.direction, createdAt: target.createdAt };
+  const transcript = formatTranscript(analyzed.transcript);
+
+  // Surface the real reason so failures are debuggable from the UI.
+  if (!analyzed.result.ok) {
+    return NextResponse.json(
+      { error: analyzed.result.message, reason: analyzed.result.reason, call, transcript },
+      { status: analyzed.result.reason === "too_short" ? 200 : 502 }
+    );
+  }
+
   return NextResponse.json({
     success: true,
-    call: { id: target.id, duration: target.duration, direction: target.direction, createdAt: target.createdAt },
-    transcript: formatTranscript(analyzed.transcript),
-    intel: analyzed.intel,
+    call,
+    transcript,
+    intel: analyzed.result.intel,
     note: "Dry run — nothing was saved.",
   });
 }

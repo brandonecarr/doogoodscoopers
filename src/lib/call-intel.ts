@@ -109,18 +109,32 @@ export function isCallIntelConfigured(): boolean {
   return !!process.env.ANTHROPIC_API_KEY;
 }
 
+export type ExtractResult =
+  | { ok: true; intel: CallIntel }
+  | { ok: false; reason: "not_configured" | "too_short" | "api_error"; message: string };
+
 /**
- * Extract structured lead data from a call transcript. Returns null when the AI
- * isn't configured, the transcript is too short to be meaningful, or the call
- * fails — callers should treat null as "no data", never as an error to retry.
+ * Extract structured lead data from a call transcript.
+ *
+ * Returns a discriminated result rather than null so failures carry their real
+ * cause — an API error swallowed into a console log is invisible in production
+ * and makes this impossible to debug from the UI.
  */
-export async function extractCallIntel(segments: TranscriptSegment[]): Promise<CallIntel | null> {
+export async function extractCallIntel(segments: TranscriptSegment[]): Promise<ExtractResult> {
   const anthropic = client();
-  if (!anthropic) return null;
+  if (!anthropic) {
+    return { ok: false, reason: "not_configured", message: "ANTHROPIC_API_KEY is not set in this environment." };
+  }
 
   // A couple of words each way is a hang-up or voicemail beep, not a lead.
   const callerLines = segments.filter((s) => s.speaker === "caller");
-  if (segments.length < 4 || callerLines.length === 0) return null;
+  if (segments.length < 4 || callerLines.length === 0) {
+    return {
+      ok: false,
+      reason: "too_short",
+      message: `Transcript too short to extract from (${segments.length} lines, ${callerLines.length} from the caller).`,
+    };
+  }
 
   try {
     const res = await anthropic.messages.parse({
@@ -138,20 +152,28 @@ export async function extractCallIntel(segments: TranscriptSegment[]): Promise<C
         },
       ],
     });
-    return res.parsed_output ?? null;
+    if (!res.parsed_output) {
+      return {
+        ok: false,
+        reason: "api_error",
+        message: `Model returned no parsed output (stop_reason: ${res.stop_reason ?? "unknown"}).`,
+      };
+    }
+    return { ok: true, intel: res.parsed_output };
   } catch (e) {
-    console.error("[call-intel] extraction failed:", e);
-    return null;
+    const message = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+    console.error("[call-intel] extraction failed:", message);
+    return { ok: false, reason: "api_error", message };
   }
 }
 
 /** Fetch + extract in one step, for a Quo call id. */
 export async function analyzeCall(
   callId: string
-): Promise<{ transcript: TranscriptSegment[]; intel: CallIntel | null } | null> {
+): Promise<{ transcript: TranscriptSegment[]; result: ExtractResult } | null> {
   const transcript = await fetchCallTranscript(callId);
   if (!transcript) return null;
-  return { transcript, intel: await extractCallIntel(transcript) };
+  return { transcript, result: await extractCallIntel(transcript) };
 }
 
 // ── Applying intel to the CRM ───────────────────────────────────────────────
