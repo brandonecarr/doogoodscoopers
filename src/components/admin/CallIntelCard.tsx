@@ -50,6 +50,7 @@ export function CallIntelCard() {
         if (s["calls.ai.enabled"] !== undefined) setEnabled(s["calls.ai.enabled"] !== "false");
         if (s["calls.ai.createLeads"] !== undefined) setCreateLeads(s["calls.ai.createLeads"] === "true");
       })
+      .catch(() => {})
       .finally(() => setLoaded(true));
   }, []);
 
@@ -80,6 +81,10 @@ export function CallIntelCard() {
   async function test() {
     setError(null);
     setResult(null);
+    if (!phone.trim()) {
+      setError("Enter a phone number that has called you, then try again.");
+      return;
+    }
     setTesting(true);
     try {
       const res = await fetch("/api/admin/calls/analyze", {
@@ -87,11 +92,28 @@ export function CallIntelCard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone }),
       });
-      const d = await res.json();
-      if (res.ok) setResult(d);
-      else setError(d.error || "Couldn't analyze that call.");
-    } catch {
-      setError("Couldn't analyze that call.");
+      // The body isn't always JSON (a 500 can return an HTML error page).
+      const raw = await res.text();
+      let d: { error?: string; intel?: Intel | null; transcript?: string; call?: { duration?: number } } = {};
+      try {
+        d = JSON.parse(raw);
+      } catch {
+        setError(`Server returned ${res.status}. ${raw.slice(0, 140)}`);
+        return;
+      }
+      if (!res.ok) {
+        setError(d.error || `Request failed (${res.status}).`);
+        return;
+      }
+      if (!d.intel) {
+        // A 200 with no extraction — say so instead of rendering nothing.
+        setError("Got the transcript, but the AI returned no data for it (it may be too short, or ANTHROPIC_API_KEY isn't set).");
+        if (d.transcript) setResult({ intel: null, transcript: d.transcript, call: d.call || {} });
+        return;
+      }
+      setResult({ intel: d.intel, transcript: d.transcript || "", call: d.call || {} });
+    } catch (e) {
+      setError(e instanceof Error ? `Request failed: ${e.message}` : "Request failed.");
     } finally {
       setTesting(false);
     }
@@ -146,7 +168,7 @@ export function CallIntelCard() {
           />
           <button
             onClick={test}
-            disabled={testing || !phone.trim()}
+            disabled={testing}
             className="inline-flex items-center gap-1.5 px-3 py-2 bg-navy-600 text-white rounded-lg hover:bg-navy-700 disabled:opacity-50 text-sm font-medium"
           >
             {testing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
@@ -154,6 +176,13 @@ export function CallIntelCard() {
           </button>
         </div>
         {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
+
+        {/* Transcript-only fallback when we got a call but no extraction. */}
+        {result && !result.intel && result.transcript && (
+          <pre className="mt-3 text-[11px] whitespace-pre-wrap text-gray-600 max-h-64 overflow-y-auto bg-gray-50 rounded p-2 border border-gray-100">
+            {result.transcript}
+          </pre>
+        )}
 
         {result?.intel && (
           <div className="mt-3 rounded-lg border border-gray-100 bg-gray-50 p-3 space-y-2">
