@@ -8,6 +8,12 @@ import { LeadStatus, type LeadSource } from "@prisma/client";
  * that are archived, opted out, or already enrolled.
  */
 
+/**
+ * `lastStep` value on a QuoteLead created by AI call notes from a phone call.
+ * These leads are excluded from every drip trigger — see findDripCandidates.
+ */
+export const PHONE_CALL_STEP = "Phone Call";
+
 export interface DripCandidate {
   leadType: LeadSource;
   leadId: string;
@@ -30,14 +36,21 @@ export async function findDripCandidates(campaign: DripCampaign): Promise<DripCa
   const out: DripCandidate[] = [];
 
   if (types.has("quote") || types.has("manual")) {
+    const stepFilter =
+      types.has("quote") && types.has("manual")
+        ? {}
+        : types.has("manual")
+          ? { lastStep: "Manual Entry" }
+          : { NOT: { lastStep: "Manual Entry" } };
+
     const rows = await prisma.quoteLead.findMany({
       where: {
         ...base,
-        ...(types.has("quote") && types.has("manual")
-          ? {}
-          : types.has("manual")
-            ? { lastStep: "Manual Entry" }
-            : { NOT: { lastStep: "Manual Entry" } }),
+        // Phone-call leads live in QuoteLead but never ran a quote — they just
+        // called. Auto-enrolling them in a quote drip sends copy that is plainly
+        // wrong ("I saw that you ran a quote on our website"). They are never
+        // auto-enrolled in any drip; add them to a campaign by hand instead.
+        AND: [stepFilter, { NOT: { lastStep: PHONE_CALL_STEP } }],
       },
       select: { id: true, phone: true, firstName: true, lastName: true },
     });

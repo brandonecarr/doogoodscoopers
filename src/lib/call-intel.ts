@@ -4,7 +4,7 @@ import { z } from "zod";
 import type { LeadSource } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { quoFetch, getQuoFromNumber, normalizePhoneNumber } from "@/lib/quo";
-import { markLeadContactedIfNew } from "@/lib/drip";
+import { markLeadContactedIfNew, PHONE_CALL_STEP } from "@/lib/drip";
 
 /**
  * Call intelligence: turn a finished phone call into structured lead data.
@@ -340,7 +340,7 @@ export async function applyCallIntel(opts: {
       // Lands in the "Phone Review Leads" column for a human to verify the AI's
       // extraction and fill anything the call didn't cover.
       status: "PHONE_REVIEW",
-      lastStep: "Phone Call",
+      lastStep: PHONE_CALL_STEP,
       notes: `Created from an inbound call (Quo call ${callId}).`,
     },
   });
