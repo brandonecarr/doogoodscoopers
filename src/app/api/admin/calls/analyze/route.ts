@@ -22,16 +22,38 @@ export async function POST(request: Request) {
   const normalized = normalizePhoneNumber(String(phone || ""));
   if (!normalized) return NextResponse.json({ error: "Enter a valid 10-digit phone number." }, { status: 400 });
 
-  const calls = await listCallsWith(normalized, 10);
+  const calls = await listCallsWith(normalized, 15);
   if (calls.length === 0) {
     return NextResponse.json({ error: "No calls found with that number in Quo." }, { status: 404 });
   }
-  // Longest call has the most to extract from.
-  const target = [...calls].sort((a, b) => (b.duration || 0) - (a.duration || 0))[0];
 
-  const analyzed = await analyzeCall(target.id);
-  if (!analyzed) {
-    return NextResponse.json({ error: "That call has no transcript in Quo yet." }, { status: 404 });
+  // Newest first — you almost always mean the call you just made. Walk down
+  // until one actually has a transcript (very recent calls may still be
+  // processing, and short/unrecorded ones never get one).
+  const byRecency = [...calls].sort(
+    (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+  );
+
+  let target: (typeof byRecency)[number] | undefined;
+  let analyzed: Awaited<ReturnType<typeof analyzeCall>> = null;
+  for (const c of byRecency.slice(0, 8)) {
+    const a = await analyzeCall(c.id);
+    if (a) {
+      target = c;
+      analyzed = a;
+      break;
+    }
+  }
+  if (!target || !analyzed) {
+    const newest = byRecency[0];
+    return NextResponse.json(
+      {
+        error: `No transcript yet for any recent call with that number. The newest was ${
+          newest.duration ?? 0
+        }s on ${newest.createdAt}. Quo only transcribes recorded calls, and it can take a few minutes after hanging up.`,
+      },
+      { status: 404 }
+    );
   }
 
   const call = { id: target.id, duration: target.duration, direction: target.direction, createdAt: target.createdAt };
