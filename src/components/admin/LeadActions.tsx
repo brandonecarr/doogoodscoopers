@@ -10,6 +10,15 @@ interface LeadActionsProps {
   isArchived: boolean;
 }
 
+// Where to send the user after deleting — the list this lead came from.
+const LIST_PATH: Record<LeadActionsProps["leadType"], string> = {
+  quote: "/admin/quote-leads",
+  adlead: "/admin/ad-leads",
+  outofarea: "/admin/out-of-area",
+  commercial: "/admin/commercial",
+  career: "/admin/careers",
+};
+
 export function LeadActions({ leadId, leadType, isArchived }: LeadActionsProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
@@ -31,7 +40,7 @@ export function LeadActions({ leadId, leadType, isArchived }: LeadActionsProps) 
 
       if (response.ok) {
         if (action === "delete") {
-          router.push("/admin/quote-leads");
+          router.push(LIST_PATH[leadType] ?? "/admin/leads");
         } else {
           router.refresh();
         }
