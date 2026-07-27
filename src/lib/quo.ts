@@ -194,30 +194,38 @@ export function verifyQuoWebhook(opts: {
   authHeader?: string | null;
   querySecret?: string | null;
 }): boolean {
-  const secret = process.env.QUO_WEBHOOK_SECRET;
-  if (!secret) return true; // not configured → permissive (like sweepandgo)
+  // Quo issues a SEPARATE signing key per webhook subscription (messages, call
+  // transcripts, ...), all delivering to this one endpoint. So accept a list:
+  // QUO_WEBHOOK_SECRET may hold several secrets separated by commas/whitespace,
+  // and a request is valid if it matches ANY of them. With one secret this
+  // behaves exactly as before.
+  const secrets = (process.env.QUO_WEBHOOK_SECRET || "")
+    .split(/[,\s]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (secrets.length === 0) return true; // not configured → permissive (like sweepandgo)
 
-  // Shared-secret styles
   const bearer = opts.authHeader?.replace(/^Bearer\s+/i, "").trim();
-  if (bearer && bearer === secret) return true;
-  if (opts.querySecret && opts.querySecret === secret) return true;
+  const provided = opts.signatureHeader?.replace(/^sha256=/i, "").trim();
 
-  // HMAC-SHA256 over the raw body
-  if (opts.signatureHeader) {
-    const expected = crypto
-      .createHmac("sha256", secret)
-      .update(opts.rawBody)
-      .digest("hex");
-    const provided = opts.signatureHeader.replace(/^sha256=/i, "").trim();
-    try {
-      if (
-        provided.length === expected.length &&
-        crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(expected))
-      ) {
-        return true;
+  for (const secret of secrets) {
+    // Shared-secret styles
+    if (bearer && bearer === secret) return true;
+    if (opts.querySecret && opts.querySecret === secret) return true;
+
+    // HMAC-SHA256 over the raw body
+    if (provided) {
+      const expected = crypto.createHmac("sha256", secret).update(opts.rawBody).digest("hex");
+      try {
+        if (
+          provided.length === expected.length &&
+          crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(expected))
+        ) {
+          return true;
+        }
+      } catch {
+        // try the next secret
       }
-    } catch {
-      // fall through
     }
   }
   return false;
