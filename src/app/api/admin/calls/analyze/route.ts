@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { listCallsWith, normalizePhoneNumber, isQuoConfigured } from "@/lib/quo";
-import { analyzeCall, isCallIntelConfigured, formatTranscript } from "@/lib/call-intel";
+import { analyzeCall, applyCallIntel, isCallIntelConfigured, formatTranscript } from "@/lib/call-intel";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "ANTHROPIC_API_KEY isn't set, so AI call notes can't run." }, { status: 400 });
   }
 
-  const { phone } = await request.json().catch(() => ({ phone: "" }));
+  const { phone, apply } = await request.json().catch(() => ({ phone: "", apply: false }));
   const normalized = normalizePhoneNumber(String(phone || ""));
   if (!normalized) return NextResponse.json({ error: "Enter a valid 10-digit phone number." }, { status: 400 });
 
@@ -43,6 +43,14 @@ export async function POST(request: Request) {
       { error: analyzed.result.message, reason: analyzed.result.reason, call, transcript },
       { status: analyzed.result.reason === "too_short" ? 200 : 502 }
     );
+  }
+
+  // apply:true runs the same path the webhook does — creates/enriches the lead.
+  // Lets a call that happened before the webhook existed be backfilled.
+  if (apply) {
+    const caller = analyzed.externalNumber || normalized;
+    const result = await applyCallIntel({ phone: caller, intel: analyzed.result.intel, callId: target.id });
+    return NextResponse.json({ success: true, call, transcript, intel: analyzed.result.intel, applied: result });
   }
 
   return NextResponse.json({

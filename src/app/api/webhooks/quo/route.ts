@@ -466,23 +466,42 @@ function callIdFromPayload(payload: unknown): string | null {
  * blanks only) — or create a lead for an unknown caller. Returns null to fall
  * back to the plain timeline entry when the AI is off or has nothing to add.
  */
-async function handleCallTranscript(payload: unknown, external: string) {
-  if (!isCallIntelConfigured()) return null;
+async function handleCallTranscript(payload: unknown) {
+  if (!isCallIntelConfigured()) {
+    console.warn("[call-ai] skipped — ANTHROPIC_API_KEY not set");
+    return null;
+  }
   const setting = await prisma.appSetting.findUnique({ where: { key: "calls.ai.enabled" } });
-  if (setting?.value === "false") return null;
+  if (setting?.value === "false") {
+    console.warn("[call-ai] skipped — calls.ai.enabled is false");
+    return null;
+  }
 
   const callId = callIdFromPayload(payload);
-  if (!callId) return null;
+  if (!callId) {
+    console.warn("[call-ai] skipped — no callId in payload:", JSON.stringify(payload).slice(0, 300));
+    return null;
+  }
 
   try {
     const analyzed = await analyzeCall(callId);
-    if (!analyzed) return null;
+    if (!analyzed) {
+      console.warn(`[call-ai] ${callId} skipped — no transcript returned by Quo`);
+      return null;
+    }
+    // Prefer the number carried on the payload (when present); otherwise use the
+    // one recovered from the transcript's speaker identifiers.
+    const external = callExternalNumber(payload) || analyzed.externalNumber;
+    if (!external) {
+      console.warn(`[call-ai] ${callId} skipped — could not determine the caller's number`);
+      return null;
+    }
     if (!analyzed.result.ok) {
       console.warn(`[call-ai] ${callId} skipped — ${analyzed.result.reason}: ${analyzed.result.message}`);
       return null; // fall through to the plain timeline entry
     }
     const result = await applyCallIntel({ phone: external, intel: analyzed.result.intel, callId });
-    console.log(`[call-ai] ${callId} → ${result.action} ${result.fieldsFilled.join(",")}`);
+    console.log(`[call-ai] ${callId} (${external}) → ${result.action} ${result.fieldsFilled.join(",")}`);
     return NextResponse.json({ success: true, callAi: result });
   } catch (e) {
     console.error("[call-ai] failed:", e);
@@ -491,16 +510,20 @@ async function handleCallTranscript(payload: unknown, external: string) {
 }
 
 async function handleCall(supabase: SupabaseClient, event: string, payload: unknown) {
+  // Transcript ready → run AI extraction. This MUST come before the
+  // external-number check below: Quo's transcript payload carries only
+  // callId/createdAt/dialogue (no from/to), so callExternalNumber() returns null
+  // for it and we would bail before ever extracting. handleCallTranscript
+  // recovers the caller from the transcript's own speaker identifiers instead.
+  if (event === "call.transcript.completed") {
+    const handled = await handleCallTranscript(payload);
+    if (handled) return handled;
+  }
+
   const external = callExternalNumber(payload);
   if (!external) return NextResponse.json({ success: true, skipped: "no external number" });
   const candidates = phoneCandidates(external);
   const text = callActivityText(event, payload);
-
-  // Transcript ready → run AI extraction instead of a bare "transcript available" note.
-  if (event === "call.transcript.completed") {
-    const handled = await handleCallTranscript(payload, external);
-    if (handled) return handled;
-  }
 
   // 1) Client → log into the client's conversation timeline (shows in /office/messages).
   const { data: org } = await supabase.from("organizations").select("id").limit(1).single();

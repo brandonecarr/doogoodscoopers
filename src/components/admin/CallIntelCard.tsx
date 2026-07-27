@@ -41,6 +41,7 @@ export function CallIntelCard() {
   const [result, setResult] = useState<{ intel: Intel | null; transcript: string; call: { duration?: number } } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showTranscript, setShowTranscript] = useState(false);
+  const [applied, setApplied] = useState<{ action: string; leadType?: string; leadId?: string; fieldsFilled: string[]; reason?: string } | null>(null);
 
   useEffect(() => {
     fetch("/api/admin/app-settings?prefix=calls.ai.")
@@ -78,9 +79,10 @@ export function CallIntelCard() {
     }
   }
 
-  async function test() {
+  async function test(apply = false) {
     setError(null);
     setResult(null);
+    setApplied(null);
     if (!phone.trim()) {
       setError("Enter a phone number that has called you, then try again.");
       return;
@@ -90,11 +92,12 @@ export function CallIntelCard() {
       const res = await fetch("/api/admin/calls/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone }),
+        body: JSON.stringify({ phone, apply }),
       });
       // The body isn't always JSON (a 500 can return an HTML error page).
       const raw = await res.text();
-      let d: { error?: string; intel?: Intel | null; transcript?: string; call?: { duration?: number } } = {};
+      let d: { error?: string; intel?: Intel | null; transcript?: string; call?: { duration?: number };
+        applied?: { action: string; leadType?: string; leadId?: string; fieldsFilled: string[]; reason?: string } } = {};
       try {
         d = JSON.parse(raw);
       } catch {
@@ -108,6 +111,7 @@ export function CallIntelCard() {
         return;
       }
       setResult({ intel: d.intel, transcript: d.transcript || "", call: d.call || {} });
+      if (d.applied) setApplied(d.applied);
     } catch (e) {
       setError(e instanceof Error ? `Request failed: ${e.message}` : "Request failed.");
     } finally {
@@ -163,14 +167,38 @@ export function CallIntelCard() {
             className="flex-1 min-w-[200px] px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500"
           />
           <button
-            onClick={test}
+            onClick={() => test(false)}
             disabled={testing}
             className="inline-flex items-center gap-1.5 px-3 py-2 bg-navy-600 text-white rounded-lg hover:bg-navy-700 disabled:opacity-50 text-sm font-medium"
           >
             {testing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
             Preview extraction
           </button>
+          <button
+            onClick={() => test(true)}
+            disabled={testing}
+            title="Run it for real: create or update the lead from this call"
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 text-sm font-medium"
+          >
+            {testing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+            Create lead from this call
+          </button>
         </div>
+        {applied && (
+          <p className="text-xs text-green-700 mt-2">
+            {applied.action === "created" && "Lead created"}
+            {applied.action === "enriched" && "Existing lead updated"}
+            {applied.action === "noted" && "Note added to the existing record"}
+            {applied.action === "skipped" && `Skipped — ${applied.reason ?? "no action needed"}`}
+            {applied.fieldsFilled.length > 0 && ` · filled: ${applied.fieldsFilled.join(", ")}`}
+            {applied.leadType === "QUOTE_FORM" && applied.leadId ? (
+              <> · <a href={`/admin/quote-leads/${applied.leadId}`} className="underline">open lead</a></>
+            ) : null}
+            {applied.leadType === "AD_LEAD" && applied.leadId ? (
+              <> · <a href={`/admin/ad-leads/${applied.leadId}`} className="underline">open lead</a></>
+            ) : null}
+          </p>
+        )}
         {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
 
         {/* Transcript-only fallback when we got a call but no extraction. */}

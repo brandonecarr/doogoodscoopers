@@ -32,22 +32,38 @@ interface QuoDialogueEntry {
   userId?: string | null;
 }
 
-/** Pull a call's transcript from Quo and label each line by speaker. */
-export async function fetchCallTranscript(callId: string): Promise<TranscriptSegment[] | null> {
+export interface CallTranscript {
+  segments: TranscriptSegment[];
+  /**
+   * The other party's number, derived from the dialogue itself. Quo's transcript
+   * webhook payload carries only callId/createdAt/dialogue — no from/to — so the
+   * caller must be recovered from the speaker identifiers or we have no one to
+   * attach the lead to.
+   */
+  externalNumber: string | null;
+}
+
+/** Pull a call's transcript from Quo, label each line by speaker, and identify the caller. */
+export async function fetchCallTranscript(callId: string): Promise<CallTranscript | null> {
   const res = await quoFetch(`/call-transcripts/${encodeURIComponent(callId)}`);
   if (!res.ok) return null;
   const dialogue = ((res.data as { data?: { dialogue?: QuoDialogueEntry[] } })?.data?.dialogue) || [];
   if (dialogue.length === 0) return null;
 
   const ours = normalizePhoneNumber(getQuoFromNumber());
-  return dialogue
+  let externalNumber: string | null = null;
+
+  const segments = dialogue
     .filter((d) => (d.content || "").trim())
     .map((d) => {
       const from = normalizePhoneNumber(d.identifier || "");
       // Anything spoken from our own number (or by a logged-in Quo user) is us.
       const isUs = (!!ours && from === ours) || !!d.userId;
+      if (!isUs && from && from !== ours && !externalNumber) externalNumber = from;
       return { speaker: isUs ? ("us" as const) : ("caller" as const), text: (d.content || "").trim() };
     });
+
+  return { segments, externalNumber };
 }
 
 /** Quo's own AI summary for a call, when available. */
@@ -170,10 +186,10 @@ export async function extractCallIntel(segments: TranscriptSegment[]): Promise<E
 /** Fetch + extract in one step, for a Quo call id. */
 export async function analyzeCall(
   callId: string
-): Promise<{ transcript: TranscriptSegment[]; result: ExtractResult } | null> {
-  const transcript = await fetchCallTranscript(callId);
-  if (!transcript) return null;
-  return { transcript, result: await extractCallIntel(transcript) };
+): Promise<{ transcript: TranscriptSegment[]; externalNumber: string | null; result: ExtractResult } | null> {
+  const t = await fetchCallTranscript(callId);
+  if (!t) return null;
+  return { transcript: t.segments, externalNumber: t.externalNumber, result: await extractCallIntel(t.segments) };
 }
 
 // ── Applying intel to the CRM ───────────────────────────────────────────────
