@@ -111,12 +111,12 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
             </p>
           )}
         </div>
-        {isDrip && <CampaignPauseToggle campaignId={campaign.id} active={campaign.active} />}
+        {isDrip && <CampaignPauseToggle campaignId={campaign.id} active={campaign.active} size="md" />}
         <Link
           href={`/admin/campaigns/${campaign.id}/edit`}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-navy-600 text-white rounded-lg hover:bg-navy-700 transition-colors text-sm font-medium"
+          className="flex items-center gap-1.5 px-4 py-2 bg-navy-600 text-white rounded-lg hover:bg-navy-700 transition-colors text-sm font-medium"
         >
-          <Pencil className="w-3.5 h-3.5" />
+          <Pencil className="w-4 h-4" />
           Edit
         </Link>
       </div>

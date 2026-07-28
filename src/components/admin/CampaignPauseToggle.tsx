@@ -4,7 +4,19 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Pause, Play } from "lucide-react";
 
-export function CampaignPauseToggle({ campaignId, active }: { campaignId: string; active: boolean }) {
+/**
+ * `sm` suits the dense campaigns list; `md` matches the Edit button on the
+ * campaign detail header so the two read as a matched pair.
+ */
+export function CampaignPauseToggle({
+  campaignId,
+  active,
+  size = "sm",
+}: {
+  campaignId: string;
+  active: boolean;
+  size?: "sm" | "md";
+}) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
 
@@ -26,10 +38,14 @@ export function CampaignPauseToggle({ campaignId, active }: { campaignId: string
     <button
       onClick={toggle}
       disabled={busy}
-      className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded border border-gray-200 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+      // The site's standard secondary button (same as Templates / Contacts /
+      // Automations); `sm` is the compact form for the dense campaigns list.
+      className={`inline-flex items-center gap-1.5 border border-gray-200 text-navy-900 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium disabled:opacity-50 ${
+        size === "md" ? "px-4 py-2" : "px-3 py-1.5"
+      }`}
       title={active ? "Pause drip" : "Resume drip"}
     >
-      {active ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
+      {active ? <Pause className={size === "md" ? "w-4 h-4" : "w-3.5 h-3.5"} /> : <Play className={size === "md" ? "w-4 h-4" : "w-3.5 h-3.5"} />}
       {active ? "Pause" : "Resume"}
     </button>
   );
