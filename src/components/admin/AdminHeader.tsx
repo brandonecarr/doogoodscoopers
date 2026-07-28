@@ -9,6 +9,7 @@ interface AdminHeaderProps {
 }
 
 import { NotificationBell } from "@/components/admin/NotificationBell";
+import { SmsBalanceChip } from "@/components/admin/SmsBalanceChip";
 
 export function AdminHeader({ email }: AdminHeaderProps) {
   const router = useRouter();
@@ -50,6 +51,7 @@ export function AdminHeader({ email }: AdminHeaderProps) {
 
         {/* Right side */}
         <div className="flex items-center gap-4">
+          <SmsBalanceChip />
           <NotificationBell />
           {/* User info */}
           <div className="hidden sm:flex items-center gap-2 text-sm text-navy-600">

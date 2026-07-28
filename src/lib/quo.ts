@@ -119,6 +119,13 @@ export async function sendSms(options: SendSmsOptions): Promise<SendSmsResult> {
     }
 
     const msg = unwrap(data);
+    // Every outgoing SMS in the app funnels through here, so this is the one
+    // place that can keep the tracked balance honest. Imported lazily to avoid
+    // a module cycle (sms-balance -> notify -> prisma) and never awaited in a
+    // way that can fail the send.
+    import("@/lib/sms-balance")
+      .then((m) => m.chargeForMessage(options.body))
+      .catch(() => {});
     return {
       success: true,
       messageId: (msg.id as string) || undefined,
