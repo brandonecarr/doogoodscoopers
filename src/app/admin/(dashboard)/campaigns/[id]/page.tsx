@@ -57,10 +57,18 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
 
   const isDrip = campaign.type === "DRIP";
   const { timeZone } = await loadSendWindow();
-  const [recipients, messages] = await Promise.all([
+  const [recipients, messages, sentPerLead] = await Promise.all([
     prisma.campaignRecipient.findMany({ where: { campaignId: id }, orderBy: { createdAt: "desc" }, take: 300 }),
     prisma.leadMessage.findMany({ where: { campaignId: id }, orderBy: { createdAt: "desc" }, take: 100, select: { id: true, phone: true, body: true, status: true, createdAt: true, direction: true } }),
+    // Messages that actually left — currentStep advances even when a send fails,
+    // so it can't be used to report what the recipient received.
+    prisma.leadMessage.groupBy({
+      by: ["leadId"],
+      where: { campaignId: id, direction: "OUTBOUND", NOT: { status: "FAILED" } },
+      _count: { _all: true },
+    }),
   ]);
+  const deliveredByLead = new Map(sentPerLead.map((g) => [g.leadId, g._count._all]));
 
   const totalSteps = campaign.steps.length;
   const counts = recipients.reduce<Record<string, number>>((a, r) => ((a[r.status] = (a[r.status] || 0) + 1), a), {});
@@ -186,12 +194,19 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
                         <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${recStatusStyle[r.status] || "bg-gray-100 text-gray-600"}`}>
                           {r.status}
                         </span>
-                        {r.error && r.status === "STOPPED" ? <span className="text-xs text-gray-400 ml-1">({r.error})</span> : null}
+                        {r.error ? (
+                          <span className={`text-xs ml-1 ${r.status === "STOPPED" ? "text-gray-400" : "text-red-600"}`}>
+                            ({r.error})
+                          </span>
+                        ) : null}
                       </td>
                       {isDrip ? (
                         <>
                           <td className="py-2 pr-4 text-gray-700">
-                            {received} of {totalSteps} received
+                            {deliveredByLead.get(r.leadId) ?? 0} of {totalSteps} sent
+                            {received > (deliveredByLead.get(r.leadId) ?? 0) && (
+                              <span className="text-red-600"> · {received - (deliveredByLead.get(r.leadId) ?? 0)} failed</span>
+                            )}
                           </td>
                           <td className="py-2 pr-4 text-gray-500" suppressHydrationWarning>
                             {r.status === "ACTIVE" ? fmt(r.nextSendAt, timeZone) : r.status === "COMPLETED" ? "done" : "—"}
