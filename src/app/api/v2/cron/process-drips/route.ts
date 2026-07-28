@@ -6,6 +6,7 @@ import { optedOutKeys, optOutKey } from "@/lib/sms-optout";
 import { findDripCandidates, isLeadArchived, markLeadContactedIfNew } from "@/lib/drip";
 import { getLeadPersonalization } from "@/lib/personalization";
 import { loadSendWindow, clampToSendWindow, isWithinSendWindow } from "@/lib/send-window";
+import { notify } from "@/lib/notify";
 
 // Drives DRIP campaigns: enrolls new matching leads and sends each recipient's
 // next step when due. Stops a recipient on reply / opt-out / archive.
@@ -142,6 +143,24 @@ export async function GET(request: NextRequest) {
         where: { id: campaign.id },
         data: result.success ? { sentCount: { increment: 1 } } : { failedCount: { increment: 1 } },
       });
+
+      // A send that fails needs to reach the owner. Out-of-credits in particular
+      // fails every message silently, so it dedupes to a single standing alert.
+      if (!result.success) {
+        const err = result.error || "unknown error";
+        const outOfCredits = /credit/i.test(err);
+        await notify({
+          type: outOfCredits ? "credits" : "delivery_failed",
+          severity: "error",
+          title: outOfCredits ? "Quo is out of messaging credits" : `Couldn't send a text to ${r.name || r.phone}`,
+          body: outOfCredits
+            ? "Drip messages are failing to send. Add credits in Quo to resume."
+            : `${r.phone}: ${err}`,
+          link: `/admin/campaigns/${campaign.id}`,
+          dedupeKey: outOfCredits ? "quo:no-credits" : undefined,
+          push: outOfCredits,
+        });
+      }
 
       // First successful drip contact moves a NEW lead → Contacted (won't
       // overwrite a status you've set by hand). Idempotent on later steps.

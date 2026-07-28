@@ -560,6 +560,25 @@ model AppSetting {
   createdAt DateTime @default(now())
 }
 
+// Admin notifications — the bell in the header. One row per thing the owner
+// should know about (a message that couldn't be delivered, a lead created from
+// a call, Quo out of credits, ...). `dedupeKey` is unique so a recurring
+// condition doesn't produce a wall of identical alerts.
+model AdminNotification {
+  id        String    @id @default(cuid())
+  type      String // delivery_failed | lead_created | lead_replied | credits | system
+  severity  String    @default("info") // info | warning | error
+  title     String
+  body      String?   @db.Text
+  link      String? // where clicking it should go
+  dedupeKey String?   @unique
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([readAt])
+  @@index([createdAt])
+}
+
 // One row per Quo call whose transcript we've already run AI notes on.
 // callId is the primary key, so a retried or concurrently-delivered webhook
 // loses the insert race and skips — preventing duplicate leads and duplicate

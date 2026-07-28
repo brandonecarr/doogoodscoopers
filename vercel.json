@@ -35,6 +35,10 @@
     {
       "path": "/api/v2/cron/process-email-automations",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/v2/cron/check-delivery",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

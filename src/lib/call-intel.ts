@@ -5,6 +5,7 @@ import type { LeadSource } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { quoFetch, getQuoFromNumber, normalizePhoneNumber } from "@/lib/quo";
 import { markLeadContactedIfNew, PHONE_CALL_STEP } from "@/lib/drip";
+import { notify } from "@/lib/notify";
 
 /**
  * Call intelligence: turn a finished phone call into structured lead data.
@@ -356,6 +357,16 @@ export async function applyCallIntel(opts: {
     },
   });
   await timeline("QUOTE_FORM", created.id);
+  await notify({
+    type: "lead_created",
+    severity: "info",
+    title: `New lead from a phone call: ${created.firstName}`,
+    body: [intel.zipCode && `zip ${intel.zipCode}`, intel.numberOfDogs && `${intel.numberOfDogs} dogs`, intel.summary]
+      .filter(Boolean)
+      .join(" · "),
+    link: `/admin/quote-leads/${created.id}`,
+    push: true,
+  });
   return record({
     action: "created",
     leadType: "QUOTE_FORM",

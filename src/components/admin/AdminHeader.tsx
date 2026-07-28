@@ -8,6 +8,8 @@ interface AdminHeaderProps {
   email: string;
 }
 
+import { NotificationBell } from "@/components/admin/NotificationBell";
+
 export function AdminHeader({ email }: AdminHeaderProps) {
   const router = useRouter();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -48,6 +50,7 @@ export function AdminHeader({ email }: AdminHeaderProps) {
 
         {/* Right side */}
         <div className="flex items-center gap-4">
+          <NotificationBell />
           {/* User info */}
           <div className="hidden sm:flex items-center gap-2 text-sm text-navy-600">
             <div className="w-8 h-8 rounded-full bg-teal-100 flex items-center justify-center">
