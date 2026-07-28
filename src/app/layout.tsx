@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Montserrat, Bebas_Neue, Homemade_Apple } from "next/font/google";
 import "./globals.css";
 
@@ -21,6 +21,21 @@ const homemadeApple = Homemade_Apple({
   variable: "--font-handwriting",
   display: "swap",
 });
+
+/**
+ * There was no viewport export, so Next.js used its default. Declaring it
+ * explicitly pins initial-scale and adds viewport-fit=cover so the home-screen
+ * web app draws correctly around the iPhone notch and home indicator.
+ *
+ * userScalable stays true on purpose — the focus-zoom annoyance is fixed at the
+ * source in globals.css (16px form controls), so there's no need to take
+ * pinch-to-zoom away from anyone.
+ */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://doogoodscoopers.com"),

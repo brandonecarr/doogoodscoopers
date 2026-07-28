@@ -611,3 +611,21 @@ body:has([class*="ti-popup"]) {
     scroll-behavior: auto;
   }
 }
+
+/* ===== iOS: stop the auto-zoom when a field is focused =====
+   Mobile Safari zooms the page whenever a focused form control has a font-size
+   below 16px. Most fields here use Tailwind's text-sm (14px) or text-xs (12px),
+   which trips it on every tap — especially noticeable in the home-screen web
+   app, where you can't easily pinch back out.
+
+   Setting every control to 16px on small screens removes the trigger at its
+   source. Deliberately NOT using `maximum-scale=1` / `user-scalable=no` in the
+   viewport: that also kills pinch-to-zoom, which people rely on to read things.
+   Desktop keeps the compact sizing — this only applies below the md breakpoint. */
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
