@@ -429,12 +429,14 @@ function BgImageField({
   onChange,
   veilColor,
   note,
+  label = "Background image",
 }: {
   value: BgImage;
   onChange: (next: BgImage) => void;
   /** The colour the image is dimmed toward — normally whatever sits behind it. */
   veilColor: string;
   note?: string;
+  label?: string;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -491,7 +493,7 @@ function BgImageField({
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <span className="text-[11px] font-medium text-slate-600">Background image</span>
+        <span className="text-[11px] font-medium text-slate-600">{label}</span>
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -1825,7 +1827,8 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
                     pageBgOpacity: v.opacity,
                   }))}
                   veilColor={safeColor(settings.pageBg) || "#ffffff"}
-                  note="Outlook needs a fallback — keep a background color set behind the image."
+                  label="Background image (whole email)"
+                  note="Sits behind the entire email and works in all clients, Outlook included. Keep a background color set as the fallback."
                 />
 
                 <div className="h-px bg-slate-100" />
@@ -1976,7 +1979,8 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
                 value={selBg}
                 onChange={(v) => applySelBg(v, selVeil)}
                 veilColor={selVeil}
-                note="Dimmed toward this element's background color. Outlook can't show element background images at all — keep a background color set."
+                label="Background image (this element only)"
+                note="Applies only to the selected element, and Outlook can't show it. For a background behind the whole email, use Email body → Background image at the top instead."
               />
             </div>
           </div>
