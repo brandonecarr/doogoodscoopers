@@ -5,18 +5,22 @@ import grapesjs, { type Editor } from "grapesjs";
 import "grapesjs/dist/css/grapes.min.css";
 import presetNewsletter from "grapesjs-preset-newsletter";
 import {
-  AlignCenter, AlignLeft, AlignRight, ChevronDown, Copy, Eye, Layers, LayoutGrid,
-  Monitor, MousePointerClick, Redo2, Settings2, Smartphone, Sliders, Trash2, Undo2,
+  AlignCenter, AlignLeft, AlignRight, Check, ChevronDown, Copy, Eye, ImagePlus, Layers,
+  LayoutGrid, Loader2, Monitor, MousePointerClick, Palette, Redo2, Settings2, Smartphone,
+  Sliders, Trash2, Undo2, X,
 } from "lucide-react";
 
 /* ------------------------------------------------------------------ *
  * Email-wide settings — the "body" controls Brevo puts above everything
- * else. Kept in React state (not GrapesJS) so they can drive both the
- * canvas preview and the exported email scaffold.
+ * else. Held in React (not GrapesJS) so they can drive both the canvas
+ * preview and the exported email scaffold.
  * ------------------------------------------------------------------ */
 
 export interface EmailSettings {
   pageBg: string;
+  pageBgImage: string;
+  pageBgFit: "cover" | "contain" | "tile" | "actual";
+  pageBgPosition: string;
   contentBg: string;
   contentWidth: number;
   outerPadding: number;
@@ -28,6 +32,9 @@ export interface EmailSettings {
 /** New designs get the classic newsletter look. */
 const NEW_DESIGN: EmailSettings = {
   pageBg: "#f1f5f9",
+  pageBgImage: "",
+  pageBgFit: "cover",
+  pageBgPosition: "center center",
   contentBg: "#ffffff",
   contentWidth: 600,
   outerPadding: 24,
@@ -38,9 +45,9 @@ const NEW_DESIGN: EmailSettings = {
 
 /** Designs saved before these controls existed: change nothing they didn't ask for. */
 const EXISTING_DESIGN: EmailSettings = {
+  ...NEW_DESIGN,
   pageBg: "",
   contentBg: "",
-  contentWidth: 600,
   outerPadding: 0,
   font: "",
   textColor: "",
@@ -59,71 +66,129 @@ const FONTS = [
   { value: "'Courier New', Courier, monospace", label: "Courier New" },
 ];
 
-const PAGE_SWATCHES = ["#ffffff", "#f1f5f9", "#eef2f7", "#f0fdfa", "#fff7ed", "#fdf2f8", "#0d1b2a", "#134e4a"];
+const PAGE_SWATCHES = ["#ffffff", "#f1f5f9", "#e2e8f0", "#f0fdfa", "#fff7ed", "#fdf2f8", "#134e4a", "#0d1b2a"];
 const CONTENT_SWATCHES = ["#ffffff", "#fafafa", "#f8fafc", "#f0fdfa", "#fffbeb", "#0d1b2a"];
+
+/** How the four fit presets map to real CSS. */
+const FIT: Record<EmailSettings["pageBgFit"], { size: string; repeat: string }> = {
+  cover: { size: "cover", repeat: "no-repeat" },
+  contain: { size: "contain", repeat: "no-repeat" },
+  tile: { size: "auto", repeat: "repeat" },
+  actual: { size: "auto", repeat: "no-repeat" },
+};
+
+const POSITIONS = [
+  ["left top", "center top", "right top"],
+  ["left center", "center center", "right center"],
+  ["left bottom", "center bottom", "right bottom"],
+];
 
 const HEX = /^#[0-9a-f]{3,8}$/i;
 const safeColor = (c: string) => (c && HEX.test(c) ? c : "");
+const safeUrl = (u: string) => (/^https?:\/\/\S+$/i.test(u.trim()) ? u.trim() : "");
+const escAttr = (s: string) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 /* ------------------------------------------------------------------ *
  * Editor chrome
  * ------------------------------------------------------------------ */
 
 // GrapesJS ships a dark theme and expects Font Awesome for its icons. We load
-// neither, so this repaints the managers light (to sit in the white sidebars)
-// and turns the icon-only radio groups — alignment among them — into readable
-// segmented controls instead of blank squares.
+// neither, so this repaints its managers to match the admin UI and turns the
+// icon-only radio groups — alignment among them — into readable segmented
+// controls instead of blank squares.
 const THEME_CSS = `
 .gjs-editor-cont .gjs-pn-panels { display:none !important; }
-.gjs-editor-cont .gjs-cv-canvas { top:0 !important; width:100% !important; height:100% !important; }
+.gjs-editor-cont .gjs-cv-canvas {
+  top:0 !important; width:100% !important; height:100% !important;
+  background:#eceff3;
+}
+.gjs-frame { box-shadow:0 12px 32px rgba(15,23,42,.10), 0 2px 6px rgba(15,23,42,.05); background:#fff; }
 
 .gjs-one-bg { background-color:#ffffff; }
 .gjs-two-color { color:#0f172a; }
 .gjs-three-bg { background-color:#14b8a6; color:#fff; }
 .gjs-four-color, .gjs-four-color-h:hover { color:#14b8a6; }
 
+/* Selection affordances */
+.gjs-badge { background-color:#0f172a; border-radius:5px; font-size:10px; font-weight:600; letter-spacing:.02em; padding:2px 6px; }
+.gjs-toolbar { background-color:#14b8a6; border-radius:6px; overflow:hidden; }
+.gjs-toolbar-item { padding:4px 5px; }
+.gjs-dashed *[data-gjs-highlightable] { outline:1px dashed rgba(148,163,184,.55); outline-offset:-1px; }
+
+/* Blocks */
+.gjs-blocks-c { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; padding:12px; }
+.gjs-block {
+  width:auto; min-height:0; margin:0; padding:12px 6px 10px;
+  display:flex; flex-direction:column; align-items:center; justify-content:flex-start; gap:7px;
+  font-size:10.5px; font-weight:500; line-height:1.25; text-align:center;
+  background:#fff; border:1px solid #e8edf3; border-radius:10px; color:#64748b;
+  box-shadow:0 1px 2px rgba(15,23,42,.04); transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease, color .15s ease;
+  cursor:grab;
+}
+.gjs-block:hover {
+  border-color:#5eead4; color:#0f766e;
+  box-shadow:0 6px 16px rgba(20,184,166,.16); transform:translateY(-1px);
+}
+.gjs-block__media {
+  display:flex; align-items:center; justify-content:center;
+  width:34px; height:34px; border-radius:9px; background:#f1f5f9; color:#334155; transition:background .15s ease, color .15s ease;
+}
+.gjs-block:hover .gjs-block__media { background:#ccfbf1; color:#0f766e; }
+.gjs-block__media svg { width:20px; height:20px; }
+.gjs-block-category .gjs-title { background:#fff; color:#94a3b8; font-size:10px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; border:0; padding:10px 14px 2px; }
+
+/* Style manager */
+.gjs-sm-sector { border-bottom:1px solid #f1f5f9; }
 .gjs-sm-sector-title {
-  background:#f8fafc; border-bottom:1px solid #e5e7eb; color:#0f172a;
-  font-size:11px; font-weight:600; letter-spacing:.03em; text-transform:uppercase; padding:8px 10px;
+  background:#fff; color:#94a3b8; border:0;
+  font-size:10px; font-weight:600; letter-spacing:.08em; text-transform:uppercase;
+  padding:13px 14px 7px;
 }
-.gjs-sm-sector .gjs-sm-properties { padding:10px; }
-.gjs-sm-label, .gjs-label, .gjs-trt-trait__label, .gjs-clm-tags-label { color:#64748b; font-size:11px; }
+.gjs-sm-sector .gjs-sm-properties { padding:0 14px 14px; }
+.gjs-sm-property { margin-bottom:10px; }
+.gjs-sm-label, .gjs-label, .gjs-trt-trait__label, .gjs-clm-tags-label {
+  color:#64748b; font-size:11px; font-weight:500;
+}
 .gjs-field {
-  background-color:#fff; border:1px solid #e2e8f0; border-radius:6px; color:#0f172a;
+  background:#fff; border:1px solid #e2e8f0; border-radius:8px; color:#0f172a;
+  box-shadow:0 1px 2px rgba(15,23,42,.03);
+  transition:border-color .15s ease, box-shadow .15s ease;
 }
-.gjs-field input, .gjs-field select, .gjs-field textarea { color:#0f172a; }
+.gjs-field:focus-within { border-color:#14b8a6; box-shadow:0 0 0 3px rgba(20,184,166,.14); }
+.gjs-field input, .gjs-field select, .gjs-field textarea { color:#0f172a; font-size:12px; }
 .gjs-field-arrow-u { border-bottom-color:#94a3b8; }
 .gjs-field-arrow-d { border-top-color:#94a3b8; }
-.gjs-sm-property { margin-bottom:8px; }
+.gjs-sm-composite, .gjs-sm-stack { border-radius:8px; }
 
-.gjs-blocks-c { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; padding:10px; }
-.gjs-block {
-  width:auto; min-height:64px; margin:0; padding:8px 4px; font-size:10.5px; line-height:1.3;
-  background:#fff; border:1px solid #e2e8f0; border-radius:8px; color:#475569; box-shadow:none;
-}
-.gjs-block:hover { border-color:#14b8a6; color:#0f766e; }
-.gjs-block__media svg { width:24px; height:24px; }
-.gjs-block-category .gjs-title { background:#f8fafc; color:#0f172a; font-size:11px; }
-
-.gjs-layer-title { background:#fff; color:#0f172a; }
-.gjs-layer-name { font-size:12px; }
-.gjs-trt-trait { padding:5px 10px; }
-
-/* Radio groups (alignment, decoration) as a visible segmented control. */
+/* Radio groups (alignment, decoration) as a real segmented control. */
 .gjs-radio-items { display:flex; gap:4px; flex-wrap:wrap; }
 .gjs-radio-item { flex:1 1 0; min-width:52px; border:none; }
 .gjs-radio-item-label {
-  display:block; text-align:center; padding:5px 4px; font-size:11px; cursor:pointer;
-  border:1px solid #e2e8f0; border-radius:6px; color:#334155;
+  display:block; text-align:center; padding:6px 4px; font-size:11px; font-weight:500; cursor:pointer;
+  border:1px solid #e2e8f0; border-radius:7px; color:#475569; transition:all .12s ease;
 }
-.gjs-radio-item-label:hover { border-color:#14b8a6; }
+.gjs-radio-item-label:hover { border-color:#5eead4; color:#0f766e; }
 .gjs-radio-item input:checked + .gjs-radio-item-label {
-  background:#14b8a6; color:#fff; border-color:#14b8a6;
+  background:#14b8a6; color:#fff; border-color:#14b8a6; box-shadow:0 1px 3px rgba(20,184,166,.35);
 }
+
+/* Layers + traits */
+.gjs-layer-title { background:#fff; color:#0f172a; }
+.gjs-layer-name { font-size:12px; }
+.gjs-layer:hover > .gjs-layer-item { background:#f8fafc; }
+.gjs-trt-traits { padding:12px 14px; }
+.gjs-trt-trait { padding:0 0 10px; }
+
+/* Scrollbars */
+.email-scroll { scrollbar-width:thin; scrollbar-color:#dbe2ea transparent; }
+.email-scroll::-webkit-scrollbar { width:9px; height:9px; }
+.email-scroll::-webkit-scrollbar-track { background:transparent; }
+.email-scroll::-webkit-scrollbar-thumb { background:#dbe2ea; border-radius:9px; border:2px solid #fff; }
+.email-scroll::-webkit-scrollbar-thumb:hover { background:#c3cdd9; }
 `;
 
 // Style Manager sectors, replacing the preset's. Grouped the way Brevo groups
-// them, open by default, and with text labels on every radio option.
+// them, open by default, with text labels on every radio option.
 const SECTORS = [
   {
     id: "text",
@@ -254,18 +319,27 @@ function paintCanvas(editor: Editor, s: EmailSettings) {
     el.id = "gjs-email-settings";
     doc.head.appendChild(el);
   }
+  const img = safeUrl(s.pageBgImage);
+  const fit = FIT[s.pageBgFit] || FIT.cover;
+  // GrapesJS styles the wrapper through an #id rule, which outranks a plain
+  // `body` selector — hence !important throughout. This is preview-only CSS;
+  // the exported email is built separately.
   el.textContent = [
-    `body { margin:0;`,
-    s.pageBg ? `background-color:${s.pageBg};` : "",
-    s.outerPadding ? `padding:${s.outerPadding}px 0;` : "",
-    s.font ? `font-family:${s.font};` : "",
-    s.textColor ? `color:${s.textColor};` : "",
-    `}`,
-    `body > * { margin-left:auto; margin-right:auto;`,
-    s.contentWidth ? `max-width:${s.contentWidth}px;` : "",
-    s.contentBg ? `background-color:${s.contentBg};` : "",
-    `}`,
-    s.linkColor ? `a { color:${s.linkColor}; }` : "",
+    "body { margin:0 !important;",
+    s.pageBg ? `background-color:${s.pageBg} !important;` : "",
+    img
+      ? `background-image:url("${img}") !important;background-size:${fit.size} !important;` +
+        `background-repeat:${fit.repeat} !important;background-position:${s.pageBgPosition} !important;`
+      : "",
+    s.outerPadding ? `padding:${s.outerPadding}px 0 !important;` : "",
+    s.font ? `font-family:${s.font} !important;` : "",
+    s.textColor ? `color:${s.textColor} !important;` : "",
+    "}",
+    "body > * { margin-left:auto !important; margin-right:auto !important;",
+    s.contentWidth ? `max-width:${s.contentWidth}px !important;` : "",
+    s.contentBg ? `background-color:${s.contentBg} !important;` : "",
+    "}",
+    s.linkColor ? `a { color:${s.linkColor} !important; }` : "",
   ].join("");
 }
 
@@ -275,10 +349,25 @@ function inlineLinkColor(html: string, color: string) {
   return html.replace(/<a\b([^>]*)>/gi, (whole, attrs: string) => {
     if (/color\s*:/i.test(attrs)) return whole;
     if (/style\s*=\s*"/i.test(attrs)) {
-      return `<a${attrs.replace(/style\s*=\s*"([^"]*)"/i, (_m, st: string) => `style="${st};color:${color}"`)}>`;
+      return `<a${attrs.replace(/style\s*=\s*"([^"]*)"/i, (_m, st: string) => `style="${st.replace(/;\s*$/, "")};color:${color}"`)}>`;
     }
     return `<a${attrs} style="color:${color}">`;
   });
+}
+
+/**
+ * Re-importing our own export would nest the scaffold one level deeper every
+ * round trip. Strip it back to the content when we see our marker.
+ */
+function unwrapScaffold(html: string) {
+  if (!html.includes("data-email-content")) return html;
+  try {
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const inner = doc.querySelector("[data-email-content]");
+    return inner ? inner.innerHTML : html;
+  } catch {
+    return html;
+  }
 }
 
 export interface EmailBuilderHandle {
@@ -301,6 +390,7 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
   const stylesRef = useRef<HTMLDivElement>(null);
   const traitsRef = useRef<HTMLDivElement>(null);
   const layersRef = useRef<HTMLDivElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<Editor | null>(null);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -318,9 +408,32 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
   const [device, setDevice] = useState<"desktop" | "mobile">("desktop");
   const [previewing, setPreviewing] = useState(false);
   const [emailOpen, setEmailOpen] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState(false);
 
   const set = useCallback(<K extends keyof EmailSettings>(key: K, value: EmailSettings[K]) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
+  }, []);
+
+  const upload = useCallback(async (file: File) => {
+    setUploading(true);
+    setUploadError(null);
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      const res = await fetch("/api/admin/email-assets", { method: "POST", body });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setUploadError(data.error || "Upload failed.");
+        return;
+      }
+      setSettings((prev) => ({ ...prev, pageBgImage: data.url }));
+    } catch {
+      setUploadError("Upload failed — check your connection.");
+    } finally {
+      setUploading(false);
+    }
   }, []);
 
   const applyAlign = useCallback((value: string) => {
@@ -403,7 +516,7 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (editor as any).loadProjectData(initialDesign);
       } else if (initialHtml) {
-        editor.setComponents(initialHtml);
+        editor.setComponents(unwrapScaffold(initialHtml));
       }
     } catch { /* fall back to empty canvas */ }
 
@@ -430,7 +543,7 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
           inner = m[2];
           bodyStyle = (m[1].match(/style\s*=\s*"([^"]*)"/i)?.[1] || "")
             // the scaffold below owns these now
-            .replace(/(^|;)\s*(background(-color|-image)?|padding|margin)\s*:[^;]*/gi, "")
+            .replace(/(^|;)\s*(background(-color|-image|-size|-repeat|-position)?|padding|margin)\s*:[^;]*/gi, "")
             .replace(/^;+|;+$/g, "");
         }
 
@@ -438,9 +551,12 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
         inner = inlineLinkColor(inner, safeColor(s.linkColor));
 
         const pageBg = safeColor(s.pageBg);
+        const img = safeUrl(s.pageBgImage);
+        const fit = FIT[s.pageBgFit] || FIT.cover;
         const contentBg = safeColor(s.contentBg);
         const width = s.contentWidth > 0 ? s.contentWidth : 600;
         const pad = s.outerPadding > 0 ? s.outerPadding : 0;
+
         const cellStyle = [
           "padding:0",
           s.font && `font-family:${s.font}`,
@@ -452,14 +568,28 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
           `<table role="presentation" align="center" width="${width}" cellpadding="0" cellspacing="0" border="0"` +
           `${contentBg ? ` bgcolor="${contentBg}"` : ""}` +
           ` style="width:${width}px;max-width:100%;margin:0 auto;${contentBg ? `background-color:${contentBg};` : ""}">` +
-          `<tr><td style="${cellStyle}">${inner}</td></tr></table>`;
+          `<tr><td data-email-content="1" style="${cellStyle}">${inner}</td></tr></table>`;
+
+        const bgStyle = [
+          pageBg && `background-color:${pageBg};`,
+          img && `background-image:url('${img}');background-size:${fit.size};background-repeat:${fit.repeat};background-position:${s.pageBgPosition};`,
+        ].filter(Boolean).join("");
+
+        // Outlook ignores CSS background images; it needs VML instead.
+        const vmlOpen = img
+          ? `<!--[if gte mso 9]><v:rect xmlns:v="urn:schemas-microsoft-com:vml" fill="true" stroke="false" style="mso-width-percent:1000;">` +
+            `<v:fill type="frame" src="${escAttr(img)}"${pageBg ? ` color="${pageBg}"` : ""} /><v:textbox inset="0,0,0,0"><![endif]-->`
+          : "";
+        const vmlClose = img ? `<!--[if gte mso 9]></v:textbox></v:rect><![endif]-->` : "";
 
         return (
           `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"` +
           `${pageBg ? ` bgcolor="${pageBg}"` : ""}` +
-          ` style="width:100%;margin:0;padding:0;${pageBg ? `background-color:${pageBg};` : ""}">` +
-          `<tr><td align="center" valign="top" style="padding:${pad}px 0;${pageBg ? `background-color:${pageBg};` : ""}">` +
-          `${content}</td></tr></table>`
+          ` style="width:100%;margin:0;padding:0;${bgStyle}">` +
+          `<tr><td align="center" valign="top"${img ? ` background="${escAttr(img)}"` : ""}` +
+          ` style="padding:${pad}px 0;${bgStyle}">` +
+          `${vmlOpen}${content}${vmlClose}` +
+          `</td></tr></table>`
         );
       },
       getDesign: () => ({
@@ -482,128 +612,148 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
     if (editor) paintCanvas(editor, settings);
   }, [settings]);
 
-  /* -------------------------------------------------------------- */
+  /* ---------------------------- UI bits --------------------------- */
 
-  const colorRow = (
+  const iconBtn = (
     label: string,
-    value: string,
-    swatches: string[],
-    onPick: (c: string) => void,
+    Icon: typeof Undo2,
+    onClick: () => void,
+    opts: { active?: boolean; disabled?: boolean; danger?: boolean } = {},
   ) => (
+    <button
+      type="button"
+      title={label}
+      aria-label={label}
+      onClick={onClick}
+      disabled={opts.disabled}
+      className={`p-1.5 rounded-md transition-all disabled:opacity-35 disabled:cursor-not-allowed ${
+        opts.active
+          ? "bg-white text-teal-700 shadow-sm ring-1 ring-black/5"
+          : opts.danger
+            ? "text-red-500 hover:bg-white hover:text-red-600 hover:shadow-sm"
+            : "text-slate-600 hover:bg-white hover:text-navy-900 hover:shadow-sm"
+      }`}
+    >
+      <Icon className="w-[17px] h-[17px]" />
+    </button>
+  );
+
+  const swatchRow = (label: string, value: string, swatches: string[], onPick: (c: string) => void) => (
     <div>
-      <div className="flex items-center justify-between mb-1.5">
-        <span className="text-[11px] font-medium text-gray-600">{label}</span>
-        <div className="flex items-center gap-1">
-          <label
-            className="w-5 h-5 rounded border border-gray-300 cursor-pointer relative overflow-hidden"
-            style={{ background: value || "conic-gradient(#ef4444,#eab308,#22c55e,#06b6d4,#6366f1,#ec4899,#ef4444)" }}
-            title="Pick any color"
-          >
-            <input type="color" value={value || "#ffffff"} onChange={(e) => onPick(e.target.value)} className="absolute inset-0 opacity-0 cursor-pointer" />
-          </label>
-          <button type="button" onClick={() => onPick("")} className="text-[10px] text-gray-400 hover:text-gray-600 px-1">
-            clear
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[11px] font-medium text-slate-600">{label}</span>
+        {value && (
+          <button type="button" onClick={() => onPick("")} className="text-[10px] text-slate-400 hover:text-slate-600 transition-colors">
+            Clear
           </button>
-        </div>
+        )}
       </div>
-      <div className="flex items-center gap-1 flex-wrap">
-        {swatches.map((c) => (
-          <button
-            key={c}
-            type="button"
-            title={c}
-            onClick={() => onPick(c)}
-            className={`w-5 h-5 rounded border transition-transform hover:scale-110 ${value.toLowerCase() === c ? "border-teal-600 ring-2 ring-teal-500/40" : "border-gray-300"}`}
-            style={{ backgroundColor: c }}
-          />
-        ))}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {swatches.map((c) => {
+          const on = value.toLowerCase() === c;
+          return (
+            <button
+              key={c}
+              type="button"
+              title={c}
+              onClick={() => onPick(c)}
+              className={`w-6 h-6 rounded-full border transition-all flex items-center justify-center ${
+                on ? "border-teal-500 ring-2 ring-teal-500/30 scale-110" : "border-slate-200 hover:scale-110"
+              }`}
+              style={{ backgroundColor: c }}
+            >
+              {on && <Check className={`w-3 h-3 ${c === "#0d1b2a" || c === "#134e4a" ? "text-white" : "text-slate-700"}`} />}
+            </button>
+          );
+        })}
+        <label
+          title="Custom color"
+          className="w-6 h-6 rounded-full border border-slate-200 cursor-pointer relative overflow-hidden hover:scale-110 transition-transform"
+          style={{ background: "conic-gradient(#ef4444,#eab308,#22c55e,#06b6d4,#6366f1,#ec4899,#ef4444)" }}
+        >
+          <input type="color" value={value || "#ffffff"} onChange={(e) => onPick(e.target.value)} className="absolute inset-0 opacity-0 cursor-pointer" />
+        </label>
       </div>
     </div>
   );
 
-  const alignBtn = (value: string, Icon: typeof AlignLeft, label: string) => (
-    <button
-      type="button"
-      title={selection ? `Align ${label}` : "Select something on the canvas first"}
-      onClick={() => applyAlign(value)}
-      disabled={!selection}
-      className={`p-1.5 rounded-md border transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
-        align === value ? "bg-teal-600 border-teal-600 text-white" : "bg-white border-gray-200 text-navy-900 hover:bg-gray-50"
-      }`}
-    >
-      <Icon className="w-4 h-4" />
-    </button>
+  const segment = <T extends string>(value: T, options: { id: T; label: string }[], onPick: (v: T) => void) => (
+    <div className="flex gap-1 p-0.5 bg-slate-100 rounded-lg">
+      {options.map((o) => (
+        <button
+          key={o.id}
+          type="button"
+          onClick={() => onPick(o.id)}
+          className={`flex-1 px-2 py-1.5 text-[11px] font-medium rounded-md transition-all ${
+            value === o.id ? "bg-white text-teal-700 shadow-sm" : "text-slate-500 hover:text-slate-800"
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
   );
 
   const tabBtn = (id: Tab, Icon: typeof Sliders, label: string) => (
     <button
       type="button"
       onClick={() => setTab(id)}
-      className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-2 text-[11px] font-medium border-b-2 transition-colors ${
-        tab === id ? "border-teal-600 text-teal-700" : "border-transparent text-gray-500 hover:text-navy-900"
+      className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-2.5 text-[11px] font-semibold tracking-wide transition-colors relative ${
+        tab === id ? "text-teal-700" : "text-slate-400 hover:text-slate-700"
       }`}
     >
       <Icon className="w-3.5 h-3.5" /> {label}
+      {tab === id && <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-teal-600 rounded-full" />}
     </button>
   );
 
+  const hasImage = !!safeUrl(settings.pageBgImage);
+
   return (
-    <div className="h-full w-full flex flex-col bg-gray-50">
+    <div className="h-full w-full flex flex-col bg-white">
       <style>{THEME_CSS}</style>
 
       {/* Top bar */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-200 bg-white flex-wrap">
-        <div className="flex items-center gap-1">
-          <button type="button" title="Undo" onClick={() => editorRef.current?.UndoManager.undo()} className="p-1.5 rounded-md border border-gray-200 text-navy-900 hover:bg-gray-50">
-            <Undo2 className="w-4 h-4" />
-          </button>
-          <button type="button" title="Redo" onClick={() => editorRef.current?.UndoManager.redo()} className="p-1.5 rounded-md border border-gray-200 text-navy-900 hover:bg-gray-50">
-            <Redo2 className="w-4 h-4" />
-          </button>
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-slate-200 bg-white flex-wrap">
+        <div className="flex items-center gap-0.5 p-0.5 bg-slate-100 rounded-lg">
+          {iconBtn("Undo", Undo2, () => editorRef.current?.UndoManager.undo())}
+          {iconBtn("Redo", Redo2, () => editorRef.current?.UndoManager.redo())}
         </div>
 
-        <div className="h-5 w-px bg-gray-200" />
-
-        <div className="flex items-center gap-1">
-          <button type="button" title="Desktop width" onClick={() => switchDevice("desktop")} className={`p-1.5 rounded-md border ${device === "desktop" ? "bg-teal-600 border-teal-600 text-white" : "border-gray-200 text-navy-900 hover:bg-gray-50"}`}>
-            <Monitor className="w-4 h-4" />
-          </button>
-          <button type="button" title="Mobile width" onClick={() => switchDevice("mobile")} className={`p-1.5 rounded-md border ${device === "mobile" ? "bg-teal-600 border-teal-600 text-white" : "border-gray-200 text-navy-900 hover:bg-gray-50"}`}>
-            <Smartphone className="w-4 h-4" />
-          </button>
+        <div className="flex items-center gap-0.5 p-0.5 bg-slate-100 rounded-lg">
+          {iconBtn("Desktop width", Monitor, () => switchDevice("desktop"), { active: device === "desktop" })}
+          {iconBtn("Mobile width", Smartphone, () => switchDevice("mobile"), { active: device === "mobile" })}
         </div>
 
-        <div className="h-5 w-px bg-gray-200" />
-
-        <div className="flex items-center gap-1">
-          <span className="text-[11px] font-medium text-gray-600 mr-0.5">Align</span>
-          {alignBtn("left", AlignLeft, "left")}
-          {alignBtn("center", AlignCenter, "center")}
-          {alignBtn("right", AlignRight, "right")}
+        <div className="flex items-center gap-0.5 p-0.5 bg-slate-100 rounded-lg">
+          {iconBtn("Align left", AlignLeft, () => applyAlign("left"), { active: align === "left", disabled: !selection })}
+          {iconBtn("Align center", AlignCenter, () => applyAlign("center"), { active: align === "center", disabled: !selection })}
+          {iconBtn("Align right", AlignRight, () => applyAlign("right"), { active: align === "right", disabled: !selection })}
         </div>
 
-        <div className="h-5 w-px bg-gray-200" />
-
-        <div className="flex items-center gap-1">
-          <button type="button" title="Duplicate selected" onClick={() => run("tlb-clone")} disabled={!selection} className="p-1.5 rounded-md border border-gray-200 text-navy-900 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
-            <Copy className="w-4 h-4" />
-          </button>
-          <button type="button" title="Delete selected" onClick={() => run("core:component-delete")} disabled={!selection} className="p-1.5 rounded-md border border-gray-200 text-red-600 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed">
-            <Trash2 className="w-4 h-4" />
-          </button>
+        <div className="flex items-center gap-0.5 p-0.5 bg-slate-100 rounded-lg">
+          {iconBtn("Duplicate", Copy, () => run("tlb-clone"), { disabled: !selection })}
+          {iconBtn("Delete", Trash2, () => run("core:component-delete"), { disabled: !selection, danger: true })}
         </div>
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-2.5">
           {selection ? (
-            <span className="text-[11px] text-gray-500">
-              Selected: <strong className="text-navy-900">{selection}</strong>
+            <span className="text-[11px] text-slate-500 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-teal-500" />
+              <strong className="text-navy-900 font-semibold">{selection}</strong>
             </span>
           ) : (
-            <span className="text-[11px] text-gray-400 hidden sm:flex items-center gap-1.5">
+            <span className="text-[11px] text-slate-400 hidden md:flex items-center gap-1.5">
               <MousePointerClick className="w-3.5 h-3.5" /> Click anything in the email to style it
             </span>
           )}
-          <button type="button" onClick={togglePreview} className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md border transition-colors font-medium ${previewing ? "bg-teal-600 border-teal-600 text-white" : "border-gray-200 bg-white text-navy-900 hover:bg-gray-50"}`}>
+          <button
+            type="button"
+            onClick={togglePreview}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg font-medium transition-all ${
+              previewing ? "bg-teal-600 text-white shadow-sm" : "border border-slate-200 bg-white text-navy-900 hover:bg-slate-50"
+            }`}
+          >
             <Eye className="w-3.5 h-3.5" /> Preview
           </button>
         </div>
@@ -612,83 +762,198 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
       {/* Three panes */}
       <div className="flex-1 min-h-0 flex">
         {/* Blocks */}
-        <aside className="w-[200px] flex-shrink-0 border-r border-gray-200 bg-white overflow-y-auto hidden sm:block">
-          <div className="px-3 py-2 border-b border-gray-100 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+        <aside className="w-[204px] flex-shrink-0 border-r border-slate-200 bg-white overflow-y-auto email-scroll hidden sm:block">
+          <div className="px-4 pt-3.5 pb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400">
             <LayoutGrid className="w-3.5 h-3.5" /> Blocks
           </div>
-          <p className="px-3 pt-2 text-[10px] text-gray-400 leading-snug">Drag a block onto the email.</p>
+          <p className="px-4 text-[10.5px] text-slate-400 leading-snug">Drag onto the email.</p>
           <div ref={blocksRef} />
         </aside>
 
         {/* Canvas */}
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 bg-[#eceff3]">
           <div ref={canvasRef} className="h-full" />
         </div>
 
         {/* Design panel */}
-        <aside className="w-[290px] flex-shrink-0 border-l border-gray-200 bg-white overflow-y-auto">
-          {/* Email-wide settings — always reachable, like Brevo's body panel */}
-          <div className="border-b border-gray-200">
+        <aside className="w-[298px] flex-shrink-0 border-l border-slate-200 bg-white overflow-y-auto email-scroll">
+          {/* Email-wide settings */}
+          <div className="border-b border-slate-200">
             <button
               type="button"
               onClick={() => setEmailOpen((o) => !o)}
-              className="w-full flex items-center justify-between px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-gray-600 hover:bg-gray-50"
+              className="w-full flex items-center justify-between px-4 py-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500 hover:bg-slate-50 transition-colors"
             >
-              <span className="flex items-center gap-1.5"><Sliders className="w-3.5 h-3.5" /> Email body</span>
-              <ChevronDown className={`w-4 h-4 transition-transform ${emailOpen ? "" : "-rotate-90"}`} />
+              <span className="flex items-center gap-1.5"><Palette className="w-3.5 h-3.5" /> Email body</span>
+              <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${emailOpen ? "" : "-rotate-90"}`} />
             </button>
 
             {emailOpen && (
-              <div className="px-3 pb-4 space-y-4">
-                {colorRow("Background (outside)", settings.pageBg, PAGE_SWATCHES, (c) => set("pageBg", c))}
-                {colorRow("Background (content)", settings.contentBg, CONTENT_SWATCHES, (c) => set("contentBg", c))}
+              <div className="px-4 pb-5 space-y-5">
+                {swatchRow("Background color", settings.pageBg, PAGE_SWATCHES, (c) => set("pageBg", c))}
 
-                <div className="grid grid-cols-2 gap-2">
+                {/* Background image */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[11px] font-medium text-slate-600">Background image</span>
+                    {hasImage && (
+                      <button type="button" onClick={() => set("pageBgImage", "")} className="text-[10px] text-slate-400 hover:text-red-600 transition-colors flex items-center gap-0.5">
+                        <X className="w-3 h-3" /> Remove
+                      </button>
+                    )}
+                  </div>
+
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) upload(f);
+                      e.target.value = "";
+                    }}
+                  />
+
+                  <div
+                    onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                    onDragLeave={() => setDragOver(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setDragOver(false);
+                      const f = e.dataTransfer.files?.[0];
+                      if (f) upload(f);
+                    }}
+                    onClick={() => !uploading && fileRef.current?.click()}
+                    className={`relative h-24 rounded-xl border-2 border-dashed overflow-hidden cursor-pointer transition-all flex items-center justify-center ${
+                      dragOver ? "border-teal-500 bg-teal-50" : "border-slate-200 hover:border-teal-400 hover:bg-slate-50"
+                    }`}
+                    style={hasImage ? {
+                      backgroundImage: `url("${safeUrl(settings.pageBgImage)}")`,
+                      backgroundSize: "cover",
+                      backgroundPosition: "center",
+                      borderStyle: "solid",
+                    } : undefined}
+                  >
+                    {uploading ? (
+                      <span className="flex items-center gap-2 text-[11px] text-slate-500 bg-white/90 px-3 py-1.5 rounded-lg">
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" /> Uploading…
+                      </span>
+                    ) : hasImage ? (
+                      <span className="text-[10.5px] font-medium text-white bg-black/45 px-2.5 py-1 rounded-md backdrop-blur-sm">
+                        Click to replace
+                      </span>
+                    ) : (
+                      <span className="flex flex-col items-center gap-1 text-slate-400">
+                        <ImagePlus className="w-5 h-5" />
+                        <span className="text-[10.5px] font-medium">Upload or drop an image</span>
+                      </span>
+                    )}
+                  </div>
+
+                  <input
+                    type="url"
+                    value={settings.pageBgImage}
+                    onChange={(e) => set("pageBgImage", e.target.value)}
+                    placeholder="…or paste an image URL"
+                    className="mt-2 w-full px-2.5 py-1.5 text-[11px] border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 outline-none transition-all"
+                  />
+                  {uploadError && <p className="mt-1.5 text-[10.5px] text-red-600">{uploadError}</p>}
+
+                  {hasImage && (
+                    <div className="mt-3 space-y-3">
+                      <div>
+                        <span className="block text-[11px] font-medium text-slate-600 mb-1.5">Fit</span>
+                        {segment(settings.pageBgFit, [
+                          { id: "cover" as const, label: "Cover" },
+                          { id: "contain" as const, label: "Contain" },
+                          { id: "tile" as const, label: "Tile" },
+                          { id: "actual" as const, label: "Actual" },
+                        ], (v) => set("pageBgFit", v))}
+                      </div>
+                      <div>
+                        <span className="block text-[11px] font-medium text-slate-600 mb-1.5">Position</span>
+                        <div className="inline-grid grid-cols-3 gap-1 p-1 bg-slate-100 rounded-lg">
+                          {POSITIONS.flat().map((p) => (
+                            <button
+                              key={p}
+                              type="button"
+                              title={p}
+                              onClick={() => set("pageBgPosition", p)}
+                              className={`w-6 h-6 rounded-md transition-all ${
+                                settings.pageBgPosition === p ? "bg-teal-600 shadow-sm" : "bg-white hover:bg-teal-100"
+                              }`}
+                            >
+                              <span className={`block w-1.5 h-1.5 rounded-full mx-auto ${settings.pageBgPosition === p ? "bg-white" : "bg-slate-300"}`} />
+                            </button>
+                          ))}
+                        </div>
+                        <p className="mt-1.5 text-[10px] text-slate-400 leading-snug">
+                          Outlook needs a fallback — keep a background color set behind the image.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="h-px bg-slate-100" />
+
+                {swatchRow("Content background", settings.contentBg, CONTENT_SWATCHES, (c) => set("contentBg", c))}
+
+                <div className="grid grid-cols-2 gap-2.5">
                   <div>
-                    <label className="block text-[11px] font-medium text-gray-600 mb-1">Content width</label>
-                    <div className="flex items-center gap-1">
+                    <label className="block text-[11px] font-medium text-slate-600 mb-1.5">Content width</label>
+                    <div className="relative">
                       <input
                         type="number" min={280} max={900} step={10}
                         value={settings.contentWidth}
                         onChange={(e) => set("contentWidth", parseInt(e.target.value, 10) || 600)}
-                        className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-md focus:ring-2 focus:ring-teal-500"
+                        className="w-full pl-2.5 pr-7 py-1.5 text-[11px] border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 outline-none transition-all"
                       />
-                      <span className="text-[10px] text-gray-400">px</span>
+                      <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 pointer-events-none">px</span>
                     </div>
                   </div>
                   <div>
-                    <label className="block text-[11px] font-medium text-gray-600 mb-1">Outer padding</label>
-                    <div className="flex items-center gap-1">
+                    <label className="block text-[11px] font-medium text-slate-600 mb-1.5">Outer padding</label>
+                    <div className="relative">
                       <input
                         type="number" min={0} max={80} step={4}
                         value={settings.outerPadding}
                         onChange={(e) => set("outerPadding", parseInt(e.target.value, 10) || 0)}
-                        className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-md focus:ring-2 focus:ring-teal-500"
+                        className="w-full pl-2.5 pr-7 py-1.5 text-[11px] border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 outline-none transition-all"
                       />
-                      <span className="text-[10px] text-gray-400">px</span>
+                      <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 pointer-events-none">px</span>
                     </div>
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-medium text-gray-600 mb-1">Default font</label>
+                  <label className="block text-[11px] font-medium text-slate-600 mb-1.5">Default font</label>
                   <select
                     value={settings.font}
                     onChange={(e) => set("font", e.target.value)}
-                    className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-md bg-white focus:ring-2 focus:ring-teal-500"
+                    className="w-full px-2.5 py-1.5 text-[11px] border border-slate-200 rounded-lg bg-white focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 outline-none transition-all"
                   >
                     {FONTS.map((f) => <option key={f.label} value={f.value}>{f.label}</option>)}
                   </select>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-2.5">
                   <div>
-                    <label className="block text-[11px] font-medium text-gray-600 mb-1">Text color</label>
-                    <input type="color" value={settings.textColor || "#1f2937"} onChange={(e) => set("textColor", e.target.value)} className="w-full h-7 rounded-md border border-gray-200 cursor-pointer" />
+                    <label className="block text-[11px] font-medium text-slate-600 mb-1.5">Text color</label>
+                    <label className="flex items-center gap-2 px-2 py-1.5 border border-slate-200 rounded-lg cursor-pointer hover:border-teal-400 transition-colors">
+                      <span className="w-4 h-4 rounded-full border border-slate-200 flex-shrink-0" style={{ backgroundColor: settings.textColor || "#1f2937" }} />
+                      <span className="text-[10.5px] text-slate-500 truncate">{settings.textColor || "Inherit"}</span>
+                      <input type="color" value={settings.textColor || "#1f2937"} onChange={(e) => set("textColor", e.target.value)} className="sr-only" />
+                    </label>
                   </div>
                   <div>
-                    <label className="block text-[11px] font-medium text-gray-600 mb-1">Link color</label>
-                    <input type="color" value={settings.linkColor || "#0d9488"} onChange={(e) => set("linkColor", e.target.value)} className="w-full h-7 rounded-md border border-gray-200 cursor-pointer" />
+                    <label className="block text-[11px] font-medium text-slate-600 mb-1.5">Link color</label>
+                    <label className="flex items-center gap-2 px-2 py-1.5 border border-slate-200 rounded-lg cursor-pointer hover:border-teal-400 transition-colors">
+                      <span className="w-4 h-4 rounded-full border border-slate-200 flex-shrink-0" style={{ backgroundColor: settings.linkColor || "#0d9488" }} />
+                      <span className="text-[10.5px] text-slate-500 truncate">{settings.linkColor || "Inherit"}</span>
+                      <input type="color" value={settings.linkColor || "#0d9488"} onChange={(e) => set("linkColor", e.target.value)} className="sr-only" />
+                    </label>
                   </div>
                 </div>
               </div>
@@ -696,17 +961,22 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
           </div>
 
           {/* Selected element */}
-          <div className="flex border-b border-gray-200">
+          <div className="flex border-b border-slate-200 bg-white sticky top-0 z-10">
             {tabBtn("design", Sliders, "Design")}
             {tabBtn("settings", Settings2, "Settings")}
             {tabBtn("layers", Layers, "Layers")}
           </div>
 
           {!selection && tab !== "layers" && (
-            <p className="px-3 py-4 text-[11px] text-gray-400 leading-relaxed">
-              Nothing selected. Click a heading, paragraph, image, button or section in the email and its
-              controls appear here.
-            </p>
+            <div className="px-5 py-8 text-center">
+              <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center mx-auto mb-3">
+                <MousePointerClick className="w-4 h-4 text-slate-400" />
+              </div>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                Nothing selected. Click a heading, paragraph, image, button or section
+                and its controls appear here.
+              </p>
+            </div>
           )}
 
           <div className={tab === "design" && selection ? "" : "hidden"}>
