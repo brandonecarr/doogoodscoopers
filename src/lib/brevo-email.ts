@@ -9,8 +9,13 @@
 
 const API = "https://api.brevo.com/v3/smtp/email";
 
+/** Read the key, tolerating a trailing newline or wrapping quotes from a paste. */
+function apiKey(): string {
+  return (process.env.BREVO_API_KEY || "").trim().replace(/^["']|["']$/g, "");
+}
+
 export function isBrevoConfigured(): boolean {
-  return !!process.env.BREVO_API_KEY;
+  return !!apiKey();
 }
 
 export interface Addr {
@@ -43,7 +48,7 @@ export interface BrevoSendResult {
 
 /** Send a single transactional email. One call per message. */
 export async function brevoSend(input: BrevoSendInput): Promise<BrevoSendResult> {
-  const key = process.env.BREVO_API_KEY;
+  const key = apiKey();
   if (!key) return { error: "Brevo not configured" };
 
   try {

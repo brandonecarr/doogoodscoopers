@@ -33,8 +33,9 @@ export default function NewEmailPage() {
   const [name, setName] = useState("");
   const [subject, setSubject] = useState("");
   const [fromName, setFromName] = useState("DooGoodScoopers");
-  const [fromEmail, setFromEmail] = useState("");
-  const [replyTo, setReplyTo] = useState("");
+  // Verified Brevo sender — pre-filled so the blast sends without a bounce.
+  const [fromEmail, setFromEmail] = useState("service@doogoodscoopers.com");
+  const [replyTo, setReplyTo] = useState("service@doogoodscoopers.com");
   const [html, setHtml] = useState(STARTER);
   const [leadTypes, setLeadTypes] = useState<string[]>(["customers"]);
   const [withinDays, setWithinDays] = useState(0);
@@ -155,13 +156,14 @@ export default function NewEmailPage() {
                 <input value={fromName} onChange={(e) => setFromName(e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">From email <span className="text-gray-400">(optional)</span></label>
-                <input value={fromEmail} onChange={(e) => setFromEmail(e.target.value)} placeholder="uses verified default" className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500" />
+                <label className="block text-sm font-medium text-gray-700 mb-1">From email</label>
+                <input value={fromEmail} onChange={(e) => setFromEmail(e.target.value)} placeholder="service@doogoodscoopers.com" className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500" />
+                <p className="text-[11px] text-gray-400 mt-1">Must be a verified Brevo sender, or the send is rejected.</p>
               </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Reply-to <span className="text-gray-400">(optional)</span></label>
-              <input value={replyTo} onChange={(e) => setReplyTo(e.target.value)} placeholder="hello@doogoodscoopers.com" className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500" />
+              <input value={replyTo} onChange={(e) => setReplyTo(e.target.value)} placeholder="service@doogoodscoopers.com" className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500" />
             </div>
             <div>
               <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
