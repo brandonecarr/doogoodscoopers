@@ -21,6 +21,8 @@ export interface EmailSettings {
   pageBgImage: string;
   pageBgFit: "cover" | "contain" | "tile" | "actual";
   pageBgPosition: string;
+  /** 0 = image invisible, 1 = fully visible. */
+  pageBgOpacity: number;
   contentBg: string;
   contentWidth: number;
   outerPadding: number;
@@ -35,6 +37,7 @@ const NEW_DESIGN: EmailSettings = {
   pageBgImage: "",
   pageBgFit: "cover",
   pageBgPosition: "center center",
+  pageBgOpacity: 1,
   contentBg: "#ffffff",
   contentWidth: 600,
   outerPadding: 24,
@@ -85,6 +88,20 @@ const POSITIONS = [
 
 const HEX = /^#[0-9a-f]{3,8}$/i;
 const safeColor = (c: string) => (c && HEX.test(c) ? c : "");
+
+/**
+ * CSS has no opacity for a background image, so we lay a translucent sheet of
+ * the page colour over it. alpha here is the sheet's opacity — the inverse of
+ * how visible the image should be.
+ */
+function rgba(hex: string, alpha: number) {
+  let h = (hex || "#ffffff").replace("#", "");
+  if (h.length === 3) h = h.split("").map((c) => c + c).join("");
+  const n = parseInt(h.slice(0, 6), 16);
+  if (Number.isNaN(n)) return `rgba(255,255,255,${alpha})`;
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`;
+}
+const clamp01 = (n: number) => Math.min(1, Math.max(0, Number.isFinite(n) ? n : 1));
 const safeUrl = (u: string) => (/^https?:\/\/\S+$/i.test(u.trim()) ? u.trim() : "");
 const escAttr = (s: string) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
@@ -178,6 +195,20 @@ const THEME_CSS = `
 .gjs-layer:hover > .gjs-layer-item { background:#f8fafc; }
 .gjs-trt-traits { padding:12px 14px; }
 .gjs-trt-trait { padding:0 0 10px; }
+
+/* Opacity slider */
+.email-range { -webkit-appearance:none; appearance:none; width:100%; height:5px; border-radius:999px; outline:none; }
+.email-range::-webkit-slider-thumb {
+  -webkit-appearance:none; appearance:none; width:15px; height:15px; border-radius:50%;
+  background:#14b8a6; border:2.5px solid #fff; box-shadow:0 1px 4px rgba(15,23,42,.28); cursor:pointer;
+}
+.email-range::-moz-range-thumb {
+  width:15px; height:15px; border-radius:50%;
+  background:#14b8a6; border:2.5px solid #fff; box-shadow:0 1px 4px rgba(15,23,42,.28); cursor:pointer;
+}
+
+/* The colour picker is re-anchored in JS; this keeps it above everything. */
+.sp-container { z-index:2147483000 !important; border-radius:10px; border:1px solid #e2e8f0; box-shadow:0 12px 32px rgba(15,23,42,.18); }
 
 /* Scrollbars */
 .email-scroll { scrollbar-width:thin; scrollbar-color:#dbe2ea transparent; }
@@ -321,6 +352,9 @@ function paintCanvas(editor: Editor, s: EmailSettings) {
   }
   const img = safeUrl(s.pageBgImage);
   const fit = FIT[s.pageBgFit] || FIT.cover;
+  const veil = clamp01(s.pageBgOpacity) < 1
+    ? rgba(safeColor(s.pageBg) || "#ffffff", 1 - clamp01(s.pageBgOpacity))
+    : "";
   // GrapesJS styles the wrapper through an #id rule, which outranks a plain
   // `body` selector — hence !important throughout. This is preview-only CSS;
   // the exported email is built separately.
@@ -328,7 +362,8 @@ function paintCanvas(editor: Editor, s: EmailSettings) {
     "body { margin:0 !important;",
     s.pageBg ? `background-color:${s.pageBg} !important;` : "",
     img
-      ? `background-image:url("${img}") !important;background-size:${fit.size} !important;` +
+      ? `background-image:${veil ? `linear-gradient(${veil},${veil}),` : ""}url("${img}") !important;` +
+        `background-size:${fit.size} !important;` +
         `background-repeat:${fit.repeat} !important;background-position:${s.pageBgPosition} !important;`
       : "",
     s.outerPadding ? `padding:${s.outerPadding}px 0 !important;` : "",
@@ -390,6 +425,7 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
   const stylesRef = useRef<HTMLDivElement>(null);
   const traitsRef = useRef<HTMLDivElement>(null);
   const layersRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<Editor | null>(null);
 
@@ -575,20 +611,34 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
           img && `background-image:url('${img}');background-size:${fit.size};background-repeat:${fit.repeat};background-position:${s.pageBgPosition};`,
         ].filter(Boolean).join("");
 
-        // Outlook ignores CSS background images; it needs VML instead.
+        // Outlook ignores CSS background images; it needs VML instead. Its
+        // v:fill takes an opacity directly, so it gets the real thing.
+        const opacity = clamp01(s.pageBgOpacity);
         const vmlOpen = img
           ? `<!--[if gte mso 9]><v:rect xmlns:v="urn:schemas-microsoft-com:vml" fill="true" stroke="false" style="mso-width-percent:1000;">` +
-            `<v:fill type="frame" src="${escAttr(img)}"${pageBg ? ` color="${pageBg}"` : ""} /><v:textbox inset="0,0,0,0"><![endif]-->`
+            `<v:fill type="frame" src="${escAttr(img)}"${pageBg ? ` color="${pageBg}"` : ""}` +
+            `${opacity < 1 ? ` opacity="${Math.round(opacity * 100)}%"` : ""} />` +
+            `<v:textbox inset="0,0,0,0"><![endif]-->`
           : "";
         const vmlClose = img ? `<!--[if gte mso 9]></v:textbox></v:rect><![endif]-->` : "";
+
+        // Everywhere else, dim the image with a translucent sheet of the page
+        // colour laid over it — CSS gradients don't survive most email clients,
+        // but an rgba background on a table cell does.
+        const veil = img && opacity < 1 ? rgba(pageBg || "#ffffff", 1 - opacity) : "";
+        const padded = `padding:${pad}px 0;`;
+        const body = veil
+          ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;background-color:${veil};">` +
+            `<tr><td align="center" valign="top" style="${padded}">${content}</td></tr></table>`
+          : content;
 
         return (
           `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"` +
           `${pageBg ? ` bgcolor="${pageBg}"` : ""}` +
           ` style="width:100%;margin:0;padding:0;${bgStyle}">` +
           `<tr><td align="center" valign="top"${img ? ` background="${escAttr(img)}"` : ""}` +
-          ` style="padding:${pad}px 0;${bgStyle}">` +
-          `${vmlOpen}${content}${vmlClose}` +
+          ` style="${veil ? "padding:0;" : padded}${bgStyle}">` +
+          `${vmlOpen}${body}${vmlClose}` +
           `</td></tr></table>`
         );
       },
@@ -611,6 +661,49 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
     const editor = editorRef.current;
     if (editor) paintCanvas(editor, settings);
   }, [settings]);
+
+  /**
+   * The Style Manager's colour picker positions itself from document
+   * coordinates, walking up offsetParents and subtracting their scrollTop. Our
+   * design panel scrolls but is unpositioned, so it isn't an offsetParent and
+   * its scroll is never subtracted — the picker lands as far below the swatch
+   * as the panel is scrolled. Re-anchor it to the swatch instead.
+   */
+  useEffect(() => {
+    const panel = panelRef.current;
+    if (!panel) return;
+    let swatch: HTMLElement | null = null;
+
+    const anchor = () => {
+      if (!swatch?.isConnected) return;
+      const picker = Array.from(document.querySelectorAll<HTMLElement>(".sp-container"))
+        .find((el) => el.style.display !== "none" && el.offsetParent !== null);
+      if (!picker) return;
+      const r = swatch.getBoundingClientRect();
+      const w = picker.offsetWidth || 240;
+      const h = picker.offsetHeight || 300;
+      const below = r.bottom + 8;
+      picker.style.position = "fixed";
+      picker.style.margin = "0";
+      picker.style.left = `${Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8))}px`;
+      picker.style.top = `${below + h <= window.innerHeight - 8 ? below : Math.max(8, r.top - h - 8)}px`;
+    };
+
+    const onPointerDown = (e: Event) => {
+      const hit = (e.target as HTMLElement | null)?.closest?.(".gjs-field-color-picker, .sp-replacer");
+      swatch = (hit as HTMLElement) || null;
+      if (swatch) requestAnimationFrame(anchor);
+    };
+
+    panel.addEventListener("mousedown", onPointerDown, true);
+    panel.addEventListener("scroll", anchor, true);
+    window.addEventListener("resize", anchor);
+    return () => {
+      panel.removeEventListener("mousedown", onPointerDown, true);
+      panel.removeEventListener("scroll", anchor, true);
+      window.removeEventListener("resize", anchor);
+    };
+  }, []);
 
   /* ---------------------------- UI bits --------------------------- */
 
@@ -776,7 +869,7 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
         </div>
 
         {/* Design panel */}
-        <aside className="w-[298px] flex-shrink-0 border-l border-slate-200 bg-white overflow-y-auto email-scroll">
+        <aside ref={panelRef} className="w-[298px] flex-shrink-0 border-l border-slate-200 bg-white overflow-y-auto email-scroll">
           {/* Email-wide settings */}
           <div className="border-b border-slate-200">
             <button
@@ -829,9 +922,14 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
                       dragOver ? "border-teal-500 bg-teal-50" : "border-slate-200 hover:border-teal-400 hover:bg-slate-50"
                     }`}
                     style={hasImage ? {
-                      backgroundImage: `url("${safeUrl(settings.pageBgImage)}")`,
+                      // Preview the opacity here too, over the page colour.
+                      backgroundImage:
+                        (clamp01(settings.pageBgOpacity) < 1
+                          ? `linear-gradient(${rgba(safeColor(settings.pageBg) || "#ffffff", 1 - clamp01(settings.pageBgOpacity))},${rgba(safeColor(settings.pageBg) || "#ffffff", 1 - clamp01(settings.pageBgOpacity))}),`
+                          : "") + `url("${safeUrl(settings.pageBgImage)}")`,
                       backgroundSize: "cover",
                       backgroundPosition: "center",
+                      backgroundColor: safeColor(settings.pageBg) || "#ffffff",
                       borderStyle: "solid",
                     } : undefined}
                   >
@@ -871,6 +969,29 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
                           { id: "actual" as const, label: "Actual" },
                         ], (v) => set("pageBgFit", v))}
                       </div>
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-[11px] font-medium text-slate-600">Image opacity</span>
+                          <span className="text-[10.5px] font-semibold text-teal-700 tabular-nums">
+                            {clamp01(settings.pageBgOpacity).toFixed(2)}
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min={0} max={1} step={0.05}
+                          value={clamp01(settings.pageBgOpacity)}
+                          onChange={(e) => set("pageBgOpacity", parseFloat(e.target.value))}
+                          className="email-range"
+                          style={{
+                            background: `linear-gradient(90deg,#14b8a6 0%,#14b8a6 ${clamp01(settings.pageBgOpacity) * 100}%,#e2e8f0 ${clamp01(settings.pageBgOpacity) * 100}%,#e2e8f0 100%)`,
+                          }}
+                        />
+                        <div className="flex justify-between text-[9.5px] text-slate-400 mt-1">
+                          <span>0.0 · hidden</span>
+                          <span>1.0 · full</span>
+                        </div>
+                      </div>
+
                       <div>
                         <span className="block text-[11px] font-medium text-slate-600 mb-1.5">Position</span>
                         <div className="inline-grid grid-cols-3 gap-1 p-1 bg-slate-100 rounded-lg">
