@@ -201,6 +201,19 @@ const THEME_CSS = `
 .gjs-trt-traits { padding:12px 14px; }
 .gjs-trt-trait { padding:0 0 10px; }
 
+/* Rich-text toolbar (appears on double-click into text) */
+.gjs-rte-toolbar { background:#0f172a; border-radius:8px; box-shadow:0 6px 18px rgba(15,23,42,.28); padding:2px; border:0; }
+.gjs-rte-action { color:#e2e8f0; border-right:0; min-width:26px; padding:4px 6px; border-radius:6px; }
+.gjs-rte-action:hover { background:rgba(255,255,255,.12); color:#5eead4; }
+.gjs-rte-action.gjs-rte-active { background:#14b8a6; color:#fff; }
+input.email-rte-color {
+  -webkit-appearance:none; appearance:none;
+  width:20px; height:16px; padding:0; border:1px solid rgba(255,255,255,.35);
+  border-radius:4px; background:none; cursor:pointer; vertical-align:middle;
+}
+input.email-rte-color::-webkit-color-swatch-wrapper { padding:0; }
+input.email-rte-color::-webkit-color-swatch { border:none; border-radius:3px; }
+
 /* Opacity slider */
 .email-range { -webkit-appearance:none; appearance:none; width:100%; height:5px; border-radius:999px; outline:none; }
 .email-range::-webkit-slider-thumb {
@@ -595,6 +608,47 @@ function alignTarget(editor: Editor): any {
   return sel;
 }
 
+/** `queryCommandValue('foreColor')` hands back rgb(); <input type=color> wants hex. */
+function toHex(value: string) {
+  const m = value?.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+  if (!m) return HEX.test(value) ? value : "";
+  return "#" + [m[1], m[2], m[3]].map((n) => Number(n).toString(16).padStart(2, "0")).join("");
+}
+
+/**
+ * Colour just the highlighted words. The Style Manager's colour applies to a
+ * whole component, so this goes on the rich-text toolbar instead, where a
+ * selection actually exists.
+ */
+function addTextColorAction(editor: Editor) {
+  const rte = editor.RichTextEditor;
+  if (rte.get("forecolor")) return;
+  rte.add("forecolor", {
+    icon: '<input type="color" class="email-rte-color" value="#000000" title="Colour the selected text"/>',
+    attributes: { title: "Text colour" },
+    event: "input",
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    result: (r: any, action: any) => {
+      const input = action.btn?.firstChild as HTMLInputElement | undefined;
+      if (!input) return;
+      // Without styleWithCSS the browser emits <font color>, which juice can't
+      // inline; we want <span style="color:…"> so it survives to the inbox.
+      r.doc?.execCommand("styleWithCSS", false, "true");
+      r.exec("foreColor", input.value);
+      r.doc?.execCommand("styleWithCSS", false, "false");
+    },
+    // Reflect the colour already under the caret back onto the swatch.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    update: (r: any, action: any) => {
+      const input = action.btn?.firstChild as HTMLInputElement | undefined;
+      const current = toHex(String(r.doc?.queryCommandValue("foreColor") || ""));
+      if (input && current) input.value = current;
+      return 0;
+    },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any);
+}
+
 /** Mirror the email settings into the canvas iframe so the editor is WYSIWYG. */
 function paintCanvas(editor: Editor, s: EmailSettings) {
   let doc: Document | null | undefined;
@@ -876,6 +930,7 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
     } catch { /* fall back to empty canvas */ }
 
     editor.onReady(() => {
+      addTextColorAction(editor);
       paintCanvas(editor, settingsRef.current);
       // The preset hides component outlines by default, which makes empty
       // cells impossible to find. Turn them on.
