@@ -25,9 +25,7 @@ export function isEmailConfigured(): boolean {
 
 /** Wrap a body in a minimal responsive shell + compliant footer. */
 export function wrapNewsletter(bodyHtml: string, unsubUrl: string): string {
-  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light">
-  <style>:root{color-scheme:light;supported-color-schemes:light}</style></head>
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
 <body style="margin:0;padding:0;background:#f4f4f5;">
   <div style="max-width:600px;margin:0 auto;background:#ffffff;">${bodyHtml}</div>
   <div style="max-width:600px;margin:0 auto;padding:20px;text-align:center;color:#9ca3af;font-size:12px;font-family:Arial,Helvetica,sans-serif;">

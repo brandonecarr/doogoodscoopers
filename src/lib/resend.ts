@@ -157,11 +157,8 @@ export function wrapEmailHtml(content: string, title?: string): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="color-scheme" content="light">
-  <meta name="supported-color-schemes" content="light">
   <title>${title || "DooGoodScoopers"}</title>
   <style>
-    :root { color-scheme: light; supported-color-schemes: light; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
       line-height: 1.6;

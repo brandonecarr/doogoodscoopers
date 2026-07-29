@@ -7,7 +7,7 @@ import presetNewsletter from "grapesjs-preset-newsletter";
 import {
   AlignCenter, AlignLeft, AlignRight, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd,
   AlignVerticalJustifyStart, Check, ChevronDown, Copy, Eye, ImagePlus, Layers,
-  Info, LayoutGrid, Loader2, Monitor, MousePointerClick, Palette, Plus, Redo2, Settings2, Smartphone,
+  Info, LayoutGrid, Loader2, Monitor, Moon, MousePointerClick, Palette, Plus, Redo2, Settings2, Smartphone, Sun,
   Sliders, Trash2, Undo2, X,
 } from "lucide-react";
 
@@ -30,6 +30,12 @@ export interface EmailSettings {
   font: string;
   textColor: string;
   linkColor: string;
+  /** Dark mode — overrides applied when the recipient's client is in dark mode. */
+  darkMode: boolean;
+  darkPageBg: string;
+  darkContentBg: string;
+  darkText: string;
+  darkLink: string;
 }
 
 /** New designs get the classic newsletter look. */
@@ -45,6 +51,11 @@ const NEW_DESIGN: EmailSettings = {
   font: "Arial, Helvetica, sans-serif",
   textColor: "#1f2937",
   linkColor: "#0d9488",
+  darkMode: false,
+  darkPageBg: "#0b1220",
+  darkContentBg: "#111827",
+  darkText: "#e5e7eb",
+  darkLink: "#5eead4",
 };
 
 /** Designs saved before these controls existed: change nothing they didn't ask for. */
@@ -1109,7 +1120,7 @@ function addTextColorAction(editor: Editor, onOpen: (o: RtePickerOpen) => void) 
 }
 
 /** Mirror the email settings into the canvas iframe so the editor is WYSIWYG. */
-function paintCanvas(editor: Editor, s: EmailSettings) {
+function paintCanvas(editor: Editor, s: EmailSettings, dark = false) {
   let doc: Document | null | undefined;
   try { doc = editor.Canvas.getDocument(); } catch { return; }
   if (!doc?.head) return;
@@ -1121,15 +1132,21 @@ function paintCanvas(editor: Editor, s: EmailSettings) {
   }
   const img = safeUrl(s.pageBgImage);
   const fit = FIT[s.pageBgFit] || FIT.cover;
+  // When previewing dark mode, swap the page/content/text/link colours for the
+  // dark set (the background image still shows over the dark page colour).
+  const pageBg = dark ? safeColor(s.darkPageBg) : safeColor(s.pageBg);
+  const contentBg = dark ? safeColor(s.darkContentBg) : safeColor(s.contentBg);
+  const textColor = dark ? safeColor(s.darkText) : safeColor(s.textColor);
+  const linkColor = dark ? safeColor(s.darkLink) : safeColor(s.linkColor);
   const veil = clamp01(s.pageBgOpacity) < 1
-    ? rgba(safeColor(s.pageBg) || "#ffffff", 1 - clamp01(s.pageBgOpacity))
+    ? rgba(pageBg || (dark ? "#0b1220" : "#ffffff"), 1 - clamp01(s.pageBgOpacity))
     : "";
   // GrapesJS styles the wrapper through an #id rule, which outranks a plain
   // `body` selector — hence !important throughout. This is preview-only CSS;
   // the exported email is built separately.
   el.textContent = [
     "body { margin:0 !important;",
-    s.pageBg ? `background-color:${s.pageBg} !important;` : "",
+    pageBg ? `background-color:${pageBg} !important;` : "",
     img
       ? `background-image:${veil ? `linear-gradient(${veil},${veil}),` : ""}url("${img}") !important;` +
         `background-size:${fit.size} !important;` +
@@ -1137,15 +1154,19 @@ function paintCanvas(editor: Editor, s: EmailSettings) {
       : "",
     s.outerPadding ? `padding:${s.outerPadding}px 0 !important;` : "",
     s.font ? `font-family:${s.font} !important;` : "",
-    s.textColor ? `color:${s.textColor} !important;` : "",
+    // In dark mode the default text is forced (matches export); light mode isn't.
+    textColor ? `color:${textColor} ${dark ? "!important" : "!important"};` : "",
     "}",
+    // In dark preview, flip default text on content descendants too — but not
+    // !important on colour so an element's own accent colour still wins.
+    dark && textColor ? `body > * , body > * * { color:${textColor}; }` : "",
     // Deliberately not !important — GrapesJS styles each element through an
     // #id rule, so an element's own background must be able to win here.
     "body > * { margin-left:auto; margin-right:auto;",
     s.contentWidth ? `max-width:${s.contentWidth}px;` : "",
-    s.contentBg ? `background-color:${s.contentBg};` : "",
+    contentBg ? `background-color:${contentBg}${dark ? " !important" : ""};` : "",
     "}",
-    s.linkColor ? `a { color:${s.linkColor} !important; }` : "",
+    linkColor ? `a { color:${linkColor} !important; }` : "",
   ].join("");
 }
 
@@ -1211,6 +1232,8 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
   const [selection, setSelection] = useState<string | null>(null);
   const [align, setAlign] = useState("");
   const [vAlign, setVAlign] = useState("");
+  /** Canvas preview mode — see the design as it looks in a light or dark inbox. */
+  const [darkPreview, setDarkPreview] = useState(false);
   /** Whether the selection owns table cells, the only thing vertical align works on. */
   const [canVAlign, setCanVAlign] = useState(false);
   /** Background image of whatever is selected, mirrored out of its CSS. */
@@ -1561,10 +1584,10 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
         ].filter(Boolean).join(";");
 
         const content =
-          `<table role="presentation" align="center" width="${width}" cellpadding="0" cellspacing="0" border="0"` +
+          `<table role="presentation" align="center" width="${width}" cellpadding="0" cellspacing="0" border="0" class="em-content"` +
           `${contentBg ? ` bgcolor="${contentBg}"` : ""}` +
           ` style="width:${width}px;max-width:100%;margin:0 auto;${contentBg ? `background-color:${contentBg};` : ""}">` +
-          `<tr><td data-email-content="1" style="${cellStyle}">${inner}</td></tr></table>`;
+          `<tr><td data-email-content="1" class="em-content-c" style="${cellStyle}">${inner}</td></tr></table>`;
 
         const bgStyle = [
           pageBg && `background-color:${pageBg};`,
@@ -1600,12 +1623,34 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
           ? `<style>@import url('https://fonts.googleapis.com/css2?${usedFonts.map((g) => "family=" + g).join("&")}&display=swap');</style>`
           : "";
 
+        // Dark mode — clients that honour prefers-color-scheme (Apple Mail,
+        // iOS Mail) swap in these colours; Outlook.com uses [data-ogsc]. Others
+        // ignore it and show the light design. !important beats the inline
+        // styles. Only the default text colour is flipped, so accent colours
+        // (headings, buttons the user coloured) stay put in both modes.
+        const dpb = safeColor(s.darkPageBg) || "#0b1220";
+        const dcb = safeColor(s.darkContentBg) || "#111827";
+        const dtx = safeColor(s.darkText) || "#e5e7eb";
+        const dlk = safeColor(s.darkLink) || "#5eead4";
+        const darkRules =
+          `.em-page,.em-page-c{background-color:${dpb}!important}` +
+          `.em-content{background-color:${dcb}!important}` +
+          `.em-content-c{color:${dtx}!important}` +
+          `.em-content-c a{color:${dlk}!important}`;
+        const darkCss = s.darkMode
+          ? `<style>@media (prefers-color-scheme:dark){${darkRules}}` +
+            `[data-ogsc] .em-page,[data-ogsc] .em-page-c{background-color:${dpb}!important}` +
+            `[data-ogsc] .em-content{background-color:${dcb}!important}` +
+            `[data-ogsc] .em-content-c{color:${dtx}!important}` +
+            `[data-ogsc] .em-content-c a{color:${dlk}!important}</style>`
+          : "";
+
         return (
-          fontImport +
-          `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"` +
+          fontImport + darkCss +
+          `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="em-page"` +
           `${pageBg ? ` bgcolor="${pageBg}"` : ""}` +
           ` style="width:100%;margin:0;padding:0;${bgStyle}">` +
-          `<tr><td align="center" valign="top"${img ? ` background="${escAttr(img)}"` : ""}` +
+          `<tr><td align="center" valign="top" class="em-page-c"${img ? ` background="${escAttr(img)}"` : ""}` +
           ` style="${veil ? "padding:0;" : padded}${bgStyle}">` +
           `${vmlOpen}${body}${vmlClose}` +
           `</td></tr></table>`
@@ -1625,12 +1670,12 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Repaint the canvas whenever the email-wide settings change.
+  // Repaint the canvas whenever the email-wide settings or preview mode change.
   useEffect(() => {
     const editor = editorRef.current;
-    if (editor) paintCanvas(editor, settings);
+    if (editor) paintCanvas(editor, settings, darkPreview);
     loadFontsInCanvas();
-  }, [settings, loadFontsInCanvas]);
+  }, [settings, darkPreview, loadFontsInCanvas]);
 
   /**
    * The Style Manager's colour picker positions itself from document
@@ -1823,6 +1868,12 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
         <div className="flex items-center gap-0.5 p-0.5 bg-slate-100 rounded-lg">
           {iconBtn("Desktop width", Monitor, () => switchDevice("desktop"), { active: device === "desktop" })}
           {iconBtn("Mobile width", Smartphone, () => switchDevice("mobile"), { active: device === "mobile" })}
+        </div>
+
+        {/* Preview the design as a light or dark inbox would show it. */}
+        <div className="flex items-center gap-0.5 p-0.5 bg-slate-100 rounded-lg">
+          {iconBtn("Light mode preview", Sun, () => setDarkPreview(false), { active: !darkPreview })}
+          {iconBtn("Dark mode preview", Moon, () => setDarkPreview(true), { active: darkPreview })}
         </div>
 
         <div className="flex items-center gap-0.5 p-0.5 bg-slate-100 rounded-lg">
@@ -2021,6 +2072,51 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
                       <input type="color" value={settings.linkColor || "#0d9488"} onChange={(e) => set("linkColor", e.target.value)} className="sr-only" />
                     </label>
                   </div>
+                </div>
+
+                <div className="h-px bg-slate-100" />
+
+                {/* Dark mode */}
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-700">
+                      <Moon className="w-3.5 h-3.5" /> Dark mode
+                    </span>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={settings.darkMode}
+                      onClick={() => { set("darkMode", !settings.darkMode); if (!settings.darkMode) setDarkPreview(true); }}
+                      className={`relative w-9 h-5 rounded-full transition-colors ${settings.darkMode ? "bg-teal-600" : "bg-slate-300"}`}
+                    >
+                      <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${settings.darkMode ? "translate-x-4" : ""}`} />
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-slate-400 leading-snug mt-1.5">
+                    When on, these colors swap in for recipients whose email app is in dark mode (Apple Mail, iOS Mail, Outlook.com). Accent colors you set on headings and buttons stay the same. Use the ☾ button up top to preview.
+                  </p>
+
+                  {settings.darkMode && (
+                    <div className="mt-3 space-y-3">
+                      <div className="grid grid-cols-2 gap-2.5">
+                        {([
+                          ["darkPageBg", "Background", "#0b1220"],
+                          ["darkContentBg", "Content", "#111827"],
+                          ["darkText", "Text", "#e5e7eb"],
+                          ["darkLink", "Links", "#5eead4"],
+                        ] as const).map(([key, lbl, def]) => (
+                          <div key={key}>
+                            <label className="block text-[11px] font-medium text-slate-600 mb-1.5">{lbl}</label>
+                            <label className="flex items-center gap-2 px-2 py-1.5 border border-slate-200 rounded-lg cursor-pointer hover:border-teal-400 transition-colors">
+                              <span className="w-4 h-4 rounded-full border border-slate-200 flex-shrink-0" style={{ backgroundColor: settings[key] || def }} />
+                              <span className="text-[10.5px] text-slate-500 truncate">{settings[key] || def}</span>
+                              <input type="color" value={settings[key] || def} onChange={(e) => set(key, e.target.value)} className="sr-only" />
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
