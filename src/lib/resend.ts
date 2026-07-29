@@ -5,9 +5,14 @@
  */
 
 import { Resend } from "resend";
+import { brevoSend, isBrevoConfigured, parseAddr } from "@/lib/brevo-email";
 
 const apiKey = process.env.RESEND_API_KEY;
-const fromEmail = process.env.RESEND_FROM_EMAIL || "DooGoodScoopers <noreply@doogoodscoopers.com>";
+// Default sender = our verified Brevo sender. An unverified address is rejected.
+const fromEmail =
+  process.env.EMAIL_FROM_EMAIL ||
+  process.env.RESEND_FROM_EMAIL ||
+  "DooGoodScoopers <service@doogoodscoopers.com>";
 
 let resendClient: Resend | null = null;
 
@@ -21,8 +26,9 @@ function getClient(): Resend | null {
   return resendClient;
 }
 
+/** True when any email provider is configured (Brevo preferred, Resend fallback). */
 export function isResendConfigured(): boolean {
-  return !!apiKey;
+  return isBrevoConfigured() || !!apiKey;
 }
 
 export interface SendEmailResult {
@@ -45,13 +51,28 @@ export interface SendEmailOptions {
  * Send an email via Resend
  */
 export async function sendEmail(options: SendEmailOptions): Promise<SendEmailResult> {
+  // Prefer Brevo when configured.
+  if (isBrevoConfigured()) {
+    const to = (Array.isArray(options.to) ? options.to : [options.to]).map((email) => ({ email }));
+    const r = await brevoSend({
+      from: parseAddr(options.from || fromEmail),
+      to,
+      subject: options.subject,
+      html: options.html || "<p>No content</p>",
+      text: options.text,
+      replyTo: options.replyTo,
+      tags: options.tags?.map((t) => t.value),
+    });
+    return r.messageId ? { success: true, messageId: r.messageId } : { success: false, error: r.error };
+  }
+
   const client = getClient();
 
   if (!client) {
-    console.warn("Resend not configured - email not sent");
+    console.warn("No email provider configured - email not sent");
     return {
       success: false,
-      error: "Resend not configured",
+      error: "Email provider not configured",
     };
   }
 

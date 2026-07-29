@@ -1,9 +1,14 @@
 import { Resend } from "resend";
 import { renderTemplate } from "@/lib/resend";
+import { brevoSend, isBrevoConfigured, mapLimit, parseAddr } from "@/lib/brevo-email";
 import { unsubToken } from "@/lib/email-unsubscribe";
 
 const apiKey = process.env.RESEND_API_KEY;
-const FROM_DEFAULT = process.env.RESEND_FROM_EMAIL || "DooGoodScoopers <noreply@doogoodscoopers.com>";
+// Default sender = our verified Brevo sender.
+const FROM_DEFAULT =
+  process.env.EMAIL_FROM_EMAIL ||
+  process.env.RESEND_FROM_EMAIL ||
+  "DooGoodScoopers <service@doogoodscoopers.com>";
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || "https://doogoodscoopers.com";
 // Physical mailing address is required by CAN-SPAM.
 const ADDRESS = process.env.MAIL_FOOTER_ADDRESS || "DooGoodScoopers, Fontana, CA";
@@ -15,7 +20,7 @@ function getClient(): Resend | null {
   return client;
 }
 export function isEmailConfigured(): boolean {
-  return !!apiKey;
+  return isBrevoConfigured() || !!apiKey;
 }
 
 /** Wrap a body in a minimal responsive shell + compliant footer. */
@@ -41,35 +46,68 @@ function extractBatchIds(res: any): (string | null)[] {
   return list.map((x: { id?: string }) => x?.id ?? null);
 }
 
-/** Send one Resend batch (≤100). Returns per-recipient Resend ids (aligned by index). */
+/** One fully-rendered message, ready for whichever provider sends it. */
+function prepare(opts: { subject: string; html: string; from: CampaignFrom; recipient: OutRecipient }) {
+  const r = opts.recipient;
+  const firstName = (r.name || "").trim().split(/\s+/)[0] || "";
+  const unsubUrl = `${SITE}/unsubscribe?token=${unsubToken(r.email)}`;
+  const oneClick = `${SITE}/api/email/unsubscribe?token=${unsubToken(r.email)}`;
+  const body = renderTemplate(opts.html, { firstName, name: r.name || "" });
+  return {
+    subject: opts.subject,
+    html: wrapNewsletter(body, unsubUrl),
+    headers: {
+      "List-Unsubscribe": `<${oneClick}>`,
+      "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+    },
+  };
+}
+
+/**
+ * Send a campaign batch. Uses Brevo when configured (one transactional send per
+ * recipient, run with bounded concurrency), otherwise falls back to a Resend
+ * batch. `resendId` holds whichever provider's message id, aligned by index.
+ */
 export async function sendCampaignBatch(opts: {
   subject: string;
   html: string;
   from: CampaignFrom;
   recipients: OutRecipient[];
 }): Promise<SendResult[]> {
+  const fromStr = opts.from.fromEmail ? `${opts.from.fromName || "DooGoodScoopers"} <${opts.from.fromEmail}>` : FROM_DEFAULT;
+
+  // --- Brevo (preferred) ---
+  if (isBrevoConfigured()) {
+    const from = parseAddr(fromStr);
+    return mapLimit(opts.recipients, 8, async (r) => {
+      const msg = prepare({ ...opts, recipient: r });
+      const res = await brevoSend({
+        from,
+        to: [{ email: r.email, name: r.name || undefined }],
+        subject: msg.subject,
+        html: msg.html,
+        replyTo: opts.from.replyTo || undefined,
+        headers: msg.headers,
+      });
+      return { id: r.id, resendId: res.messageId ?? null, error: res.messageId ? null : res.error || "send failed" };
+    });
+  }
+
+  // --- Resend (fallback) ---
   const c = getClient();
-  const fromAddr = opts.from.fromEmail ? `${opts.from.fromName || "DooGoodScoopers"} <${opts.from.fromEmail}>` : FROM_DEFAULT;
+  if (!c) return opts.recipients.map((r) => ({ id: r.id, resendId: null, error: "Email provider not configured" }));
 
   const payloads = opts.recipients.map((r) => {
-    const firstName = (r.name || "").trim().split(/\s+/)[0] || "";
-    const unsubUrl = `${SITE}/unsubscribe?token=${unsubToken(r.email)}`;
-    const oneClick = `${SITE}/api/email/unsubscribe?token=${unsubToken(r.email)}`;
-    const body = renderTemplate(opts.html, { firstName, name: r.name || "" });
+    const msg = prepare({ ...opts, recipient: r });
     return {
-      from: fromAddr,
+      from: fromStr,
       to: [r.email],
-      subject: opts.subject,
-      html: wrapNewsletter(body, unsubUrl),
+      subject: msg.subject,
+      html: msg.html,
       ...(opts.from.replyTo ? { replyTo: opts.from.replyTo } : {}),
-      headers: {
-        "List-Unsubscribe": `<${oneClick}>`,
-        "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
-      },
+      headers: msg.headers,
     };
   });
-
-  if (!c) return opts.recipients.map((r) => ({ id: r.id, resendId: null, error: "Resend not configured" }));
 
   try {
     const res = await c.batch.send(payloads);

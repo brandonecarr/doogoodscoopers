@@ -28,7 +28,7 @@ export async function POST(request: Request) {
   // Test send — one email, nothing persisted.
   if (action === "test") {
     if (!b.testEmail?.trim()) return NextResponse.json({ error: "Test email is required." }, { status: 400 });
-    if (!isEmailConfigured()) return NextResponse.json({ error: "Resend not configured." }, { status: 400 });
+    if (!isEmailConfigured()) return NextResponse.json({ error: "Email sending is not configured. Add BREVO_API_KEY in the environment settings." }, { status: 400 });
     const [r] = await sendCampaignBatch({
       subject: `[TEST] ${b.subject}`,
       html: b.html,
