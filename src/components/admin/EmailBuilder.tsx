@@ -7,7 +7,7 @@ import presetNewsletter from "grapesjs-preset-newsletter";
 import {
   AlignCenter, AlignLeft, AlignRight, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd,
   AlignVerticalJustifyStart, Check, ChevronDown, Copy, Eye, ImagePlus, Layers,
-  Info, LayoutGrid, Loader2, Monitor, MousePointerClick, Palette, Redo2, Settings2, Smartphone,
+  Info, LayoutGrid, Loader2, Monitor, MousePointerClick, Palette, Plus, Redo2, Settings2, Smartphone,
   Sliders, Trash2, Undo2, X,
 } from "lucide-react";
 
@@ -58,8 +58,9 @@ const EXISTING_DESIGN: EmailSettings = {
   linkColor: "",
 };
 
-const FONTS = [
-  { value: "", label: "Inherit" },
+// System fonts render everywhere with no loading. Kept first because they are
+// the safe default for email.
+const SYSTEM_FONTS = [
   { value: "Arial, Helvetica, sans-serif", label: "Arial" },
   { value: "Helvetica, Arial, sans-serif", label: "Helvetica" },
   { value: "Verdana, Geneva, sans-serif", label: "Verdana" },
@@ -70,8 +71,41 @@ const FONTS = [
   { value: "'Courier New', Courier, monospace", label: "Courier New" },
 ];
 
+// Google fonts. `g` is the family spec for the Google Fonts CSS API; each keeps
+// a same-category system fallback so clients that block web fonts (Gmail,
+// Outlook desktop) still render something close.
+const GOOGLE_FONTS = [
+  { value: "'Poppins', Arial, sans-serif", label: "Poppins", g: "Poppins:wght@400;500;600;700" },
+  { value: "'Montserrat', Arial, sans-serif", label: "Montserrat", g: "Montserrat:wght@400;500;600;700" },
+  { value: "'Roboto', Arial, sans-serif", label: "Roboto", g: "Roboto:wght@400;500;700" },
+  { value: "'Open Sans', Arial, sans-serif", label: "Open Sans", g: "Open+Sans:wght@400;600;700" },
+  { value: "'Lato', Arial, sans-serif", label: "Lato", g: "Lato:wght@400;700" },
+  { value: "'Nunito', Arial, sans-serif", label: "Nunito", g: "Nunito:wght@400;600;700" },
+  { value: "'Raleway', Arial, sans-serif", label: "Raleway", g: "Raleway:wght@400;600;700" },
+  { value: "'Oswald', Arial, sans-serif", label: "Oswald", g: "Oswald:wght@400;500;700" },
+  { value: "'Merriweather', Georgia, serif", label: "Merriweather", g: "Merriweather:wght@400;700" },
+  { value: "'Playfair Display', Georgia, serif", label: "Playfair Display", g: "Playfair+Display:wght@400;600;700" },
+];
+
+const FONTS = [{ value: "", label: "Inherit" }, ...SYSTEM_FONTS, ...GOOGLE_FONTS];
+
+// Stylesheet that loads every Google font at once — used for the editor canvas
+// so any pick previews immediately.
+const GOOGLE_FONTS_HREF =
+  "https://fonts.googleapis.com/css2?" + GOOGLE_FONTS.map((f) => "family=" + f.g).join("&") + "&display=swap";
+
+/** The Google font-family names referenced anywhere in `html` + `font`, for a scoped import on export. */
+function googleFontsUsed(html: string, font: string): string[] {
+  const hay = `${html} ${font}`;
+  return GOOGLE_FONTS.filter((f) => hay.includes(`'${f.label}'`) || hay.includes(f.label)).map((f) => f.g);
+}
+
 const PAGE_SWATCHES = ["#ffffff", "#f1f5f9", "#e2e8f0", "#f0fdfa", "#fff7ed", "#fdf2f8", "#134e4a", "#0d1b2a"];
 const CONTENT_SWATCHES = ["#ffffff", "#fafafa", "#f8fafc", "#f0fdfa", "#fffbeb", "#0d1b2a"];
+
+// Brand palette, cached at module scope so a freshly-mounted editor can seed
+// its GrapesJS colour pickers synchronously (the API load fills it in too).
+let BRAND_CACHE: string[] = [];
 
 /** How the four fit presets map to real CSS. */
 const FIT: Record<EmailSettings["pageBgFit"], { size: string; repeat: string }> = {
@@ -246,7 +280,7 @@ const SECTORS = [
     buildProps: ["color", "font-size", "font-family", "font-weight", "line-height", "letter-spacing", "text-align", "text-decoration"],
     properties: [
       { property: "color", name: "Text color" },
-      { property: "font-family", name: "Font" },
+      { property: "font-family", name: "Font", type: "select", default: "", options: FONTS.map((f) => ({ id: f.value, label: f.label })) },
       { property: "font-size", name: "Size" },
       { property: "font-weight", name: "Weight" },
       { property: "line-height", name: "Line height" },
@@ -405,11 +439,34 @@ function BgImageField({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [libOpen, setLibOpen] = useState(false);
+  const [library, setLibrary] = useState<{ name: string; url: string }[]>([]);
+  const [libLoading, setLibLoading] = useState(false);
 
   const url = safeUrl(value.image);
   const opacity = clamp01(value.opacity);
   const sheet = 1 - opacity;
   const veil = veilColor || "#ffffff";
+
+  const loadLibrary = useCallback(async () => {
+    setLibLoading(true);
+    try {
+      const res = await fetch("/api/admin/email-assets");
+      const data = await res.json().catch(() => ({ assets: [] }));
+      setLibrary(Array.isArray(data.assets) ? data.assets : []);
+    } catch {
+      setLibrary([]);
+    } finally {
+      setLibLoading(false);
+    }
+  }, []);
+
+  const toggleLibrary = useCallback(() => {
+    setLibOpen((open) => {
+      if (!open) loadLibrary();
+      return !open;
+    });
+  }, [loadLibrary]);
 
   async function upload(file: File) {
     setUploading(true);
@@ -421,6 +478,8 @@ function BgImageField({
       const data = await res.json().catch(() => ({}));
       if (!res.ok) return setError(data.error || "Upload failed.");
       onChange({ ...value, image: data.url });
+      // A fresh upload belongs in the library too.
+      setLibrary((prev) => (prev.some((a) => a.url === data.url) ? prev : [{ name: data.url, url: data.url }, ...prev]));
     } catch {
       setError("Upload failed — check your connection.");
     } finally {
@@ -432,16 +491,53 @@ function BgImageField({
     <div>
       <div className="flex items-center justify-between mb-2">
         <span className="text-[11px] font-medium text-slate-600">Background image</span>
-        {url && (
+        <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => onChange({ ...value, image: "" })}
-            className="text-[10px] text-slate-400 hover:text-red-600 transition-colors flex items-center gap-0.5"
+            onClick={toggleLibrary}
+            className={`text-[10px] transition-colors flex items-center gap-0.5 ${libOpen ? "text-teal-700 font-semibold" : "text-teal-600 hover:text-teal-700"}`}
           >
-            <X className="w-3 h-3" /> Remove
+            <LayoutGrid className="w-3 h-3" /> Library
           </button>
-        )}
+          {url && (
+            <button
+              type="button"
+              onClick={() => onChange({ ...value, image: "" })}
+              className="text-[10px] text-slate-400 hover:text-red-600 transition-colors flex items-center gap-0.5"
+            >
+              <X className="w-3 h-3" /> Remove
+            </button>
+          )}
+        </div>
       </div>
+
+      {libOpen && (
+        <div className="mb-2 rounded-xl border border-slate-200 bg-slate-50 p-2">
+          {libLoading ? (
+            <div className="h-16 flex items-center justify-center text-[11px] text-slate-400">
+              <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> Loading…
+            </div>
+          ) : library.length === 0 ? (
+            <p className="text-[10.5px] text-slate-400 text-center py-3">No images yet — upload one and it&apos;ll be saved here.</p>
+          ) : (
+            <div className="grid grid-cols-4 gap-1.5 max-h-40 overflow-y-auto email-scroll">
+              {library.map((a) => {
+                const on = a.url === value.image;
+                return (
+                  <button
+                    key={a.url}
+                    type="button"
+                    title={a.name}
+                    onClick={() => { onChange({ ...value, image: a.url }); setLibOpen(false); }}
+                    className={`aspect-square rounded-lg bg-white bg-cover bg-center border-2 transition-all hover:scale-[1.04] ${on ? "border-teal-500 ring-2 ring-teal-500/30" : "border-slate-200"}`}
+                    style={{ backgroundImage: `url("${a.url}")` }}
+                  />
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       <input
         ref={fileRef}
@@ -628,6 +724,19 @@ function colorRange(doc: Document, range: Range, color: string): Range | null {
   } catch {
     return null;
   }
+  // Strip colour from any inner spans so re-colouring the same words replaces
+  // the colour instead of nesting a new layer over it; unwrap ones left empty.
+  span.querySelectorAll("span").forEach((el) => {
+    el.style.removeProperty("color");
+    if (!el.getAttribute("style")?.trim()) el.replaceWith(...Array.from(el.childNodes));
+  });
+  // Re-colouring the exact same words leaves us wrapped in the old colour span;
+  // flatten any parent span that now wraps only us so colours don't accumulate.
+  let parent = span.parentElement;
+  while (parent && parent.tagName === "SPAN" && parent.childNodes.length === 1) {
+    parent.replaceWith(span);
+    parent = span.parentElement;
+  }
   // Merge any adjacent text nodes the split left behind.
   span.parentNode?.normalize();
   const after = doc.createRange();
@@ -655,7 +764,11 @@ function addTextColorAction(editor: Editor) {
   rte.add("forecolor", {
     icon: '<input type="color" class="email-rte-color" value="#000000" title="Colour the selected text"/>',
     attributes: { title: "Text colour" },
-    event: "input",
+    // "change", not "input": the native picker fires "input" continuously while
+    // you drag, and each one re-wrapped the selection and re-synced GrapesJS —
+    // hundreds of nested spans and re-renders that froze the page. "change"
+    // fires once, when the colour is committed.
+    event: "change",
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     result: (r: any, action: any) => {
       const input = action.btn?.firstChild as HTMLInputElement | undefined;
@@ -822,10 +935,54 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
   const [device, setDevice] = useState<"desktop" | "mobile">("desktop");
   const [previewing, setPreviewing] = useState(false);
   const [emailOpen, setEmailOpen] = useState(true);
+  const [brandColors, setBrandColors] = useState<string[]>(BRAND_CACHE);
 
   const set = useCallback(<K extends keyof EmailSettings>(key: K, value: EmailSettings[K]) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
   }, []);
+
+  // Load the saved brand palette once; keep the module cache in step so the
+  // GrapesJS colour pickers (opened per element) can seed from it too.
+  useEffect(() => {
+    let live = true;
+    fetch("/api/admin/email-brand")
+      .then((r) => (r.ok ? r.json() : { colors: [] }))
+      .then((d) => { if (live) { BRAND_CACHE = d.colors || []; setBrandColors(BRAND_CACHE); } })
+      .catch(() => {});
+    return () => { live = false; };
+  }, []);
+
+  const persistBrand = useCallback((colors: string[]) => {
+    BRAND_CACHE = colors;
+    setBrandColors(colors);
+    fetch("/api/admin/email-brand", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ colors }),
+    }).catch(() => {});
+  }, []);
+
+  const addBrandColor = useCallback((c: string) => {
+    const v = (c || "").trim().toLowerCase();
+    if (!/^#[0-9a-f]{3,8}$/.test(v)) return;
+    setBrandColors((prev) => {
+      if (prev.includes(v)) return prev;
+      const next = [...prev, v].slice(0, 24);
+      BRAND_CACHE = next;
+      fetch("/api/admin/email-brand", {
+        method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ colors: next }),
+      }).catch(() => {});
+      return next;
+    });
+  }, []);
+
+  const removeBrandColor = useCallback((c: string) => {
+    setBrandColors((prev) => {
+      const next = prev.filter((x) => x !== c);
+      persistBrand(next);
+      return next;
+    });
+  }, [persistBrand]);
 
   const applyAlign = useCallback((value: string) => {
     const editor = editorRef.current;
@@ -902,6 +1059,8 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
       fromElement: false,
       storageManager: false,
       assetManager: { embedAsBase64: true },
+      // Seed every Style Manager colour picker with the saved brand palette.
+      colorPicker: { palette: BRAND_CACHE.length ? [BRAND_CACHE] : undefined },
       // Style the element you clicked, not everything sharing its class.
       selectorManager: { componentFirst: true },
       blockManager: { appendTo: blocksRef.current! },
@@ -986,6 +1145,17 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
     editor.onReady(() => {
       addTextColorAction(editor);
       paintCanvas(editor, settingsRef.current);
+      // Load the Google fonts into the canvas so any pick previews immediately.
+      try {
+        const cdoc = editor.Canvas.getDocument();
+        if (cdoc?.head && !cdoc.getElementById("gjs-google-fonts")) {
+          const link = cdoc.createElement("link");
+          link.id = "gjs-google-fonts";
+          link.rel = "stylesheet";
+          link.href = GOOGLE_FONTS_HREF;
+          cdoc.head.appendChild(link);
+        }
+      } catch { /* canvas not ready */ }
       // The preset hides component outlines by default, which makes empty
       // cells impossible to find. Turn them on.
       editor.runCommand("core:component-outline");
@@ -1060,7 +1230,16 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
             `<tr><td align="center" valign="top" style="${padded}">${content}</td></tr></table>`
           : content;
 
+        // Pull in any Google fonts actually used. @import is honoured by the
+        // clients that support web fonts (Apple Mail, iOS Mail); everywhere else
+        // the font-family stacks fall back to a system font, so nothing breaks.
+        const usedFonts = googleFontsUsed(inner, s.font);
+        const fontImport = usedFonts.length
+          ? `<style>@import url('https://fonts.googleapis.com/css2?${usedFonts.map((g) => "family=" + g).join("&")}&display=swap');</style>`
+          : "";
+
         return (
+          fontImport +
           `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"` +
           `${pageBg ? ` bgcolor="${pageBg}"` : ""}` +
           ` style="width:100%;margin:0;padding:0;${bgStyle}">` +
@@ -1184,20 +1363,22 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
         >
           {!value && <Check className="w-3 h-3 text-slate-700" />}
         </button>
-        {swatches.map((c) => {
+        {/* Brand colours first, then the presets (skipping any duplicates). */}
+        {[...brandColors, ...swatches.filter((c) => !brandColors.includes(c))].map((c) => {
           const on = value.toLowerCase() === c;
+          const isBrand = brandColors.includes(c);
           return (
             <button
               key={c}
               type="button"
-              title={c}
+              title={isBrand ? `Brand · ${c}` : c}
               onClick={() => onPick(c)}
-              className={`w-6 h-6 rounded-full border transition-all flex items-center justify-center ${
-                on ? "border-teal-500 ring-2 ring-teal-500/30 scale-110" : "border-slate-200 hover:scale-110"
-              }`}
+              className={`w-6 h-6 rounded-full transition-all flex items-center justify-center ${
+                on ? "ring-2 ring-teal-500/40 scale-110" : "hover:scale-110"
+              } ${isBrand ? "border-2 border-teal-400" : "border border-slate-200"}`}
               style={{ backgroundColor: c }}
             >
-              {on && <Check className={`w-3 h-3 ${c === "#0d1b2a" || c === "#134e4a" ? "text-white" : "text-slate-700"}`} />}
+              {on && <Check className={`w-3 h-3 ${/^#(0|1|2|3|4|5)/.test(c) ? "text-white" : "text-slate-700"}`} />}
             </button>
           );
         })}
@@ -1208,6 +1389,17 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
         >
           <input type="color" value={value || "#ffffff"} onChange={(e) => onPick(e.target.value)} className="absolute inset-0 opacity-0 cursor-pointer" />
         </label>
+        {/* Save the current colour to the brand palette. */}
+        {value && !brandColors.includes(value.toLowerCase()) && (
+          <button
+            type="button"
+            title="Save to brand colors"
+            onClick={() => addBrandColor(value)}
+            className="w-6 h-6 rounded-full border border-dashed border-slate-300 text-slate-400 hover:border-teal-400 hover:text-teal-600 flex items-center justify-center transition-colors"
+          >
+            <Plus className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
     </div>
   );
@@ -1335,6 +1527,52 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
 
             {emailOpen && (
               <div className="px-4 pb-5 space-y-5">
+                {/* Brand palette — appears in every colour row and every element picker. */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[11px] font-medium text-slate-600">Brand colors</span>
+                    <label
+                      title="Add a brand color"
+                      className="text-[10px] text-teal-600 hover:text-teal-700 cursor-pointer flex items-center gap-0.5 relative"
+                    >
+                      <Plus className="w-3 h-3" /> Add
+                      <input
+                        type="color"
+                        defaultValue="#0d9488"
+                        onChange={(e) => addBrandColor(e.target.value)}
+                        className="absolute inset-0 opacity-0 cursor-pointer w-full"
+                      />
+                    </label>
+                  </div>
+                  {brandColors.length === 0 ? (
+                    <p className="text-[10px] text-slate-400 leading-snug">
+                      Save colors here and they&apos;ll show first in every color picker — background, text, buttons, borders.
+                    </p>
+                  ) : (
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {brandColors.map((c) => (
+                        <div key={c} className="group relative">
+                          <span
+                            title={c}
+                            className="block w-6 h-6 rounded-full border-2 border-teal-400"
+                            style={{ backgroundColor: c }}
+                          />
+                          <button
+                            type="button"
+                            title="Remove"
+                            onClick={() => removeBrandColor(c)}
+                            className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-white border border-slate-300 text-slate-500 hidden group-hover:flex items-center justify-center hover:text-red-600"
+                          >
+                            <X className="w-2.5 h-2.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="h-px bg-slate-100" />
+
                 {swatchRow("Background color", settings.pageBg, PAGE_SWATCHES, (c) => set("pageBg", c))}
 
                 <BgImageField
