@@ -6,7 +6,7 @@ import "grapesjs/dist/css/grapes.min.css";
 import presetNewsletter from "grapesjs-preset-newsletter";
 import {
   AlignCenter, AlignLeft, AlignRight, Check, ChevronDown, Copy, Eye, ImagePlus, Layers,
-  LayoutGrid, Loader2, Monitor, MousePointerClick, Palette, Redo2, Settings2, Smartphone,
+  Info, LayoutGrid, Loader2, Monitor, MousePointerClick, Palette, Redo2, Settings2, Smartphone,
   Sliders, Trash2, Undo2, X,
 } from "lucide-react";
 
@@ -102,6 +102,10 @@ function rgba(hex: string, alpha: number) {
   return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`;
 }
 const clamp01 = (n: number) => Math.min(1, Math.max(0, Number.isFinite(n) ? n : 1));
+
+/** Anything you can see through: unset, `transparent`, or an rgba with 0 alpha. */
+const isSeeThrough = (v?: string) =>
+  !v || /^\s*transparent\s*$/i.test(v) || /rgba\([^)]*,\s*0(\.0+)?\s*\)/i.test(v);
 const safeUrl = (u: string) => (/^https?:\/\/\S+$/i.test(u.trim()) ? u.trim() : "");
 const escAttr = (s: string) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
@@ -666,6 +670,13 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
   /** Background image of whatever is selected, mirrored out of its CSS. */
   const [selBg, setSelBg] = useState<BgImage>(NO_BG);
   const [selVeil, setSelVeil] = useState("#ffffff");
+  /**
+   * A see-through element still shows nothing if something opaque sits between
+   * it and the body image. Name that thing rather than leaving people to guess.
+   */
+  const [blocker, setBlocker] = useState<{ kind: "content" | "component"; name: string } | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const blockerComp = useRef<any>(null);
   const [tab, setTab] = useState<Tab>("design");
   const [device, setDevice] = useState<"desktop" | "mobile">("desktop");
   const [previewing, setPreviewing] = useState(false);
@@ -696,6 +707,18 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
     for (const k of BG_KEYS) delete style[k];
     sel.setStyle({ ...style, ...bgImageCss(next, veil) });
   }, []);
+
+  /** Clear whichever opaque layer is hiding the body image. */
+  const clearBlocker = useCallback(() => {
+    if (blocker?.kind === "content") {
+      setSettings((prev) => ({ ...prev, contentBg: "" }));
+    } else if (blockerComp.current) {
+      const style = { ...((blockerComp.current.getStyle() || {}) as Record<string, string>) };
+      delete style["background-color"];
+      blockerComp.current.setStyle(style);
+    }
+    setBlocker(null);
+  }, [blocker]);
 
   const run = useCallback((cmd: string) => editorRef.current?.runCommand(cmd), []);
 
@@ -758,6 +781,32 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
       const own = (sel.getStyle() || {}) as Record<string, string>;
       setSelBg(parseBgImage(own));
       setSelVeil(safeColor(own["background-color"] || "") || "#ffffff");
+
+      // Walk up looking for the first opaque layer between this element and the
+      // body — only worth reporting when the element itself is see-through and
+      // there is actually a body image to reveal.
+      blockerComp.current = null;
+      const s = settingsRef.current;
+      if (!safeUrl(s.pageBgImage) || !isSeeThrough(own["background-color"])) {
+        setBlocker(null);
+        return;
+      }
+      let node = sel.parent();
+      let found: { kind: "content" | "component"; name: string } | null = null;
+      while (node) {
+        if (node.get("type") === "wrapper") {
+          if (!isSeeThrough(s.contentBg)) found = { kind: "content", name: "Content background" };
+          break;
+        }
+        const bg = ((node.getStyle() || {}) as Record<string, string>)["background-color"];
+        if (!isSeeThrough(bg)) {
+          blockerComp.current = node;
+          found = { kind: "component", name: node.getName?.() || "Container" };
+          break;
+        }
+        node = node.parent();
+      }
+      setBlocker(found);
     };
     editor.on("component:selected", syncSelection);
     editor.on("component:deselected", syncSelection);
@@ -953,13 +1002,27 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
     <div>
       <div className="flex items-center justify-between mb-2">
         <span className="text-[11px] font-medium text-slate-600">{label}</span>
-        {value && (
-          <button type="button" onClick={() => onPick("")} className="text-[10px] text-slate-400 hover:text-slate-600 transition-colors">
-            Clear
-          </button>
-        )}
       </div>
       <div className="flex items-center gap-1.5 flex-wrap">
+        {/* Transparent, as a real swatch — "no background" is a choice people
+            need to make deliberately once a background image is in play. */}
+        <button
+          type="button"
+          title="Transparent"
+          onClick={() => onPick("")}
+          className={`w-6 h-6 rounded-full border transition-all flex items-center justify-center ${
+            !value ? "border-teal-500 ring-2 ring-teal-500/30 scale-110" : "border-slate-200 hover:scale-110"
+          }`}
+          style={{
+            backgroundImage:
+              "linear-gradient(45deg,#cbd5e1 25%,transparent 25%,transparent 75%,#cbd5e1 75%)," +
+              "linear-gradient(45deg,#cbd5e1 25%,#fff 25%,#fff 75%,#cbd5e1 75%)",
+            backgroundSize: "8px 8px",
+            backgroundPosition: "0 0, 4px 4px",
+          }}
+        >
+          {!value && <Check className="w-3 h-3 text-slate-700" />}
+        </button>
         {swatches.map((c) => {
           const on = value.toLowerCase() === c;
           return (
@@ -1101,6 +1164,22 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
 
                 {swatchRow("Content background", settings.contentBg, CONTENT_SWATCHES, (c) => set("contentBg", c))}
 
+                {!!safeUrl(settings.pageBgImage) && !isSeeThrough(settings.contentBg) && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 flex items-start gap-2 -mt-2">
+                    <Info className="w-3.5 h-3.5 text-amber-600 mt-px flex-shrink-0" />
+                    <div className="text-[10.5px] text-amber-900 leading-relaxed">
+                      A solid content background covers your background image behind the content.
+                      <button
+                        type="button"
+                        onClick={() => set("contentBg", "")}
+                        className="block mt-1.5 font-semibold text-amber-900 underline underline-offset-2 hover:text-amber-700"
+                      >
+                        Make it transparent
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-2.5">
                   <div>
                     <label className="block text-[11px] font-medium text-slate-600 mb-1.5">Content width</label>
@@ -1181,6 +1260,22 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
           )}
 
           <div className={tab === "design" && selection ? "" : "hidden"}>
+            {blocker && (
+              <div className="mx-3 mt-3 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 flex items-start gap-2">
+                <Info className="w-3.5 h-3.5 text-amber-600 mt-px flex-shrink-0" />
+                <div className="text-[10.5px] text-amber-900 leading-relaxed">
+                  This element is transparent, but <strong>{blocker.name}</strong> sits between it and
+                  the email background image.
+                  <button
+                    type="button"
+                    onClick={clearBlocker}
+                    className="block mt-1.5 font-semibold text-amber-900 underline underline-offset-2 hover:text-amber-700"
+                  >
+                    Make {blocker.kind === "content" ? "it" : `“${blocker.name}”`} transparent
+                  </button>
+                </div>
+              </div>
+            )}
             <div ref={stylesRef} />
             {/* Sits directly under the Style Manager's "Background & border",
                 replacing GrapesJS's layer-chip control, which has no opacity. */}
