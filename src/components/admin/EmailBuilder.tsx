@@ -71,33 +71,76 @@ const SYSTEM_FONTS = [
   { value: "'Courier New', Courier, monospace", label: "Courier New" },
 ];
 
-// Google fonts. `g` is the family spec for the Google Fonts CSS API; each keeps
-// a same-category system fallback so clients that block web fonts (Gmail,
-// Outlook desktop) still render something close.
-const GOOGLE_FONTS = [
-  { value: "'Poppins', Arial, sans-serif", label: "Poppins", g: "Poppins:wght@400;500;600;700" },
-  { value: "'Montserrat', Arial, sans-serif", label: "Montserrat", g: "Montserrat:wght@400;500;600;700" },
-  { value: "'Roboto', Arial, sans-serif", label: "Roboto", g: "Roboto:wght@400;500;700" },
-  { value: "'Open Sans', Arial, sans-serif", label: "Open Sans", g: "Open+Sans:wght@400;600;700" },
-  { value: "'Lato', Arial, sans-serif", label: "Lato", g: "Lato:wght@400;700" },
-  { value: "'Nunito', Arial, sans-serif", label: "Nunito", g: "Nunito:wght@400;600;700" },
-  { value: "'Raleway', Arial, sans-serif", label: "Raleway", g: "Raleway:wght@400;600;700" },
-  { value: "'Oswald', Arial, sans-serif", label: "Oswald", g: "Oswald:wght@400;500;700" },
-  { value: "'Merriweather', Georgia, serif", label: "Merriweather", g: "Merriweather:wght@400;700" },
-  { value: "'Playfair Display', Georgia, serif", label: "Playfair Display", g: "Playfair+Display:wght@400;600;700" },
+// The Google Fonts catalogue we offer — the popular families that cover
+// essentially all real-world use. Each is loaded on demand (only when picked
+// or used), never all at once.
+const GOOGLE_FAMILIES = [
+  "Poppins", "Montserrat", "Roboto", "Open Sans", "Lato", "Nunito", "Nunito Sans", "Raleway", "Oswald",
+  "Inter", "Work Sans", "Rubik", "Mulish", "Quicksand", "Josefin Sans", "Barlow", "Karla", "DM Sans",
+  "Manrope", "Figtree", "Outfit", "Sora", "Space Grotesk", "Plus Jakarta Sans", "Archivo", "Kanit",
+  "Titillium Web", "Fira Sans", "PT Sans", "Source Sans 3", "Noto Sans", "Roboto Condensed", "Roboto Mono",
+  "Cabin", "Comfortaa", "Dosis", "Exo 2", "Heebo", "Hind", "IBM Plex Sans", "IBM Plex Mono", "Inconsolata",
+  "Libre Franklin", "Maven Pro", "Overpass", "Oxygen", "Prompt", "Questrial", "Signika", "Teko", "Ubuntu",
+  "Varela Round", "Abel", "Anton", "Bebas Neue", "Fjalla One", "Righteous", "Jost", "Lexend",
+  "Red Hat Display", "Urbanist", "Assistant", "Catamaran", "Chivo", "Asap",
+  // Serif
+  "Merriweather", "Playfair Display", "Lora", "PT Serif", "Source Serif 4", "Noto Serif", "Roboto Slab",
+  "Bitter", "IBM Plex Serif", "Libre Baskerville", "Cormorant Garamond", "Crimson Text", "EB Garamond",
+  "Arvo", "Domine", "Vollkorn", "Cardo", "Spectral", "Frank Ruhl Libre", "Zilla Slab", "Slabo 27px",
+  "Cinzel", "Alegreya", "Abril Fatface",
+  // Display / script
+  "Lobster", "Pacifico", "Great Vibes", "Dancing Script", "Caveat", "Satisfy", "Permanent Marker",
+  "Shadows Into Light", "Indie Flower", "Amatic SC", "Courgette", "Sacramento", "Yellowtail",
 ];
 
+const SERIF_FAMILIES = new Set([
+  "Merriweather", "Playfair Display", "Lora", "PT Serif", "Source Serif 4", "Noto Serif", "Roboto Slab",
+  "Bitter", "IBM Plex Serif", "Libre Baskerville", "Cormorant Garamond", "Crimson Text", "EB Garamond",
+  "Arvo", "Domine", "Vollkorn", "Cardo", "Spectral", "Frank Ruhl Libre", "Zilla Slab", "Slabo 27px",
+  "Cinzel", "Alegreya", "Abril Fatface",
+]);
+const MONO_FAMILIES = new Set(["Roboto Mono", "IBM Plex Mono", "Inconsolata"]);
+const CURSIVE_FAMILIES = new Set([
+  "Lobster", "Pacifico", "Great Vibes", "Dancing Script", "Caveat", "Satisfy", "Permanent Marker",
+  "Shadows Into Light", "Indie Flower", "Amatic SC", "Courgette", "Sacramento", "Yellowtail",
+]);
+
+function fontFallback(name: string): string {
+  if (SERIF_FAMILIES.has(name)) return "Georgia, 'Times New Roman', serif";
+  if (MONO_FAMILIES.has(name)) return "'Courier New', Courier, monospace";
+  if (CURSIVE_FAMILIES.has(name)) return "'Brush Script MT', cursive";
+  return "Helvetica, Arial, sans-serif";
+}
+const fontValue = (name: string) => `'${name}', ${fontFallback(name)}`;
+const fontSpec = (name: string) => `${name.replace(/ /g, "+")}:wght@400;500;600;700`;
+const googleHref = (name: string) => `https://fonts.googleapis.com/css2?family=${fontSpec(name)}&display=swap`;
+
+// Recover the primary family name from a font-family value string.
+function familyName(value: string): string {
+  const m = String(value || "").match(/^\s*['"]?([^'",]+)/);
+  return m ? m[1].trim() : "";
+}
+const GOOGLE_SET = new Set(GOOGLE_FAMILIES);
+
+const GOOGLE_FONTS = GOOGLE_FAMILIES.map((name) => ({ value: fontValue(name), label: name, g: fontSpec(name) }));
 const FONTS = [{ value: "", label: "Inherit" }, ...SYSTEM_FONTS, ...GOOGLE_FONTS];
 
-// Stylesheet that loads every Google font at once — used for the editor canvas
-// so any pick previews immediately.
-const GOOGLE_FONTS_HREF =
-  "https://fonts.googleapis.com/css2?" + GOOGLE_FONTS.map((f) => "family=" + f.g).join("&") + "&display=swap";
+/** Inject a Google font's stylesheet into `doc` (idempotent). No-op for non-Google families. */
+function ensureFontInDoc(doc: Document | null | undefined, name: string) {
+  if (!doc?.head || !name || !GOOGLE_SET.has(name)) return;
+  const id = "gf-" + name.replace(/[^a-z0-9]/gi, "-").toLowerCase();
+  if (doc.getElementById(id)) return;
+  const link = doc.createElement("link");
+  link.id = id;
+  link.rel = "stylesheet";
+  link.href = googleHref(name);
+  doc.head.appendChild(link);
+}
 
-/** The Google font-family names referenced anywhere in `html` + `font`, for a scoped import on export. */
+/** Every Google font-family referenced in `html` + `font`, as css2 family specs, for a scoped export import. */
 function googleFontsUsed(html: string, font: string): string[] {
   const hay = `${html} ${font}`;
-  return GOOGLE_FONTS.filter((f) => hay.includes(`'${f.label}'`) || hay.includes(f.label)).map((f) => f.g);
+  return GOOGLE_FAMILIES.filter((name) => hay.includes(`'${name}'`) || hay.includes(`"${name}"`)).map(fontSpec);
 }
 
 const PAGE_SWATCHES = ["#ffffff", "#f1f5f9", "#e2e8f0", "#f0fdfa", "#fff7ed", "#fdf2f8", "#134e4a", "#0d1b2a"];
@@ -753,6 +796,73 @@ function hsvToHex(h: number, s: number, v: number): string {
   return "#" + to(r) + to(g) + to(b);
 }
 
+/* ------------------------------------------------------------------ *
+ * Searchable font picker — the whole Google-font catalogue we bundle,
+ * filtered as you type. Each option previews in its own font.
+ * ------------------------------------------------------------------ */
+function FontPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+
+  const current = FONTS.find((f) => f.value === value)?.label || "Inherit";
+  const q = query.trim().toLowerCase();
+  const results = q ? FONTS.filter((f) => f.label.toLowerCase().includes(q)) : FONTS;
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => { if (!rootRef.current?.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", onDown, true);
+    return () => document.removeEventListener("mousedown", onDown, true);
+  }, [open]);
+
+  // Preview each option in its own font: load the Google ones into THIS document.
+  useEffect(() => {
+    if (!open) return;
+    results.slice(0, 40).forEach((f) => ensureFontInDoc(document, familyName(f.value)));
+  }, [open, results]);
+
+  return (
+    <div ref={rootRef} className="relative">
+      <button
+        type="button"
+        onClick={() => { setOpen((o) => !o); setQuery(""); }}
+        className="w-full flex items-center justify-between px-2.5 py-1.5 text-[11px] border border-slate-200 rounded-lg bg-white hover:border-teal-400 focus:ring-2 focus:ring-teal-500/30 outline-none transition-all"
+      >
+        <span style={{ fontFamily: value || undefined }} className="truncate">{current}</span>
+        <ChevronDown className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+      </button>
+      {open && (
+        <div className="absolute z-50 mt-1 left-0 right-0 rounded-lg border border-slate-200 bg-white shadow-[0_12px_28px_rgba(15,23,42,0.16)] overflow-hidden">
+          <div className="p-1.5 border-b border-slate-100">
+            <input
+              autoFocus
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={`Search ${GOOGLE_FAMILIES.length}+ fonts…`}
+              className="w-full px-2 py-1.5 text-[11px] border border-slate-200 rounded-md focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 outline-none"
+            />
+          </div>
+          <div className="max-h-64 overflow-y-auto email-scroll py-1">
+            {results.length === 0 && <p className="px-3 py-2 text-[11px] text-slate-400">No match</p>}
+            {results.map((f) => (
+              <button
+                key={f.label}
+                type="button"
+                onClick={() => { onChange(f.value); setOpen(false); }}
+                className={`w-full text-left px-3 py-1.5 text-[12px] hover:bg-slate-50 ${f.value === value ? "text-teal-700 font-semibold" : "text-slate-700"}`}
+                style={{ fontFamily: f.value || undefined }}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const PICKER_PRESETS = [
   "#000000", "#475569", "#94a3b8", "#e2e8f0", "#ffffff",
   "#ef4444", "#f97316", "#eab308", "#22c55e", "#14b8a6",
@@ -1125,6 +1235,23 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
     setSettings((prev) => ({ ...prev, [key]: value }));
   }, []);
 
+  // Load into the canvas every Google font referenced by a component style or
+  // by the email-body default font — on demand, so we never pull all ~100.
+  const loadFontsInCanvas = useCallback(() => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    let doc: Document | null | undefined;
+    try { doc = editor.Canvas.getDocument(); } catch { return; }
+    if (!doc) return;
+    const names = new Set<string>();
+    (editor.getCss?.() || "").replace(/font-family\s*:\s*([^;}"']+)/gi, (_m: string, v: string) => {
+      names.add(familyName(v));
+      return _m;
+    });
+    names.add(familyName(settingsRef.current.font));
+    names.forEach((n) => ensureFontInDoc(doc, n));
+  }, []);
+
   // Push the palette into GrapesJS so every Style Manager colour picker (bg,
   // border, element text) opens with the brand colours as its swatches. Read
   // fresh at each picker open, so updating it takes effect on the next open.
@@ -1371,21 +1498,14 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
     editor.onReady(() => {
       addTextColorAction(editor, (o) => setRtePicker(o));
       paintCanvas(editor, settingsRef.current);
-      // Load the Google fonts into the canvas so any pick previews immediately.
-      try {
-        const cdoc = editor.Canvas.getDocument();
-        if (cdoc?.head && !cdoc.getElementById("gjs-google-fonts")) {
-          const link = cdoc.createElement("link");
-          link.id = "gjs-google-fonts";
-          link.rel = "stylesheet";
-          link.href = GOOGLE_FONTS_HREF;
-          cdoc.head.appendChild(link);
-        }
-      } catch { /* canvas not ready */ }
+      loadFontsInCanvas();
       // The preset hides component outlines by default, which makes empty
       // cells impossible to find. Turn them on.
       editor.runCommand("core:component-outline");
     });
+    // Load any font used by a component the moment its styles change.
+    editor.on("component:styleUpdate", loadFontsInCanvas);
+    editor.on("component:add", loadFontsInCanvas);
 
     onReady?.({
       getHtml: () => {
@@ -1509,7 +1629,8 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
   useEffect(() => {
     const editor = editorRef.current;
     if (editor) paintCanvas(editor, settings);
-  }, [settings]);
+    loadFontsInCanvas();
+  }, [settings, loadFontsInCanvas]);
 
   /**
    * The Style Manager's colour picker positions itself from document
@@ -1880,13 +2001,7 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
 
                 <div>
                   <label className="block text-[11px] font-medium text-slate-600 mb-1.5">Default font</label>
-                  <select
-                    value={settings.font}
-                    onChange={(e) => set("font", e.target.value)}
-                    className="w-full px-2.5 py-1.5 text-[11px] border border-slate-200 rounded-lg bg-white focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 outline-none transition-all"
-                  >
-                    {FONTS.map((f) => <option key={f.label} value={f.value}>{f.label}</option>)}
-                  </select>
+                  <FontPicker value={settings.font} onChange={(v) => set("font", v)} />
                 </div>
 
                 <div className="grid grid-cols-2 gap-2.5">
