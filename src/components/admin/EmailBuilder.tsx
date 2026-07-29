@@ -5,7 +5,8 @@ import grapesjs, { type Editor } from "grapesjs";
 import "grapesjs/dist/css/grapes.min.css";
 import presetNewsletter from "grapesjs-preset-newsletter";
 import {
-  AlignCenter, AlignLeft, AlignRight, Check, ChevronDown, Copy, Eye, ImagePlus, Layers,
+  AlignCenter, AlignLeft, AlignRight, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd,
+  AlignVerticalJustifyStart, Check, ChevronDown, Copy, Eye, ImagePlus, Layers,
   Info, LayoutGrid, Loader2, Monitor, MousePointerClick, Palette, Redo2, Settings2, Smartphone,
   Sliders, Trash2, Undo2, X,
 } from "lucide-react";
@@ -552,6 +553,35 @@ function BgImageField({
   );
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const tagOf = (c: any) => String(c?.get?.("tagName") || "").toLowerCase();
+const isCell = (c: unknown) => tagOf(c) === "td" || tagOf(c) === "th";
+
+/**
+ * Vertical alignment in email is `vertical-align` on a table cell — there is no
+ * portable equivalent for a plain div. Selecting a Section gives you the table,
+ * so reach down to the cells it owns (without descending into nested tables).
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function cellsOf(sel: any): any[] {
+  if (!sel) return [];
+  if (isCell(sel)) return [sel];
+  const tag = tagOf(sel);
+  if (tag !== "table" && tag !== "tbody" && tag !== "tr") return [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const found: any[] = [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const walk = (node: any) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    node.components?.()?.forEach?.((child: any) => {
+      if (isCell(child)) found.push(child);
+      else walk(child);
+    });
+  };
+  walk(sel);
+  return found;
+}
+
 /** An <img> or <a> is inline — aligning it means aligning the cell it sits in. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function alignTarget(editor: Editor): any {
@@ -667,6 +697,9 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
 
   const [selection, setSelection] = useState<string | null>(null);
   const [align, setAlign] = useState("");
+  const [vAlign, setVAlign] = useState("");
+  /** Whether the selection owns table cells, the only thing vertical align works on. */
+  const [canVAlign, setCanVAlign] = useState(false);
   /** Background image of whatever is selected, mirrored out of its CSS. */
   const [selBg, setSelBg] = useState<BgImage>(NO_BG);
   const [selVeil, setSelVeil] = useState("#ffffff");
@@ -692,10 +725,24 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
     const target = alignTarget(editor);
     if (!target) return;
     target.addStyle({ "text-align": value });
+    // Outlook's Word engine honours the attribute more reliably than the style.
+    if (isCell(target)) target.addAttributes({ align: value });
     // An image only obeys its cell's text-align while it stays inline.
     const sel = editor.getSelected();
     if (sel?.get("type") === "image") sel.addStyle({ display: "inline-block", float: "none" });
     setAlign(value);
+  }, []);
+
+  /** Vertical alignment lands on the cells the selection owns. */
+  const applyVAlign = useCallback((value: string) => {
+    const sel = editorRef.current?.getSelected();
+    const cells = cellsOf(sel);
+    if (!cells.length) return;
+    for (const cell of cells) {
+      cell.addStyle({ "vertical-align": value });
+      cell.addAttributes({ valign: value });
+    }
+    setVAlign(value);
   }, []);
 
   /** Write a background image back onto the selected element. */
@@ -773,11 +820,16 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
       if (!sel) {
         setSelection(null);
         setAlign("");
+        setVAlign("");
+        setCanVAlign(false);
         setSelBg(NO_BG);
         return;
       }
       setSelection(sel.getName?.() || String(sel.get("type") || "Element"));
       setAlign(((alignTarget(editor)?.getStyle() || {}) as Record<string, string>)["text-align"] || "");
+      const cells = cellsOf(sel);
+      setCanVAlign(cells.length > 0);
+      setVAlign(cells.length ? ((cells[0].getStyle() || {}) as Record<string, string>)["vertical-align"] || "" : "");
       const own = (sel.getStyle() || {}) as Record<string, string>;
       setSelBg(parseBgImage(own));
       setSelVeil(safeColor(own["background-color"] || "") || "#ffffff");
@@ -1051,6 +1103,35 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
     </div>
   );
 
+  /** A row of three segmented icon buttons. */
+  const alignRow = (
+    label: string,
+    current: string,
+    options: { value: string; Icon: typeof AlignLeft; title: string }[],
+    onPick: (v: string) => void,
+    disabled = false,
+  ) => (
+    <div className="flex items-center gap-2">
+      <span className="w-11 text-[10.5px] text-slate-500 flex-shrink-0">{label}</span>
+      <div className={`flex-1 flex gap-1 p-0.5 bg-slate-100 rounded-lg ${disabled ? "opacity-40" : ""}`}>
+        {options.map((o) => (
+          <button
+            key={o.value}
+            type="button"
+            title={disabled ? "Select a section or cell to align vertically" : o.title}
+            onClick={() => onPick(o.value)}
+            disabled={disabled}
+            className={`flex-1 flex items-center justify-center py-1.5 rounded-md transition-all disabled:cursor-not-allowed ${
+              current === o.value ? "bg-white text-teal-700 shadow-sm" : "text-slate-500 hover:text-slate-800"
+            }`}
+          >
+            <o.Icon className="w-4 h-4" />
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
   const tabBtn = (id: Tab, Icon: typeof Sliders, label: string) => (
     <button
       type="button"
@@ -1276,6 +1357,30 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
                 </div>
               </div>
             )}
+            {/* Where this container's contents sit, across and down. */}
+            <div className="px-[14px] pt-3.5 pb-4 border-b border-slate-100">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 mb-2.5">
+                Content alignment
+              </div>
+              <div className="space-y-2">
+                {alignRow("Across", align, [
+                  { value: "left", Icon: AlignLeft, title: "Left" },
+                  { value: "center", Icon: AlignCenter, title: "Center" },
+                  { value: "right", Icon: AlignRight, title: "Right" },
+                ], applyAlign)}
+                {alignRow("Down", vAlign, [
+                  { value: "top", Icon: AlignVerticalJustifyStart, title: "Top" },
+                  { value: "middle", Icon: AlignVerticalJustifyCenter, title: "Middle" },
+                  { value: "bottom", Icon: AlignVerticalJustifyEnd, title: "Bottom" },
+                ], applyVAlign, !canVAlign)}
+              </div>
+              <p className="mt-2 text-[10px] text-slate-400 leading-snug">
+                {canVAlign
+                  ? "Vertical alignment shows once the section is taller than its contents — set a Height under Spacing & size."
+                  : "Vertical alignment needs a Section block (a table cell). Plain containers have no portable way to do it in email."}
+              </p>
+            </div>
+
             <div ref={stylesRef} />
             {/* Sits directly under the Style Manager's "Background & border",
                 replacing GrapesJS's layer-chip control, which has no opacity. */}
