@@ -479,6 +479,9 @@ model SweepandgoCustomer {
   homePhone         String?
   cellPhone         String?
   subscriptionNames String? // comma-joined, e.g. "2d-1xW,Sanitize w/ Regular Service"
+  // Dog count, parsed from the plan code ("2d-1xW" = 2 dogs, once a week).
+  // Sweep&Go's API exposes the count but NOT dog names or breeds.
+  numberOfDogs      Int?
   oneTimeClient     Boolean   @default(false)
   channel           String?
   serviceDays       String?

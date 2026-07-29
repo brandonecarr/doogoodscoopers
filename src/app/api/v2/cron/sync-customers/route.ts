@@ -93,6 +93,9 @@ export async function GET(request: NextRequest) {
   for (const c of clients) {
     if (!c.client) continue;
     seenIds.push(c.client);
+    // Sweep&Go encodes the dog count in the plan name ("2d-1xW" = 2 dogs, once
+    // a week). It's the only dog data their API exposes — no names or breeds.
+    const dogMatch = (c.subscription_names || "").match(/(\d+)\s*d-/i);
     const fields = {
       type: c.type ?? null,
       sngStatus: c.status ?? null,
@@ -104,6 +107,7 @@ export async function GET(request: NextRequest) {
       homePhone: c.home_phone ?? null,
       cellPhone: c.cell_phone ?? null,
       subscriptionNames: c.subscription_names ?? null,
+      numberOfDogs: dogMatch ? parseInt(dogMatch[1], 10) : null,
       oneTimeClient: !!c.one_time_client,
       channel: c.channel ?? null,
       serviceDays: c.service_days ?? null,

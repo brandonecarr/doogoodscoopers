@@ -33,6 +33,7 @@ const SORTS: Record<string, (dir: "asc" | "desc") => Prisma.SweepandgoCustomerOr
   subscription: (d) => [{ subscriptionNames: d }],
   serviceDay:   (d) => [{ serviceDays: d }],
   frequency:    (d) => [{ cleanupFrequency: d }],
+  dogs:         (d) => [{ numberOfDogs: d }],
   tech:         (d) => [{ assignedTo: d }],
   review:       (d) => [{ reviewStatus: d }],
 };
@@ -139,6 +140,7 @@ export default async function CustomersPage({ searchParams }: PageProps) {
             <option value="serviceDay:asc">Service day</option>
             <option value="frequency:asc">Frequency</option>
             <option value="tech:asc">Tech</option>
+            <option value="dogs:desc">Dogs (most first)</option>
             <option value="review:asc">Review status</option>
           </select>
           <button type="submit" className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors text-sm">Apply</button>
@@ -156,6 +158,7 @@ export default async function CustomersPage({ searchParams }: PageProps) {
                 {renderTh("Start Date", "start")}
                 {renderTh("Address", "address")}
                 {renderTh("Phone")}
+                {renderTh("Dogs", "dogs")}
                 {renderTh("Subscription", "subscription")}
                 {renderTh("Service Day", "serviceDay")}
                 {renderTh("Frequency", "frequency")}
@@ -166,7 +169,7 @@ export default async function CustomersPage({ searchParams }: PageProps) {
             <tbody className="divide-y divide-gray-100">
               {customers.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan={10} className="px-6 py-12 text-center text-gray-500">
                     {search ? "No customers match your search." : "No customers synced yet — the hourly sync will populate this list."}
                   </td>
                 </tr>
@@ -187,6 +190,7 @@ export default async function CustomersPage({ searchParams }: PageProps) {
                     <td className="px-6 py-4 text-sm text-navy-900 whitespace-nowrap">
                       {fmtPhone(c.cellPhone) ? <a href={`tel:${c.cellPhone}`} className="hover:text-teal-600">{fmtPhone(c.cellPhone)}</a> : "-"}
                     </td>
+                    <td className="px-6 py-4 text-sm text-gray-700 whitespace-nowrap">{c.numberOfDogs != null ? `${c.numberOfDogs} ${c.numberOfDogs === 1 ? "dog" : "dogs"}` : "-"}</td>
                     <td className="px-6 py-4 text-sm text-gray-700">{c.subscriptionNames || "-"}</td>
                     <td className="px-6 py-4 text-sm text-gray-700 whitespace-nowrap">{c.serviceDays || "-"}</td>
                     <td className="px-6 py-4 text-sm text-gray-700">{c.cleanupFrequency || "-"}</td>
