@@ -1407,6 +1407,22 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
 
         const s = settingsRef.current;
         inner = inlineLinkColor(inner, safeColor(s.linkColor));
+        // An <img> should never carry a background-image (an artifact of the
+        // element background control being applied to an image); strip it, and
+        // give images email-friendly defaults so they render and reserve space
+        // even while a client is blocking remote images.
+        inner = inner.replace(/<img\b[^>]*>/gi, (tag) => {
+          let out = tag.replace(/style\s*=\s*"([^"]*)"/i, (_m, css: string) => {
+            const cleaned = css
+              // background-image first — its url() may contain escaped quotes (which hold ";")
+              .replace(/background-image\s*:\s*url\([^)]*\)\s*;?/gi, "")
+              .replace(/background(-size|-repeat|-position|-color|-attachment)\s*:[^;]*;?/gi, "")
+              .replace(/;\s*;+/g, ";").replace(/^\s*;+|;+\s*$/g, "").trim();
+            return cleaned ? `style="${cleaned}"` : "";
+          });
+          if (!/\bborder\s*=/.test(out)) out = out.replace(/<img\b/i, '<img border="0"');
+          return out;
+        });
 
         const pageBg = safeColor(s.pageBg);
         const img = safeUrl(s.pageBgImage);
