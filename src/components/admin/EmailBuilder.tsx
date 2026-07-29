@@ -1254,7 +1254,35 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
       height: "100%",
       fromElement: false,
       storageManager: false,
-      assetManager: { embedAsBase64: true },
+      // Images must be URLs in email — NEVER base64. A data: URI bloats the
+      // HTML to megabytes and email clients (and Brevo) block, truncate, or
+      // show it as raw text. Upload dropped/added images to our public bucket
+      // and reference the returned URL instead.
+      assetManager: {
+        embedAsBase64: false,
+        autoAdd: true,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        uploadFile: async (ev: any) => {
+          const files: FileList | undefined = ev?.dataTransfer?.files ?? ev?.target?.files;
+          if (!files?.length) return;
+          for (const file of Array.from(files)) {
+            try {
+              const body = new FormData();
+              body.append("file", file);
+              const res = await fetch("/api/admin/email-assets", { method: "POST", body });
+              const data = await res.json().catch(() => ({}));
+              if (data.url) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                (editorRef.current as any)?.AssetManager.add(data.url);
+              } else {
+                editorRef.current?.Modal.open({ title: "Upload failed", content: data.error || "Could not upload image." });
+              }
+            } catch {
+              editorRef.current?.Modal.open({ title: "Upload failed", content: "Could not upload image — check your connection." });
+            }
+          }
+        },
+      },
       // Seed every Style Manager colour picker with the saved brand palette.
       colorPicker: { palette: BRAND_CACHE.length ? [BRAND_CACHE] : undefined },
       // Style the element you clicked, not everything sharing its class.

@@ -110,6 +110,12 @@ export default function NewEmailPage() {
     if (!subject.trim() || !html.trim()) return setMsg("Subject and content are required.");
     if (action === "test" && !testEmail.trim()) return setMsg("Enter a test email address.");
     if (action === "schedule" && !scheduledAt) return setMsg("Pick a schedule time.");
+    // An embedded (base64) image bloats the email and gets blocked by mail
+    // clients — it must be a hosted URL. Block it with a clear fix, except on
+    // Save draft so work isn't lost.
+    if (action !== "draft" && /data:image\//i.test(html)) {
+      return setMsg("This email has an embedded image that mail clients will block. Open Design, delete the image, and re-add it so it uploads as a hosted image.");
+    }
     setBusy(action);
     try {
       const res = await fetch("/api/admin/email-campaigns", {
