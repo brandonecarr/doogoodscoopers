@@ -178,7 +178,7 @@ export default function NewEmailPage() {
                 </div>
               </div>
               <textarea value={html} onChange={(e) => { setHtml(e.target.value); setDesignJson(null); }} rows={10} className="w-full px-3 py-2 text-xs font-mono border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 resize-y" />
-              <p className="text-[11px] text-gray-400 mt-1">Use the <strong>Design</strong> button for the drag-and-drop builder, start from a saved template, or edit the HTML directly. {"{{firstName}}"} personalizes.</p>
+              <p className="text-[11px] text-gray-400 mt-1">Use the <strong>Design</strong> button for the drag-and-drop builder — background, width, fonts and per-element styles all live there. Or start from a saved template, or edit the HTML directly. {"{{firstName}}"} personalizes.</p>
             </div>
           </div>
 

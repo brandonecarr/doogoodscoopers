@@ -77,14 +77,14 @@ export default function EmailTemplateEditor({ templateId }: { templateId?: strin
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Save template
         </button>
       </div>
-      <div className="rounded-xl border border-gray-200 overflow-hidden" style={{ height: "calc(100vh - 200px)", minHeight: 480 }}>
+      <div className="rounded-xl border border-gray-200 overflow-hidden" style={{ height: "calc(100vh - 200px)", minHeight: 600 }}>
         {ready ? (
           <EmailBuilder initialHtml={initialHtml ?? undefined} initialDesign={initialDesign} onReady={(h) => (handleRef.current = h)} />
         ) : (
           <div className="h-full flex items-center justify-center text-gray-400">Loading…</div>
         )}
       </div>
-      <p className="text-xs text-gray-400">Use {"{{firstName}}"} anywhere to personalize. Blocks drag in from the top-right; click any element to edit its text and style.</p>
+      <p className="text-xs text-gray-400">Use {"{{firstName}}"} anywhere to personalize. Drag blocks in from the left; click any element to style it on the right. <strong>Email body</strong> sets the background, width and fonts for the whole email.</p>
     </div>
   );
 }
