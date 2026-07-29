@@ -615,14 +615,43 @@ function toHex(value: string) {
   return "#" + [m[1], m[2], m[3]].map((n) => Number(n).toString(16).padStart(2, "0")).join("");
 }
 
+/** Wrap exactly `range` in a coloured <span>, leaving everything else alone. */
+function colorRange(doc: Document, range: Range, color: string): Range | null {
+  if (!range || range.collapsed) return null;
+  const span = doc.createElement("span");
+  span.style.color = color;
+  try {
+    // extractContents + insert handles a selection that crosses element
+    // boundaries; surroundContents would throw on those.
+    span.appendChild(range.extractContents());
+    range.insertNode(span);
+  } catch {
+    return null;
+  }
+  // Merge any adjacent text nodes the split left behind.
+  span.parentNode?.normalize();
+  const after = doc.createRange();
+  after.selectNodeContents(span);
+  return after;
+}
+
 /**
  * Colour just the highlighted words. The Style Manager's colour applies to a
- * whole component, so this goes on the rich-text toolbar instead, where a
- * selection actually exists.
+ * whole component, so this lives on the rich-text toolbar instead, where a
+ * text selection actually exists.
+ *
+ * The catch: clicking the <input type=color> opens the OS colour picker, which
+ * clears the canvas selection before the colour is chosen — so by the time the
+ * value changes there is nothing selected and execCommand would colour the
+ * whole block. We snapshot the range on pointerdown (while it is still live)
+ * and wrap that exact range by hand when the colour comes back.
  */
 function addTextColorAction(editor: Editor) {
   const rte = editor.RichTextEditor;
   if (rte.get("forecolor")) return;
+
+  let saved: Range | null = null;
+
   rte.add("forecolor", {
     icon: '<input type="color" class="email-rte-color" value="#000000" title="Colour the selected text"/>',
     attributes: { title: "Text colour" },
@@ -630,12 +659,19 @@ function addTextColorAction(editor: Editor) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     result: (r: any, action: any) => {
       const input = action.btn?.firstChild as HTMLInputElement | undefined;
-      if (!input) return;
-      // Without styleWithCSS the browser emits <font color>, which juice can't
-      // inline; we want <span style="color:…"> so it survives to the inbox.
-      r.doc?.execCommand("styleWithCSS", false, "true");
-      r.exec("foreColor", input.value);
-      r.doc?.execCommand("styleWithCSS", false, "false");
+      const doc: Document | undefined = r.doc;
+      if (!input || !doc) return;
+      const range = saved && !saved.collapsed ? saved : null;
+      if (!range) return; // nothing was highlighted — do nothing rather than paint everything
+      const next = colorRange(doc, range, input.value);
+      if (next) {
+        const sel = doc.getSelection();
+        sel?.removeAllRanges();
+        sel?.addRange(next);
+        saved = next.cloneRange();
+        // Push the edited HTML back into the component model.
+        (r.el as HTMLElement | undefined)?.dispatchEvent(new Event("input", { bubbles: true }));
+      }
     },
     // Reflect the colour already under the caret back onto the swatch.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -647,6 +683,24 @@ function addTextColorAction(editor: Editor) {
     },
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any);
+
+  // The toolbar sits in the top document; the text lives in the canvas iframe.
+  // Capture the live selection the instant the swatch is pressed, before the
+  // native picker steals focus and collapses it.
+  const grab = (e: Event) => {
+    const t = e.target as HTMLElement | null;
+    if (!t?.classList?.contains("email-rte-color")) return;
+    let cdoc: Document | null = null;
+    try { cdoc = editor.Canvas.getDocument(); } catch { /* not ready */ }
+    const sel = cdoc?.getSelection();
+    saved = sel && sel.rangeCount && !sel.isCollapsed ? sel.getRangeAt(0).cloneRange() : null;
+  };
+  document.addEventListener("pointerdown", grab, true);
+  document.addEventListener("mousedown", grab, true);
+  editor.on("destroy", () => {
+    document.removeEventListener("pointerdown", grab, true);
+    document.removeEventListener("mousedown", grab, true);
+  });
 }
 
 /** Mirror the email settings into the canvas iframe so the editor is WYSIWYG. */
