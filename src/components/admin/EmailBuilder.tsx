@@ -240,13 +240,14 @@ const THEME_CSS = `
 .gjs-rte-action { color:#e2e8f0; border-right:0; min-width:26px; padding:4px 6px; border-radius:6px; }
 .gjs-rte-action:hover { background:rgba(255,255,255,.12); color:#5eead4; }
 .gjs-rte-action.gjs-rte-active { background:#14b8a6; color:#fff; }
-input.email-rte-color {
-  -webkit-appearance:none; appearance:none;
-  width:20px; height:16px; padding:0; border:1px solid rgba(255,255,255,.35);
-  border-radius:4px; background:none; cursor:pointer; vertical-align:middle;
+/* RTE text-colour swatch — a button that opens our own picker, styled with an
+   "A" over a colour bar so it reads as text colour. */
+.email-rte-color {
+  display:inline-flex; flex-direction:column; align-items:center; justify-content:center;
+  width:20px; height:18px; cursor:pointer; line-height:1;
 }
-input.email-rte-color::-webkit-color-swatch-wrapper { padding:0; }
-input.email-rte-color::-webkit-color-swatch { border:none; border-radius:3px; }
+.email-rte-color::before { content:"A"; font-size:11px; font-weight:700; color:#e2e8f0; }
+.email-rte-color-dot { width:14px; height:3px; border-radius:2px; margin-top:1px; background:#111827; }
 
 /* Opacity slider */
 .email-range { -webkit-appearance:none; appearance:none; width:100%; height:5px; border-radius:999px; outline:none; }
@@ -711,6 +712,178 @@ function toHex(value: string) {
   return "#" + [m[1], m[2], m[3]].map((n) => Number(n).toString(16).padStart(2, "0")).join("");
 }
 
+/* ------------------------------------------------------------------ *
+ * Custom colour picker — replaces the browser's native <input type=color>,
+ * which opens the OS colour panel and can't show brand colours. Palette +
+ * hex + a real HSV spectrum, all in-app.
+ * ------------------------------------------------------------------ */
+
+const clampU = (n: number) => Math.min(1, Math.max(0, n));
+
+function normHex(h: string): string {
+  let s = (h || "").trim().toLowerCase();
+  if (s && !s.startsWith("#")) s = "#" + s;
+  if (/^#[0-9a-f]{3}$/.test(s)) s = "#" + s.slice(1).split("").map((c) => c + c).join("");
+  return /^#[0-9a-f]{6}$/.test(s) ? s : "";
+}
+
+function hexToHsv(hex: string): { h: number; s: number; v: number } {
+  const h = normHex(hex) || "#000000";
+  const r = parseInt(h.slice(1, 3), 16) / 255, g = parseInt(h.slice(3, 5), 16) / 255, b = parseInt(h.slice(5, 7), 16) / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+  let hh = 0;
+  if (d) {
+    if (max === r) hh = ((g - b) / d) % 6;
+    else if (max === g) hh = (b - r) / d + 2;
+    else hh = (r - g) / d + 4;
+    hh = hh * 60;
+    if (hh < 0) hh += 360;
+  }
+  return { h: hh, s: max === 0 ? 0 : d / max, v: max };
+}
+
+function hsvToHex(h: number, s: number, v: number): string {
+  const c = v * s, x = c * (1 - Math.abs(((h / 60) % 2) - 1)), m = v - c;
+  let r = 0, g = 0, b = 0;
+  if (h < 60) { r = c; g = x; } else if (h < 120) { r = x; g = c; } else if (h < 180) { g = c; b = x; }
+  else if (h < 240) { g = x; b = c; } else if (h < 300) { r = x; b = c; } else { r = c; b = x; }
+  const to = (n: number) => Math.round((n + m) * 255).toString(16).padStart(2, "0");
+  return "#" + to(r) + to(g) + to(b);
+}
+
+const PICKER_PRESETS = [
+  "#000000", "#475569", "#94a3b8", "#e2e8f0", "#ffffff",
+  "#ef4444", "#f97316", "#eab308", "#22c55e", "#14b8a6",
+  "#0ea5e9", "#3b82f6", "#6366f1", "#a855f7", "#ec4899",
+  "#7f1d1d", "#78350f", "#134e4a", "#0d1b2a", "#0d9488",
+];
+
+function ColorPopover({
+  x, y, value, brand, onPick, onClose,
+}: {
+  x: number; y: number; value: string; brand: string[];
+  onPick: (hex: string) => void; onClose: () => void;
+}) {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [hsv, setHsv] = useState(() => hexToHsv(value));
+  const [hexText, setHexText] = useState(() => normHex(value) || "#000000");
+
+  // Commit a colour: update the local UI and apply it to the selection.
+  const commit = useCallback((next: { h: number; s: number; v: number }) => {
+    setHsv(next);
+    const hx = hsvToHex(next.h, next.s, next.v);
+    setHexText(hx);
+    onPick(hx);
+  }, [onPick]);
+
+  // Drag within a box; `read` maps a pointer position to the new HSV.
+  const drag = (
+    read: (px: number, py: number, rect: DOMRect) => { h: number; s: number; v: number },
+  ) => (e: React.PointerEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const move = (cx: number, cy: number) => commit(read(cx, cy, rect));
+    move(e.clientX, e.clientY);
+    const onMove = (ev: PointerEvent) => move(ev.clientX, ev.clientY);
+    const onUp = () => { window.removeEventListener("pointermove", onMove); window.removeEventListener("pointerup", onUp); };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
+
+  const onSV = drag((px, py, rect) => ({
+    h: hsv.h,
+    s: clampU((px - rect.left) / rect.width),
+    v: 1 - clampU((py - rect.top) / rect.height),
+  }));
+  const onHue = drag((px, _py, rect) => ({
+    h: clampU((px - rect.left) / rect.width) * 360,
+    s: hsv.s || 1,
+    v: hsv.v || 1,
+  }));
+
+  // Close on outside click / Escape.
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => { if (!rootRef.current?.contains(e.target as Node)) onClose(); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("mousedown", onDown, true);
+    document.addEventListener("keydown", onKey, true);
+    return () => { document.removeEventListener("mousedown", onDown, true); document.removeEventListener("keydown", onKey, true); };
+  }, [onClose]);
+
+  const hueColor = hsvToHex(hsv.h, 1, 1);
+  const swatch = (c: string, isBrand = false) => (
+    <button
+      key={(isBrand ? "b" : "p") + c}
+      type="button"
+      title={isBrand ? `Brand · ${c}` : c}
+      onClick={() => { const n = hexToHsv(c); setHsv(n); setHexText(c); onPick(c); }}
+      className={`w-5 h-5 rounded-full transition-transform hover:scale-110 ${isBrand ? "border-2 border-teal-400" : "border border-slate-200"}`}
+      style={{ backgroundColor: c }}
+    />
+  );
+
+  // Keep the popover on-screen.
+  const width = 232, height = 300;
+  const left = Math.max(8, Math.min(x, window.innerWidth - width - 8));
+  const top = y + height > window.innerHeight - 8 ? Math.max(8, y - height - 40) : y;
+
+  return (
+    <div
+      ref={rootRef}
+      className="fixed z-[2147483600] w-[232px] rounded-xl border border-slate-200 bg-white shadow-[0_12px_32px_rgba(15,23,42,0.22)] p-3"
+      style={{ left, top }}
+    >
+      {/* Saturation / value */}
+      <div
+        onPointerDown={onSV}
+        className="relative h-32 w-full rounded-lg cursor-crosshair touch-none"
+        style={{ backgroundColor: hueColor, backgroundImage: "linear-gradient(to right,#fff,rgba(255,255,255,0)),linear-gradient(to top,#000,rgba(0,0,0,0))" }}
+      >
+        <span
+          className="absolute w-3 h-3 -ml-1.5 -mt-1.5 rounded-full border-2 border-white shadow ring-1 ring-black/20 pointer-events-none"
+          style={{ left: `${hsv.s * 100}%`, top: `${(1 - hsv.v) * 100}%`, backgroundColor: hexText }}
+        />
+      </div>
+
+      {/* Hue */}
+      <div
+        onPointerDown={onHue}
+        className="relative h-3 w-full rounded-full mt-3 cursor-pointer touch-none"
+        style={{ backgroundImage: "linear-gradient(to right,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00)" }}
+      >
+        <span
+          className="absolute top-1/2 w-3.5 h-3.5 -ml-1.5 -mt-1.5 rounded-full border-2 border-white shadow ring-1 ring-black/20 pointer-events-none"
+          style={{ left: `${(hsv.h / 360) * 100}%`, backgroundColor: hueColor }}
+        />
+      </div>
+
+      {/* Hex */}
+      <div className="mt-3 flex items-center gap-2">
+        <span className="w-6 h-6 rounded-md border border-slate-200 flex-shrink-0" style={{ backgroundColor: hexText }} />
+        <input
+          value={hexText}
+          onChange={(e) => {
+            setHexText(e.target.value);
+            const n = normHex(e.target.value);
+            if (n) { setHsv(hexToHsv(n)); onPick(n); }
+          }}
+          spellCheck={false}
+          className="flex-1 min-w-0 px-2 py-1 text-[11px] font-mono border border-slate-200 rounded-md focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 outline-none uppercase"
+        />
+      </div>
+
+      {brand.length > 0 && (
+        <>
+          <div className="mt-3 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Brand</div>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">{brand.map((c) => swatch(c, true))}</div>
+        </>
+      )}
+
+      <div className="mt-3 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Presets</div>
+      <div className="mt-1.5 grid grid-cols-10 gap-1">{PICKER_PRESETS.map((c) => swatch(c))}</div>
+    </div>
+  );
+}
+
 /** Wrap exactly `range` in a coloured <span>, leaving everything else alone. */
 function colorRange(doc: Document, range: Range, color: string): Range | null {
   if (!range || range.collapsed) return null;
@@ -744,54 +917,61 @@ function colorRange(doc: Document, range: Range, color: string): Range | null {
   return after;
 }
 
+/** What the RTE colour swatch hands to the React layer when clicked. */
+interface RtePickerOpen {
+  x: number;
+  y: number;
+  color: string;
+  apply: (hex: string) => void;
+}
+
 /**
  * Colour just the highlighted words. The Style Manager's colour applies to a
  * whole component, so this lives on the rich-text toolbar instead, where a
  * text selection actually exists.
  *
- * The catch: clicking the <input type=color> opens the OS colour picker, which
- * clears the canvas selection before the colour is chosen — so by the time the
- * value changes there is nothing selected and execCommand would colour the
- * whole block. We snapshot the range on pointerdown (while it is still live)
- * and wrap that exact range by hand when the colour comes back.
+ * The toolbar swatch is a plain button — clicking it opens our own colour
+ * popover (not the OS picker). We snapshot the selection on pointerdown, while
+ * it is still live, then wrap that exact range by hand each time the popover
+ * reports a colour.
  */
-function addTextColorAction(editor: Editor) {
+function addTextColorAction(editor: Editor, onOpen: (o: RtePickerOpen) => void) {
   const rte = editor.RichTextEditor;
   if (rte.get("forecolor")) return;
 
   let saved: Range | null = null;
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const apply = (r: any) => (hex: string) => {
+    const doc: Document | undefined = r.doc;
+    const range = saved && !saved.collapsed ? saved : null;
+    if (!doc || !range) return; // nothing highlighted — don't paint the whole block
+    const next = colorRange(doc, range, hex);
+    if (next) {
+      const sel = doc.getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(next);
+      saved = next.cloneRange();
+      (r.el as HTMLElement | undefined)?.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+  };
+
   rte.add("forecolor", {
-    icon: '<input type="color" class="email-rte-color" value="#000000" title="Colour the selected text"/>',
+    icon: '<span class="email-rte-color" title="Colour the selected text"><span class="email-rte-color-dot" style="background:#111827"></span></span>',
     attributes: { title: "Text colour" },
-    // "change", not "input": the native picker fires "input" continuously while
-    // you drag, and each one re-wrapped the selection and re-synced GrapesJS —
-    // hundreds of nested spans and re-renders that froze the page. "change"
-    // fires once, when the colour is committed.
-    event: "change",
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     result: (r: any, action: any) => {
-      const input = action.btn?.firstChild as HTMLInputElement | undefined;
-      const doc: Document | undefined = r.doc;
-      if (!input || !doc) return;
-      const range = saved && !saved.collapsed ? saved : null;
-      if (!range) return; // nothing was highlighted — do nothing rather than paint everything
-      const next = colorRange(doc, range, input.value);
-      if (next) {
-        const sel = doc.getSelection();
-        sel?.removeAllRanges();
-        sel?.addRange(next);
-        saved = next.cloneRange();
-        // Push the edited HTML back into the component model.
-        (r.el as HTMLElement | undefined)?.dispatchEvent(new Event("input", { bubbles: true }));
-      }
+      const btn = action.btn as HTMLElement | undefined;
+      const rect = btn?.getBoundingClientRect();
+      const color = toHex(String(r.doc?.queryCommandValue("foreColor") || "")) || "#111827";
+      onOpen({ x: rect ? rect.left : 200, y: rect ? rect.bottom + 6 : 200, color, apply: apply(r) });
     },
-    // Reflect the colour already under the caret back onto the swatch.
+    // Keep the swatch dot showing the colour under the caret.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     update: (r: any, action: any) => {
-      const input = action.btn?.firstChild as HTMLInputElement | undefined;
+      const dot = action.btn?.querySelector?.(".email-rte-color-dot") as HTMLElement | undefined;
       const current = toHex(String(r.doc?.queryCommandValue("foreColor") || ""));
-      if (input && current) input.value = current;
+      if (dot && current) dot.style.background = current;
       return 0;
     },
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -799,10 +979,10 @@ function addTextColorAction(editor: Editor) {
 
   // The toolbar sits in the top document; the text lives in the canvas iframe.
   // Capture the live selection the instant the swatch is pressed, before the
-  // native picker steals focus and collapses it.
+  // click moves focus out of the editable and collapses it.
   const grab = (e: Event) => {
     const t = e.target as HTMLElement | null;
-    if (!t?.classList?.contains("email-rte-color")) return;
+    if (!t?.closest?.(".email-rte-color")) return;
     let cdoc: Document | null = null;
     try { cdoc = editor.Canvas.getDocument(); } catch { /* not ready */ }
     const sel = cdoc?.getSelection();
@@ -936,9 +1116,23 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
   const [previewing, setPreviewing] = useState(false);
   const [emailOpen, setEmailOpen] = useState(true);
   const [brandColors, setBrandColors] = useState<string[]>(BRAND_CACHE);
+  // The custom colour popover for the rich-text (selected words) swatch.
+  const [rtePicker, setRtePicker] = useState<RtePickerOpen | null>(null);
 
   const set = useCallback(<K extends keyof EmailSettings>(key: K, value: EmailSettings[K]) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
+  }, []);
+
+  // Push the palette into GrapesJS so every Style Manager colour picker (bg,
+  // border, element text) opens with the brand colours as its swatches. Read
+  // fresh at each picker open, so updating it takes effect on the next open.
+  const seedGjsPalette = useCallback((colors: string[]) => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (editor.getConfig() as any).colorPicker = { palette: colors.length ? [colors] : [] };
+    } catch { /* ignore */ }
   }, []);
 
   // Load the saved brand palette once; keep the module cache in step so the
@@ -947,20 +1141,21 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
     let live = true;
     fetch("/api/admin/email-brand")
       .then((r) => (r.ok ? r.json() : { colors: [] }))
-      .then((d) => { if (live) { BRAND_CACHE = d.colors || []; setBrandColors(BRAND_CACHE); } })
+      .then((d) => { if (live) { BRAND_CACHE = d.colors || []; setBrandColors(BRAND_CACHE); seedGjsPalette(BRAND_CACHE); } })
       .catch(() => {});
     return () => { live = false; };
-  }, []);
+  }, [seedGjsPalette]);
 
   const persistBrand = useCallback((colors: string[]) => {
     BRAND_CACHE = colors;
     setBrandColors(colors);
+    seedGjsPalette(colors);
     fetch("/api/admin/email-brand", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ colors }),
     }).catch(() => {});
-  }, []);
+  }, [seedGjsPalette]);
 
   const addBrandColor = useCallback((c: string) => {
     const v = (c || "").trim().toLowerCase();
@@ -969,12 +1164,13 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
       if (prev.includes(v)) return prev;
       const next = [...prev, v].slice(0, 24);
       BRAND_CACHE = next;
+      seedGjsPalette(next);
       fetch("/api/admin/email-brand", {
         method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ colors: next }),
       }).catch(() => {});
       return next;
     });
-  }, []);
+  }, [seedGjsPalette]);
 
   const removeBrandColor = useCallback((c: string) => {
     setBrandColors((prev) => {
@@ -1143,7 +1339,7 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
     } catch { /* fall back to empty canvas */ }
 
     editor.onReady(() => {
-      addTextColorAction(editor);
+      addTextColorAction(editor, (o) => setRtePicker(o));
       paintCanvas(editor, settingsRef.current);
       // Load the Google fonts into the canvas so any pick previews immediately.
       try {
@@ -1748,6 +1944,18 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
           </div>
         </aside>
       </div>
+
+      {/* Custom colour picker for the rich-text (selected words) swatch. */}
+      {rtePicker && (
+        <ColorPopover
+          x={rtePicker.x}
+          y={rtePicker.y}
+          value={rtePicker.color}
+          brand={brandColors}
+          onPick={(hex) => rtePicker.apply(hex)}
+          onClose={() => setRtePicker(null)}
+        />
+      )}
     </div>
   );
 }
