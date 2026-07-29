@@ -259,44 +259,6 @@ const SECTORS = [
     ],
   },
   {
-    id: "background",
-    name: "Background & border",
-    open: true,
-    buildProps: ["background-color", "border-radius", "border", "background"],
-    properties: [
-      { property: "background-color", name: "Background" },
-      {
-        property: "border-radius",
-        name: "Corner radius",
-        properties: [
-          { name: "Top left", property: "border-top-left-radius" },
-          { name: "Top right", property: "border-top-right-radius" },
-          { name: "Bottom right", property: "border-bottom-right-radius" },
-          { name: "Bottom left", property: "border-bottom-left-radius" },
-        ],
-      },
-      {
-        property: "border",
-        name: "Border",
-        properties: [
-          { name: "Width", property: "border-width", defaults: "0" },
-          { name: "Style", property: "border-style" },
-          { name: "Color", property: "border-color" },
-        ],
-      },
-      {
-        property: "background",
-        name: "Background image",
-        properties: [
-          { name: "Image", property: "background-image" },
-          { name: "Repeat", property: "background-repeat" },
-          { name: "Position", property: "background-position" },
-          { name: "Size", property: "background-size" },
-        ],
-      },
-    ],
-  },
-  {
     id: "spacing",
     name: "Spacing & size",
     open: true,
@@ -324,7 +286,267 @@ const SECTORS = [
       },
     ],
   },
+  // Last, so our own Background image control renders directly beneath it.
+  {
+    id: "background",
+    name: "Background & border",
+    open: true,
+    // No `background` stack property — GrapesJS renders it as an opaque layer
+    // chip ("repeat left top cover") with no opacity control at all.
+    buildProps: ["background-color", "border-radius", "border"],
+    properties: [
+      { property: "background-color", name: "Background" },
+      {
+        property: "border-radius",
+        name: "Corner radius",
+        properties: [
+          { name: "Top left", property: "border-top-left-radius" },
+          { name: "Top right", property: "border-top-right-radius" },
+          { name: "Bottom right", property: "border-bottom-right-radius" },
+          { name: "Bottom left", property: "border-bottom-left-radius" },
+        ],
+      },
+      {
+        property: "border",
+        name: "Border",
+        properties: [
+          { name: "Width", property: "border-width", defaults: "0" },
+          { name: "Style", property: "border-style" },
+          { name: "Color", property: "border-color" },
+        ],
+      },
+    ],
+  },
 ];
+
+/* ------------------------------------------------------------------ *
+ * Background image — one control, used for the email body and for
+ * whichever element is selected.
+ * ------------------------------------------------------------------ */
+
+export interface BgImage {
+  image: string;
+  fit: EmailSettings["pageBgFit"];
+  position: string;
+  opacity: number;
+}
+
+const NO_BG: BgImage = { image: "", fit: "cover", position: "center center", opacity: 1 };
+
+/** Recover our settings back out of a `background-image` declaration. */
+function parseBgImage(style: Record<string, string>): BgImage {
+  const raw = style["background-image"] || "";
+  const veiled = raw.match(
+    /^\s*linear-gradient\(\s*rgba\(\s*[\d.]+\s*,\s*[\d.]+\s*,\s*[\d.]+\s*,\s*([\d.]+)\s*\)\s*,\s*rgba\([^)]*\)\s*\)\s*,\s*([\s\S]*)$/i,
+  );
+  const rest = veiled ? veiled[2] : raw;
+  const url = rest.match(/url\(\s*['"]?([^'")]+)['"]?\s*\)/i)?.[1] || "";
+  // No image yet — hand back the defaults rather than inferring "actual" from
+  // the absent background-size.
+  if (!url) return NO_BG;
+  const size = style["background-size"] || "";
+  const repeat = style["background-repeat"] || "";
+  return {
+    image: url,
+    fit: size === "cover" ? "cover" : size === "contain" ? "contain" : repeat === "repeat" ? "tile" : "actual",
+    position: style["background-position"] || "center center",
+    opacity: veiled ? clamp01(1 - parseFloat(veiled[1])) : 1,
+  };
+}
+
+/** ...and turn them back into CSS, dimming with a sheet of `veilColor`. */
+function bgImageCss(v: BgImage, veilColor: string): Record<string, string> {
+  const url = safeUrl(v.image);
+  if (!url) return {};
+  const fit = FIT[v.fit] || FIT.cover;
+  const sheet = 1 - clamp01(v.opacity);
+  const veil = sheet > 0 ? `linear-gradient(${rgba(veilColor, sheet)},${rgba(veilColor, sheet)}),` : "";
+  return {
+    "background-image": `${veil}url("${url}")`,
+    "background-size": fit.size,
+    "background-repeat": fit.repeat,
+    "background-position": v.position,
+  };
+}
+
+const BG_KEYS = ["background-image", "background-size", "background-repeat", "background-position"];
+
+function BgImageField({
+  value,
+  onChange,
+  veilColor,
+  note,
+}: {
+  value: BgImage;
+  onChange: (next: BgImage) => void;
+  /** The colour the image is dimmed toward — normally whatever sits behind it. */
+  veilColor: string;
+  note?: string;
+}) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+
+  const url = safeUrl(value.image);
+  const opacity = clamp01(value.opacity);
+  const sheet = 1 - opacity;
+  const veil = veilColor || "#ffffff";
+
+  async function upload(file: File) {
+    setUploading(true);
+    setError(null);
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      const res = await fetch("/api/admin/email-assets", { method: "POST", body });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return setError(data.error || "Upload failed.");
+      onChange({ ...value, image: data.url });
+    } catch {
+      setError("Upload failed — check your connection.");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[11px] font-medium text-slate-600">Background image</span>
+        {url && (
+          <button
+            type="button"
+            onClick={() => onChange({ ...value, image: "" })}
+            className="text-[10px] text-slate-400 hover:text-red-600 transition-colors flex items-center gap-0.5"
+          >
+            <X className="w-3 h-3" /> Remove
+          </button>
+        )}
+      </div>
+
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/gif"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) upload(f);
+          e.target.value = "";
+        }}
+      />
+
+      <div
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragOver(false);
+          const f = e.dataTransfer.files?.[0];
+          if (f) upload(f);
+        }}
+        onClick={() => !uploading && fileRef.current?.click()}
+        className={`relative h-24 rounded-xl border-2 border-dashed overflow-hidden cursor-pointer transition-all flex items-center justify-center ${
+          dragOver ? "border-teal-500 bg-teal-50" : "border-slate-200 hover:border-teal-400 hover:bg-slate-50"
+        }`}
+        style={url ? {
+          // Preview the dimming here too.
+          backgroundImage: (sheet > 0 ? `linear-gradient(${rgba(veil, sheet)},${rgba(veil, sheet)}),` : "") + `url("${url}")`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundColor: veil,
+          borderStyle: "solid",
+        } : undefined}
+      >
+        {uploading ? (
+          <span className="flex items-center gap-2 text-[11px] text-slate-500 bg-white/90 px-3 py-1.5 rounded-lg">
+            <Loader2 className="w-3.5 h-3.5 animate-spin" /> Uploading…
+          </span>
+        ) : url ? (
+          <span className="text-[10.5px] font-medium text-white bg-black/45 px-2.5 py-1 rounded-md backdrop-blur-sm">
+            Click to replace
+          </span>
+        ) : (
+          <span className="flex flex-col items-center gap-1 text-slate-400">
+            <ImagePlus className="w-5 h-5" />
+            <span className="text-[10.5px] font-medium">Upload or drop an image</span>
+          </span>
+        )}
+      </div>
+
+      <input
+        type="url"
+        value={value.image}
+        onChange={(e) => onChange({ ...value, image: e.target.value })}
+        placeholder="…or paste an image URL"
+        className="mt-2 w-full px-2.5 py-1.5 text-[11px] border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 outline-none transition-all"
+      />
+      {error && <p className="mt-1.5 text-[10.5px] text-red-600">{error}</p>}
+
+      {url && (
+        <div className="mt-3 space-y-3">
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[11px] font-medium text-slate-600">Image opacity</span>
+              <span className="text-[10.5px] font-semibold text-teal-700 tabular-nums">{opacity.toFixed(2)}</span>
+            </div>
+            <input
+              type="range"
+              min={0} max={1} step={0.05}
+              value={opacity}
+              onChange={(e) => onChange({ ...value, opacity: parseFloat(e.target.value) })}
+              className="email-range"
+              style={{ background: `linear-gradient(90deg,#14b8a6 0%,#14b8a6 ${opacity * 100}%,#e2e8f0 ${opacity * 100}%,#e2e8f0 100%)` }}
+            />
+            <div className="flex justify-between text-[9.5px] text-slate-400 mt-1">
+              <span>0.0 · hidden</span>
+              <span>1.0 · full</span>
+            </div>
+          </div>
+
+          <div>
+            <span className="block text-[11px] font-medium text-slate-600 mb-1.5">Fit</span>
+            <div className="flex gap-1 p-0.5 bg-slate-100 rounded-lg">
+              {(["cover", "contain", "tile", "actual"] as const).map((f) => (
+                <button
+                  key={f}
+                  type="button"
+                  onClick={() => onChange({ ...value, fit: f })}
+                  className={`flex-1 px-2 py-1.5 text-[11px] font-medium rounded-md capitalize transition-all ${
+                    value.fit === f ? "bg-white text-teal-700 shadow-sm" : "text-slate-500 hover:text-slate-800"
+                  }`}
+                >
+                  {f}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <span className="block text-[11px] font-medium text-slate-600 mb-1.5">Position</span>
+            <div className="inline-grid grid-cols-3 gap-1 p-1 bg-slate-100 rounded-lg">
+              {POSITIONS.flat().map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  title={p}
+                  onClick={() => onChange({ ...value, position: p })}
+                  className={`w-6 h-6 rounded-md transition-all ${
+                    value.position === p ? "bg-teal-600 shadow-sm" : "bg-white hover:bg-teal-100"
+                  }`}
+                >
+                  <span className={`block w-1.5 h-1.5 rounded-full mx-auto ${value.position === p ? "bg-white" : "bg-slate-300"}`} />
+                </button>
+              ))}
+            </div>
+            {note && <p className="mt-1.5 text-[10px] text-slate-400 leading-snug">{note}</p>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 /** An <img> or <a> is inline — aligning it means aligning the cell it sits in. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -370,9 +592,11 @@ function paintCanvas(editor: Editor, s: EmailSettings) {
     s.font ? `font-family:${s.font} !important;` : "",
     s.textColor ? `color:${s.textColor} !important;` : "",
     "}",
-    "body > * { margin-left:auto !important; margin-right:auto !important;",
-    s.contentWidth ? `max-width:${s.contentWidth}px !important;` : "",
-    s.contentBg ? `background-color:${s.contentBg} !important;` : "",
+    // Deliberately not !important — GrapesJS styles each element through an
+    // #id rule, so an element's own background must be able to win here.
+    "body > * { margin-left:auto; margin-right:auto;",
+    s.contentWidth ? `max-width:${s.contentWidth}px;` : "",
+    s.contentBg ? `background-color:${s.contentBg};` : "",
     "}",
     s.linkColor ? `a { color:${s.linkColor} !important; }` : "",
   ].join("");
@@ -426,7 +650,6 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
   const traitsRef = useRef<HTMLDivElement>(null);
   const layersRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLElement>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<Editor | null>(null);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -440,36 +663,16 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
 
   const [selection, setSelection] = useState<string | null>(null);
   const [align, setAlign] = useState("");
+  /** Background image of whatever is selected, mirrored out of its CSS. */
+  const [selBg, setSelBg] = useState<BgImage>(NO_BG);
+  const [selVeil, setSelVeil] = useState("#ffffff");
   const [tab, setTab] = useState<Tab>("design");
   const [device, setDevice] = useState<"desktop" | "mobile">("desktop");
   const [previewing, setPreviewing] = useState(false);
   const [emailOpen, setEmailOpen] = useState(true);
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const [dragOver, setDragOver] = useState(false);
 
   const set = useCallback(<K extends keyof EmailSettings>(key: K, value: EmailSettings[K]) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
-  }, []);
-
-  const upload = useCallback(async (file: File) => {
-    setUploading(true);
-    setUploadError(null);
-    try {
-      const body = new FormData();
-      body.append("file", file);
-      const res = await fetch("/api/admin/email-assets", { method: "POST", body });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setUploadError(data.error || "Upload failed.");
-        return;
-      }
-      setSettings((prev) => ({ ...prev, pageBgImage: data.url }));
-    } catch {
-      setUploadError("Upload failed — check your connection.");
-    } finally {
-      setUploading(false);
-    }
   }, []);
 
   const applyAlign = useCallback((value: string) => {
@@ -482,6 +685,16 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
     const sel = editor.getSelected();
     if (sel?.get("type") === "image") sel.addStyle({ display: "inline-block", float: "none" });
     setAlign(value);
+  }, []);
+
+  /** Write a background image back onto the selected element. */
+  const applySelBg = useCallback((next: BgImage, veil: string) => {
+    setSelBg(next);
+    const sel = editorRef.current?.getSelected();
+    if (!sel) return;
+    const style = { ...((sel.getStyle() || {}) as Record<string, string>) };
+    for (const k of BG_KEYS) delete style[k];
+    sel.setStyle({ ...style, ...bgImageCss(next, veil) });
   }, []);
 
   const run = useCallback((cmd: string) => editorRef.current?.runCommand(cmd), []);
@@ -537,14 +750,19 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
       if (!sel) {
         setSelection(null);
         setAlign("");
+        setSelBg(NO_BG);
         return;
       }
       setSelection(sel.getName?.() || String(sel.get("type") || "Element"));
-      const style = (alignTarget(editor)?.getStyle() || {}) as Record<string, string>;
-      setAlign(style["text-align"] || "");
+      setAlign(((alignTarget(editor)?.getStyle() || {}) as Record<string, string>)["text-align"] || "");
+      const own = (sel.getStyle() || {}) as Record<string, string>;
+      setSelBg(parseBgImage(own));
+      setSelVeil(safeColor(own["background-color"] || "") || "#ffffff");
     };
     editor.on("component:selected", syncSelection);
     editor.on("component:deselected", syncSelection);
+    // Keep in step when the Style Manager edits background-color underneath us.
+    editor.on("component:styleUpdate", syncSelection);
 
     // Load existing design (preferred) or seed HTML.
     try {
@@ -770,23 +988,6 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
     </div>
   );
 
-  const segment = <T extends string>(value: T, options: { id: T; label: string }[], onPick: (v: T) => void) => (
-    <div className="flex gap-1 p-0.5 bg-slate-100 rounded-lg">
-      {options.map((o) => (
-        <button
-          key={o.id}
-          type="button"
-          onClick={() => onPick(o.id)}
-          className={`flex-1 px-2 py-1.5 text-[11px] font-medium rounded-md transition-all ${
-            value === o.id ? "bg-white text-teal-700 shadow-sm" : "text-slate-500 hover:text-slate-800"
-          }`}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
-  );
-
   const tabBtn = (id: Tab, Icon: typeof Sliders, label: string) => (
     <button
       type="button"
@@ -799,8 +1000,6 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
       {tab === id && <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-teal-600 rounded-full" />}
     </button>
   );
-
-  const hasImage = !!safeUrl(settings.pageBgImage);
 
   return (
     <div className="h-full w-full flex flex-col bg-white">
@@ -885,137 +1084,18 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
               <div className="px-4 pb-5 space-y-5">
                 {swatchRow("Background color", settings.pageBg, PAGE_SWATCHES, (c) => set("pageBg", c))}
 
-                {/* Background image */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[11px] font-medium text-slate-600">Background image</span>
-                    {hasImage && (
-                      <button type="button" onClick={() => set("pageBgImage", "")} className="text-[10px] text-slate-400 hover:text-red-600 transition-colors flex items-center gap-0.5">
-                        <X className="w-3 h-3" /> Remove
-                      </button>
-                    )}
-                  </div>
-
-                  <input
-                    ref={fileRef}
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp,image/gif"
-                    className="hidden"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      if (f) upload(f);
-                      e.target.value = "";
-                    }}
-                  />
-
-                  <div
-                    onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-                    onDragLeave={() => setDragOver(false)}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      setDragOver(false);
-                      const f = e.dataTransfer.files?.[0];
-                      if (f) upload(f);
-                    }}
-                    onClick={() => !uploading && fileRef.current?.click()}
-                    className={`relative h-24 rounded-xl border-2 border-dashed overflow-hidden cursor-pointer transition-all flex items-center justify-center ${
-                      dragOver ? "border-teal-500 bg-teal-50" : "border-slate-200 hover:border-teal-400 hover:bg-slate-50"
-                    }`}
-                    style={hasImage ? {
-                      // Preview the opacity here too, over the page colour.
-                      backgroundImage:
-                        (clamp01(settings.pageBgOpacity) < 1
-                          ? `linear-gradient(${rgba(safeColor(settings.pageBg) || "#ffffff", 1 - clamp01(settings.pageBgOpacity))},${rgba(safeColor(settings.pageBg) || "#ffffff", 1 - clamp01(settings.pageBgOpacity))}),`
-                          : "") + `url("${safeUrl(settings.pageBgImage)}")`,
-                      backgroundSize: "cover",
-                      backgroundPosition: "center",
-                      backgroundColor: safeColor(settings.pageBg) || "#ffffff",
-                      borderStyle: "solid",
-                    } : undefined}
-                  >
-                    {uploading ? (
-                      <span className="flex items-center gap-2 text-[11px] text-slate-500 bg-white/90 px-3 py-1.5 rounded-lg">
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" /> Uploading…
-                      </span>
-                    ) : hasImage ? (
-                      <span className="text-[10.5px] font-medium text-white bg-black/45 px-2.5 py-1 rounded-md backdrop-blur-sm">
-                        Click to replace
-                      </span>
-                    ) : (
-                      <span className="flex flex-col items-center gap-1 text-slate-400">
-                        <ImagePlus className="w-5 h-5" />
-                        <span className="text-[10.5px] font-medium">Upload or drop an image</span>
-                      </span>
-                    )}
-                  </div>
-
-                  <input
-                    type="url"
-                    value={settings.pageBgImage}
-                    onChange={(e) => set("pageBgImage", e.target.value)}
-                    placeholder="…or paste an image URL"
-                    className="mt-2 w-full px-2.5 py-1.5 text-[11px] border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 outline-none transition-all"
-                  />
-                  {uploadError && <p className="mt-1.5 text-[10.5px] text-red-600">{uploadError}</p>}
-
-                  {hasImage && (
-                    <div className="mt-3 space-y-3">
-                      <div>
-                        <span className="block text-[11px] font-medium text-slate-600 mb-1.5">Fit</span>
-                        {segment(settings.pageBgFit, [
-                          { id: "cover" as const, label: "Cover" },
-                          { id: "contain" as const, label: "Contain" },
-                          { id: "tile" as const, label: "Tile" },
-                          { id: "actual" as const, label: "Actual" },
-                        ], (v) => set("pageBgFit", v))}
-                      </div>
-                      <div>
-                        <div className="flex items-center justify-between mb-1.5">
-                          <span className="text-[11px] font-medium text-slate-600">Image opacity</span>
-                          <span className="text-[10.5px] font-semibold text-teal-700 tabular-nums">
-                            {clamp01(settings.pageBgOpacity).toFixed(2)}
-                          </span>
-                        </div>
-                        <input
-                          type="range"
-                          min={0} max={1} step={0.05}
-                          value={clamp01(settings.pageBgOpacity)}
-                          onChange={(e) => set("pageBgOpacity", parseFloat(e.target.value))}
-                          className="email-range"
-                          style={{
-                            background: `linear-gradient(90deg,#14b8a6 0%,#14b8a6 ${clamp01(settings.pageBgOpacity) * 100}%,#e2e8f0 ${clamp01(settings.pageBgOpacity) * 100}%,#e2e8f0 100%)`,
-                          }}
-                        />
-                        <div className="flex justify-between text-[9.5px] text-slate-400 mt-1">
-                          <span>0.0 · hidden</span>
-                          <span>1.0 · full</span>
-                        </div>
-                      </div>
-
-                      <div>
-                        <span className="block text-[11px] font-medium text-slate-600 mb-1.5">Position</span>
-                        <div className="inline-grid grid-cols-3 gap-1 p-1 bg-slate-100 rounded-lg">
-                          {POSITIONS.flat().map((p) => (
-                            <button
-                              key={p}
-                              type="button"
-                              title={p}
-                              onClick={() => set("pageBgPosition", p)}
-                              className={`w-6 h-6 rounded-md transition-all ${
-                                settings.pageBgPosition === p ? "bg-teal-600 shadow-sm" : "bg-white hover:bg-teal-100"
-                              }`}
-                            >
-                              <span className={`block w-1.5 h-1.5 rounded-full mx-auto ${settings.pageBgPosition === p ? "bg-white" : "bg-slate-300"}`} />
-                            </button>
-                          ))}
-                        </div>
-                        <p className="mt-1.5 text-[10px] text-slate-400 leading-snug">
-                          Outlook needs a fallback — keep a background color set behind the image.
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                <BgImageField
+                  value={{ image: settings.pageBgImage, fit: settings.pageBgFit, position: settings.pageBgPosition, opacity: settings.pageBgOpacity }}
+                  onChange={(v) => setSettings((prev) => ({
+                    ...prev,
+                    pageBgImage: v.image,
+                    pageBgFit: v.fit,
+                    pageBgPosition: v.position,
+                    pageBgOpacity: v.opacity,
+                  }))}
+                  veilColor={safeColor(settings.pageBg) || "#ffffff"}
+                  note="Outlook needs a fallback — keep a background color set behind the image."
+                />
 
                 <div className="h-px bg-slate-100" />
 
@@ -1102,6 +1182,16 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
 
           <div className={tab === "design" && selection ? "" : "hidden"}>
             <div ref={stylesRef} />
+            {/* Sits directly under the Style Manager's "Background & border",
+                replacing GrapesJS's layer-chip control, which has no opacity. */}
+            <div className="px-[14px] pb-5 pt-1">
+              <BgImageField
+                value={selBg}
+                onChange={(v) => applySelBg(v, selVeil)}
+                veilColor={selVeil}
+                note="Dimmed toward this element's background color. Outlook can't show element background images at all — keep a background color set."
+              />
+            </div>
           </div>
           <div className={tab === "settings" && selection ? "" : "hidden"}>
             <div ref={traitsRef} />
