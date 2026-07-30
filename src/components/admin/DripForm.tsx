@@ -151,10 +151,29 @@ export function DripForm({ mode, campaignId, initial }: DripFormProps) {
           <div key={i} className="border border-gray-100 rounded-lg p-4 space-y-3">
             <div className="flex items-center justify-between">
               <span className="flex items-center gap-1.5 text-sm font-medium text-navy-900">
-                {i === 0 ? <Zap className="w-4 h-4 text-teal-600" /> : <Clock className="w-4 h-4 text-gray-400" />}
+                {step.delayValue === 0 ? <Zap className="w-4 h-4 text-teal-600" /> : <Clock className="w-4 h-4 text-gray-400" />}
                 Message {i + 1}
-                {i === 0 ? (
-                  <span className="text-xs text-gray-500 font-normal">· sent immediately on enrollment</span>
+                {i === 0 && step.delayValue === 0 ? (
+                  <span className="flex items-center gap-1 text-xs text-gray-500 font-normal">
+                    · send
+                    <input
+                      type="number"
+                      min={0}
+                      value={step.delayValue}
+                      onChange={(e) => updateStep(i, { delayValue: Math.max(0, parseInt(e.target.value || "0", 10)) })}
+                      className="w-14 px-2 py-0.5 text-xs border border-gray-200 rounded"
+                    />
+                    <select
+                      value={step.delayUnit}
+                      onChange={(e) => updateStep(i, { delayUnit: e.target.value as DelayUnit })}
+                      className="px-1.5 py-0.5 text-xs border border-gray-200 rounded bg-white"
+                    >
+                      <option value="minutes">minutes</option>
+                      <option value="hours">hours</option>
+                      <option value="days">days</option>
+                    </select>
+                    after enrollment <span className="text-teal-600">(immediately)</span>
+                  </span>
                 ) : (
                   <span className="flex items-center gap-1 text-xs text-gray-500 font-normal">
                     · send
@@ -174,7 +193,7 @@ export function DripForm({ mode, campaignId, initial }: DripFormProps) {
                       <option value="hours">hours</option>
                       <option value="days">days</option>
                     </select>
-                    after the previous
+                    {i === 0 ? "after enrollment" : "after the previous"}
                   </span>
                 )}
               </span>

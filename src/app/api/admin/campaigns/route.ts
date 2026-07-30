@@ -57,7 +57,7 @@ export async function POST(request: Request) {
           create: steps.map((s, i) => ({
             stepOrder: i,
             body: s.body.trim(),
-            delayMinutes: i === 0 ? 0 : Math.max(0, Math.round(s.delayMinutes || 0)),
+            delayMinutes: Math.max(0, Math.round(s.delayMinutes || 0)),
           })),
         },
       },

@@ -70,7 +70,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
             create: steps.map((s: { body: string; delayMinutes?: number }, i: number) => ({
               stepOrder: i,
               body: s.body.trim(),
-              delayMinutes: i === 0 ? 0 : Math.max(0, Math.round(s.delayMinutes || 0)),
+              delayMinutes: Math.max(0, Math.round(s.delayMinutes || 0)),
             })),
           },
         },
