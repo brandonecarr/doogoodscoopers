@@ -47,8 +47,9 @@ export function DuplicateBanner({ leadId, leadType }: { leadId: string; leadType
   const handleMerge = async () => {
     if (
       !confirm(
-        `Merge ${mergeable.length} duplicate lead${mergeable.length > 1 ? "s" : ""} into this one? ` +
-          `All their info, messages, and history move here, and the duplicates are removed. This can't be undone.`
+        `Merge ${mergeable.length} duplicate lead${mergeable.length > 1 ? "s" : ""} into one? ` +
+          `All contact info, messages, notes, and history combine into a single lead (a quote is kept ` +
+          `when types differ), and the duplicates are removed. This can't be undone.`
       )
     )
       return;
@@ -57,9 +58,17 @@ export function DuplicateBanner({ leadId, leadType }: { leadId: string; leadType
       const res = await fetch("/api/admin/lead-duplicates/merge", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ leadType, survivorId: leadId, mergeIds: mergeable.map((d) => d.id) }),
+        body: JSON.stringify({ leadType, leadId }),
       });
       if (res.ok) {
+        const data = await res.json();
+        // If the consolidated lead moved to a different record (e.g. this Ad Lead
+        // folded into a Quote), go there. Otherwise refresh in place.
+        const survivorMoved = data.survivor && !(data.survivor.type === leadType && data.survivor.id === leadId);
+        if (survivorMoved) {
+          router.push(data.survivor.url);
+          return;
+        }
         // Update this banner immediately, tell the message thread to pull the
         // moved-in messages, and refresh server-rendered lead data — no reload.
         const fresh = await fetch(`/api/admin/lead-duplicates?leadId=${leadId}&leadType=${leadType}`)
@@ -108,11 +117,11 @@ export function DuplicateBanner({ leadId, leadType }: { leadId: string; leadType
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 text-white text-sm font-medium rounded-lg hover:bg-amber-700 disabled:opacity-50"
               >
                 {merging ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Merge className="w-3.5 h-3.5" />}
-                {merging ? "Merging…" : `Merge ${mergeable.length} into this lead`}
+                {merging ? "Merging…" : mergeable.length > 1 ? `Merge ${mergeable.length} into one lead` : "Merge into one lead"}
               </button>
               {dupes.length > mergeable.length && (
                 <p className="text-[11px] text-amber-700 mt-1.5">
-                  Only same-type ({typeLabel[leadType]}) leads can be merged; other types are linked above.
+                  Quote and Ad leads merge into a single lead; out-of-area, commercial, and career leads are linked above but kept separate.
                 </p>
               )}
             </div>

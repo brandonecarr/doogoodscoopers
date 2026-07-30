@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { syncContactToQuo } from "@/lib/quo";
 import { Prisma } from "@prisma/client";
 import { sendAdminPush } from "@/lib/web-push";
+import { consolidateByPhone } from "@/lib/lead-duplicates";
 
 // Zapier Webhook endpoint to receive leads from Facebook Lead Ads
 //
@@ -138,8 +139,24 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // One person = one lead: if this phone is already in the system (e.g. they
+    // ran a quote before), fold this ad lead into the surviving lead — a Quote
+    // always wins, absorbing the ad's contact info + campaign details. Falls
+    // back to the ad lead we just created if there's nothing to merge.
+    let finalType: "quote" | "adlead" = "adlead";
+    let finalId = lead.id;
+    try {
+      const survivor = await consolidateByPhone(phone);
+      if (survivor) {
+        finalType = survivor.type;
+        finalId = survivor.id;
+      }
+    } catch (e) {
+      console.error("[Zapier Webhook] consolidation failed:", e);
+    }
+
     syncContactToQuo({
-      externalId: `adlead:${lead.id}`,
+      externalId: `${finalType === "quote" ? "quotelead" : "adlead"}:${finalId}`,
       firstName: lead.firstName || lead.fullName || "Ad Lead",
       lastName: lead.lastName,
       email: lead.email,
@@ -147,19 +164,21 @@ export async function POST(request: NextRequest) {
       source: "DooGoodScoopers Ad",
     });
 
-    console.log(`[Zapier Webhook] New lead created: ${lead.id} - ${fullName || email || phone}`);
+    console.log(`[Zapier Webhook] New lead processed: ${finalType}:${finalId} - ${fullName || email || phone}`);
 
     // Fire-and-forget push notification — don't let push failure block the response
+    const merged = finalType === "quote";
     sendAdminPush({
-      title: "📣 New Ad Lead",
+      title: merged ? "📣 Ad Lead matched an existing quote" : "📣 New Ad Lead",
       body: `${fullName || phone || email || "Unknown"} — ${campaignName || "Meta Ad"}`,
-      url: `/admin/ad-leads/${lead.id}`,
-      tag: `ad-lead-${lead.id}`,
+      url: `/admin/${finalType === "quote" ? "quote-leads" : "ad-leads"}/${finalId}`,
+      tag: `ad-lead-${finalId}`,
     }).catch((err) => console.error("[Zapier Webhook] Push notification failed:", err));
 
     return NextResponse.json({
       success: true,
-      lead_id: lead.id,
+      lead_id: finalId,
+      lead_type: finalType,
       message: "Lead saved successfully",
     });
   } catch (error) {

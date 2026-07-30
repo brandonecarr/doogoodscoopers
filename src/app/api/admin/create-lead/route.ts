@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { syncContactToQuo } from "@/lib/quo";
+import { consolidateByPhone } from "@/lib/lead-duplicates";
 import type { LeadStatus } from "@/types/leads";
 
 interface CreateLeadData {
@@ -85,7 +86,17 @@ export async function POST(request: Request) {
       },
     });
 
-    return NextResponse.json({ success: true, id: lead.id });
+    // One person = one lead: if this phone already exists (e.g. as an Ad Lead),
+    // fold everything into a single surviving Quote and return its id.
+    let id = lead.id;
+    try {
+      const survivor = await consolidateByPhone(data.phone);
+      if (survivor) id = survivor.id;
+    } catch (e) {
+      console.error("[create-lead] consolidation failed:", e);
+    }
+
+    return NextResponse.json({ success: true, id });
   } catch (error) {
     console.error("Error creating lead:", error);
     return NextResponse.json(
