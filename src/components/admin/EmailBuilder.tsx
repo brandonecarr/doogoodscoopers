@@ -36,9 +36,9 @@ export interface EmailSettings {
   darkContentBg: string;
   darkText: string;
   darkLink: string;
-  /** Per-element dark-mode overrides, keyed by the component's id. `img` is a
-   *  swapped-in image for dark mode (light/dark logo). */
-  darkStyles: Record<string, { color?: string; bg?: string; img?: string }>;
+  /** Per-element dark-mode overrides, keyed by the component's id. `style` holds
+   *  any CSS props that differ in dark mode; `img` is a swapped dark image. */
+  darkStyles: Record<string, { style?: Record<string, string>; img?: string }>;
 }
 
 /** New designs get the classic newsletter look. */
@@ -482,69 +482,6 @@ function bgImageCss(v: BgImage, veilColor: string): Record<string, string> {
 
 const BG_KEYS = ["background-image", "background-size", "background-repeat", "background-position"];
 
-/** Compact image chooser (upload / URL / library) for the dark-mode logo swap. */
-function DarkImagePicker({ value, onChange }: { value: string; onChange: (url: string) => void }) {
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [busy, setBusy] = useState(false);
-  const [libOpen, setLibOpen] = useState(false);
-  const [library, setLibrary] = useState<{ name: string; url: string }[]>([]);
-
-  async function upload(file: File) {
-    setBusy(true);
-    try {
-      const body = new FormData();
-      body.append("file", file);
-      const res = await fetch("/api/admin/email-assets", { method: "POST", body });
-      const data = await res.json().catch(() => ({}));
-      if (data.url) onChange(data.url);
-    } finally { setBusy(false); }
-  }
-  async function openLib() {
-    setLibOpen((o) => !o);
-    if (!library.length) {
-      const res = await fetch("/api/admin/email-assets").catch(() => null);
-      const data = res ? await res.json().catch(() => ({ assets: [] })) : { assets: [] };
-      setLibrary(Array.isArray(data.assets) ? data.assets : []);
-    }
-  }
-
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-1.5">
-        <span className="text-[11px] font-medium text-slate-600">Dark-mode image</span>
-        <div className="flex items-center gap-2">
-          <button type="button" onClick={openLib} className="text-[10px] text-teal-600 hover:text-teal-700 flex items-center gap-0.5"><LayoutGrid className="w-3 h-3" /> Library</button>
-          {value && <button type="button" onClick={() => onChange("")} className="text-[10px] text-slate-400 hover:text-red-600 flex items-center gap-0.5"><X className="w-3 h-3" /> Remove</button>}
-        </div>
-      </div>
-      <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = ""; }} />
-      {libOpen && (
-        <div className="mb-2 rounded-lg border border-slate-200 bg-slate-50 p-2">
-          {library.length === 0 ? (
-            <p className="text-[10.5px] text-slate-400 text-center py-2">No images yet.</p>
-          ) : (
-            <div className="grid grid-cols-4 gap-1.5 max-h-32 overflow-y-auto email-scroll">
-              {library.map((a) => (
-                <button key={a.url} type="button" title={a.name} onClick={() => { onChange(a.url); setLibOpen(false); }}
-                  className={`aspect-square rounded-md bg-white bg-cover bg-center border-2 ${a.url === value ? "border-teal-500" : "border-slate-200"}`}
-                  style={{ backgroundImage: `url("${a.url}")` }} />
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-      <div onClick={() => !busy && fileRef.current?.click()}
-        className="relative h-16 rounded-lg border-2 border-dashed border-slate-200 hover:border-teal-400 cursor-pointer flex items-center justify-center transition-colors"
-        style={safeUrl(value) ? { backgroundImage: `url("${safeUrl(value)}")`, backgroundSize: "contain", backgroundRepeat: "no-repeat", backgroundPosition: "center", borderStyle: "solid" } : undefined}>
-        {busy ? <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
-          : !safeUrl(value) && <span className="flex items-center gap-1 text-[10.5px] text-slate-400"><ImagePlus className="w-4 h-4" /> Upload dark logo</span>}
-      </div>
-      <input type="url" value={value} onChange={(e) => onChange(e.target.value)} placeholder="…or paste an image URL"
-        className="mt-1.5 w-full px-2 py-1.5 text-[10.5px] border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 outline-none" />
-    </div>
-  );
-}
-
 function BgImageField({
   value,
   onChange,
@@ -813,6 +750,17 @@ function cellsOf(sel: any): any[] {
   };
   walk(sel);
   return found;
+}
+
+/** Depth-first walk over every component below the wrapper (excludes the wrapper). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function walkComps(editor: Editor, fn: (c: any) => void) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const wrapper = (editor as any).getWrapper?.();
+  if (!wrapper) return;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const go = (c: any) => { fn(c); (c.components?.() || []).forEach(go); };
+  (wrapper.components?.() || []).forEach(go);
 }
 
 /** An <img> or <a> is inline — aligning it means aligning the cell it sits in. */
@@ -1234,20 +1182,19 @@ function paintCanvas(editor: Editor, s: EmailSettings, dark = false) {
     contentBg ? `background-color:${contentBg}${dark ? " !important" : ""};` : "",
     "}",
     linkColor ? `a { color:${linkColor} !important; }` : "",
-    // Per-element dark overrides — only in the dark preview.
-    dark ? darkOverrideCss(s.darkStyles) : "",
+    // In dark mode the components themselves carry their dark styles (applied
+    // by enterDark), so the canvas shows dark natively — no per-id CSS needed.
   ].join("");
 }
 
-/** `#id{color:…!important;background-color:…!important}` for each per-element dark override. */
-function darkOverrideCss(darkStyles: EmailSettings["darkStyles"]): string {
+/** `#id{prop:val!important;…}` rules for each per-element dark override, for the export @media block. */
+function darkOverrideCss(darkStyles: EmailSettings["darkStyles"], prefix = ""): string {
   return Object.entries(darkStyles || {})
     .map(([id, o]) => {
-      const parts = [
-        o.color && `color:${o.color} !important`,
-        o.bg && `background-color:${o.bg} !important`,
-      ].filter(Boolean).join(";");
-      return parts ? `#${id}{${parts}}` : "";
+      const parts = Object.entries(o.style || {})
+        .map(([k, v]) => `${k}:${v}!important`)
+        .join(";");
+      return parts ? `${prefix}#${id}{${parts}}` : "";
     })
     .filter(Boolean)
     .join("");
@@ -1302,8 +1249,11 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
   const layersRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLElement>(null);
   const editorRef = useRef<Editor | null>(null);
-  // Remembers each swapped image's light src while the dark preview is showing.
-  const lightSrcRef = useRef<Record<string, string>>({});
+  // While editing in dark mode, the components hold their dark styles; these
+  // remember the light baseline so we can capture the dark diff and restore.
+  const lightStyleSnapRef = useRef<Record<string, Record<string, string>>>({});
+  const lightSrcSnapRef = useRef<Record<string, string>>({});
+  const modeRef = useRef<"light" | "dark">("light");
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const saved = (initialDesign as any)?.emailSettings as Partial<EmailSettings> | undefined;
@@ -1315,12 +1265,10 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
   settingsRef.current = settings;
 
   const [selection, setSelection] = useState<string | null>(null);
-  const [selId, setSelId] = useState<string | null>(null);
-  const [selType, setSelType] = useState<string>("");
   const [align, setAlign] = useState("");
   const [vAlign, setVAlign] = useState("");
-  /** Canvas preview mode — see the design as it looks in a light or dark inbox. */
-  const [darkPreview, setDarkPreview] = useState(false);
+  /** Which version you're editing. Every edit applies to the selected mode only. */
+  const [mode, setMode] = useState<"light" | "dark">("light");
   /** Whether the selection owns table cells, the only thing vertical align works on. */
   const [canVAlign, setCanVAlign] = useState(false);
   /** Background image of whatever is selected, mirrored out of its CSS. */
@@ -1345,17 +1293,94 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
     setSettings((prev) => ({ ...prev, [key]: value }));
   }, []);
 
-  /** Set (or clear, with "") a dark-mode override (colour, background, or swapped image) on the selected element. */
-  const setDarkStyle = useCallback((prop: "color" | "bg" | "img", value: string) => {
-    if (!selId) return;
-    setSettings((prev) => {
-      const map = { ...(prev.darkStyles || {}) };
-      const entry = { ...(map[selId] || {}) };
-      if (value) entry[prop] = value; else delete entry[prop];
-      if (Object.keys(entry).length) map[selId] = entry; else delete map[selId];
-      return { ...prev, darkStyles: map };
+  /* -------------------------------------------------------------- *
+   * Light / dark edit modes. In dark mode the components carry their dark
+   * styles, so the normal Style Manager / colour controls edit the dark
+   * version directly. We snapshot the light baseline on entering dark, and on
+   * leaving dark we diff it back out into settings.darkStyles.
+   * -------------------------------------------------------------- */
+
+  const snapshotAndApplyDark = useCallback((ds: EmailSettings["darkStyles"]) => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    const styleSnap: Record<string, Record<string, string>> = {};
+    const srcSnap: Record<string, string> = {};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    walkComps(editor, (c: any) => {
+      const id = c.getId?.();
+      if (!id) return;
+      styleSnap[id] = { ...(c.getStyle() || {}) };
+      const tag = String(c.get?.("tagName") || "").toLowerCase();
+      if (tag === "img") srcSnap[id] = c.getAttributes?.().src || "";
+      const d = ds[id];
+      if (d?.style && Object.keys(d.style).length) c.setStyle({ ...styleSnap[id], ...d.style });
+      if (d?.img && tag === "img") c.addAttributes?.({ src: d.img });
     });
-  }, [selId]);
+    lightStyleSnapRef.current = styleSnap;
+    lightSrcSnapRef.current = srcSnap;
+  }, []);
+
+  const captureDarkStyles = useCallback((): EmailSettings["darkStyles"] => {
+    const editor = editorRef.current;
+    const styleSnap = lightStyleSnapRef.current;
+    const srcSnap = lightSrcSnapRef.current;
+    const ds: EmailSettings["darkStyles"] = {};
+    if (!editor) return ds;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    walkComps(editor, (c: any) => {
+      const id = c.getId?.();
+      if (!id) return;
+      const light = styleSnap[id];
+      if (light === undefined) return; // created while in dark → treat as light baseline
+      const cur = (c.getStyle?.() || {}) as Record<string, string>;
+      const diff: Record<string, string> = {};
+      for (const [k, v] of Object.entries(cur)) if (light[k] !== v) diff[k] = String(v);
+      const tag = String(c.get?.("tagName") || "").toLowerCase();
+      let img: string | undefined;
+      if (tag === "img") {
+        const cs = c.getAttributes?.().src || "";
+        if (cs && cs !== srcSnap[id]) img = cs;
+      }
+      const entry: { style?: Record<string, string>; img?: string } = {};
+      if (Object.keys(diff).length) entry.style = diff;
+      if (img) entry.img = img;
+      if (Object.keys(entry).length) ds[id] = entry;
+    });
+    return ds;
+  }, []);
+
+  const restoreLight = useCallback(() => {
+    const editor = editorRef.current;
+    const styleSnap = lightStyleSnapRef.current;
+    const srcSnap = lightSrcSnapRef.current;
+    if (!editor) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    walkComps(editor, (c: any) => {
+      const id = c.getId?.();
+      if (!id) return;
+      if (styleSnap[id] !== undefined) c.setStyle(styleSnap[id]);
+      const tag = String(c.get?.("tagName") || "").toLowerCase();
+      if (tag === "img" && srcSnap[id] !== undefined) c.addAttributes?.({ src: srcSnap[id] });
+    });
+  }, []);
+
+  const switchMode = useCallback((next: "light" | "dark") => {
+    if (modeRef.current === next) return;
+    if (next === "dark") {
+      snapshotAndApplyDark(settingsRef.current.darkStyles || {});
+      setSettings((s) => ({ ...s, darkMode: true }));
+    } else {
+      const ds = captureDarkStyles();
+      restoreLight();
+      lightStyleSnapRef.current = {};
+      lightSrcSnapRef.current = {};
+      setSettings((s) => ({ ...s, darkStyles: ds }));
+    }
+    modeRef.current = next;
+    setMode(next);
+    // Repaint the email-body colours for the new mode.
+    if (editorRef.current) paintCanvas(editorRef.current, settingsRef.current, next === "dark");
+  }, [snapshotAndApplyDark, captureDarkStyles, restoreLight]);
 
   // Load into the canvas every Google font referenced by a component style or
   // by the email-body default font — on demand, so we never pull all ~100.
@@ -1561,8 +1586,6 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
       const sel = editor.getSelected();
       if (!sel) {
         setSelection(null);
-        setSelId(null);
-        setSelType("");
         setAlign("");
         setVAlign("");
         setCanVAlign(false);
@@ -1570,9 +1593,6 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
         return;
       }
       setSelection(sel.getName?.() || String(sel.get("type") || "Element"));
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      setSelId((sel as any).getId?.() || null);
-      setSelType(String(sel.get("type") || (String(sel.get("tagName") || "").toLowerCase() === "img" ? "image" : "")));
       setAlign(((alignTarget(editor)?.getStyle() || {}) as Record<string, string>)["text-align"] || "");
       const cells = cellsOf(sel);
       setCanVAlign(cells.length > 0);
@@ -1636,6 +1656,12 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
 
     onReady?.({
       getHtml: () => {
+        // Serialize the LIGHT design: if we're editing dark, capture the dark
+        // overrides and restore the components to light before serializing, then
+        // re-apply dark so the editor stays where the user left it.
+        const inDark = modeRef.current === "dark";
+        const ds = inDark ? captureDarkStyles() : (settingsRef.current.darkStyles || {});
+        if (inDark) restoreLight();
         // preset-newsletter registers this command → returns email-safe inlined HTML
         const inlined = editor.runCommand("gjs-get-inlined-html");
         const out = typeof inlined === "string" ? inlined : `${editor.getHtml()}<style>${editor.getCss()}</style>`;
@@ -1677,7 +1703,7 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
         // BOTH — the light one (hidden in dark) and the dark one (hidden by
         // default, shown in dark). CSS can't change an <img src>, so we toggle
         // visibility via the same @media / [data-ogsc] rules below.
-        for (const [id, o] of Object.entries(s.darkStyles || {})) {
+        for (const [id, o] of Object.entries(ds)) {
           const darkImg = safeUrl(o?.img || "");
           if (!darkImg) continue;
           inner = inner.replace(new RegExp(`<img\\b[^>]*\\bid="${id}"[^>]*>`, "i"), (tag) => {
@@ -1760,23 +1786,20 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
         // All dark rules for a given selector prefix ("" for @media, "[data-ogsc] "
         // for Outlook.com). Per-element overrides are keyed by component id.
         // Any element with a swapped dark image needs the show/hide toggle.
-        const hasImgSwap = Object.values(s.darkStyles || {}).some((o) => safeUrl(o?.img || ""));
+        const hasImgSwap = Object.values(ds).some((o) => safeUrl(o?.img || ""));
         const darkRules = (p: string) =>
           `${p}.em-page,${p}.em-page-c{background-color:${dpb}!important}` +
           `${p}.em-content{background-color:${dcb}!important}` +
           `${p}.em-content-c{color:${dtx}!important}` +
           `${p}.em-content-c a{color:${dlk}!important}` +
           (hasImgSwap ? `${p}.em-dl{display:none!important}${p}.em-dd{display:inline-block!important}` : "") +
-          Object.entries(s.darkStyles || {})
-            .map(([id, o]) => {
-              const parts = [o.color && `color:${o.color}!important`, o.bg && `background-color:${o.bg}!important`]
-                .filter(Boolean).join(";");
-              return parts ? `${p}#${id}{${parts}}` : "";
-            })
-            .filter(Boolean).join("");
+          darkOverrideCss(ds, p);
         const darkCss = s.darkMode
           ? `<style>@media (prefers-color-scheme:dark){${darkRules("")}}${darkRules("[data-ogsc] ")}</style>`
           : "";
+
+        // Restore the dark editing state we borrowed for serialization.
+        if (inDark) snapshotAndApplyDark(ds);
 
         return (
           fontImport + darkCss +
@@ -1789,11 +1812,15 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
           `</td></tr></table>`
         );
       },
-      getDesign: () => ({
+      getDesign: () => {
+        const inDark = modeRef.current === "dark";
+        const ds = inDark ? captureDarkStyles() : (settingsRef.current.darkStyles || {});
+        if (inDark) restoreLight();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ...((editor as any).getProjectData() as object),
-        emailSettings: settingsRef.current,
-      }),
+        const project = (editor as any).getProjectData() as object;
+        if (inDark) snapshotAndApplyDark(ds);
+        return { ...project, emailSettings: { ...settingsRef.current, darkStyles: ds } };
+      },
     });
 
     return () => {
@@ -1803,31 +1830,13 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Repaint the canvas whenever the email-wide settings or preview mode change.
+  // Repaint the email-body colours whenever the settings or mode change. (The
+  // per-element dark styles live on the components themselves in dark mode.)
   useEffect(() => {
     const editor = editorRef.current;
-    if (editor) paintCanvas(editor, settings, darkPreview);
+    if (editor) paintCanvas(editor, settings, mode === "dark");
     loadFontsInCanvas();
-    // Swap dark-mode images in the canvas preview only (never touches the model,
-    // so the export keeps the light src). Light src is remembered in a ref.
-    try {
-      const cdoc = editor?.Canvas.getDocument();
-      if (cdoc) {
-        Object.entries(settings.darkStyles || {}).forEach(([id, o]) => {
-          const el = cdoc.getElementById(id) as HTMLImageElement | null;
-          if (!el || el.tagName !== "IMG") return;
-          const di = safeUrl(o?.img || "");
-          if (darkPreview && di) {
-            if (lightSrcRef.current[id] === undefined) lightSrcRef.current[id] = el.getAttribute("src") || "";
-            el.setAttribute("src", di);
-          } else if (lightSrcRef.current[id] !== undefined) {
-            el.setAttribute("src", lightSrcRef.current[id]);
-            delete lightSrcRef.current[id];
-          }
-        });
-      }
-    } catch { /* canvas not ready */ }
-  }, [settings, darkPreview, loadFontsInCanvas]);
+  }, [settings, mode, loadFontsInCanvas]);
 
   /**
    * The Style Manager's colour picker positions itself from document
@@ -2022,10 +2031,11 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
           {iconBtn("Mobile width", Smartphone, () => switchDevice("mobile"), { active: device === "mobile" })}
         </div>
 
-        {/* Preview the design as a light or dark inbox would show it. */}
+        {/* Edit the light or the dark version — every change applies to the
+            selected mode only. */}
         <div className="flex items-center gap-0.5 p-0.5 bg-slate-100 rounded-lg">
-          {iconBtn("Light mode preview", Sun, () => setDarkPreview(false), { active: !darkPreview })}
-          {iconBtn("Dark mode preview", Moon, () => setDarkPreview(true), { active: darkPreview })}
+          {iconBtn("Edit light mode", Sun, () => switchMode("light"), { active: mode === "light" })}
+          {iconBtn("Edit dark mode", Moon, () => switchMode("dark"), { active: mode === "dark" })}
         </div>
 
         <div className="flex items-center gap-0.5 p-0.5 bg-slate-100 rounded-lg">
@@ -2061,6 +2071,14 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
           </button>
         </div>
       </div>
+
+      {/* Editing-dark banner — makes it unmistakable that edits target dark. */}
+      {mode === "dark" && (
+        <div className="flex items-center justify-center gap-2 py-1.5 text-[11px] font-medium text-teal-50 bg-slate-900">
+          <Moon className="w-3.5 h-3.5" /> Editing dark mode — every change applies to the dark version only.
+          <button type="button" onClick={() => switchMode("light")} className="ml-2 underline underline-offset-2 hover:text-white">Back to light</button>
+        </div>
+      )}
 
       {/* Three panes */}
       <div className="flex-1 min-h-0 flex">
@@ -2139,7 +2157,9 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
 
                 <div className="h-px bg-slate-100" />
 
-                {swatchRow("Background color", settings.pageBg, PAGE_SWATCHES, (c) => set("pageBg", c))}
+                {mode === "dark"
+                  ? swatchRow("Background color", settings.darkPageBg, PAGE_SWATCHES, (c) => set("darkPageBg", c))
+                  : swatchRow("Background color", settings.pageBg, PAGE_SWATCHES, (c) => set("pageBg", c))}
 
                 <BgImageField
                   value={{ image: settings.pageBgImage, fit: settings.pageBgFit, position: settings.pageBgPosition, opacity: settings.pageBgOpacity }}
@@ -2150,14 +2170,16 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
                     pageBgPosition: v.position,
                     pageBgOpacity: v.opacity,
                   }))}
-                  veilColor={safeColor(settings.pageBg) || "#ffffff"}
+                  veilColor={safeColor(mode === "dark" ? settings.darkPageBg : settings.pageBg) || "#ffffff"}
                   label="Background image (whole email)"
                   note="Sits behind the entire email and works in all clients, Outlook included. Keep a background color set as the fallback."
                 />
 
                 <div className="h-px bg-slate-100" />
 
-                {swatchRow("Content background", settings.contentBg, CONTENT_SWATCHES, (c) => set("contentBg", c))}
+                {mode === "dark"
+                  ? swatchRow("Content background", settings.darkContentBg, CONTENT_SWATCHES, (c) => set("darkContentBg", c))
+                  : swatchRow("Content background", settings.contentBg, CONTENT_SWATCHES, (c) => set("contentBg", c))}
 
                 {!!safeUrl(settings.pageBgImage) && !isSeeThrough(settings.contentBg) && (
                   <div className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 flex items-start gap-2 -mt-2">
@@ -2207,69 +2229,33 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
                   <FontPicker value={settings.font} onChange={(v) => set("font", v)} />
                 </div>
 
-                <div className="grid grid-cols-2 gap-2.5">
-                  <div>
-                    <label className="block text-[11px] font-medium text-slate-600 mb-1.5">Text color</label>
-                    <label className="flex items-center gap-2 px-2 py-1.5 border border-slate-200 rounded-lg cursor-pointer hover:border-teal-400 transition-colors">
-                      <span className="w-4 h-4 rounded-full border border-slate-200 flex-shrink-0" style={{ backgroundColor: settings.textColor || "#1f2937" }} />
-                      <span className="text-[10.5px] text-slate-500 truncate">{settings.textColor || "Inherit"}</span>
-                      <input type="color" value={settings.textColor || "#1f2937"} onChange={(e) => set("textColor", e.target.value)} className="sr-only" />
-                    </label>
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-medium text-slate-600 mb-1.5">Link color</label>
-                    <label className="flex items-center gap-2 px-2 py-1.5 border border-slate-200 rounded-lg cursor-pointer hover:border-teal-400 transition-colors">
-                      <span className="w-4 h-4 rounded-full border border-slate-200 flex-shrink-0" style={{ backgroundColor: settings.linkColor || "#0d9488" }} />
-                      <span className="text-[10.5px] text-slate-500 truncate">{settings.linkColor || "Inherit"}</span>
-                      <input type="color" value={settings.linkColor || "#0d9488"} onChange={(e) => set("linkColor", e.target.value)} className="sr-only" />
-                    </label>
-                  </div>
-                </div>
-
-                <div className="h-px bg-slate-100" />
-
-                {/* Dark mode */}
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-700">
-                      <Moon className="w-3.5 h-3.5" /> Dark mode
-                    </span>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={settings.darkMode}
-                      onClick={() => { set("darkMode", !settings.darkMode); if (!settings.darkMode) setDarkPreview(true); }}
-                      className={`relative w-9 h-5 rounded-full transition-colors ${settings.darkMode ? "bg-teal-600" : "bg-slate-300"}`}
-                    >
-                      <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${settings.darkMode ? "translate-x-4" : ""}`} />
-                    </button>
-                  </div>
-                  <p className="text-[10px] text-slate-400 leading-snug mt-1.5">
-                    When on, these colors swap in for recipients whose email app is in dark mode (Apple Mail, iOS Mail, Outlook.com). Accent colors you set on headings and buttons stay the same. Use the ☾ button up top to preview.
-                  </p>
-
-                  {settings.darkMode && (
-                    <div className="mt-3 space-y-3">
-                      <div className="grid grid-cols-2 gap-2.5">
-                        {([
-                          ["darkPageBg", "Background", "#0b1220"],
-                          ["darkContentBg", "Content", "#111827"],
-                          ["darkText", "Text", "#e5e7eb"],
-                          ["darkLink", "Links", "#5eead4"],
-                        ] as const).map(([key, lbl, def]) => (
-                          <div key={key}>
-                            <label className="block text-[11px] font-medium text-slate-600 mb-1.5">{lbl}</label>
-                            <label className="flex items-center gap-2 px-2 py-1.5 border border-slate-200 rounded-lg cursor-pointer hover:border-teal-400 transition-colors">
-                              <span className="w-4 h-4 rounded-full border border-slate-200 flex-shrink-0" style={{ backgroundColor: settings[key] || def }} />
-                              <span className="text-[10.5px] text-slate-500 truncate">{settings[key] || def}</span>
-                              <input type="color" value={settings[key] || def} onChange={(e) => set(key, e.target.value)} className="sr-only" />
-                            </label>
-                          </div>
-                        ))}
+                {(() => {
+                  const dk = mode === "dark";
+                  const textKey = dk ? "darkText" : "textColor";
+                  const linkKey = dk ? "darkLink" : "linkColor";
+                  const textDef = dk ? "#e5e7eb" : "#1f2937";
+                  const linkDef = dk ? "#5eead4" : "#0d9488";
+                  return (
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <div>
+                        <label className="block text-[11px] font-medium text-slate-600 mb-1.5">Text color</label>
+                        <label className="flex items-center gap-2 px-2 py-1.5 border border-slate-200 rounded-lg cursor-pointer hover:border-teal-400 transition-colors">
+                          <span className="w-4 h-4 rounded-full border border-slate-200 flex-shrink-0" style={{ backgroundColor: settings[textKey] || textDef }} />
+                          <span className="text-[10.5px] text-slate-500 truncate">{settings[textKey] || "Inherit"}</span>
+                          <input type="color" value={settings[textKey] || textDef} onChange={(e) => set(textKey, e.target.value)} className="sr-only" />
+                        </label>
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-medium text-slate-600 mb-1.5">Link color</label>
+                        <label className="flex items-center gap-2 px-2 py-1.5 border border-slate-200 rounded-lg cursor-pointer hover:border-teal-400 transition-colors">
+                          <span className="w-4 h-4 rounded-full border border-slate-200 flex-shrink-0" style={{ backgroundColor: settings[linkKey] || linkDef }} />
+                          <span className="text-[10.5px] text-slate-500 truncate">{settings[linkKey] || "Inherit"}</span>
+                          <input type="color" value={settings[linkKey] || linkDef} onChange={(e) => set(linkKey, e.target.value)} className="sr-only" />
+                        </label>
                       </div>
                     </div>
-                  )}
-                </div>
+                  );
+                })()}
               </div>
             )}
           </div>
@@ -2294,52 +2280,6 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
           )}
 
           <div className={tab === "design" && selection ? "" : "hidden"}>
-            {/* Per-element dark-mode colour override for the selected element. */}
-            {settings.darkMode && selId && (() => {
-              const dv = settings.darkStyles?.[selId] || {};
-              return (
-                <div className="px-[14px] pt-3.5 pb-4 border-b border-slate-100 bg-slate-900/[0.03]">
-                  <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 mb-2.5">
-                    <Moon className="w-3.5 h-3.5" /> Dark mode · this element
-                  </div>
-                  <div className="grid grid-cols-2 gap-2.5">
-                    <div>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-[11px] font-medium text-slate-600">Text</span>
-                        {dv.color && <button type="button" onClick={() => setDarkStyle("color", "")} className="text-[10px] text-slate-400 hover:text-slate-600">Reset</button>}
-                      </div>
-                      <label className="flex items-center gap-2 px-2 py-1.5 border border-slate-200 rounded-lg cursor-pointer hover:border-teal-400 transition-colors">
-                        <span className="w-4 h-4 rounded-full border border-slate-200 flex-shrink-0" style={{ backgroundColor: dv.color || settings.darkText }} />
-                        <span className="text-[10.5px] text-slate-500 truncate">{dv.color || "Default"}</span>
-                        <input type="color" value={dv.color || settings.darkText} onChange={(e) => setDarkStyle("color", e.target.value)} className="sr-only" />
-                      </label>
-                    </div>
-                    <div>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-[11px] font-medium text-slate-600">Background</span>
-                        {dv.bg && <button type="button" onClick={() => setDarkStyle("bg", "")} className="text-[10px] text-slate-400 hover:text-slate-600">Reset</button>}
-                      </div>
-                      <label className="flex items-center gap-2 px-2 py-1.5 border border-slate-200 rounded-lg cursor-pointer hover:border-teal-400 transition-colors">
-                        <span className="w-4 h-4 rounded-full border border-slate-200 flex-shrink-0" style={{ backgroundColor: dv.bg || "transparent" }} />
-                        <span className="text-[10.5px] text-slate-500 truncate">{dv.bg || "None"}</span>
-                        <input type="color" value={dv.bg || "#111827"} onChange={(e) => setDarkStyle("bg", e.target.value)} className="sr-only" />
-                      </label>
-                    </div>
-                  </div>
-                  {selType === "image" && (
-                    <div className="mt-3">
-                      <DarkImagePicker value={dv.img || ""} onChange={(u) => setDarkStyle("img", u)} />
-                      <p className="text-[10px] text-slate-400 leading-snug mt-1">
-                        Ships both images; dark-mode inboxes show this one. (Apple Mail, iOS Mail, Outlook.com — Gmail keeps the light image.)
-                      </p>
-                    </div>
-                  )}
-                  <p className="text-[10px] text-slate-400 leading-snug mt-2">
-                    Only changes this element in dark mode. Its light-mode colors stay as set. {!darkPreview && "Switch to the ☾ preview to see it."}
-                  </p>
-                </div>
-              );
-            })()}
             {blocker && (
               <div className="mx-3 mt-3 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 flex items-start gap-2">
                 <Info className="w-3.5 h-3.5 text-amber-600 mt-px flex-shrink-0" />
