@@ -36,6 +36,8 @@ export interface EmailSettings {
   darkContentBg: string;
   darkText: string;
   darkLink: string;
+  /** Per-element dark-mode colour overrides, keyed by the component's id. */
+  darkStyles: Record<string, { color?: string; bg?: string }>;
 }
 
 /** New designs get the classic newsletter look. */
@@ -56,6 +58,7 @@ const NEW_DESIGN: EmailSettings = {
   darkContentBg: "#111827",
   darkText: "#e5e7eb",
   darkLink: "#5eead4",
+  darkStyles: {},
 };
 
 /** Designs saved before these controls existed: change nothing they didn't ask for. */
@@ -1167,7 +1170,23 @@ function paintCanvas(editor: Editor, s: EmailSettings, dark = false) {
     contentBg ? `background-color:${contentBg}${dark ? " !important" : ""};` : "",
     "}",
     linkColor ? `a { color:${linkColor} !important; }` : "",
+    // Per-element dark overrides — only in the dark preview.
+    dark ? darkOverrideCss(s.darkStyles) : "",
   ].join("");
+}
+
+/** `#id{color:…!important;background-color:…!important}` for each per-element dark override. */
+function darkOverrideCss(darkStyles: EmailSettings["darkStyles"]): string {
+  return Object.entries(darkStyles || {})
+    .map(([id, o]) => {
+      const parts = [
+        o.color && `color:${o.color} !important`,
+        o.bg && `background-color:${o.bg} !important`,
+      ].filter(Boolean).join(";");
+      return parts ? `#${id}{${parts}}` : "";
+    })
+    .filter(Boolean)
+    .join("");
 }
 
 /** Email clients ignore <style>; push the link colour onto each anchor. */
@@ -1230,6 +1249,7 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
   settingsRef.current = settings;
 
   const [selection, setSelection] = useState<string | null>(null);
+  const [selId, setSelId] = useState<string | null>(null);
   const [align, setAlign] = useState("");
   const [vAlign, setVAlign] = useState("");
   /** Canvas preview mode — see the design as it looks in a light or dark inbox. */
@@ -1257,6 +1277,18 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
   const set = useCallback(<K extends keyof EmailSettings>(key: K, value: EmailSettings[K]) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
   }, []);
+
+  /** Set (or clear, with "") a dark-mode colour override on the selected element. */
+  const setDarkStyle = useCallback((prop: "color" | "bg", value: string) => {
+    if (!selId) return;
+    setSettings((prev) => {
+      const map = { ...(prev.darkStyles || {}) };
+      const entry = { ...(map[selId] || {}) };
+      if (value) entry[prop] = value; else delete entry[prop];
+      if (Object.keys(entry).length) map[selId] = entry; else delete map[selId];
+      return { ...prev, darkStyles: map };
+    });
+  }, [selId]);
 
   // Load into the canvas every Google font referenced by a component style or
   // by the email-body default font — on demand, so we never pull all ~100.
@@ -1462,6 +1494,7 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
       const sel = editor.getSelected();
       if (!sel) {
         setSelection(null);
+        setSelId(null);
         setAlign("");
         setVAlign("");
         setCanVAlign(false);
@@ -1469,6 +1502,8 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
         return;
       }
       setSelection(sel.getName?.() || String(sel.get("type") || "Element"));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      setSelId((sel as any).getId?.() || null);
       setAlign(((alignTarget(editor)?.getStyle() || {}) as Record<string, string>)["text-align"] || "");
       const cells = cellsOf(sel);
       setCanVAlign(cells.length > 0);
@@ -1632,17 +1667,22 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
         const dcb = safeColor(s.darkContentBg) || "#111827";
         const dtx = safeColor(s.darkText) || "#e5e7eb";
         const dlk = safeColor(s.darkLink) || "#5eead4";
-        const darkRules =
-          `.em-page,.em-page-c{background-color:${dpb}!important}` +
-          `.em-content{background-color:${dcb}!important}` +
-          `.em-content-c{color:${dtx}!important}` +
-          `.em-content-c a{color:${dlk}!important}`;
+        // All dark rules for a given selector prefix ("" for @media, "[data-ogsc] "
+        // for Outlook.com). Per-element overrides are keyed by component id.
+        const darkRules = (p: string) =>
+          `${p}.em-page,${p}.em-page-c{background-color:${dpb}!important}` +
+          `${p}.em-content{background-color:${dcb}!important}` +
+          `${p}.em-content-c{color:${dtx}!important}` +
+          `${p}.em-content-c a{color:${dlk}!important}` +
+          Object.entries(s.darkStyles || {})
+            .map(([id, o]) => {
+              const parts = [o.color && `color:${o.color}!important`, o.bg && `background-color:${o.bg}!important`]
+                .filter(Boolean).join(";");
+              return parts ? `${p}#${id}{${parts}}` : "";
+            })
+            .filter(Boolean).join("");
         const darkCss = s.darkMode
-          ? `<style>@media (prefers-color-scheme:dark){${darkRules}}` +
-            `[data-ogsc] .em-page,[data-ogsc] .em-page-c{background-color:${dpb}!important}` +
-            `[data-ogsc] .em-content{background-color:${dcb}!important}` +
-            `[data-ogsc] .em-content-c{color:${dtx}!important}` +
-            `[data-ogsc] .em-content-c a{color:${dlk}!important}</style>`
+          ? `<style>@media (prefers-color-scheme:dark){${darkRules("")}}${darkRules("[data-ogsc] ")}</style>`
           : "";
 
         return (
@@ -2142,6 +2182,44 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
           )}
 
           <div className={tab === "design" && selection ? "" : "hidden"}>
+            {/* Per-element dark-mode colour override for the selected element. */}
+            {settings.darkMode && selId && (() => {
+              const dv = settings.darkStyles?.[selId] || {};
+              return (
+                <div className="px-[14px] pt-3.5 pb-4 border-b border-slate-100 bg-slate-900/[0.03]">
+                  <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 mb-2.5">
+                    <Moon className="w-3.5 h-3.5" /> Dark mode · this element
+                  </div>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-[11px] font-medium text-slate-600">Text</span>
+                        {dv.color && <button type="button" onClick={() => setDarkStyle("color", "")} className="text-[10px] text-slate-400 hover:text-slate-600">Reset</button>}
+                      </div>
+                      <label className="flex items-center gap-2 px-2 py-1.5 border border-slate-200 rounded-lg cursor-pointer hover:border-teal-400 transition-colors">
+                        <span className="w-4 h-4 rounded-full border border-slate-200 flex-shrink-0" style={{ backgroundColor: dv.color || settings.darkText }} />
+                        <span className="text-[10.5px] text-slate-500 truncate">{dv.color || "Default"}</span>
+                        <input type="color" value={dv.color || settings.darkText} onChange={(e) => setDarkStyle("color", e.target.value)} className="sr-only" />
+                      </label>
+                    </div>
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-[11px] font-medium text-slate-600">Background</span>
+                        {dv.bg && <button type="button" onClick={() => setDarkStyle("bg", "")} className="text-[10px] text-slate-400 hover:text-slate-600">Reset</button>}
+                      </div>
+                      <label className="flex items-center gap-2 px-2 py-1.5 border border-slate-200 rounded-lg cursor-pointer hover:border-teal-400 transition-colors">
+                        <span className="w-4 h-4 rounded-full border border-slate-200 flex-shrink-0" style={{ backgroundColor: dv.bg || "transparent" }} />
+                        <span className="text-[10.5px] text-slate-500 truncate">{dv.bg || "None"}</span>
+                        <input type="color" value={dv.bg || "#111827"} onChange={(e) => setDarkStyle("bg", e.target.value)} className="sr-only" />
+                      </label>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-slate-400 leading-snug mt-2">
+                    Only changes this element in dark mode. Its light-mode colors stay as set. {!darkPreview && "Switch to the ☾ preview to see it."}
+                  </p>
+                </div>
+              );
+            })()}
             {blocker && (
               <div className="mx-3 mt-3 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 flex items-start gap-2">
                 <Info className="w-3.5 h-3.5 text-amber-600 mt-px flex-shrink-0" />
