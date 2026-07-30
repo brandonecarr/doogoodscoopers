@@ -39,6 +39,9 @@ export default function NewEmailPage() {
   const [html, setHtml] = useState(STARTER);
   const [leadTypes, setLeadTypes] = useState<string[]>(["customers"]);
   const [withinDays, setWithinDays] = useState(0);
+  // Customer sub-filters (only meaningful when "Customers" is selected).
+  const [custFreqs, setCustFreqs] = useState<string[]>([]);
+  const [custAddon, setCustAddon] = useState<"" | "has" | "none">("");
   const [testEmail, setTestEmail] = useState("");
   const [scheduledAt, setScheduledAt] = useState("");
   const [count, setCount] = useState<number | null>(null);
@@ -48,7 +51,7 @@ export default function NewEmailPage() {
   const [designJson, setDesignJson] = useState<object | null>(null);
   const [showBuilder, setShowBuilder] = useState(false);
   const [templates, setTemplates] = useState<{ id: string; name: string }[]>([]);
-  const [segments, setSegments] = useState<{ id: string; name: string; filter: { leadTypes?: string[]; withinDays?: number } }[]>([]);
+  const [segments, setSegments] = useState<{ id: string; name: string; filter: { leadTypes?: string[]; withinDays?: number; customerFrequencies?: string[]; customerAddon?: "" | "has" | "none" } }[]>([]);
   const builderRef = useRef<EmailBuilderHandle | null>(null);
 
   const toggle = (v: string) => setLeadTypes((p) => (p.includes(v) ? p.filter((x) => x !== v) : [...p, v]));
@@ -63,13 +66,15 @@ export default function NewEmailPage() {
     if (!s) return;
     setLeadTypes(s.filter?.leadTypes || []);
     setWithinDays(s.filter?.withinDays || 0);
+    setCustFreqs(s.filter?.customerFrequencies || []);
+    setCustAddon(s.filter?.customerAddon || "");
   }
   async function saveSegment() {
     const name = prompt("Name this segment:");
     if (!name?.trim()) return;
     const res = await fetch("/api/admin/email-segments", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: name.trim(), filter: { leadTypes, withinDays: withinDays || undefined } }),
+      body: JSON.stringify({ name: name.trim(), filter: audienceFilter() }),
     });
     if (res.ok) { const d = await res.json(); setSegments((p) => [d.segment, ...p]); }
   }
@@ -92,16 +97,25 @@ export default function NewEmailPage() {
     setShowBuilder(false);
   }
 
+  // Customer sub-filters only ride along when "Customers" is part of the audience.
+  const audienceFilter = useCallback(() => ({
+    leadTypes,
+    withinDays: withinDays || undefined,
+    ...(leadTypes.includes("customers")
+      ? { customerFrequencies: custFreqs.length ? custFreqs : undefined, customerAddon: custAddon || undefined }
+      : {}),
+  }), [leadTypes, withinDays, custFreqs, custAddon]);
+
   const refreshCount = useCallback(async () => {
     setCount(null);
     try {
       const res = await fetch("/api/admin/email-campaigns/audience", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filter: { leadTypes, withinDays: withinDays || undefined } }),
+        body: JSON.stringify({ filter: audienceFilter() }),
       });
       if (res.ok) setCount((await res.json()).count);
     } catch {}
-  }, [leadTypes, withinDays]);
+  }, [audienceFilter]);
 
   useEffect(() => { refreshCount(); }, [refreshCount]);
 
@@ -123,7 +137,7 @@ export default function NewEmailPage() {
         body: JSON.stringify({
           action, name, subject, fromName, fromEmail: fromEmail || undefined, replyTo: replyTo || undefined,
           html, designJson: designJson || undefined, testEmail, scheduledAt: scheduledAt || undefined,
-          audienceFilter: { leadTypes, withinDays: withinDays || undefined },
+          audienceFilter: audienceFilter(),
         }),
       });
       const d = await res.json();
@@ -213,6 +227,50 @@ export default function NewEmailPage() {
                 <button key={a.value} type="button" onClick={() => toggle(a.value)} className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${leadTypes.includes(a.value) ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-700 hover:bg-gray-50"}`}>{a.label}</button>
               ))}
             </div>
+
+            {/* Customer subscription sub-filters */}
+            {leadTypes.includes("customers") && (
+              <div className="rounded-lg border border-gray-100 bg-gray-50 p-3 space-y-3">
+                <p className="text-xs font-medium text-navy-900">Narrow customers by subscription</p>
+                <div>
+                  <label className="block text-[11px] text-gray-500 mb-1.5">Service frequency</label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[
+                      { value: "weekly", label: "Weekly" },
+                      { value: "biweekly", label: "Every other week" },
+                      { value: "twiceweekly", label: "2× / week" },
+                      { value: "monthly", label: "Monthly" },
+                      { value: "other", label: "Other" },
+                    ].map((f) => {
+                      const on = custFreqs.includes(f.value);
+                      return (
+                        <button
+                          key={f.value}
+                          type="button"
+                          onClick={() => setCustFreqs((p) => (on ? p.filter((x) => x !== f.value) : [...p, f.value]))}
+                          className={`px-2.5 py-1 rounded-full text-xs border transition-colors ${on ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-700 hover:bg-white"}`}
+                        >
+                          {f.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-1">No selection = all frequencies.</p>
+                </div>
+                <div>
+                  <label className="block text-[11px] text-gray-500 mb-1">Deodorizing add-on</label>
+                  <select
+                    value={custAddon}
+                    onChange={(e) => setCustAddon(e.target.value as "" | "has" | "none")}
+                    className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-teal-500"
+                  >
+                    <option value="">Any</option>
+                    <option value="none">Doesn&apos;t have it (upsell targets)</option>
+                    <option value="has">Already has it</option>
+                  </select>
+                </div>
+              </div>
+            )}
             <div>
               <label className="block text-xs text-gray-500 mb-1">Only those added within</label>
               <select value={withinDays} onChange={(e) => setWithinDays(parseInt(e.target.value))} className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white">
