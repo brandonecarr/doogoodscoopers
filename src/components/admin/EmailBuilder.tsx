@@ -36,8 +36,9 @@ export interface EmailSettings {
   darkContentBg: string;
   darkText: string;
   darkLink: string;
-  /** Per-element dark-mode colour overrides, keyed by the component's id. */
-  darkStyles: Record<string, { color?: string; bg?: string }>;
+  /** Per-element dark-mode overrides, keyed by the component's id. `img` is a
+   *  swapped-in image for dark mode (light/dark logo). */
+  darkStyles: Record<string, { color?: string; bg?: string; img?: string }>;
 }
 
 /** New designs get the classic newsletter look. */
@@ -480,6 +481,69 @@ function bgImageCss(v: BgImage, veilColor: string): Record<string, string> {
 }
 
 const BG_KEYS = ["background-image", "background-size", "background-repeat", "background-position"];
+
+/** Compact image chooser (upload / URL / library) for the dark-mode logo swap. */
+function DarkImagePicker({ value, onChange }: { value: string; onChange: (url: string) => void }) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [libOpen, setLibOpen] = useState(false);
+  const [library, setLibrary] = useState<{ name: string; url: string }[]>([]);
+
+  async function upload(file: File) {
+    setBusy(true);
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      const res = await fetch("/api/admin/email-assets", { method: "POST", body });
+      const data = await res.json().catch(() => ({}));
+      if (data.url) onChange(data.url);
+    } finally { setBusy(false); }
+  }
+  async function openLib() {
+    setLibOpen((o) => !o);
+    if (!library.length) {
+      const res = await fetch("/api/admin/email-assets").catch(() => null);
+      const data = res ? await res.json().catch(() => ({ assets: [] })) : { assets: [] };
+      setLibrary(Array.isArray(data.assets) ? data.assets : []);
+    }
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-[11px] font-medium text-slate-600">Dark-mode image</span>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={openLib} className="text-[10px] text-teal-600 hover:text-teal-700 flex items-center gap-0.5"><LayoutGrid className="w-3 h-3" /> Library</button>
+          {value && <button type="button" onClick={() => onChange("")} className="text-[10px] text-slate-400 hover:text-red-600 flex items-center gap-0.5"><X className="w-3 h-3" /> Remove</button>}
+        </div>
+      </div>
+      <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = ""; }} />
+      {libOpen && (
+        <div className="mb-2 rounded-lg border border-slate-200 bg-slate-50 p-2">
+          {library.length === 0 ? (
+            <p className="text-[10.5px] text-slate-400 text-center py-2">No images yet.</p>
+          ) : (
+            <div className="grid grid-cols-4 gap-1.5 max-h-32 overflow-y-auto email-scroll">
+              {library.map((a) => (
+                <button key={a.url} type="button" title={a.name} onClick={() => { onChange(a.url); setLibOpen(false); }}
+                  className={`aspect-square rounded-md bg-white bg-cover bg-center border-2 ${a.url === value ? "border-teal-500" : "border-slate-200"}`}
+                  style={{ backgroundImage: `url("${a.url}")` }} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      <div onClick={() => !busy && fileRef.current?.click()}
+        className="relative h-16 rounded-lg border-2 border-dashed border-slate-200 hover:border-teal-400 cursor-pointer flex items-center justify-center transition-colors"
+        style={safeUrl(value) ? { backgroundImage: `url("${safeUrl(value)}")`, backgroundSize: "contain", backgroundRepeat: "no-repeat", backgroundPosition: "center", borderStyle: "solid" } : undefined}>
+        {busy ? <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+          : !safeUrl(value) && <span className="flex items-center gap-1 text-[10.5px] text-slate-400"><ImagePlus className="w-4 h-4" /> Upload dark logo</span>}
+      </div>
+      <input type="url" value={value} onChange={(e) => onChange(e.target.value)} placeholder="…or paste an image URL"
+        className="mt-1.5 w-full px-2 py-1.5 text-[10.5px] border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 outline-none" />
+    </div>
+  );
+}
 
 function BgImageField({
   value,
@@ -1238,6 +1302,8 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
   const layersRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLElement>(null);
   const editorRef = useRef<Editor | null>(null);
+  // Remembers each swapped image's light src while the dark preview is showing.
+  const lightSrcRef = useRef<Record<string, string>>({});
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const saved = (initialDesign as any)?.emailSettings as Partial<EmailSettings> | undefined;
@@ -1250,6 +1316,7 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
 
   const [selection, setSelection] = useState<string | null>(null);
   const [selId, setSelId] = useState<string | null>(null);
+  const [selType, setSelType] = useState<string>("");
   const [align, setAlign] = useState("");
   const [vAlign, setVAlign] = useState("");
   /** Canvas preview mode — see the design as it looks in a light or dark inbox. */
@@ -1278,8 +1345,8 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
     setSettings((prev) => ({ ...prev, [key]: value }));
   }, []);
 
-  /** Set (or clear, with "") a dark-mode colour override on the selected element. */
-  const setDarkStyle = useCallback((prop: "color" | "bg", value: string) => {
+  /** Set (or clear, with "") a dark-mode override (colour, background, or swapped image) on the selected element. */
+  const setDarkStyle = useCallback((prop: "color" | "bg" | "img", value: string) => {
     if (!selId) return;
     setSettings((prev) => {
       const map = { ...(prev.darkStyles || {}) };
@@ -1495,6 +1562,7 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
       if (!sel) {
         setSelection(null);
         setSelId(null);
+        setSelType("");
         setAlign("");
         setVAlign("");
         setCanVAlign(false);
@@ -1504,6 +1572,7 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
       setSelection(sel.getName?.() || String(sel.get("type") || "Element"));
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       setSelId((sel as any).getId?.() || null);
+      setSelType(String(sel.get("type") || (String(sel.get("tagName") || "").toLowerCase() === "img" ? "image" : "")));
       setAlign(((alignTarget(editor)?.getStyle() || {}) as Record<string, string>)["text-align"] || "");
       const cells = cellsOf(sel);
       setCanVAlign(cells.length > 0);
@@ -1604,6 +1673,27 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
           return out;
         });
 
+        // Light/dark image swap: for any image with a dark-mode image set, ship
+        // BOTH — the light one (hidden in dark) and the dark one (hidden by
+        // default, shown in dark). CSS can't change an <img src>, so we toggle
+        // visibility via the same @media / [data-ogsc] rules below.
+        for (const [id, o] of Object.entries(s.darkStyles || {})) {
+          const darkImg = safeUrl(o?.img || "");
+          if (!darkImg) continue;
+          inner = inner.replace(new RegExp(`<img\\b[^>]*\\bid="${id}"[^>]*>`, "i"), (tag) => {
+            const lightImg = tag.replace(/<img\b/i, '<img class="em-dl" ');
+            let dark = tag
+              .replace(/\bid="[^"]*"/i, "")               // no duplicate id
+              .replace(/\bsrc="[^"]*"/i, `src="${escAttr(darkImg)}"`)
+              .replace(/<img\b/i, '<img class="em-dd" ');
+            // hidden unless the client is in dark mode
+            dark = /style\s*=\s*"/i.test(dark)
+              ? dark.replace(/style\s*=\s*"([^"]*)"/i, (_m, st: string) => `style="display:none;mso-hide:all;${st}"`)
+              : dark.replace(/<img\b/i, '<img style="display:none;mso-hide:all"');
+            return lightImg + dark;
+          });
+        }
+
         const pageBg = safeColor(s.pageBg);
         const img = safeUrl(s.pageBgImage);
         const fit = FIT[s.pageBgFit] || FIT.cover;
@@ -1669,11 +1759,14 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
         const dlk = safeColor(s.darkLink) || "#5eead4";
         // All dark rules for a given selector prefix ("" for @media, "[data-ogsc] "
         // for Outlook.com). Per-element overrides are keyed by component id.
+        // Any element with a swapped dark image needs the show/hide toggle.
+        const hasImgSwap = Object.values(s.darkStyles || {}).some((o) => safeUrl(o?.img || ""));
         const darkRules = (p: string) =>
           `${p}.em-page,${p}.em-page-c{background-color:${dpb}!important}` +
           `${p}.em-content{background-color:${dcb}!important}` +
           `${p}.em-content-c{color:${dtx}!important}` +
           `${p}.em-content-c a{color:${dlk}!important}` +
+          (hasImgSwap ? `${p}.em-dl{display:none!important}${p}.em-dd{display:inline-block!important}` : "") +
           Object.entries(s.darkStyles || {})
             .map(([id, o]) => {
               const parts = [o.color && `color:${o.color}!important`, o.bg && `background-color:${o.bg}!important`]
@@ -1715,6 +1808,25 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
     const editor = editorRef.current;
     if (editor) paintCanvas(editor, settings, darkPreview);
     loadFontsInCanvas();
+    // Swap dark-mode images in the canvas preview only (never touches the model,
+    // so the export keeps the light src). Light src is remembered in a ref.
+    try {
+      const cdoc = editor?.Canvas.getDocument();
+      if (cdoc) {
+        Object.entries(settings.darkStyles || {}).forEach(([id, o]) => {
+          const el = cdoc.getElementById(id) as HTMLImageElement | null;
+          if (!el || el.tagName !== "IMG") return;
+          const di = safeUrl(o?.img || "");
+          if (darkPreview && di) {
+            if (lightSrcRef.current[id] === undefined) lightSrcRef.current[id] = el.getAttribute("src") || "";
+            el.setAttribute("src", di);
+          } else if (lightSrcRef.current[id] !== undefined) {
+            el.setAttribute("src", lightSrcRef.current[id]);
+            delete lightSrcRef.current[id];
+          }
+        });
+      }
+    } catch { /* canvas not ready */ }
   }, [settings, darkPreview, loadFontsInCanvas]);
 
   /**
@@ -2214,6 +2326,14 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
                       </label>
                     </div>
                   </div>
+                  {selType === "image" && (
+                    <div className="mt-3">
+                      <DarkImagePicker value={dv.img || ""} onChange={(u) => setDarkStyle("img", u)} />
+                      <p className="text-[10px] text-slate-400 leading-snug mt-1">
+                        Ships both images; dark-mode inboxes show this one. (Apple Mail, iOS Mail, Outlook.com — Gmail keeps the light image.)
+                      </p>
+                    </div>
+                  )}
                   <p className="text-[10px] text-slate-400 leading-snug mt-2">
                     Only changes this element in dark mode. Its light-mode colors stay as set. {!darkPreview && "Switch to the ☾ preview to see it."}
                   </p>
