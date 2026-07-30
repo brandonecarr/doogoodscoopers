@@ -482,6 +482,92 @@ function bgImageCss(v: BgImage, veilColor: string): Record<string, string> {
 
 const BG_KEYS = ["background-image", "background-size", "background-repeat", "background-position"];
 
+/** Replace a selected image's actual src (upload / URL / library). Mode-aware
+ *  via the caller — in dark mode the new src becomes the dark logo. */
+function ImageReplaceField({ value, onChange }: { value: string; onChange: (url: string) => void }) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [libOpen, setLibOpen] = useState(false);
+  const [library, setLibrary] = useState<{ name: string; url: string }[]>([]);
+  const [dragOver, setDragOver] = useState(false);
+
+  async function upload(file: File) {
+    setBusy(true);
+    setError(null);
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      const res = await fetch("/api/admin/email-assets", { method: "POST", body });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return setError(data.error || "Upload failed.");
+      onChange(data.url);
+    } catch {
+      setError("Upload failed — check your connection.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function openLib() {
+    setLibOpen((o) => !o);
+    if (!library.length) {
+      const res = await fetch("/api/admin/email-assets").catch(() => null);
+      const data = res ? await res.json().catch(() => ({ assets: [] })) : { assets: [] };
+      setLibrary(Array.isArray(data.assets) ? data.assets : []);
+    }
+  }
+
+  return (
+    <div className="px-[14px] pt-3.5 pb-4 border-b border-slate-100">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400 flex items-center gap-1.5">
+          <ImagePlus className="w-3.5 h-3.5" /> Replace image
+        </span>
+        <button type="button" onClick={openLib} className={`text-[10px] flex items-center gap-0.5 ${libOpen ? "text-teal-700 font-semibold" : "text-teal-600 hover:text-teal-700"}`}>
+          <LayoutGrid className="w-3 h-3" /> Library
+        </button>
+      </div>
+
+      <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden"
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = ""; }} />
+
+      {libOpen && (
+        <div className="mb-2 rounded-lg border border-slate-200 bg-slate-50 p-2">
+          {library.length === 0 ? (
+            <p className="text-[10.5px] text-slate-400 text-center py-2">No images yet.</p>
+          ) : (
+            <div className="grid grid-cols-4 gap-1.5 max-h-40 overflow-y-auto email-scroll">
+              {library.map((a) => (
+                <button key={a.url} type="button" title={a.name} onClick={() => { onChange(a.url); setLibOpen(false); }}
+                  className={`aspect-square rounded-md bg-white bg-contain bg-center bg-no-repeat border-2 ${a.url === value ? "border-teal-500" : "border-slate-200"}`}
+                  style={{ backgroundImage: `url("${a.url}")` }} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files?.[0]; if (f) upload(f); }}
+        onClick={() => !busy && fileRef.current?.click()}
+        className={`relative h-20 rounded-xl border-2 border-dashed cursor-pointer flex items-center justify-center transition-all ${dragOver ? "border-teal-500 bg-teal-50" : "border-slate-200 hover:border-teal-400 hover:bg-slate-50"}`}
+        style={safeUrl(value) ? { backgroundImage: `url("${safeUrl(value)}")`, backgroundSize: "contain", backgroundRepeat: "no-repeat", backgroundPosition: "center", borderStyle: "solid" } : undefined}
+      >
+        {busy ? <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+          : safeUrl(value)
+            ? <span className="text-[10.5px] font-medium text-white bg-black/45 px-2.5 py-1 rounded-md backdrop-blur-sm">Click to replace</span>
+            : <span className="flex flex-col items-center gap-1 text-slate-400"><ImagePlus className="w-5 h-5" /><span className="text-[10.5px] font-medium">Upload or drop an image</span></span>}
+      </div>
+
+      <input type="url" value={value} onChange={(e) => onChange(e.target.value)} placeholder="…or paste an image URL"
+        className="mt-2 w-full px-2.5 py-1.5 text-[11px] border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 outline-none" />
+      {error && <p className="mt-1.5 text-[10.5px] text-red-600">{error}</p>}
+    </div>
+  );
+}
+
 function BgImageField({
   value,
   onChange,
@@ -1265,6 +1351,9 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
   settingsRef.current = settings;
 
   const [selection, setSelection] = useState<string | null>(null);
+  /** True when the selected component is an image (shows the Replace-image control). */
+  const [selIsImage, setSelIsImage] = useState(false);
+  const [selSrc, setSelSrc] = useState("");
   const [align, setAlign] = useState("");
   const [vAlign, setVAlign] = useState("");
   /** Which version you're editing. Every edit applies to the selected mode only. */
@@ -1293,6 +1382,16 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
     setSettings((prev) => ({ ...prev, [key]: value }));
   }, []);
 
+  /** Replace the selected image's src. Mode-aware: in dark mode this becomes the
+   *  dark logo (captured on switch to light), in light mode it's the light logo. */
+  const replaceSelectedImage = useCallback((url: string) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sel = editorRef.current?.getSelected() as any;
+    if (!sel) return;
+    sel.set?.("src", url); // updates the model + the export (addAttributes does not)
+    setSelSrc(url);
+  }, []);
+
   /* -------------------------------------------------------------- *
    * Light / dark edit modes. In dark mode the components carry their dark
    * styles, so the normal Style Manager / colour controls edit the dark
@@ -1311,10 +1410,11 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
       if (!id) return;
       styleSnap[id] = { ...(c.getStyle() || {}) };
       const tag = String(c.get?.("tagName") || "").toLowerCase();
-      if (tag === "img") srcSnap[id] = c.getAttributes?.().src || "";
+      const isImg = c.get?.("type") === "image" || tag === "img";
+      if (isImg) srcSnap[id] = c.get?.("src") || "";
       const d = ds[id];
       if (d?.style && Object.keys(d.style).length) c.setStyle({ ...styleSnap[id], ...d.style });
-      if (d?.img && tag === "img") c.addAttributes?.({ src: d.img });
+      if (d?.img && isImg) c.set?.("src", d.img);
     });
     lightStyleSnapRef.current = styleSnap;
     lightSrcSnapRef.current = srcSnap;
@@ -1336,9 +1436,10 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
       const diff: Record<string, string> = {};
       for (const [k, v] of Object.entries(cur)) if (light[k] !== v) diff[k] = String(v);
       const tag = String(c.get?.("tagName") || "").toLowerCase();
+      const isImg = c.get?.("type") === "image" || tag === "img";
       let img: string | undefined;
-      if (tag === "img") {
-        const cs = c.getAttributes?.().src || "";
+      if (isImg) {
+        const cs = c.get?.("src") || "";
         if (cs && cs !== srcSnap[id]) img = cs;
       }
       const entry: { style?: Record<string, string>; img?: string } = {};
@@ -1360,7 +1461,8 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
       if (!id) return;
       if (styleSnap[id] !== undefined) c.setStyle(styleSnap[id]);
       const tag = String(c.get?.("tagName") || "").toLowerCase();
-      if (tag === "img" && srcSnap[id] !== undefined) c.addAttributes?.({ src: srcSnap[id] });
+      const isImg = c.get?.("type") === "image" || tag === "img";
+      if (isImg && srcSnap[id] !== undefined) c.set?.("src", srcSnap[id]);
     });
   }, []);
 
@@ -1586,6 +1688,8 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
       const sel = editor.getSelected();
       if (!sel) {
         setSelection(null);
+        setSelIsImage(false);
+        setSelSrc("");
         setAlign("");
         setVAlign("");
         setCanVAlign(false);
@@ -1593,6 +1697,10 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
         return;
       }
       setSelection(sel.getName?.() || String(sel.get("type") || "Element"));
+      const isImg = sel.get("type") === "image" || String(sel.get("tagName") || "").toLowerCase() === "img";
+      setSelIsImage(isImg);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      setSelSrc(isImg ? String((sel as any).getAttributes?.().src || "") : "");
       setAlign(((alignTarget(editor)?.getStyle() || {}) as Record<string, string>)["text-align"] || "");
       const cells = cellsOf(sel);
       setCanVAlign(cells.length > 0);
@@ -2074,9 +2182,10 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
 
       {/* Editing-dark banner — makes it unmistakable that edits target dark. */}
       {mode === "dark" && (
-        <div className="flex items-center justify-center gap-2 py-1.5 text-[11px] font-medium text-teal-50 bg-slate-900">
-          <Moon className="w-3.5 h-3.5" /> Editing dark mode — every change applies to the dark version only.
-          <button type="button" onClick={() => switchMode("light")} className="ml-2 underline underline-offset-2 hover:text-white">Back to light</button>
+        <div className="flex items-center justify-center gap-2 py-1.5 px-3 text-[11px] font-medium text-teal-50 bg-slate-900 text-center">
+          <Moon className="w-3.5 h-3.5 flex-shrink-0" />
+          <span>Editing dark mode — colors, backgrounds &amp; images apply to dark only. Adding, moving or deleting elements changes both modes (they share one layout).</span>
+          <button type="button" onClick={() => switchMode("light")} className="ml-1 underline underline-offset-2 hover:text-white flex-shrink-0">Back to light</button>
         </div>
       )}
 
@@ -2320,18 +2429,27 @@ export default function EmailBuilder({ initialHtml, initialDesign, onReady }: Pr
               </p>
             </div>
 
+            {/* Images: replace the actual picture (mode-aware — swaps the logo
+                per light/dark). Other elements: a background image. */}
+            {selIsImage ? (
+              <ImageReplaceField value={selSrc} onChange={replaceSelectedImage} />
+            ) : null}
+
             <div ref={stylesRef} />
-            {/* Sits directly under the Style Manager's "Background & border",
-                replacing GrapesJS's layer-chip control, which has no opacity. */}
-            <div className="px-[14px] pb-5 pt-1">
-              <BgImageField
-                value={selBg}
-                onChange={(v) => applySelBg(v, selVeil)}
-                veilColor={selVeil}
-                label="Background image (this element only)"
-                note="Applies only to the selected element, and Outlook can't show it. For a background behind the whole email, use Email body → Background image at the top instead."
-              />
-            </div>
+
+            {!selIsImage && (
+              // Sits under the Style Manager's "Background & border", replacing
+              // GrapesJS's layer-chip control, which has no opacity.
+              <div className="px-[14px] pb-5 pt-1">
+                <BgImageField
+                  value={selBg}
+                  onChange={(v) => applySelBg(v, selVeil)}
+                  veilColor={selVeil}
+                  label="Background image (this element only)"
+                  note="Applies only to the selected element, and Outlook can't show it. For a background behind the whole email, use Email body → Background image at the top instead."
+                />
+              </div>
+            )}
           </div>
           <div className={tab === "settings" && selection ? "" : "hidden"}>
             <div ref={traitsRef} />
