@@ -78,6 +78,56 @@ export async function brevoSend(input: BrevoSendInput): Promise<BrevoSendResult>
   }
 }
 
+export interface BrevoEvent {
+  email: string;
+  date?: string;
+  event: string; // requests | delivered | opened | uniqueOpened | clicks | softBounces | hardBounces | blocked | invalid | unsubscribed | spam | error | ...
+  reason?: string;
+  link?: string;
+  messageId?: string;
+}
+
+/** A transactional messageId can be stored with or without <angle brackets>. */
+function messageIdVariants(id: string): string[] {
+  const stripped = id.replace(/^<|>$/g, "");
+  return [...new Set([id, stripped, `<${stripped}>`])];
+}
+
+/**
+ * Pull the transactional events Brevo recorded for a single sent message
+ * (opens, clicks, bounces, unsubscribes…). Used to back-fill stats for a blast
+ * that was sent before the event webhook was in place. Returns [] on any error.
+ */
+export async function fetchBrevoEvents(messageId: string): Promise<BrevoEvent[]> {
+  const key = apiKey();
+  if (!key || !messageId) return [];
+  for (const id of messageIdVariants(messageId)) {
+    try {
+      const url = `https://api.brevo.com/v3/smtp/statistics/events?limit=100&messageId=${encodeURIComponent(id)}`;
+      const res = await fetch(url, { headers: { "api-key": key, accept: "application/json" } });
+      if (!res.ok) continue;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const data: any = await res.json().catch(() => ({}));
+      const events: BrevoEvent[] = Array.isArray(data?.events) ? data.events : [];
+      if (events.length) return events;
+    } catch {
+      // try the next id variant
+    }
+  }
+  return [];
+}
+
+/** Classify any Brevo event string into the engagement bucket we track. */
+export function classifyBrevoEvent(event: string): "open" | "click" | "bounce" | "unsub" | "delivered" | null {
+  const e = event.toLowerCase();
+  if (/click/.test(e)) return "click";
+  if (/open/.test(e)) return "open";
+  if (/bounce|blocked|invalid|error/.test(e)) return "bounce";
+  if (/unsub|spam|complaint/.test(e)) return "unsub";
+  if (/deliver/.test(e)) return "delivered";
+  return null;
+}
+
 /** Map over items with a bounded number of in-flight requests. */
 export async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T, index: number) => Promise<R>): Promise<R[]> {
   const results = new Array<R>(items.length);

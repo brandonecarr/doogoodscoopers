@@ -59,7 +59,7 @@ export default async function EmailPage() {
       ) : (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 divide-y divide-gray-100">
           {campaigns.map((c) => (
-            <div key={c.id} className="flex items-center gap-4 p-4">
+            <Link key={c.id} href={`/admin/email/${c.id}`} className="flex items-center gap-4 p-4 hover:bg-gray-50/70 transition-colors">
               <div className="w-10 h-10 rounded-lg bg-teal-50 flex items-center justify-center flex-shrink-0">
                 {c.status === "SENT" ? <CheckCircle2 className="w-5 h-5 text-teal-600" /> : c.status === "SENDING" || c.status === "QUEUED" ? <Send className="w-5 h-5 text-teal-600" /> : c.status === "SCHEDULED" ? <Clock className="w-5 h-5 text-teal-600" /> : <FileText className="w-5 h-5 text-teal-600" />}
               </div>
@@ -77,7 +77,7 @@ export default async function EmailPage() {
                 </p>
                 <p className="text-xs text-gray-400" suppressHydrationWarning>{fmtDate(c.createdAt)}</p>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       )}
