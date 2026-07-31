@@ -524,7 +524,7 @@ export async function sendGiftCertificateEmail(data: GiftCertificateEmailData): 
 
   const fromEmail = process.env.SMTP_FROM || SITE_CONFIG.email;
   const fromName = process.env.SMTP_FROM_NAME || SITE_CONFIG.name;
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://doogoodscoopers.com";
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://doogoodscoopers.vercel.app";
 
   const primaryColor = "#0d4b4a";
   const accentColor = "#14b8a6";

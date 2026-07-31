@@ -69,7 +69,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     const baseUrl =
-      process.env.NEXT_PUBLIC_APP_URL || "https://doogoodscoopers.com";
+      process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || "https://doogoodscoopers.vercel.app";
     const link = `${baseUrl}/add-card/${token}`;
 
     // Log activity

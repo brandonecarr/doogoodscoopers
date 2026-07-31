@@ -94,7 +94,7 @@ export async function GET(request: NextRequest) {
 
     // Generate referral code from client ID
     const referralCode = client.id.split("-")[0].toUpperCase();
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://doogoodscoopers.com";
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://doogoodscoopers.vercel.app";
     const referralLink = `${baseUrl}/quote?ref=${referralCode}`;
 
     return NextResponse.json({

@@ -142,7 +142,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://doogoodscoopers.com";
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://doogoodscoopers.vercel.app";
 
     // Process each session
     for (const session of sessions as AbandonedSession[]) {

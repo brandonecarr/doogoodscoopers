@@ -9,7 +9,10 @@ const FROM_DEFAULT =
   process.env.EMAIL_FROM_EMAIL ||
   process.env.RESEND_FROM_EMAIL ||
   "DooGoodScoopers <service@doogoodscoopers.com>";
-const SITE = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || "https://doogoodscoopers.com";
+// Base URL of the CRM app (where /unsubscribe lives). The fallback is the app's
+// vercel.app domain — NOT the apex doogoodscoopers.com, which is a separate
+// WordPress marketing site where /unsubscribe 404s (a CAN-SPAM risk).
+const SITE = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || "https://doogoodscoopers.vercel.app";
 // Physical mailing address is required by CAN-SPAM.
 const ADDRESS = process.env.MAIL_FOOTER_ADDRESS || "DooGoodScoopers, Fontana, CA";
 

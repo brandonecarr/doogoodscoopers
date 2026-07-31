@@ -163,7 +163,7 @@ export async function POST(request: NextRequest) {
       client_first_name: client.first_name,
       client_last_name: client.last_name,
       client_name: `${client.first_name} ${client.last_name}`,
-      portal_link: `${process.env.NEXT_PUBLIC_SITE_URL || "https://doogoodscoopers.com"}/app/client`,
+      portal_link: `${process.env.NEXT_PUBLIC_SITE_URL || "https://doogoodscoopers.vercel.app"}/app/client`,
       ...variables,
     };
 
