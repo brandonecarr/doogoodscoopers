@@ -68,6 +68,12 @@ export const metadata: Metadata = {
     title: "DGS Admin",
     statusBarStyle: "default",
   },
+  // Next 16's appleWebApp.capable only emits the standardized
+  // `mobile-web-app-capable`, but iOS Safari still requires the legacy
+  // `apple-mobile-web-app-capable` tag to launch standalone. Emit it explicitly.
+  other: {
+    "apple-mobile-web-app-capable": "yes",
+  },
   openGraph: {
     type: "website",
     locale: "en_US",
