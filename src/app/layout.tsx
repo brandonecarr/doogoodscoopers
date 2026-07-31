@@ -61,6 +61,13 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: "DooGoodScoopers" }],
   creator: "DooGoodScoopers",
+  // Let the app be added to the home screen and launch standalone (no browser
+  // address bar / chrome) — proper web-app behavior on iOS.
+  appleWebApp: {
+    capable: true,
+    title: "DGS Admin",
+    statusBarStyle: "default",
+  },
   openGraph: {
     type: "website",
     locale: "en_US",

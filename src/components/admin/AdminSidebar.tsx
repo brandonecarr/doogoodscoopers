@@ -18,16 +18,29 @@ import {
 import { cn } from "@/lib/utils";
 
 const navigation = [
-  { name: "Dashboard",            href: "/admin",            icon: LayoutDashboard },
-  { name: "Leads",                href: "/admin/leads",      icon: Users2 },
-  { name: "Customers",            href: "/admin/customers",  icon: Dog },
-  { name: "Reviews",              href: "/admin/reviews",    icon: Star },
-  { name: "Campaigns",            href: "/admin/campaigns",  icon: Megaphone },
-  { name: "Email",                href: "/admin/email",      icon: Mail },
-  { name: "Commercial Inquiries", href: "/admin/commercial", icon: Building2 },
-  { name: "Out of Area",          href: "/admin/out-of-area", icon: MapPinOff },
-  { name: "Career Applications",  href: "/admin/careers",    icon: Briefcase },
+  { name: "Dashboard",            short: "Dashboard",  href: "/admin",             icon: LayoutDashboard },
+  { name: "Leads",                short: "Leads",      href: "/admin/leads",       icon: Users2 },
+  { name: "Customers",            short: "Customers",  href: "/admin/customers",   icon: Dog },
+  { name: "Reviews",              short: "Reviews",    href: "/admin/reviews",     icon: Star },
+  { name: "Campaigns",            short: "Campaigns",  href: "/admin/campaigns",   icon: Megaphone },
+  { name: "Email",                short: "Email",      href: "/admin/email",       icon: Mail },
+  { name: "Commercial Inquiries", short: "Commercial", href: "/admin/commercial",  icon: Building2 },
+  { name: "Out of Area",          short: "Out of Area", href: "/admin/out-of-area", icon: MapPinOff },
+  { name: "Career Applications",  short: "Careers",    href: "/admin/careers",     icon: Briefcase },
 ];
+
+/** Whether a nav href matches the current path (exact for Dashboard; prefix otherwise). */
+function navMatches(pathname: string, href: string): boolean {
+  if (href === "/admin/leads") {
+    return (
+      pathname.startsWith("/admin/leads") ||
+      pathname.startsWith("/admin/quote-leads") ||
+      pathname.startsWith("/admin/ad-leads")
+    );
+  }
+  if (href === "/admin") return pathname === "/admin";
+  return pathname === href || pathname.startsWith(href + "/");
+}
 
 export function AdminSidebar() {
   const pathname = usePathname();
@@ -53,12 +66,7 @@ export function AdminSidebar() {
           {/* Navigation */}
           <nav className="mt-8 flex-1 px-2 space-y-1">
             {navigation.map((item) => {
-              const isActive =
-                pathname === item.href ||
-                (item.href === "/admin/leads" &&
-                  (pathname.startsWith("/admin/leads") ||
-                    pathname.startsWith("/admin/quote-leads") ||
-                    pathname.startsWith("/admin/ad-leads")));
+              const isActive = navMatches(pathname, item.href);
               return (
                 <Link
                   key={item.name}
@@ -92,30 +100,26 @@ export function AdminSidebar() {
         </div>
       </div>
 
-      {/* Mobile sidebar - simple version */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-navy-900 border-t border-white/10 z-50">
-        <nav className="flex justify-around py-2">
-          {navigation.slice(0, 5).map((item) => {
-            const isActive =
-              pathname === item.href ||
-              (item.href === "/admin/leads" &&
-                (pathname.startsWith("/admin/leads") ||
-                  pathname.startsWith("/admin/quote-leads") ||
-                  pathname.startsWith("/admin/ad-leads"))) ||
-              (item.href === "/admin/customers" && pathname.startsWith("/admin/customers")) ||
-              (item.href === "/admin/reviews" && pathname.startsWith("/admin/reviews")) ||
-              (item.href === "/admin/email" && pathname.startsWith("/admin/email"));
+      {/* Mobile bottom bar — horizontally scrollable so every link fits.
+          Safe-area padding keeps it clear of the home indicator / browser chrome. */}
+      <div
+        className="lg:hidden fixed bottom-0 left-0 right-0 bg-navy-900 border-t border-white/10 z-50"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      >
+        <nav className="flex overflow-x-auto overscroll-x-contain gap-1 px-1 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {navigation.map((item) => {
+            const isActive = navMatches(pathname, item.href);
             return (
               <Link
                 key={item.name}
                 href={item.href}
                 className={cn(
-                  "flex flex-col items-center px-2 py-1 text-xs",
+                  "flex flex-shrink-0 min-w-[68px] flex-col items-center px-2 py-1 text-[11px] font-medium",
                   isActive ? "text-teal-400" : "text-white/60"
                 )}
               >
                 <item.icon className="h-5 w-5 mb-1" />
-                <span className="truncate max-w-[60px]">{item.name.split(" ")[0]}</span>
+                <span className="whitespace-nowrap">{item.short}</span>
               </Link>
             );
           })}
