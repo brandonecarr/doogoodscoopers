@@ -16,6 +16,7 @@ const pathFor: Record<LeadSource, string> = {
   COMMERCIAL: "commercial",
   CAREERS: "careers",
   CUSTOMER: "customers",
+  MESSENGER: "messenger",
 };
 
 function fmt(d: Date | null, timeZone: string) {
