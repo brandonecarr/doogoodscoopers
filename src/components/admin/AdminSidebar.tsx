@@ -14,7 +14,6 @@ import {
   Dog,
   Star,
   Mail,
-  MessageCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -23,7 +22,6 @@ const navigation = [
   { name: "Leads",                short: "Leads",      href: "/admin/leads",       icon: Users2 },
   { name: "Customers",            short: "Customers",  href: "/admin/customers",   icon: Dog },
   { name: "Reviews",              short: "Reviews",    href: "/admin/reviews",     icon: Star },
-  { name: "Messenger",            short: "Messenger",  href: "/admin/messenger",   icon: MessageCircle },
   { name: "Campaigns",            short: "Campaigns",  href: "/admin/campaigns",   icon: Megaphone },
   { name: "Email",                short: "Email",      href: "/admin/email",       icon: Mail },
   { name: "Commercial Inquiries", short: "Commercial", href: "/admin/commercial",  icon: Building2 },
