@@ -254,6 +254,58 @@ model AdLead {
 }
 
 // =====================
+// INSTAGRAM AUTOMATION (comment → auto-DM, ManyChat-style)
+// =====================
+// A keyword campaign: when someone comments a keyword on a post/reel, we send
+// them a private-reply DM. Powered by the Meta webhook + a cron-drained queue.
+model InstagramCampaign {
+  id            String    @id @default(cuid())
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  name          String
+  mediaId       String?   // specific post/reel to watch; null = any post
+  keywords      String[]  // trigger words
+  matchType     String    @default("partial") // "partial" | "whole"
+  dmText        String    @db.Text // the DM to send (supports {username})
+  publicReply   String?   @db.Text // optional public comment reply
+  active        Boolean   @default(true)
+  followGate    Boolean   @default(false) // require the user to follow first (phase 2)
+
+  matchedCount  Int       @default(0)
+  sentCount     Int       @default(0)
+  failedCount   Int       @default(0)
+  adminEmail    String?
+
+  @@index([active])
+  @@index([mediaId])
+}
+
+// One matched comment → one queued/sent DM. commentId is unique so a comment is
+// only ever answered once. Doubles as the send queue (status QUEUED) and the log.
+model InstagramDm {
+  id           String    @id @default(cuid())
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  campaignId   String
+  commentId    String    @unique // the IG comment we privately reply to
+  mediaId      String?
+  igUserId     String?   // commenter's IG-scoped id
+  username     String?
+  commentText  String?   @db.Text
+  text         String    @db.Text // rendered DM body
+
+  status       String    @default("QUEUED") // QUEUED | SENT | SKIPPED | FAILED | RATE_LIMITED
+  error        String?
+  sentAt       DateTime?
+
+  @@index([status])
+  @@index([campaignId])
+  @@index([createdAt])
+}
+
+// =====================
 // ADMIN PUSH SUBSCRIPTIONS
 // =====================
 // Web Push subscriptions for admin followup notifications
