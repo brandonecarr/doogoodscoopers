@@ -71,16 +71,13 @@ export function makeTrackingCode(): string {
 }
 
 /**
- * The quote link embedded in a commenter's DM. Points at the main-site Sweep&Go
- * onboarding form (the real "get a quote" flow) — overridable via env. The `ig`
- * tracking code rides along so a future click-tracking redirect can attribute it.
+ * The quote link embedded in a commenter's DM. Points at our /ig/<code> redirect,
+ * which logs the click on the InstagramLead and forwards to the real onboarding
+ * form (set by INSTAGRAM_QUOTE_LINK, read in that route).
  */
 export function trackedQuoteUrl(trackingCode: string): string {
-  const base =
-    process.env.INSTAGRAM_QUOTE_LINK ||
-    "https://doogoodscoopers.com/sng/doogoodscoopers-obc2w-client-onboarding/";
-  const sep = base.includes("?") ? "&" : "?";
-  return `${base}${sep}ig=${encodeURIComponent(trackingCode)}`;
+  const base = process.env.NEXT_PUBLIC_SITE_URL || "https://doogoodscoopers.vercel.app";
+  return `${base}/ig/${encodeURIComponent(trackingCode)}`;
 }
 
 /**

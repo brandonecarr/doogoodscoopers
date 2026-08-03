@@ -339,6 +339,8 @@ model InstagramLead {
 
   // Tracked link embedded in their DM (unique per person)
   trackingCode  String     @unique
+  linkClickedAt DateTime?  // first time they clicked the tracked quote link
+  linkClickCount Int       @default(0)
 
   // Contact info — only known after they convert through the quote form
   firstName     String?

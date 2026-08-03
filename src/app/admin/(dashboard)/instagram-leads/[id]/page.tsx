@@ -127,8 +127,18 @@ export default async function InstagramLeadPage({ params }: { params: Promise<{ 
           {/* Tracked link */}
           <div className={card}>
             <h2 className="text-sm font-semibold text-navy-900 flex items-center gap-1.5 mb-2"><Send className="w-4 h-4 text-teal-600" /> Tracked quote link</h2>
-            <p className="text-xs text-gray-500 mb-2">The <code className="bg-gray-100 px-1 rounded">{"{link}"}</code> in this person’s DM points here. A quote submitted through it is attributed to this lead.</p>
+            <p className="text-xs text-gray-500 mb-2">The <code className="bg-gray-100 px-1 rounded">{"{link}"}</code> in this person’s DM points here. Clicks are logged, then forwarded to your onboarding form.</p>
             <a href={trackedUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-teal-600 hover:underline break-all">{trackedUrl}</a>
+            <div className="mt-3 pt-3 border-t border-gray-100 text-sm">
+              {lead.linkClickedAt ? (
+                <p className="inline-flex items-center gap-1.5 text-green-700">
+                  <CheckCircle2 className="w-4 h-4" />
+                  Clicked {lead.linkClickCount}× · first {fmt(lead.linkClickedAt, timeZone)}
+                </p>
+              ) : (
+                <p className="text-gray-400">Not clicked yet</p>
+              )}
+            </div>
           </div>
         </div>
 
