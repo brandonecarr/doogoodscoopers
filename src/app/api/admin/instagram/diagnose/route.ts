@@ -9,9 +9,12 @@ const GRAPH = "https://graph.facebook.com/v21.0";
  * culprit — is this IG account actually SUBSCRIBED to the app for `comments`?
  * Tokens are never returned; only presence/length and Meta's answers.
  */
-export async function GET() {
+export async function GET(request: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  // Open ...?subscribe=1 to also subscribe this account to `comments` before checking.
+  const doSubscribe = new URL(request.url).searchParams.get("subscribe") === "1";
 
   const token = process.env.IG_PAGE_TOKEN || "";
   const accountId = process.env.IG_ACCOUNT_ID || "";
@@ -41,6 +44,19 @@ export async function GET() {
 
   // 1) Who is this account / is the token valid?
   out.account = await graph(`${encodeURIComponent(accountId)}?fields=id,username,name,account_type,followers_count`);
+
+  // Optional one-click fix: subscribe this account to `comments`.
+  if (doSubscribe) {
+    try {
+      const res = await fetch(
+        `${GRAPH}/${encodeURIComponent(accountId)}/subscribed_apps?subscribed_fields=comments&access_token=${encodeURIComponent(token)}`,
+        { method: "POST" },
+      );
+      out.subscribe_attempt = { status: res.status, json: await res.json().catch(() => ({})) };
+    } catch (e) {
+      out.subscribe_attempt = { error: e instanceof Error ? e.message : "failed" };
+    }
+  }
 
   // 2) THE key check — is the app subscribed to this account, and for which fields?
   out.subscribed_apps = await graph(`${encodeURIComponent(accountId)}/subscribed_apps`);
