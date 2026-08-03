@@ -2,6 +2,7 @@ import prisma from "@/lib/prisma";
 import { Instagram } from "lucide-react";
 import { isInstagramConfigured } from "@/lib/instagram";
 import { InstagramManager, type IgCampaign } from "@/components/admin/InstagramManager";
+import { InstagramActivity, type IgActivityItem } from "@/components/admin/InstagramActivity";
 import { loadSendWindow } from "@/lib/send-window";
 
 export const dynamic = "force-dynamic";
@@ -16,13 +17,6 @@ function fmt(d: Date, timeZone: string) {
     timeZoneName: "short",
   });
 }
-const STATUS_STYLE: Record<string, string> = {
-  SENT: "bg-green-50 text-green-700",
-  QUEUED: "bg-blue-50 text-blue-700",
-  RATE_LIMITED: "bg-amber-50 text-amber-700",
-  FAILED: "bg-red-50 text-red-700",
-  SKIPPED: "bg-gray-100 text-gray-600",
-};
 
 export default async function InstagramPage() {
   const [campaigns, recent, { timeZone }] = await Promise.all([
@@ -35,6 +29,9 @@ export default async function InstagramPage() {
     id: c.id, name: c.name, mediaId: c.mediaId, keywords: c.keywords, matchType: c.matchType,
     dmText: c.dmText, publicReply: c.publicReply, active: c.active,
     matchedCount: c.matchedCount, sentCount: c.sentCount, failedCount: c.failedCount,
+  }));
+  const activityItems: IgActivityItem[] = recent.map((d) => ({
+    id: d.id, username: d.username, commentText: d.commentText ?? "", status: d.status, when: fmt(d.createdAt, timeZone),
   }));
 
   return (
@@ -59,25 +56,7 @@ export default async function InstagramPage() {
 
       <InstagramManager campaigns={igCampaigns} />
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-100">
-          <h2 className="text-sm font-semibold text-navy-900">Recent activity</h2>
-        </div>
-        {recent.length === 0 ? (
-          <p className="text-sm text-gray-500 px-4 py-8 text-center">No comments matched yet. When they do, every send shows here — queued, sent, skipped, or failed.</p>
-        ) : (
-          <div className="divide-y divide-gray-50">
-            {recent.map((d) => (
-              <div key={d.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
-                <span className="font-medium text-navy-900 flex-shrink-0">{d.username ? `@${d.username}` : "someone"}</span>
-                <span className="text-gray-500 truncate flex-1 min-w-0">commented “{d.commentText}”</span>
-                <span className={`text-[11px] px-1.5 py-0.5 rounded ${STATUS_STYLE[d.status] || "bg-gray-100 text-gray-600"}`}>{d.status.toLowerCase().replace("_", " ")}</span>
-                <span className="text-[11px] text-gray-400 whitespace-nowrap" suppressHydrationWarning>{fmt(d.createdAt, timeZone)}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      <InstagramActivity items={activityItems} timeZone={timeZone} />
     </div>
   );
 }

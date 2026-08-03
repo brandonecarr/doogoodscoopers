@@ -88,6 +88,36 @@ export async function sendPrivateReply(commentId: string, text: string): Promise
   }
 }
 
+/** Live-fetch a post/reel's public info (permalink, caption, thumbnail). Null on any error. */
+export async function fetchMediaInfo(mediaId: string | null | undefined): Promise<Record<string, unknown> | null> {
+  const token = process.env.IG_PAGE_TOKEN;
+  if (!token || !mediaId) return null;
+  try {
+    const res = await fetch(
+      `${GRAPH}/${encodeURIComponent(mediaId)}?fields=permalink,caption,media_type,media_url,thumbnail_url,timestamp&access_token=${encodeURIComponent(token)}`,
+    );
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+/** Live-fetch a comment's public info (text, like count, timestamp). Null on any error. */
+export async function fetchCommentInfo(commentId: string | null | undefined): Promise<Record<string, unknown> | null> {
+  const token = process.env.IG_PAGE_TOKEN;
+  if (!token || !commentId) return null;
+  try {
+    const res = await fetch(
+      `${GRAPH}/${encodeURIComponent(commentId)}?fields=text,timestamp,like_count&access_token=${encodeURIComponent(token)}`,
+    );
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
 /** Post a public reply to a comment (optional). */
 export async function replyToComment(commentId: string, message: string): Promise<{ ok: boolean; error?: string }> {
   const token = process.env.IG_PAGE_TOKEN;
