@@ -1,5 +1,7 @@
+import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import prisma from "@/lib/prisma";
 
 // Instagram-Login tokens (IGAA…) must go to Instagram's host, not graph.facebook.com.
 const GRAPH = "https://graph.instagram.com/v21.0";
@@ -106,6 +108,33 @@ export async function GET(request: Request) {
     : fields.includes("comments")
       ? "✅ Subscribed and 'comments' is in the field list — webhooks should deliver."
       : `⚠️ Subscribed, but 'comments' NOT in fields (${fields.join(", ") || "none"}). Re-subscribe including comments.`;
+
+  // Recompute the signature for the most recent REAL webhook using the CURRENTLY
+  // deployed secret — definitively answers "is the live secret the right signer?"
+  // without needing another comment.
+  try {
+    const rows = (await prisma.$queryRawUnsafe(
+      `SELECT "raw","sigHeader","createdAt" FROM "IgWebhookEvent" WHERE "sigHeader" IS NOT NULL ORDER BY "createdAt" DESC LIMIT 1`,
+    )) as Array<{ raw: string; sigHeader: string; createdAt: Date }>;
+    const row = rows?.[0];
+    if (row && process.env.META_APP_SECRET) {
+      const liveComputed = "sha256=" + crypto.createHmac("sha256", process.env.META_APP_SECRET).update(row.raw, "utf8").digest("hex");
+      out.live_secret_vs_last_webhook = {
+        lastWebhookAt: row.createdAt,
+        metaSent: row.sigHeader,
+        liveComputes: liveComputed,
+        matches: liveComputed === row.sigHeader,
+        note:
+          liveComputed === row.sigHeader
+            ? "✅ The deployed secret matches Meta's signature — webhooks will verify now."
+            : "❌ The deployed secret does NOT match Meta's signature. Either the redeploy hasn't taken, or this still isn't the signing secret.",
+      };
+    } else {
+      out.live_secret_vs_last_webhook = "No captured webhook with a signature yet.";
+    }
+  } catch (e) {
+    out.live_secret_vs_last_webhook = { error: e instanceof Error ? e.message : "failed" };
+  }
 
   return NextResponse.json(out);
 }
