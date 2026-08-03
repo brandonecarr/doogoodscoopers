@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 
-const GRAPH = "https://graph.facebook.com/v21.0";
+// Instagram-Login tokens (IGAA…) must go to Instagram's host, not graph.facebook.com.
+const GRAPH = "https://graph.instagram.com/v21.0";
 
 /**
  * Read-only diagnostic for the Instagram webhook wiring. Admin-only.
@@ -56,14 +57,23 @@ export async function GET(request: Request) {
     }
   }
 
-  // 1) Who is this account / is the token valid?
-  out.account = await graph(`${encodeURIComponent(accountId)}?fields=id,username,name,account_type,followers_count`);
+  // 1) Who is this account / is the token valid? /me always maps to the token owner.
+  out.account = await graph(`me?fields=user_id,username,account_type`);
 
-  // Optional one-click fix: subscribe this account to `comments`.
+  // Confirm IG_ACCOUNT_ID matches the token's actual account (a mismatch breaks DM sends).
+  const meId = (out.account as { json?: { user_id?: string; id?: string } })?.json?.user_id
+    ?? (out.account as { json?: { id?: string } })?.json?.id;
+  out.account_id_check = meId
+    ? meId === accountId
+      ? `✅ IG_ACCOUNT_ID matches the token's account (${accountId})`
+      : `⚠️ MISMATCH — IG_ACCOUNT_ID is ${accountId} but the token's account is ${meId}. Set IG_ACCOUNT_ID to ${meId}.`
+    : "could not read the token's account id";
+
+  // Optional one-click fix: subscribe this account to `comments` (via /me = token owner).
   if (doSubscribe) {
     try {
       const res = await fetch(
-        `${GRAPH}/${encodeURIComponent(accountId)}/subscribed_apps?subscribed_fields=comments&access_token=${encodeURIComponent(token)}`,
+        `${GRAPH}/me/subscribed_apps?subscribed_fields=comments&access_token=${encodeURIComponent(token)}`,
         { method: "POST" },
       );
       out.subscribe_attempt = { status: res.status, json: await res.json().catch(() => ({})) };
@@ -73,7 +83,7 @@ export async function GET(request: Request) {
   }
 
   // 2) THE key check — is the app subscribed to this account, and for which fields?
-  out.subscribed_apps = await graph(`${encodeURIComponent(accountId)}/subscribed_apps`);
+  out.subscribed_apps = await graph(`me/subscribed_apps`);
 
   // Interpret the subscription result for a quick human read.
   const subs = out.subscribed_apps as { json?: { data?: Array<{ subscribed_fields?: string[] }> } };
@@ -102,7 +112,7 @@ export async function POST() {
 
   try {
     const res = await fetch(
-      `${GRAPH}/${encodeURIComponent(accountId)}/subscribed_apps?subscribed_fields=comments&access_token=${encodeURIComponent(token)}`,
+      `${GRAPH}/me/subscribed_apps?subscribed_fields=comments&access_token=${encodeURIComponent(token)}`,
       { method: "POST" },
     );
     const json = await res.json().catch(() => ({}));

@@ -16,7 +16,10 @@ import crypto from "crypto";
  *   META_APP_SECRET  – app secret, for verifying webhook signatures
  */
 
-const GRAPH = "https://graph.facebook.com/v21.0";
+// Instagram API with Instagram Login uses Instagram's own Graph host — tokens
+// begin with "IGAA" and are rejected ("Cannot parse access token") by
+// graph.facebook.com, which only accepts Facebook/Page (EAA…) tokens.
+const GRAPH = "https://graph.instagram.com/v21.0";
 
 export function isInstagramConfigured(): boolean {
   return !!(process.env.IG_PAGE_TOKEN && process.env.IG_VERIFY_TOKEN && process.env.IG_ACCOUNT_ID);
