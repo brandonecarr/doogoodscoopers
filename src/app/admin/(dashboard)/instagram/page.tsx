@@ -2,11 +2,19 @@ import prisma from "@/lib/prisma";
 import { Instagram } from "lucide-react";
 import { isInstagramConfigured } from "@/lib/instagram";
 import { InstagramManager, type IgCampaign } from "@/components/admin/InstagramManager";
+import { loadSendWindow } from "@/lib/send-window";
 
 export const dynamic = "force-dynamic";
 
-function fmt(d: Date) {
-  return new Date(d).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+function fmt(d: Date, timeZone: string) {
+  return new Date(d).toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone,
+    timeZoneName: "short",
+  });
 }
 const STATUS_STYLE: Record<string, string> = {
   SENT: "bg-green-50 text-green-700",
@@ -17,9 +25,10 @@ const STATUS_STYLE: Record<string, string> = {
 };
 
 export default async function InstagramPage() {
-  const [campaigns, recent] = await Promise.all([
+  const [campaigns, recent, { timeZone }] = await Promise.all([
     prisma.instagramCampaign.findMany({ orderBy: { createdAt: "desc" } }),
     prisma.instagramDm.findMany({ orderBy: { createdAt: "desc" }, take: 25 }),
+    loadSendWindow(),
   ]);
   const configured = isInstagramConfigured();
   const igCampaigns: IgCampaign[] = campaigns.map((c) => ({
@@ -63,7 +72,7 @@ export default async function InstagramPage() {
                 <span className="font-medium text-navy-900 flex-shrink-0">{d.username ? `@${d.username}` : "someone"}</span>
                 <span className="text-gray-500 truncate flex-1 min-w-0">commented “{d.commentText}”</span>
                 <span className={`text-[11px] px-1.5 py-0.5 rounded ${STATUS_STYLE[d.status] || "bg-gray-100 text-gray-600"}`}>{d.status.toLowerCase().replace("_", " ")}</span>
-                <span className="text-[11px] text-gray-400 whitespace-nowrap" suppressHydrationWarning>{fmt(d.createdAt)}</span>
+                <span className="text-[11px] text-gray-400 whitespace-nowrap" suppressHydrationWarning>{fmt(d.createdAt, timeZone)}</span>
               </div>
             ))}
           </div>
