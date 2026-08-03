@@ -25,6 +25,20 @@ export async function GET(request: Request) {
       IG_VERIFY_TOKEN: process.env.IG_VERIFY_TOKEN ? "present" : "MISSING",
       META_APP_SECRET: process.env.META_APP_SECRET ? "present" : "MISSING",
     },
+    // Safe shape inspection of the token — only 6 chars of each end + hygiene flags.
+    token_shape: token
+      ? {
+          prefix: token.slice(0, 6),
+          suffix: token.slice(-4),
+          length: token.length,
+          startsWithIGAA: token.startsWith("IGAA"),
+          startsWithEAA: token.startsWith("EAA"),
+          hasWhitespace: /\s/.test(token),
+          hasLeadingOrTrailingSpace: token !== token.trim(),
+          hasNewline: /[\r\n]/.test(token),
+          hasQuotes: /["']/.test(token),
+        }
+      : null,
   };
 
   if (!token || !accountId) {
