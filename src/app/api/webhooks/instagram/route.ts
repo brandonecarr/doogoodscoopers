@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { verifyMetaSignature, matchesKeywords, renderDm } from "@/lib/instagram";
@@ -29,6 +30,10 @@ export async function POST(request: NextRequest) {
 
   // TEMP debug: record every inbound POST before any filtering, so we can tell
   // "Meta isn't delivering" apart from "arriving but dropped (signature/match)".
+  const sigHeader = request.headers.get("x-hub-signature-256");
+  const expectedSig = process.env.META_APP_SECRET
+    ? "sha256=" + crypto.createHmac("sha256", process.env.META_APP_SECRET).update(raw, "utf8").digest("hex")
+    : null;
   try {
     let objType: string | null = null;
     try {
@@ -37,10 +42,12 @@ export async function POST(request: NextRequest) {
       /* not JSON */
     }
     await prisma.$executeRawUnsafe(
-      `INSERT INTO "IgWebhookEvent" ("sigOk","objectType","raw") VALUES ($1,$2,$3)`,
+      `INSERT INTO "IgWebhookEvent" ("sigOk","objectType","raw","sigHeader","expectedSig") VALUES ($1,$2,$3,$4,$5)`,
       sigOk,
       objType,
       raw.slice(0, 4000),
+      sigHeader,
+      expectedSig,
     );
   } catch {
     /* logging must never break the webhook */

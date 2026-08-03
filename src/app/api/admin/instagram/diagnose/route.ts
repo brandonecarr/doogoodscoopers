@@ -26,6 +26,18 @@ export async function GET(request: Request) {
       IG_VERIFY_TOKEN: process.env.IG_VERIFY_TOKEN ? "present" : "MISSING",
       META_APP_SECRET: process.env.META_APP_SECRET ? "present" : "MISSING",
     },
+    // App secret should be 32 lowercase hex chars, no whitespace. A stray
+    // newline/space (or wrong value) makes every webhook signature check fail.
+    app_secret_shape: process.env.META_APP_SECRET
+      ? {
+          length: process.env.META_APP_SECRET.length,
+          looksLike32Hex: /^[a-f0-9]{32}$/.test(process.env.META_APP_SECRET),
+          hasWhitespace: /\s/.test(process.env.META_APP_SECRET),
+          hasLeadingOrTrailingSpace: process.env.META_APP_SECRET !== process.env.META_APP_SECRET.trim(),
+          prefix: process.env.META_APP_SECRET.slice(0, 4),
+          suffix: process.env.META_APP_SECRET.slice(-4),
+        }
+      : "MISSING",
     // Safe shape inspection of the token — only 6 chars of each end + hygiene flags.
     token_shape: token
       ? {
