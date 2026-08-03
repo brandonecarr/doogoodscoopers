@@ -21,6 +21,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ cod
         where: { id: lead.id },
         data: { linkClickCount: { increment: 1 }, linkClickedAt: lead.linkClickedAt ?? new Date() },
       });
+      // Log this individual click (per-click history, distinct from the counter).
+      await prisma.instagramLinkClick.create({ data: { instagramLeadId: lead.id } });
     }
   } catch {
     /* never block the redirect */

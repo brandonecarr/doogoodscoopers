@@ -360,6 +360,17 @@ model InstagramLead {
   @@index([username])
 }
 
+// One row per click of a tracked /ig/<code> link — the real per-click history
+// (InstagramLead.linkClickCount/linkClickedAt stay as denormalized quick-stats).
+model InstagramLinkClick {
+  id              String   @id @default(cuid())
+  createdAt       DateTime @default(now())
+  instagramLeadId String
+
+  @@index([instagramLeadId])
+  @@index([createdAt])
+}
+
 // =====================
 // ADMIN PUSH SUBSCRIPTIONS
 // =====================

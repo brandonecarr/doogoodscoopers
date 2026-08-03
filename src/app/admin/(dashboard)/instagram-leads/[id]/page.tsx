@@ -36,6 +36,11 @@ export default async function InstagramLeadPage({ params }: { params: Promise<{ 
     fetchCommentInfo(lead.commentId),
   ]);
   const suggestions = lead.convertedQuoteLeadId ? [] : await suggestQuotesForInstagramLead(lead);
+  const clicks = await prisma.instagramLinkClick.findMany({
+    where: { instagramLeadId: lead.id },
+    orderBy: { createdAt: "desc" },
+    take: 50,
+  });
   const trackedUrl = trackedQuoteUrl(lead.trackingCode);
   const permalink = (media as { permalink?: string } | null)?.permalink;
   const caption = (media as { caption?: string } | null)?.caption;
@@ -158,7 +163,23 @@ export default async function InstagramLeadPage({ params }: { params: Promise<{ 
             <p className="text-xs text-gray-500 mb-2">The <code className="bg-gray-100 px-1 rounded">{"{link}"}</code> in this person’s DM points here. Clicks are logged, then forwarded to your onboarding form.</p>
             <a href={trackedUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-teal-600 hover:underline break-all">{trackedUrl}</a>
             <div className="mt-3 pt-3 border-t border-gray-100 text-sm">
-              {lead.linkClickedAt ? (
+              {clicks.length > 0 ? (
+                <>
+                  <p className="inline-flex items-center gap-1.5 text-green-700 font-medium">
+                    <CheckCircle2 className="w-4 h-4" />
+                    Clicked {clicks.length}{clicks.length >= 50 ? "+" : ""}×
+                  </p>
+                  <ul className="mt-2 space-y-1">
+                    {clicks.map((c) => (
+                      <li key={c.id} className="flex items-center gap-2 text-xs text-gray-600" suppressHydrationWarning>
+                        <Clock className="w-3.5 h-3.5 text-gray-400" />
+                        {fmt(c.createdAt, timeZone)}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              ) : lead.linkClickedAt ? (
+                // Legacy: clicks predating per-click logging (only the counter + first time exist).
                 <p className="inline-flex items-center gap-1.5 text-green-700">
                   <CheckCircle2 className="w-4 h-4" />
                   Clicked {lead.linkClickCount}× · first {fmt(lead.linkClickedAt, timeZone)}
