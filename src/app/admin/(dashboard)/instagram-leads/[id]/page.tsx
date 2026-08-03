@@ -3,8 +3,10 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Instagram, ExternalLink, CheckCircle2, Send, Clock, Heart } from "lucide-react";
 import prisma from "@/lib/prisma";
 import { fetchMediaInfo, fetchCommentInfo, trackedQuoteUrl } from "@/lib/instagram";
+import { suggestQuotesForInstagramLead } from "@/lib/instagram-leads";
 import { loadSendWindow } from "@/lib/send-window";
 import { InstagramLeadControls } from "@/components/admin/InstagramLeadControls";
+import { InstagramMatchButton } from "@/components/admin/InstagramMatchButton";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +35,7 @@ export default async function InstagramLeadPage({ params }: { params: Promise<{ 
     fetchMediaInfo(lead.mediaId),
     fetchCommentInfo(lead.commentId),
   ]);
+  const suggestions = lead.convertedQuoteLeadId ? [] : await suggestQuotesForInstagramLead(lead);
   const trackedUrl = trackedQuoteUrl(lead.trackingCode);
   const permalink = (media as { permalink?: string } | null)?.permalink;
   const caption = (media as { caption?: string } | null)?.caption;
@@ -92,7 +95,32 @@ export default async function InstagramLeadPage({ params }: { params: Promise<{ 
           ) : (
             <div className={card}>
               <h2 className="text-sm font-semibold text-navy-900 mb-2">Not converted yet</h2>
-              <p className="text-sm text-gray-500">This commenter hasn’t submitted the quote form. Their DM contains the tracked link below — when they use it, this lead flips to <b>Converted</b> and links to the quote automatically.</p>
+              <p className="text-sm text-gray-500">This commenter hasn’t been matched to a quote. If they clicked the tracked link, any quote that landed soon after shows below as a likely match to confirm.</p>
+            </div>
+          )}
+
+          {/* Possible conversions — quotes that landed soon after this lead clicked */}
+          {suggestions.length > 0 && (
+            <div className={card + " border-purple-200 bg-purple-50/40"}>
+              <h2 className="text-sm font-semibold text-navy-900 mb-1">Possible conversions</h2>
+              <p className="text-xs text-gray-500 mb-3">
+                {lead.linkClickedAt ? "This lead clicked the quote link — " : ""}these quotes came in shortly after. Confirm a match to attribute it.
+              </p>
+              <div className="divide-y divide-purple-100">
+                {suggestions.map((q) => (
+                  <div key={q.id} className="flex items-center gap-3 py-2.5">
+                    <div className="flex-1 min-w-0">
+                      <Link href={`/admin/quote-leads/${q.id}`} className="text-sm font-medium text-navy-900 hover:text-teal-600 hover:underline">
+                        {q.name}
+                      </Link>
+                      <p className="text-xs text-gray-500 truncate">
+                        {q.phone || "no phone"}{q.zipCode ? ` · ${q.zipCode}` : ""} · {q.minutesAfterClick < 1 ? "under a minute" : `${q.minutesAfterClick} min`} after the click
+                      </p>
+                    </div>
+                    <InstagramMatchButton instagramLeadId={lead.id} quoteLeadId={q.id} label="It's them" />
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 

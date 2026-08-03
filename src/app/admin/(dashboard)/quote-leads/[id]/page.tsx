@@ -12,6 +12,8 @@ import { isOptedOut } from "@/lib/sms-optout";
 import { LeadActions } from "@/components/admin/LeadActions";
 import { FollowupGrade } from "@/components/admin/FollowupGrade";
 import { ArrangeableBoard, type ArrangeableCard } from "@/components/admin/ArrangeableBoard";
+import { suggestInstagramLeadsForQuote } from "@/lib/instagram-leads";
+import { InstagramMatchButton } from "@/components/admin/InstagramMatchButton";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -177,6 +179,8 @@ export default async function QuoteLeadDetailPage({ params }: PageProps) {
   const igLead = lead.sourceChannel === "instagram" && lead.instagramLeadId
     ? await prisma.instagramLead.findUnique({ where: { id: lead.instagramLeadId } })
     : null;
+  // Otherwise, suggest Instagram leads that clicked a quote link right before this quote landed.
+  const igSuggestions = igLead ? [] : await suggestInstagramLeadsForQuote(lead);
 
   const optedOut = await isOptedOut(lead.phone);
 
@@ -468,6 +472,34 @@ export default async function QuoteLeadDetailPage({ params }: PageProps) {
             </p>
           </div>
         </Link>
+      )}
+
+      {/* Suggested Instagram source — an IG lead clicked a quote link just before this quote landed */}
+      {igSuggestions.length > 0 && (
+        <div className="p-4 bg-purple-50 border border-purple-200 rounded-xl">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#f58529] via-[#dd2a7b] to-[#8134af] flex items-center justify-center flex-shrink-0">
+              <Instagram className="w-4 h-4 text-white" />
+            </span>
+            <p className="text-sm font-medium text-navy-900">Possibly from Instagram — confirm the match?</p>
+          </div>
+          <div className="divide-y divide-purple-100">
+            {igSuggestions.map((s) => (
+              <div key={s.id} className="flex items-center gap-3 py-2">
+                <div className="flex-1 min-w-0 text-sm">
+                  <Link href={`/admin/instagram-leads/${s.id}`} className="font-medium text-navy-900 hover:text-teal-600 hover:underline">
+                    {s.username ? `@${s.username}` : "Instagram lead"}
+                  </Link>
+                  <p className="text-xs text-gray-600 truncate">
+                    clicked the quote link {s.minutesBeforeQuote < 1 ? "under a minute" : `${s.minutesBeforeQuote} min`} before this quote
+                    {s.commentText ? ` · commented “${s.commentText}”` : ""}
+                  </p>
+                </div>
+                <InstagramMatchButton instagramLeadId={s.id} quoteLeadId={lead.id} label="It's them" />
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* Archived Banner */}
