@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { archiveConvertedLeads } from "@/lib/lead-duplicates";
 
 // One-way mirror of ACTIVE Sweep&Go residential customers.
 //
@@ -89,6 +90,7 @@ export async function GET(request: NextRequest) {
   const seenIds: string[] = [];
   let created = 0;
   let updated = 0;
+  let leadsArchived = 0;
 
   for (const c of clients) {
     if (!c.client) continue;
@@ -126,8 +128,16 @@ export async function GET(request: NextRequest) {
       update: fields,
     });
     // upsert doesn't report create-vs-update; approximate via firstSeenAt.
-    if (result.firstSeenAt.getTime() === now.getTime()) created++;
-    else updated++;
+    if (result.firstSeenAt.getTime() === now.getTime()) {
+      created++;
+      // A brand-new customer means this person converted — archive their old
+      // prospect lead(s) so they stop showing/behaving as an active lead.
+      try {
+        leadsArchived += await archiveConvertedLeads([c.cell_phone, c.home_phone]);
+      } catch (e) {
+        console.error("[sync-customers] lead archive failed:", e);
+      }
+    } else updated++;
   }
 
   // ── Archive customers that fell off the active list ─────────────────────────
@@ -142,5 +152,6 @@ export async function GET(request: NextRequest) {
     created,
     updated,
     archived: archived.count,
+    leadsArchived,
   });
 }

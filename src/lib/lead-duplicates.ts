@@ -101,6 +101,39 @@ export async function findProspectLeadsByPhone(phone: string | null | undefined)
   return out;
 }
 
+/**
+ * A prospect became a customer → their old lead(s) should stop acting like active
+ * leads. Archive (never delete — keep history/attribution) every quote/ad lead
+ * matching the customer's phone(s), marking them CONVERTED. Idempotent: only
+ * touches leads that aren't already archived. Returns how many it archived.
+ */
+export async function archiveConvertedLeads(phones: Array<string | null | undefined>): Promise<number> {
+  const quoteIds = new Set<string>();
+  const adIds = new Set<string>();
+  for (const p of phones) {
+    for (const ref of await findProspectLeadsByPhone(p)) {
+      if (ref.type === "quote") quoteIds.add(ref.id);
+      else adIds.add(ref.id);
+    }
+  }
+  let n = 0;
+  if (quoteIds.size) {
+    const r = await prisma.quoteLead.updateMany({
+      where: { id: { in: [...quoteIds] }, archived: false },
+      data: { archived: true, status: "CONVERTED" },
+    });
+    n += r.count;
+  }
+  if (adIds.size) {
+    const r = await prisma.adLead.updateMany({
+      where: { id: { in: [...adIds] }, archived: false },
+      data: { archived: true, status: "CONVERTED" },
+    });
+    n += r.count;
+  }
+  return n;
+}
+
 /** The record that should survive a merge: richest type, then earliest created. */
 export function pickSurvivor(refs: ProspectRef[]): ProspectRef | null {
   if (refs.length === 0) return null;

@@ -206,9 +206,22 @@ async function handleInbound(supabase: SupabaseClient, payload: unknown) {
       .eq("id", matchedConversationId);
   }
 
-  // No client match → attach the reply to a LEAD (the /admin CRM). Matches
+  // A converted Sweep&Go customer texting is NOT a lead. Their old prospect lead
+  // should already be archived at conversion (sync-customers), but guard here too:
+  // never fire a "Lead replied" alert — or match a stale lead — for a real customer.
+  let isKnownCustomer = false;
+  if (!matchedClientId && normalizedFrom) {
+    const cand = phoneCandidates(normalizedFrom);
+    const customer = await prisma.sweepandgoCustomer.findFirst({
+      where: { active: true, OR: [{ cellPhone: { in: cand } }, { homePhone: { in: cand } }] },
+      select: { id: true },
+    });
+    isKnownCustomer = !!customer;
+  }
+
+  // No client/customer match → attach the reply to a LEAD (the /admin CRM). Matches
   // QuoteLead first, then AdLead, by phone; logs a LeadMessage + notifies admins.
-  if (!matchedClientId && normalizedFrom && msg.messageId) {
+  if (!matchedClientId && !isKnownCustomer && normalizedFrom && msg.messageId) {
     const already = await prisma.leadMessage.findUnique({ where: { quoMessageId: msg.messageId } });
     if (!already) {
       const candidates = phoneCandidates(normalizedFrom);
