@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { sendAdminPush } from "@/lib/web-push";
 import { syncContactToQuo } from "@/lib/quo";
+import { linkInstagramConversion } from "@/lib/instagram-leads";
 
 // Sweep&Go Webhook — receives quote and lead events
 //
@@ -300,11 +301,14 @@ export async function POST(request: NextRequest) {
           phone: lead.phone,
           source: "DooGoodScoopers Quote",
         });
+        // Instagram attribution — if this signup carried our tracking value.
+        await linkInstagramConversion(lead.id, (data.tracking_field as string) || null, { firstName, lastName, email, phone, zipCode }).catch(() => {});
         console.log(`[SweepAndGo] Quote lead deduped/updated: ${lead.id} — ${displayName}`);
         return NextResponse.json({ success: true, lead_id: lead.id, type: "quote", deduped: true });
       }
 
       const lead = await prisma.quoteLead.create({ data: leadData });
+      await linkInstagramConversion(lead.id, (data.tracking_field as string) || null, { firstName, lastName, email, phone, zipCode }).catch(() => {});
 
       syncContactToQuo({
         externalId: `quotelead:${lead.id}`,

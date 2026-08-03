@@ -53,3 +53,39 @@ export async function upsertInstagramLeadForComment(input: {
     },
   });
 }
+
+/**
+ * Close the loop: a lead came back from Sweep&Go carrying our tracking value
+ * (`ig_<trackingCode>`, set on the /ig/<code> redirect). Link the resulting
+ * QuoteLead to the InstagramLead and mark it converted. No-op if the value isn't
+ * ours or the lead isn't found. Idempotent — safe to call on every delivery.
+ */
+export async function linkInstagramConversion(
+  quoteLeadId: string,
+  trackingFieldValue: string | null | undefined,
+  contact: { firstName?: string | null; lastName?: string | null; email?: string | null; phone?: string | null; zipCode?: string | null } = {},
+): Promise<boolean> {
+  const m = /^ig_(.+)$/.exec((trackingFieldValue || "").trim());
+  if (!m) return false;
+  const lead = await prisma.instagramLead.findUnique({ where: { trackingCode: m[1] } });
+  if (!lead) return false;
+
+  await prisma.quoteLead.update({
+    where: { id: quoteLeadId },
+    data: { sourceChannel: "instagram", instagramLeadId: lead.id },
+  });
+  await prisma.instagramLead.update({
+    where: { id: lead.id },
+    data: {
+      status: "CONVERTED",
+      convertedQuoteLeadId: quoteLeadId,
+      convertedAt: lead.convertedAt ?? new Date(),
+      firstName: lead.firstName ?? contact.firstName ?? null,
+      lastName: lead.lastName ?? contact.lastName ?? null,
+      email: lead.email ?? contact.email ?? null,
+      phone: lead.phone ?? contact.phone ?? null,
+      zipCode: lead.zipCode ?? contact.zipCode ?? null,
+    },
+  });
+  return true;
+}

@@ -25,5 +25,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ cod
   } catch {
     /* never block the redirect */
   }
-  return NextResponse.redirect(DEST, 302);
+  // Carry the code into Sweep&Go's `tracking_field` so the signup can be matched
+  // back to this lead when it returns via the webhook / API sync.
+  const dest = new URL(DEST);
+  dest.searchParams.set("tracking_field", `ig_${code}`);
+  return NextResponse.redirect(dest.toString(), 302);
 }
