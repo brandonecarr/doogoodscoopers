@@ -1,16 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { isInstagramConfigured, sendPrivateReply, replyToComment } from "@/lib/instagram";
+import { isInstagramConfigured } from "@/lib/instagram";
+import { deliverInstagramDm } from "@/lib/instagram-deliver";
 import { notify } from "@/lib/notify";
 
-// Drains queued Instagram auto-DMs and sends them as private replies, rate-limited
-// well under Meta's ~750/hour cap. Runs on a cron every minute.
+// Backstop for Instagram auto-DMs. The webhook delivers matches inline (~1s); this
+// cron only picks up stragglers the webhook didn't send — crashes, and rows left
+// RATE_LIMITED — so we skip anything younger than the inline window. Rate-limited
+// well under Meta's ~750/hour cap. Runs every minute.
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const PER_RUN = 40;
 const SPACING_MS = 250;
+// Give the webhook's inline send time to resolve a fresh row before the cron
+// also grabs it (prevents a double-send without needing a transient lock state).
+const INLINE_GRACE_MS = 30_000;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export async function GET(request: NextRequest) {
@@ -22,7 +28,10 @@ export async function GET(request: NextRequest) {
   if (!isInstagramConfigured()) return NextResponse.json({ success: false, error: "Instagram not configured" });
 
   const queue = await prisma.instagramDm.findMany({
-    where: { status: { in: ["QUEUED", "RATE_LIMITED"] } },
+    where: {
+      status: { in: ["QUEUED", "RATE_LIMITED"] },
+      createdAt: { lt: new Date(Date.now() - INLINE_GRACE_MS) },
+    },
     orderBy: { createdAt: "asc" },
     take: PER_RUN,
   });
@@ -39,23 +48,15 @@ export async function GET(request: NextRequest) {
   let sent = 0, failed = 0, rateLimited = 0;
 
   for (const dm of queue) {
-    const res = await sendPrivateReply(dm.commentId, dm.text);
+    const res = await deliverInstagramDm(dm, publicReplyByCampaign.get(dm.campaignId) ?? null);
 
     if (res.ok) {
-      await prisma.instagramDm.update({ where: { id: dm.id }, data: { status: "SENT", sentAt: new Date(), error: null } });
-      await prisma.instagramCampaign.update({ where: { id: dm.campaignId }, data: { sentCount: { increment: 1 } } });
       sent++;
-      // Optional public comment reply.
-      const pub = publicReplyByCampaign.get(dm.campaignId);
-      if (pub) await replyToComment(dm.commentId, pub).catch(() => {});
     } else if (res.rateLimited) {
-      // Leave it for the next run; stop sending this minute to respect the limit.
-      await prisma.instagramDm.update({ where: { id: dm.id }, data: { status: "RATE_LIMITED", error: res.error } });
+      // Row is already marked RATE_LIMITED; stop this minute to respect the limit.
       rateLimited++;
       break;
     } else {
-      await prisma.instagramDm.update({ where: { id: dm.id }, data: { status: "FAILED", error: res.error } });
-      await prisma.instagramCampaign.update({ where: { id: dm.campaignId }, data: { failedCount: { increment: 1 } } });
       failed++;
     }
 

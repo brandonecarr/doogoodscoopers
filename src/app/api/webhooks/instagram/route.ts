@@ -1,7 +1,8 @@
 import crypto from "crypto";
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import prisma from "@/lib/prisma";
 import { verifyMetaSignature, matchesKeywords, renderDm } from "@/lib/instagram";
+import { deliverInstagramDm } from "@/lib/instagram-deliver";
 
 // Instagram webhook.
 //  GET  → verification handshake (Meta calls this once when you set the webhook).
@@ -9,6 +10,8 @@ import { verifyMetaSignature, matchesKeywords, renderDm } from "@/lib/instagram"
 //         is queued as an InstagramDm; the process-instagram-dms cron sends it.
 
 export const dynamic = "force-dynamic";
+// after() sends the DM in the background once we've already 200'd Meta; give it room.
+export const maxDuration = 30;
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -70,6 +73,12 @@ export async function POST(request: NextRequest) {
   const campaigns = await prisma.instagramCampaign.findMany({ where: { active: true } });
   if (campaigns.length === 0) return NextResponse.json({ ok: true });
 
+  // Rows freshly queued this request, to deliver inline (after we respond to Meta).
+  const toDeliver: Array<{
+    dm: { id: string; commentId: string; text: string; campaignId: string };
+    publicReply: string | null;
+  }> = [];
+
   for (const entry of body.entry || []) {
     for (const change of entry?.changes || []) {
       if (change?.field !== "comments") continue;
@@ -91,7 +100,7 @@ export async function POST(request: NextRequest) {
       if (!campaign) continue;
 
       try {
-        await prisma.instagramDm.create({
+        const created = await prisma.instagramDm.create({
           data: {
             campaignId: campaign.id,
             commentId, // unique → a comment is only ever answered once
@@ -104,10 +113,25 @@ export async function POST(request: NextRequest) {
           },
         });
         await prisma.instagramCampaign.update({ where: { id: campaign.id }, data: { matchedCount: { increment: 1 } } });
+        toDeliver.push({
+          dm: { id: created.id, commentId: created.commentId, text: created.text, campaignId: created.campaignId },
+          publicReply: campaign.publicReply,
+        });
       } catch {
         // unique(commentId) → already queued/handled; skip silently.
       }
     }
+  }
+
+  // Deliver right away in the background — Meta gets its 200 immediately, and the
+  // DM goes out in ~1s instead of waiting up to a minute for the cron. Anything
+  // that fails or gets rate-limited here stays QUEUED/RATE_LIMITED for the cron.
+  if (toDeliver.length > 0) {
+    after(async () => {
+      for (const item of toDeliver) {
+        await deliverInstagramDm(item.dm, item.publicReply).catch(() => {});
+      }
+    });
   }
 
   return NextResponse.json({ ok: true });
