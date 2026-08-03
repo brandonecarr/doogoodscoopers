@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Loader2, Trash2, Instagram } from "lucide-react";
+import { Plus, Loader2, Trash2, Instagram, Pencil, Save, X } from "lucide-react";
 
 export interface IgCampaign {
   id: string;
@@ -18,34 +18,76 @@ export interface IgCampaign {
   failedCount: number;
 }
 
+const EMPTY = { name: "", keywords: "", matchType: "partial", mediaId: "", dmText: "", publicReply: "" };
+
 export function InstagramManager({ campaigns }: { campaigns: IgCampaign[] }) {
   const router = useRouter();
   const [open, setOpen] = useState(campaigns.length === 0);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [f, setF] = useState({ name: "", keywords: "", matchType: "partial", mediaId: "", dmText: "", publicReply: "" });
+  const [f, setF] = useState(EMPTY);
 
   const set = (k: keyof typeof f, v: string) => setF((s) => ({ ...s, [k]: v }));
 
-  const create = async () => {
+  const startNew = () => {
+    setEditingId(null);
+    setF(EMPTY);
+    setErr(null);
+    setOpen(true);
+  };
+
+  const startEdit = (c: IgCampaign) => {
+    setEditingId(c.id);
+    setF({
+      name: c.name,
+      keywords: c.keywords.join(", "),
+      matchType: c.matchType,
+      mediaId: c.mediaId || "",
+      dmText: c.dmText,
+      publicReply: c.publicReply || "",
+    });
+    setErr(null);
+    setOpen(true);
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const closeForm = () => {
+    setOpen(false);
+    setEditingId(null);
+    setF(EMPTY);
+    setErr(null);
+  };
+
+  const submit = async () => {
     setBusy(true);
     setErr(null);
     try {
-      const res = await fetch("/api/admin/instagram-campaigns", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(f),
-      });
+      const body = {
+        name: f.name,
+        keywords: f.keywords.split(",").map((k) => k.trim()).filter(Boolean),
+        matchType: f.matchType,
+        mediaId: f.mediaId,
+        dmText: f.dmText,
+        publicReply: f.publicReply,
+      };
+      const res = await fetch(
+        editingId ? `/api/admin/instagram-campaigns/${editingId}` : "/api/admin/instagram-campaigns",
+        {
+          method: editingId ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        },
+      );
       const data = await res.json();
       if (res.ok) {
-        setF({ name: "", keywords: "", matchType: "partial", mediaId: "", dmText: "", publicReply: "" });
-        setOpen(false);
+        closeForm();
         router.refresh();
       } else {
-        setErr(data.error || "Couldn't create campaign");
+        setErr(data.error || "Couldn't save campaign");
       }
     } catch {
-      setErr("Couldn't create campaign");
+      setErr("Couldn't save campaign");
     } finally {
       setBusy(false);
     }
@@ -67,18 +109,21 @@ export function InstagramManager({ campaigns }: { campaigns: IgCampaign[] }) {
   };
 
   const inputCls = "w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent";
+  const isEditing = editingId !== null;
 
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <button onClick={() => setOpen((o) => !o)} className="inline-flex items-center gap-1.5 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 text-sm font-medium">
+        <button onClick={() => (open && !isEditing ? closeForm() : startNew())} className="inline-flex items-center gap-1.5 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 text-sm font-medium">
           <Plus className="w-4 h-4" /> New campaign
         </button>
       </div>
 
       {open && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
-          <h2 className="text-lg font-semibold text-navy-900">New comment → DM campaign</h2>
+          <h2 className="text-lg font-semibold text-navy-900">
+            {isEditing ? "Edit campaign" : "New comment → DM campaign"}
+          </h2>
           <div className="grid md:grid-cols-2 gap-4">
             <label className="block"><span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Campaign name</span>
               <input className={inputCls + " mt-1"} value={f.name} onChange={(e) => set("name", e.target.value)} placeholder="Quote-link auto-DM" />
@@ -105,10 +150,13 @@ export function InstagramManager({ campaigns }: { campaigns: IgCampaign[] }) {
           </label>
           {err && <p className="text-sm text-red-600">{err}</p>}
           <div className="flex gap-2">
-            <button onClick={create} disabled={busy} className="inline-flex items-center gap-1.5 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 text-sm font-medium disabled:opacity-50">
-              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Create campaign
+            <button onClick={submit} disabled={busy} className="inline-flex items-center gap-1.5 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 text-sm font-medium disabled:opacity-50">
+              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : isEditing ? <Save className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+              {isEditing ? "Save changes" : "Create campaign"}
             </button>
-            <button onClick={() => setOpen(false)} className="px-4 py-2 border border-gray-200 rounded-lg text-sm">Cancel</button>
+            <button onClick={closeForm} className="inline-flex items-center gap-1.5 px-4 py-2 border border-gray-200 rounded-lg text-sm">
+              <X className="w-4 h-4" /> Cancel
+            </button>
           </div>
         </div>
       )}
@@ -116,7 +164,7 @@ export function InstagramManager({ campaigns }: { campaigns: IgCampaign[] }) {
       {campaigns.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 divide-y divide-gray-100">
           {campaigns.map((c) => (
-            <div key={c.id} className="flex items-center gap-4 p-4">
+            <div key={c.id} className={`flex items-center gap-4 p-4 ${editingId === c.id ? "bg-teal-50/40" : ""}`}>
               <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-[#f58529] via-[#dd2a7b] to-[#8134af] flex items-center justify-center flex-shrink-0">
                 <Instagram className="w-4 h-4 text-white" />
               </div>
@@ -131,6 +179,9 @@ export function InstagramManager({ campaigns }: { campaigns: IgCampaign[] }) {
               </div>
               <button onClick={() => toggle(c)} className={`text-xs font-semibold px-2.5 py-1 rounded-full ${c.active ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-500"}`}>
                 {c.active ? "Active" : "Paused"}
+              </button>
+              <button onClick={() => startEdit(c)} className="p-1.5 text-gray-500 hover:bg-gray-100 rounded" title="Edit">
+                <Pencil className="w-4 h-4" />
               </button>
               <button onClick={() => remove(c)} className="p-1.5 text-red-500 hover:bg-red-50 rounded" title="Delete">
                 <Trash2 className="w-4 h-4" />
