@@ -39,6 +39,10 @@
     {
       "path": "/api/v2/cron/check-delivery",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/v2/cron/process-instagram-dms",
+      "schedule": "* * * * *"
     }
   ]
 }
