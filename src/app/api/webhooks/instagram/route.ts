@@ -1,4 +1,3 @@
-import crypto from "crypto";
 import { NextRequest, NextResponse, after } from "next/server";
 import prisma from "@/lib/prisma";
 import { verifyMetaSignature, matchesKeywords, renderDm } from "@/lib/instagram";
@@ -27,36 +26,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const raw = await request.text();
-  const sigOk = process.env.META_APP_SECRET
-    ? verifyMetaSignature(raw, request.headers.get("x-hub-signature-256"))
-    : null;
 
-  // TEMP debug: record every inbound POST before any filtering, so we can tell
-  // "Meta isn't delivering" apart from "arriving but dropped (signature/match)".
-  const sigHeader = request.headers.get("x-hub-signature-256");
-  const expectedSig = process.env.META_APP_SECRET
-    ? "sha256=" + crypto.createHmac("sha256", process.env.META_APP_SECRET).update(raw, "utf8").digest("hex")
-    : null;
-  try {
-    let objType: string | null = null;
-    try {
-      objType = (JSON.parse(raw)?.object as string) ?? null;
-    } catch {
-      /* not JSON */
-    }
-    await prisma.$executeRawUnsafe(
-      `INSERT INTO "IgWebhookEvent" ("sigOk","objectType","raw","sigHeader","expectedSig") VALUES ($1,$2,$3,$4,$5)`,
-      sigOk,
-      objType,
-      raw.slice(0, 4000),
-      sigHeader,
-      expectedSig,
-    );
-  } catch {
-    /* logging must never break the webhook */
-  }
-
-  if (process.env.META_APP_SECRET && !sigOk) {
+  if (process.env.META_APP_SECRET && !verifyMetaSignature(raw, request.headers.get("x-hub-signature-256"))) {
     return new NextResponse("Invalid signature", { status: 401 });
   }
 
