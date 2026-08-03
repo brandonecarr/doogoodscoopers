@@ -57,10 +57,23 @@ function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-/** Fill {username} (and a couple of aliases) in the DM template. */
-export function renderDm(template: string, vars: { username?: string | null }): string {
+/** Fill {username}, {name}, and {link} in the DM template. */
+export function renderDm(template: string, vars: { username?: string | null; link?: string | null }): string {
   const name = vars.username ? `@${vars.username}` : "there";
-  return template.replace(/\{username\}/gi, name).replace(/\{name\}/gi, vars.username || "there");
+  let out = template.replace(/\{username\}/gi, name).replace(/\{name\}/gi, vars.username || "there");
+  if (vars.link) out = out.replace(/\{link\}/gi, vars.link);
+  return out;
+}
+
+/** A short, URL-safe tracking code embedded in a commenter's DM quote link. */
+export function makeTrackingCode(): string {
+  return "ig" + crypto.randomBytes(6).toString("hex"); // e.g. "ig9f3a1c...", 14 chars
+}
+
+/** The tracked quote-form URL for a given code (lands on the app's /quote form). */
+export function trackedQuoteUrl(trackingCode: string): string {
+  const base = process.env.NEXT_PUBLIC_SITE_URL || "https://doogoodscoopers.vercel.app";
+  return `${base}/quote?ig=${encodeURIComponent(trackingCode)}`;
 }
 
 /**

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import prisma from "@/lib/prisma";
-import { verifyMetaSignature, matchesKeywords, renderDm } from "@/lib/instagram";
+import { verifyMetaSignature, matchesKeywords, renderDm, trackedQuoteUrl } from "@/lib/instagram";
 import { deliverInstagramDm } from "@/lib/instagram-deliver";
+import { upsertInstagramLeadForComment } from "@/lib/instagram-leads";
 
 // Instagram webhook.
 //  GET  → verification handshake (Meta calls this once when you set the webhook).
@@ -71,6 +72,19 @@ export async function POST(request: NextRequest) {
       if (!campaign) continue;
 
       try {
+        // The commenter becomes a lead (one per person). Its stable trackingCode
+        // powers the {link} in the DM so we can attribute conversions back here.
+        const lead = await upsertInstagramLeadForComment({
+          igUserId: fromId,
+          username,
+          commentText: text,
+          commentId,
+          mediaId,
+          campaignId: campaign.id,
+          campaignName: campaign.name,
+        });
+        const link = trackedQuoteUrl(lead.trackingCode);
+
         const created = await prisma.instagramDm.create({
           data: {
             campaignId: campaign.id,
@@ -79,7 +93,7 @@ export async function POST(request: NextRequest) {
             igUserId: fromId,
             username,
             commentText: text,
-            text: renderDm(campaign.dmText, { username }),
+            text: renderDm(campaign.dmText, { username, link }),
             status: "QUEUED",
           },
         });

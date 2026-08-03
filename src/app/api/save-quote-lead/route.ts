@@ -34,6 +34,9 @@ interface QuoteLeadData {
     isSafe: boolean;
     comments?: string;
   }>;
+
+  // Attribution — the `ig` tracking code from an Instagram auto-DM quote link, if any.
+  igTracking?: string;
 }
 
 export async function POST(request: NextRequest) {
@@ -94,6 +97,35 @@ export async function POST(request: NextRequest) {
         if (survivor) leadId = survivor.id;
       } catch (e) {
         console.error("[save-quote-lead] consolidation failed:", e);
+      }
+    }
+
+    // Instagram attribution — link this quote back to the commenter who got the
+    // tracked DM, and mark that Instagram lead converted (with their contact info).
+    if (data.igTracking) {
+      try {
+        const igLead = await prisma.instagramLead.findUnique({ where: { trackingCode: data.igTracking } });
+        if (igLead) {
+          await prisma.quoteLead.update({
+            where: { id: leadId },
+            data: { sourceChannel: "instagram", instagramLeadId: igLead.id },
+          });
+          await prisma.instagramLead.update({
+            where: { id: igLead.id },
+            data: {
+              status: "CONVERTED",
+              convertedQuoteLeadId: leadId,
+              convertedAt: new Date(),
+              firstName: igLead.firstName ?? data.firstName,
+              lastName: igLead.lastName ?? data.lastName ?? null,
+              email: igLead.email ?? data.email ?? null,
+              phone: igLead.phone ?? data.phone,
+              zipCode: igLead.zipCode ?? data.zipCode,
+            },
+          });
+        }
+      } catch (e) {
+        console.error("[save-quote-lead] Instagram attribution failed:", e);
       }
     }
 

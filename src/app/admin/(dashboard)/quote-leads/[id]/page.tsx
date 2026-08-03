@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Phone, Mail, MapPin, Dog, Calendar, Clock, Pencil, Archive } from "lucide-react";
+import { ArrowLeft, Phone, Mail, MapPin, Dog, Calendar, Clock, Pencil, Archive, Instagram } from "lucide-react";
 import prisma from "@/lib/prisma";
 import type { LeadStatus } from "@/types/leads";
 import StatusUpdateForm from "@/components/admin/StatusUpdateForm";
@@ -172,6 +172,11 @@ export default async function QuoteLeadDetailPage({ params }: PageProps) {
   if (!lead) {
     notFound();
   }
+
+  // If this quote came in through a tracked Instagram DM link, load that lead.
+  const igLead = lead.sourceChannel === "instagram" && lead.instagramLeadId
+    ? await prisma.instagramLead.findUnique({ where: { id: lead.instagramLeadId } })
+    : null;
 
   const optedOut = await isOptedOut(lead.phone);
 
@@ -446,6 +451,24 @@ export default async function QuoteLeadDetailPage({ params }: PageProps) {
     <div className="space-y-6 pb-20 lg:pb-0">
       {/* Duplicate leads banner */}
       <DuplicateBanner leadId={lead.id} leadType="quote" />
+
+      {/* Instagram attribution — this quote came from a tracked auto-DM link */}
+      {igLead && (
+        <Link
+          href={`/admin/instagram-leads/${igLead.id}`}
+          className="flex items-center gap-3 p-4 bg-purple-50 border border-purple-200 rounded-xl hover:bg-purple-100/60 transition-colors"
+        >
+          <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#f58529] via-[#dd2a7b] to-[#8134af] flex items-center justify-center flex-shrink-0">
+            <Instagram className="w-4 h-4 text-white" />
+          </span>
+          <div className="text-sm min-w-0">
+            <p className="font-medium text-navy-900">Came from Instagram{igLead.username ? ` — @${igLead.username}` : ""}</p>
+            <p className="text-gray-600 truncate">
+              {igLead.campaignName ? `${igLead.campaignName} · ` : ""}commented “{igLead.commentText || "—"}” · view Instagram lead →
+            </p>
+          </div>
+        </Link>
+      )}
 
       {/* Archived Banner */}
       {lead.archived && (

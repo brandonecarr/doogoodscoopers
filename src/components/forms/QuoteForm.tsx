@@ -295,6 +295,17 @@ function QuoteFormInner() {
   const elements = useElements();
   const formRef = useRef<HTMLDivElement>(null);
 
+  // Capture the Instagram auto-DM tracking code (?ig=...) so we can attribute
+  // this quote back to the exact commenter. Captured once; survives the SPA flow.
+  const igTrackingRef = useRef<string | null>(null);
+  useEffect(() => {
+    try {
+      igTrackingRef.current = new URLSearchParams(window.location.search).get("ig");
+    } catch {
+      igTrackingRef.current = null;
+    }
+  }, []);
+
   const [step, setStep] = useState<Step>("zip");
   const [zipCode, setZipCode] = useState("");
   const [inServiceArea, setInServiceArea] = useState(false);
@@ -645,6 +656,7 @@ function QuoteFormInner() {
           frequency: data.frequency,
           lastCleaned: data.lastCleaned,
           lastStep: stepName,
+          igTracking: igTrackingRef.current || undefined,
         }),
       });
     } catch (err) {

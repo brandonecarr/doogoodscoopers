@@ -33,6 +33,14 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       ])
     : [[], 0];
 
+  // The lead record for this commenter (per-person), so the drawer can link to it.
+  const igLead = orConds.length
+    ? await prisma.instagramLead.findFirst({
+        where: { OR: orConds },
+        select: { id: true, status: true, convertedQuoteLeadId: true },
+      })
+    : null;
+
   // Live enrichment (best-effort; null if the comment/post was deleted or the API errors).
   const [media, comment] = await Promise.all([fetchMediaInfo(dm.mediaId), fetchCommentInfo(dm.commentId)]);
 
@@ -56,6 +64,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     matchedKeyword,
     history,
     historyCount,
+    igLead,
     media,
     comment,
   });

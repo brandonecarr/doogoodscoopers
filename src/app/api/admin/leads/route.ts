@@ -6,7 +6,7 @@ import type { LeadStatus } from "@/types/leads";
 
 export interface CombinedLead {
   id: string;
-  type: "quote" | "ad";
+  type: "quote" | "ad" | "instagram";
   name: string;
   phone: string | null;
   email: string | null;
@@ -41,6 +41,12 @@ const AD_SELECT = {
   zipCode: true, status: true, grade: true, adSource: true, createdAt: true, followupDate: true, archived: true,
 } as const;
 
+const INSTA_SELECT = {
+  id: true, username: true, firstName: true, lastName: true, phone: true, email: true,
+  zipCode: true, status: true, grade: true, createdAt: true, followupDate: true, archived: true,
+  convertedQuoteLeadId: true,
+} as const;
+
 // Priority sort: A first … F, then ungraded. Then newest within the same grade.
 const GRADE_RANK: Record<string, number> = { A: 0, B: 1, C: 2, D: 3, F: 4 };
 const gradeRank = (g: string | null) => (g ? GRADE_RANK[g] ?? 5 : 9);
@@ -63,6 +69,7 @@ export async function GET(request: NextRequest) {
     const statusFilter = status && status !== "all" ? (status as LeadStatus) : undefined;
     const includeQuote = !sourceFilter || sourceFilter === "all" || sourceFilter === "quote";
     const includeAd = !sourceFilter || sourceFilter === "all" || sourceFilter === "ad";
+    const includeInsta = !sourceFilter || sourceFilter === "all" || sourceFilter === "instagram";
     const cutoff = days > 0 ? new Date(Date.now() - days * 86_400_000) : null;
 
     // ── Shared where-builders ────────────────────────────────────────────────
@@ -96,12 +103,27 @@ export async function GET(request: NextRequest) {
       }
       return w;
     };
+    const instaWhere = (s?: LeadStatus): Record<string, unknown> => {
+      const w: Record<string, unknown> = { archived: false };
+      if (s) w.status = s;
+      if (cutoff) w.createdAt = { gte: cutoff };
+      if (search) {
+        w.OR = [
+          { username: { contains: search, mode: "insensitive" } },
+          { firstName: { contains: search, mode: "insensitive" } },
+          { email: { contains: search, mode: "insensitive" } },
+          { phone: { contains: search, mode: "insensitive" } },
+        ];
+      }
+      return w;
+    };
 
     // Per-table order matches the JS comparator so merge+slice stays correct.
     const orderBy: Prisma.QuoteLeadOrderByWithRelationInput[] = sortBy === "grade"
       ? [{ grade: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }]
       : [{ createdAt: "desc" }];
     const adOrderBy = orderBy as unknown as Prisma.AdLeadOrderByWithRelationInput[];
+    const instaOrderBy = orderBy as unknown as Prisma.InstagramLeadOrderByWithRelationInput[];
     const cmp = (x: CombinedLead, y: CombinedLead) => {
       if (sortBy === "grade") {
         const g = gradeRank(x.grade) - gradeRank(y.grade);
@@ -126,15 +148,25 @@ export async function GET(request: NextRequest) {
       createdAt: l.createdAt.toISOString(), followupDate: l.followupDate?.toISOString() || null,
       archived: l.archived,
     });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const toInsta = (l: any): CombinedLead => ({
+      id: l.id, type: "instagram",
+      name: l.username ? `@${l.username}` : `${l.firstName || ""} ${l.lastName || ""}`.trim() || "Instagram user",
+      phone: l.phone, email: l.email, zipCode: l.zipCode, status: l.status as LeadStatus,
+      grade: l.grade, source: l.convertedQuoteLeadId ? "Instagram (converted)" : "Instagram",
+      createdAt: l.createdAt.toISOString(), followupDate: l.followupDate?.toISOString() || null,
+      archived: l.archived,
+    });
 
     // Top `take` leads for one status (by the active sort), merged across tables, offset by `skip`.
     const fetchStatusPage = async (s: LeadStatus, skip: number, take: number): Promise<CombinedLead[]> => {
       const limit = skip + take;
-      const [q, a] = await Promise.all([
+      const [q, a, ig] = await Promise.all([
         includeQuote ? prisma.quoteLead.findMany({ where: quoteWhere(s), orderBy, take: limit, select: QUOTE_SELECT }) : Promise.resolve([]),
         includeAd ? prisma.adLead.findMany({ where: adWhere(s), orderBy: adOrderBy, take: limit, select: AD_SELECT }) : Promise.resolve([]),
+        includeInsta ? prisma.instagramLead.findMany({ where: instaWhere(s), orderBy: instaOrderBy, take: limit, select: INSTA_SELECT }) : Promise.resolve([]),
       ]);
-      const merged = [...q.map(toQuote), ...a.map(toAd)].sort(cmp);
+      const merged = [...q.map(toQuote), ...a.map(toAd), ...ig.map(toInsta)].sort(cmp);
       return merged.slice(skip, skip + take);
     };
 
@@ -152,14 +184,16 @@ export async function GET(request: NextRequest) {
       }
 
       // Counts per status (one grouped query per table).
-      const [quoteCounts, adCounts] = await Promise.all([
+      const [quoteCounts, adCounts, instaCounts] = await Promise.all([
         includeQuote ? prisma.quoteLead.groupBy({ by: ["status"], where: quoteWhere(), _count: { _all: true } }) : Promise.resolve([]),
         includeAd ? prisma.adLead.groupBy({ by: ["status"], where: adWhere(), _count: { _all: true } }) : Promise.resolve([]),
+        includeInsta ? prisma.instagramLead.groupBy({ by: ["status"], where: instaWhere(), _count: { _all: true } }) : Promise.resolve([]),
       ]);
       const counts: Record<string, number> = {};
       for (const s of ALL_STATUSES) counts[s] = 0;
       for (const r of quoteCounts) counts[r.status] = (counts[r.status] || 0) + (r._count?._all || 0);
       for (const r of adCounts) counts[r.status] = (counts[r.status] || 0) + (r._count?._all || 0);
+      for (const r of instaCounts) counts[r.status] = (counts[r.status] || 0) + (r._count?._all || 0);
 
       const pages = await Promise.all(statuses.map((s) => fetchStatusPage(s, 0, PER_COLUMN)));
       const leads = pages.flat();
@@ -170,12 +204,14 @@ export async function GET(request: NextRequest) {
 
     // ── List view: combined + in-memory pagination ───────────────────────────
     const combined: CombinedLead[] = [];
-    const [quoteLeads, adLeads] = await Promise.all([
+    const [quoteLeads, adLeads, instaLeads] = await Promise.all([
       includeQuote ? prisma.quoteLead.findMany({ where: quoteWhere(statusFilter), orderBy, select: QUOTE_SELECT }) : Promise.resolve([]),
       includeAd ? prisma.adLead.findMany({ where: adWhere(statusFilter), orderBy: adOrderBy, select: AD_SELECT }) : Promise.resolve([]),
+      includeInsta ? prisma.instagramLead.findMany({ where: instaWhere(statusFilter), orderBy: instaOrderBy, select: INSTA_SELECT }) : Promise.resolve([]),
     ]);
     for (const l of quoteLeads) combined.push(toQuote(l));
     for (const l of adLeads) combined.push(toAd(l));
+    for (const l of instaLeads) combined.push(toInsta(l));
     combined.sort(cmp);
 
     const total = combined.length;

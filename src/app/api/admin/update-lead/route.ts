@@ -5,7 +5,7 @@ import type { LeadStatus } from "@/types/leads";
 
 interface UpdateLeadData {
   leadId: string;
-  leadType: "quote" | "outofarea" | "career" | "commercial" | "adlead";
+  leadType: "quote" | "outofarea" | "career" | "commercial" | "adlead" | "instagram";
   status?: LeadStatus;
   notes?: string;
   followupDate?: string | null;
@@ -89,6 +89,13 @@ export async function POST(request: Request) {
         });
         break;
 
+      case "instagram":
+        await prisma.instagramLead.update({
+          where: { id: leadId },
+          data: updateData,
+        });
+        break;
+
       default:
         return NextResponse.json(
           { success: false, message: "Invalid lead type" },
@@ -97,12 +104,13 @@ export async function POST(request: Request) {
     }
 
     // Map leadType to LeadSource enum value
-    const leadTypeMap: Record<string, "QUOTE_FORM" | "OUT_OF_AREA" | "CAREERS" | "COMMERCIAL" | "AD_LEAD"> = {
+    const leadTypeMap: Record<string, "QUOTE_FORM" | "OUT_OF_AREA" | "CAREERS" | "COMMERCIAL" | "AD_LEAD" | "INSTAGRAM"> = {
       quote: "QUOTE_FORM",
       outofarea: "OUT_OF_AREA",
       career: "CAREERS",
       commercial: "COMMERCIAL",
       adlead: "AD_LEAD",
+      instagram: "INSTAGRAM",
     };
 
     // Determine action type based on what was updated

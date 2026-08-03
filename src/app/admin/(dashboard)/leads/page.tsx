@@ -13,6 +13,7 @@ import {
   MoreHorizontal,
   FileText,
   Megaphone,
+  Instagram,
   ChevronLeft,
   ChevronRight,
   CheckCircle2,
@@ -28,7 +29,7 @@ import { CallIntelCard } from "@/components/admin/CallIntelCard";
 
 interface CombinedLead {
   id: string;
-  type: "quote" | "ad";
+  type: "quote" | "ad" | "instagram";
   name: string;
   phone: string | null;
   email: string | null;
@@ -40,6 +41,13 @@ interface CombinedLead {
   followupDate: string | null;
   archived: boolean;
 }
+
+// Source badge styling/icon/label by lead type.
+const typeBadgeClass = (t: CombinedLead["type"]) =>
+  t === "quote" ? "bg-blue-100 text-blue-800" : t === "instagram" ? "bg-purple-100 text-purple-800" : "bg-pink-100 text-pink-800";
+const TypeIcon = ({ type }: { type: CombinedLead["type"] }) =>
+  type === "quote" ? <FileText className="w-3 h-3" /> : type === "instagram" ? <Instagram className="w-3 h-3" /> : <Megaphone className="w-3 h-3" />;
+const typeShortLabel = (t: CombinedLead["type"]) => (t === "quote" ? "Quote" : t === "instagram" ? "Instagram" : "Ad");
 
 type ColorKey =
   | "teal" | "blue" | "orange" | "gray" | "purple"
@@ -332,7 +340,7 @@ export default function LeadsPage() {
     if (col?.statusMapping && col.statusMapping !== lead.status) {
       const prevStatus = lead.status;
       const newStatus = col.statusMapping;
-      const leadType = lead.type === "quote" ? "quote" : "adlead";
+      const leadType = lead.type === "quote" ? "quote" : lead.type === "instagram" ? "instagram" : "adlead";
       await fetch("/api/admin/update-lead", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -430,7 +438,7 @@ export default function LeadsPage() {
   }, {});
 
   const detailHref = (lead: CombinedLead) =>
-    `/admin/${lead.type === "quote" ? "quote-leads" : "ad-leads"}/${lead.id}`;
+    `/admin/${lead.type === "quote" ? "quote-leads" : lead.type === "instagram" ? "instagram-leads" : "ad-leads"}/${lead.id}`;
 
   return (
     <div className="space-y-6 pb-24 lg:pb-6">
@@ -522,6 +530,7 @@ export default function LeadsPage() {
             <option value="all">All Sources</option>
             <option value="quote">Quote Form</option>
             <option value="ad">Meta Ads</option>
+            <option value="instagram">Instagram</option>
           </select>
           <select
             value={sortBy}
@@ -580,8 +589,8 @@ export default function LeadsPage() {
                         {lead.email && <div className="text-xs text-gray-500">{lead.email}</div>}
                       </td>
                       <td className="px-6 py-4">
-                        <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${lead.type === "quote" ? "bg-blue-100 text-blue-800" : "bg-pink-100 text-pink-800"}`}>
-                          {lead.type === "quote" ? <FileText className="w-3 h-3" /> : <Megaphone className="w-3 h-3" />}
+                        <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${typeBadgeClass(lead.type)}`}>
+                          <TypeIcon type={lead.type} />
                           {lead.source}
                         </span>
                       </td>
@@ -695,9 +704,9 @@ export default function LeadsPage() {
                               )}
                             </div>
                             <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-                              <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs rounded-full ${lead.type === "quote" ? "bg-blue-100 text-blue-700" : "bg-pink-100 text-pink-700"}`}>
-                                {lead.type === "quote" ? <FileText className="w-3 h-3" /> : <Megaphone className="w-3 h-3" />}
-                                {lead.type === "quote" ? "Quote" : "Ad"}
+                              <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs rounded-full ${typeBadgeClass(lead.type)}`}>
+                                <TypeIcon type={lead.type} />
+                                {typeShortLabel(lead.type)}
                               </span>
                               <GradeBadge grade={lead.grade} />
                               <span className="text-xs text-gray-400 ml-auto">{timeAgo(lead.createdAt)}</span>

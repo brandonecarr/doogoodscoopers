@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, ExternalLink, Loader2, Heart, MessageCircle, Send, Clock, History } from "lucide-react";
+import { X, ExternalLink, Loader2, Heart, MessageCircle, Send, Clock, History, CheckCircle2, UserRound } from "lucide-react";
 
 export interface IgActivityItem {
   id: string;
@@ -37,6 +37,7 @@ interface Detail {
   matchedKeyword: string | null;
   history: Array<{ id: string; commentText: string; status: string; createdAt: string }>;
   historyCount: number;
+  igLead: { id: string; status: string; convertedQuoteLeadId: string | null } | null;
   media: { permalink?: string; caption?: string; media_type?: string; media_url?: string; thumbnail_url?: string; timestamp?: string } | null;
   comment: { text?: string; timestamp?: string; like_count?: number } | null;
 }
@@ -145,6 +146,20 @@ function ActivityDrawer({ id, onClose, fmt }: { id: string; onClose: () => void;
           <p className="p-5 text-sm text-red-600">Couldn’t load this activity.</p>
         ) : (
           <div className="p-5 space-y-6">
+            {/* Lead links */}
+            {data?.igLead && (
+              <div className="flex flex-col gap-2">
+                <a href={`/admin/instagram-leads/${data.igLead.id}`} className="inline-flex items-center gap-1.5 text-sm text-teal-600 hover:underline">
+                  <UserRound className="w-4 h-4" /> View full Instagram lead <ExternalLink className="w-3 h-3" />
+                </a>
+                {data.igLead.convertedQuoteLeadId && (
+                  <a href={`/admin/quote-leads/${data.igLead.convertedQuoteLeadId}`} className="inline-flex items-center gap-1.5 text-sm text-green-700 hover:underline">
+                    <CheckCircle2 className="w-4 h-4" /> Converted → open quote lead <ExternalLink className="w-3 h-3" />
+                  </a>
+                )}
+              </div>
+            )}
+
             {/* The post it was left on */}
             {data?.media && (
               <section>

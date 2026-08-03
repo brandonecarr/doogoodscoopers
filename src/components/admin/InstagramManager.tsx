@@ -142,8 +142,11 @@ export function InstagramManager({ campaigns }: { campaigns: IgCampaign[] }) {
             </label>
           </div>
           <label className="block"><span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">DM to send</span>
-            <textarea rows={3} className={inputCls + " mt-1 resize-none"} value={f.dmText} onChange={(e) => set("dmText", e.target.value)} placeholder="Hi {username}! 🐾 Here's your free quote link: https://doogoodscoopers.com/quote-request/" />
-            <span className="text-[11px] text-gray-400">Use <code className="bg-gray-100 px-1 rounded">{"{username}"}</code> to greet them by handle.</span>
+            <textarea rows={3} className={inputCls + " mt-1 resize-none"} value={f.dmText} onChange={(e) => set("dmText", e.target.value)} placeholder="Hi {username}! 🐾 Here's your free quote link: {link}" />
+            <span className="text-[11px] text-gray-400">
+              Use <code className="bg-gray-100 px-1 rounded">{"{username}"}</code> to greet them by handle, and{" "}
+              <code className="bg-gray-100 px-1 rounded">{"{link}"}</code> for a tracked quote link — quotes from it are attributed to that commenter as an Instagram lead.
+            </span>
           </label>
           <label className="block"><span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Public comment reply <span className="normal-case font-normal text-gray-400">(optional)</span></span>
             <input className={inputCls + " mt-1"} value={f.publicReply} onChange={(e) => set("publicReply", e.target.value)} placeholder="Just sent you a DM! 📩" />

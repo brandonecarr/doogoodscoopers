@@ -28,6 +28,7 @@ enum LeadSource {
   COMMERCIAL       // Commercial service inquiry
   AD_LEAD          // Meta/Facebook ads via Privyr
   CUSTOMER         // Active Sweep&Go customer (for review-request / customer drips)
+  INSTAGRAM        // Instagram comment → auto-DM commenter
 }
 
 // =====================
@@ -74,11 +75,16 @@ model QuoteLead {
   // Dogs info (stored as JSON)
   dogsInfo        Json?
 
+  // Attribution — set when the lead arrived via a tracked link (e.g. Instagram auto-DM)
+  sourceChannel   String?     // e.g. "instagram"
+  instagramLeadId String?     // links back to the InstagramLead that converted
+
   @@index([status])
   @@index([archived])
   @@index([createdAt])
   @@index([zipCode])
   @@index([followupDate])
+  @@index([instagramLeadId])
 }
 
 // =====================
@@ -303,6 +309,53 @@ model InstagramDm {
   @@index([status])
   @@index([campaignId])
   @@index([createdAt])
+}
+
+// A commenter turned into a lead. One row per person (deduped by igUserId, else
+// username). Mirrors AdLead: all contact fields optional (Instagram gives us none
+// up front) and filled in if/when the person converts through the tracked quote link.
+model InstagramLead {
+  id            String     @id @default(cuid())
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  // Lead management (same shape as other lead models)
+  status        LeadStatus @default(NEW)
+  archived      Boolean    @default(false)
+  notes         String?    @db.Text
+  followupDate  DateTime?
+  grade         String?
+
+  // Who they are on Instagram
+  igUserId      String?    // commenter's IG-scoped id (primary dedupe key)
+  username      String?
+  commentText   String?    @db.Text // their most recent matching comment
+  commentId     String?    // most recent matching comment id
+  mediaId       String?
+  campaignId    String?
+  campaignName  String?
+  commentCount  Int        @default(1) // how many matching comments we've seen from them
+  lastCommentAt DateTime?
+
+  // Tracked link embedded in their DM (unique per person)
+  trackingCode  String     @unique
+
+  // Contact info — only known after they convert through the quote form
+  firstName     String?
+  lastName      String?
+  email         String?
+  phone         String?
+  zipCode       String?
+
+  // Conversion
+  convertedQuoteLeadId String?
+  convertedAt          DateTime?
+
+  @@index([status])
+  @@index([archived])
+  @@index([createdAt])
+  @@index([igUserId])
+  @@index([username])
 }
 
 // =====================
