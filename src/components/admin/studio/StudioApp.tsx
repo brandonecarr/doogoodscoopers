@@ -1,11 +1,12 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Plus, Download, Trash2, ArrowUp, ArrowDown, Copy, LayoutGrid, Loader2, Image as ImageIcon, Square, RectangleVertical } from "lucide-react";
+import { Plus, Download, Trash2, ArrowUp, ArrowDown, Copy, LayoutGrid, Loader2, Image as ImageIcon, Square, RectangleVertical, Save, FolderOpen, Type } from "lucide-react";
 import {
-  DIMS, LAYOUTS, THEMES, TEMPLATES, FONTS, DECORS, blankSlide, newId,
+  DIMS, LAYOUTS, THEMES, TEMPLATES, FONTS, DECORS, GRADIENTS, blankSlide, newId,
   type Format, type LayoutId, type Slide, type Theme, type FontStyle, type Decor, type TextPos,
 } from "@/lib/studio/templates";
+import { generateCaption, CAPTION_STYLES } from "@/lib/studio/caption";
 import { SlideCanvas } from "./SlideCanvas";
 
 const THEME_LIST: Theme[] = ["navy", "blue", "white", "mint", "ink", "alert", "sun"];
@@ -35,6 +36,13 @@ export function StudioApp() {
   const [gallery, setGallery] = useState(false);
   const exportRefs = useRef<(HTMLDivElement | null)[]>([]);
   const fontCssRef = useRef<string | null>(null);
+  const [caption, setCaption] = useState<{ open: boolean; style: number; text: string }>({ open: false, style: 0, text: "" });
+  const [drafts, setDrafts] = useState<{ id: string; name: string; updatedAt: string }[]>([]);
+  const [draftsOpen, setDraftsOpen] = useState(false);
+  const [draftId, setDraftId] = useState<string | null>(null);
+  const [draftName, setDraftName] = useState("");
+  const [flash, setFlash] = useState("");
+  const showFlash = (m: string) => { setFlash(m); setTimeout(() => setFlash(""), 1600); };
 
   const total = slides.length;
   const cur = slides[selected];
@@ -120,6 +128,45 @@ export function StudioApp() {
     }
   }
 
+  // ── Caption generator ──────────────────────────────────────────────────────
+  const openCaption = () => setCaption({ open: true, style: 0, text: generateCaption(slides, 0) });
+  const shuffleCaption = () => setCaption((c) => { const st = c.style + 1; return { ...c, style: st, text: generateCaption(slides, st) }; });
+  const copyCaption = async () => { try { await navigator.clipboard.writeText(caption.text); showFlash("Copied!"); } catch { showFlash("Copy failed"); } };
+
+  // ── Save / open drafts ─────────────────────────────────────────────────────
+  const saveDraft = async () => {
+    const name = draftName || (typeof window !== "undefined" ? window.prompt("Name this design:", "Untitled carousel") : "") || "";
+    if (!name.trim()) return;
+    try {
+      const res = await fetch("/api/admin/studio-drafts", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: draftId || undefined, name: name.trim(), data: { format, slides } }),
+      });
+      if (res.ok) { const d = await res.json(); setDraftId(d.id); setDraftName(d.name); showFlash("Saved ✓"); }
+      else showFlash("Save failed");
+    } catch { showFlash("Save failed"); }
+  };
+  const openDrafts = async () => {
+    try { const res = await fetch("/api/admin/studio-drafts"); if (res.ok) setDrafts((await res.json()).drafts); } catch {}
+    setDraftsOpen(true);
+  };
+  const loadDraft = async (id: string) => {
+    try {
+      const res = await fetch(`/api/admin/studio-drafts/${id}`); if (!res.ok) return;
+      const { draft } = await res.json();
+      const data = draft.data as { format?: Format; slides?: Slide[] };
+      setFormat(data.format || "square");
+      setSlides((data.slides && data.slides.length ? data.slides : slides).map((s) => ({ ...s })));
+      setSelected(0); setDraftId(draft.id); setDraftName(draft.name); setDraftsOpen(false);
+    } catch {}
+  };
+  const deleteDraft = async (id: string) => {
+    if (!confirm("Delete this saved design?")) return;
+    await fetch(`/api/admin/studio-drafts/${id}`, { method: "DELETE" }).catch(() => {});
+    setDrafts((d) => d.filter((x) => x.id !== id));
+    if (draftId === id) { setDraftId(null); setDraftName(""); }
+  };
+
   const previewW = format === "square" ? 460 : 400;
   const fields = LAYOUTS[cur.layout].fields;
   const inputCls = "w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent";
@@ -132,12 +179,22 @@ export function StudioApp() {
           <button onClick={() => setGallery(true)} className="inline-flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50">
             <LayoutGrid className="w-4 h-4" /> Templates
           </button>
+          <button onClick={openDrafts} className="inline-flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50">
+            <FolderOpen className="w-4 h-4" /> Open
+          </button>
           <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden">
             <button onClick={() => setFormat("square")} className={`inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium ${format === "square" ? "bg-navy-900 text-white" : "bg-white text-gray-600"}`}><Square className="w-4 h-4" /> Square</button>
             <button onClick={() => setFormat("portrait")} className={`inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium ${format === "portrait" ? "bg-navy-900 text-white" : "bg-white text-gray-600"}`}><RectangleVertical className="w-4 h-4" /> Portrait</button>
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {flash && <span className="text-xs font-semibold text-teal-600">{flash}</span>}
+          <button onClick={openCaption} className="inline-flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50">
+            <Type className="w-4 h-4" /> Caption
+          </button>
+          <button onClick={saveDraft} className="inline-flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50">
+            <Save className="w-4 h-4" /> Save
+          </button>
           <button onClick={() => exportImages(false)} disabled={exporting} className="inline-flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-50">
             <ImageIcon className="w-4 h-4" /> This slide
           </button>
@@ -242,7 +299,18 @@ export function StudioApp() {
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Background photo</label>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Background</label>
+            <div className="flex flex-wrap gap-2 mt-1.5">
+              <button onClick={() => update(selected, { gradient: undefined })} title="Theme color (no gradient)"
+                className={`w-9 h-9 rounded-lg border-2 flex items-center justify-center text-sm font-bold text-gray-400 ${!cur.gradient ? "border-teal-500" : "border-gray-200"}`}
+                style={{ background: THEMES[cur.theme].bg }}>—</button>
+              {GRADIENTS.map((g) => (
+                <button key={g.id} title={g.name} onClick={() => update(selected, { gradient: g.css })}
+                  className={`w-9 h-9 rounded-lg border-2 ${cur.gradient === g.css ? "border-teal-500" : "border-gray-200"}`}
+                  style={{ background: g.css }} />
+              ))}
+            </div>
+            <span className="text-[11px] text-gray-400 block mt-2">Photo (overrides gradient):</span>
             {cur.bgImage ? (
               <div className="mt-1.5 space-y-2">
                 <div className="flex items-center gap-2">
@@ -330,6 +398,54 @@ export function StudioApp() {
                 </button>
               ))}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Caption generator */}
+      {caption.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setCaption((c) => ({ ...c, open: false }))}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div className="relative bg-white rounded-2xl shadow-xl max-w-lg w-full p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-1">
+              <h2 className="text-lg font-bold text-navy-900">Caption</h2>
+              <span className="text-xs text-gray-400">Style: {CAPTION_STYLES[caption.style % CAPTION_STYLES.length]}</span>
+            </div>
+            <p className="text-sm text-gray-500 mb-3">Auto-written from your slides. Edit freely, then copy & paste into Instagram.</p>
+            <textarea rows={12} value={caption.text} onChange={(e) => setCaption((c) => ({ ...c, text: e.target.value }))}
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg resize-none focus:ring-2 focus:ring-teal-500 focus:border-transparent" />
+            <div className="flex items-center gap-2 mt-3">
+              <button onClick={copyCaption} className="inline-flex items-center gap-1.5 px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-semibold hover:bg-teal-700"><Copy className="w-4 h-4" /> Copy</button>
+              <button onClick={shuffleCaption} className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50">Shuffle style</button>
+              {flash && <span className="text-xs font-semibold text-teal-600">{flash}</span>}
+              <button onClick={() => setCaption((c) => ({ ...c, open: false }))} className="ml-auto px-3 py-2 text-sm text-gray-500">Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Saved drafts */}
+      {draftsOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setDraftsOpen(false)}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div className="relative bg-white rounded-2xl shadow-xl max-w-md w-full max-h-[80vh] overflow-y-auto p-6" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-bold text-navy-900 mb-1">Saved designs</h2>
+            <p className="text-sm text-gray-500 mb-4">Open a saved carousel to keep editing.</p>
+            {drafts.length === 0 ? (
+              <p className="text-sm text-gray-400 py-6 text-center">No saved designs yet. Hit “Save” to create one.</p>
+            ) : (
+              <div className="divide-y divide-gray-100">
+                {drafts.map((d) => (
+                  <div key={d.id} className="flex items-center gap-3 py-2.5">
+                    <button onClick={() => loadDraft(d.id)} className="flex-1 text-left min-w-0">
+                      <p className="text-sm font-medium text-navy-900 truncate">{d.name}{draftId === d.id ? " (open)" : ""}</p>
+                      <p className="text-xs text-gray-400" suppressHydrationWarning>{new Date(d.updatedAt).toLocaleString()}</p>
+                    </button>
+                    <button onClick={() => deleteDraft(d.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded flex-shrink-0"><Trash2 className="w-4 h-4" /></button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

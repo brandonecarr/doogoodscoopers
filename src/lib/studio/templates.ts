@@ -33,6 +33,16 @@ export const FONTS: { id: FontStyle; label: string }[] = [
   { id: "sans", label: "Clean (Montserrat)" },
   { id: "display", label: "Bold (Bebas)" },
 ];
+
+export interface GradientDef { id: string; name: string; css: string }
+export const GRADIENTS: GradientDef[] = [
+  { id: "ocean", name: "Ocean", css: "linear-gradient(150deg,#008EEF,#00C2FF)" },
+  { id: "aqua", name: "Aqua", css: "linear-gradient(150deg,#0A8F86,#39D3FF)" },
+  { id: "sunset", name: "Sunset", css: "linear-gradient(150deg,#E4572E,#FF9E2C)" },
+  { id: "berry", name: "Berry", css: "linear-gradient(150deg,#7C3AED,#DB2777)" },
+  { id: "midnight", name: "Midnight", css: "linear-gradient(160deg,#0E2A47,#134a7d)" },
+  { id: "charcoal", name: "Charcoal", css: "linear-gradient(160deg,#232a34,#0b0f16)" },
+];
 export const DECORS: { id: Decor; label: string }[] = [
   { id: "paws", label: "Paw prints" },
   { id: "blob", label: "Soft blob" },
@@ -85,6 +95,7 @@ export interface Slide {
   showLogo: boolean; showSwipe: boolean;
   bgImage?: string;   // data URL of an uploaded photo background
   overlay?: number;   // 0.2–0.8 scrim darkness over the photo
+  gradient?: string;  // CSS gradient background (overrides theme bg; photo wins over both)
   textPos?: "top" | "center" | "bottom"; // vertical position of the text block
   fields: Record<string, string | string[] | boolean>;
 }
@@ -102,7 +113,7 @@ export function blankSlide(layout: LayoutId, theme: Theme = "white"): Slide {
 export interface TemplateDef { id: string; name: string; desc: string; tags: string[]; slides: Omit<Slide, "id">[] }
 
 const FOOT = "doogoodscoopers.com  •  (909) 366-3744";
-type Extra = Partial<Pick<Slide, "showSwipe" | "font" | "decor" | "showLogo" | "bgImage" | "overlay" | "textPos">>;
+type Extra = Partial<Pick<Slide, "showSwipe" | "font" | "decor" | "showLogo" | "bgImage" | "overlay" | "textPos" | "gradient">>;
 const s = (layout: LayoutId, theme: Theme, font: FontStyle, decor: Decor, fields: Record<string, string | string[] | boolean>, extra?: Extra): Omit<Slide, "id"> =>
   ({ layout, theme, font, decor, showLogo: extra?.showLogo ?? true, showSwipe: extra?.showSwipe ?? true, fields, ...extra });
 

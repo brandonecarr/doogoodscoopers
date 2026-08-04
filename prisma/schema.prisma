@@ -371,6 +371,17 @@ model InstagramLinkClick {
   @@index([createdAt])
 }
 
+// Saved Content Studio carousels (the whole design as JSON: format + slides).
+model StudioDraft {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  name      String
+  data      Json
+
+  @@index([updatedAt])
+}
+
 // =====================
 // ADMIN PUSH SUBSCRIPTIONS
 // =====================

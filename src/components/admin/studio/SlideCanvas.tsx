@@ -94,11 +94,14 @@ export const SlideCanvas = forwardRef<HTMLDivElement, { slide: Slide; format: Fo
     const arr = (k: string) => (Array.isArray(f[k]) ? (f[k] as string[]) : []).filter((x) => x.trim() !== "");
     const R = (text: string) => rich(text, t.hl, t.red);
     const photo = !!slide.bgImage;
-    const fg = photo ? "#ffffff" : t.fg;
-    const subC = photo ? "rgba(255,255,255,.92)" : t.sub;
-    const eyebrowC = photo ? t.hl : t.eyebrow;
-    const isDark = photo ? true : t.dark;
-    const logoSrc = (photo ? "light" : t.logo) === "light" ? "/logo-light.png" : "/logo-dark.png";
+    const grad = !photo && slide.gradient ? slide.gradient : null;
+    const light = photo || !!grad; // gradient & photo both use white/legible text
+    const fg = light ? "#ffffff" : t.fg;
+    const subC = light ? "rgba(255,255,255,.92)" : t.sub;
+    const eyebrowC = light ? t.hl : t.eyebrow;
+    const isDark = light ? true : t.dark;
+    const decorColor = light ? "#ffffff" : t.decorColor;
+    const logoSrc = (light ? "light" : t.logo) === "light" ? "/logo-light.png" : "/logo-dark.png";
     const o = Math.min(0.85, Math.max(0.15, slide.overlay ?? 0.5));
     const scrim = `linear-gradient(180deg, rgba(0,0,0,${o}) 0%, rgba(0,0,0,${(o * 0.55).toFixed(3)}) 42%, rgba(0,0,0,${Math.min(0.9, o * 1.1).toFixed(3)}) 100%)`;
 
@@ -108,7 +111,7 @@ export const SlideCanvas = forwardRef<HTMLDivElement, { slide: Slide; format: Fo
     const footerText = slide.layout === "cta" ? str("footer") : "";
 
     const rootStyle: React.CSSProperties = {
-      width: w, height: h, background: photo ? "#000" : t.bg, color: fg, justifyContent: justify,
+      width: w, height: h, background: photo ? "#000" : grad || t.bg, color: fg, justifyContent: justify,
       ["--hl" as string]: t.hl, ["--red" as string]: t.red, ["--sub" as string]: subC, ["--eyebrow" as string]: eyebrowC,
     };
 
@@ -171,7 +174,7 @@ export const SlideCanvas = forwardRef<HTMLDivElement, { slide: Slide; format: Fo
             <div className="dgs-scrim" style={{ background: scrim }} />
           </>
         ) : (
-          <Decor kind={slide.decor} color={t.decorColor} dark={t.dark} />
+          <Decor kind={slide.decor} color={decorColor} dark={isDark} />
         )}
         {slide.showLogo && (
           // eslint-disable-next-line @next/next/no-img-element
