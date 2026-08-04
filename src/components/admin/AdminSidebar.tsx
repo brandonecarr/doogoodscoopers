@@ -15,6 +15,7 @@ import {
   Star,
   Mail,
   Instagram,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -25,6 +26,7 @@ const navigation = [
   { name: "Reviews",              short: "Reviews",    href: "/admin/reviews",     icon: Star },
   { name: "Campaigns",            short: "Campaigns",  href: "/admin/campaigns",   icon: Megaphone },
   { name: "Instagram Auto-DM",    short: "Instagram",  href: "/admin/instagram",   icon: Instagram },
+  { name: "Content Studio",       short: "Studio",     href: "/admin/studio",      icon: Sparkles },
   { name: "Email",                short: "Email",      href: "/admin/email",       icon: Mail },
   { name: "Commercial Inquiries", short: "Commercial", href: "/admin/commercial",  icon: Building2 },
   { name: "Out of Area",          short: "Out of Area", href: "/admin/out-of-area", icon: MapPinOff },
