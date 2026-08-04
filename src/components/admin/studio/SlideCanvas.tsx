@@ -8,6 +8,31 @@ function paw(fill: string): string {
   return "data:image/svg+xml," + encodeURIComponent(svg);
 }
 
+function bone(fill: string): string {
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 44'><g fill='${fill}'><circle cx='16' cy='13' r='13'/><circle cx='16' cy='31' r='13'/><circle cx='84' cy='13' r='13'/><circle cx='84' cy='31' r='13'/><rect x='16' y='9' width='68' height='26' rx='10'/></g></svg>`;
+  return "data:image/svg+xml," + encodeURIComponent(svg);
+}
+
+function hydrant(fill: string): string {
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 150'><g fill='${fill}'><rect x='40' y='14' width='20' height='16' rx='6'/><rect x='30' y='28' width='40' height='13' rx='6'/><path d='M33 41 h34 v55 a17 17 0 0 1 -34 0 z'/><rect x='14' y='54' width='18' height='15' rx='7'/><rect x='68' y='54' width='18' height='15' rx='7'/><rect x='24' y='104' width='52' height='17' rx='7'/></g></svg>`;
+  return "data:image/svg+xml," + encodeURIComponent(svg);
+}
+
+function spotsTile(fill: string): string {
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 220 220'><g fill='${fill}'><ellipse cx='45' cy='55' rx='30' ry='23'/><ellipse cx='158' cy='128' rx='36' ry='29'/><ellipse cx='95' cy='170' rx='20' ry='16'/><ellipse cx='185' cy='45' rx='16' ry='13'/><ellipse cx='30' cy='150' rx='13' ry='11'/></g></svg>`;
+  return "data:image/svg+xml," + encodeURIComponent(svg);
+}
+
+// A diagonal walking trail of paw prints from bottom-left to top-right.
+const PAW_TRAIL = [
+  { x: -30, y: 920, s: 150, r: 15 },
+  { x: 140, y: 770, s: 128, r: 30 },
+  { x: 320, y: 640, s: 134, r: 12 },
+  { x: 510, y: 500, s: 124, r: 32 },
+  { x: 700, y: 360, s: 130, r: 14 },
+  { x: 885, y: 220, s: 118, r: 30 },
+];
+
 function Decor({ kind, color, dark }: { kind: string; color: string; dark: boolean }) {
   if (kind === "none") return null;
   if (kind === "blob")
@@ -16,6 +41,20 @@ function Decor({ kind, color, dark }: { kind: string; color: string; dark: boole
     return <div className="dgs-decor" style={{ width: 1700, height: 176, background: color, opacity: dark ? 0.12 : 0.16, transform: "rotate(-22deg)", bottom: 150, left: -160 }} />;
   if (kind === "dots")
     return <div className="dgs-decor" style={{ inset: 0, backgroundImage: `radial-gradient(${color} 3px, transparent 3px)`, backgroundSize: "50px 50px", opacity: dark ? 0.08 : 0.14 }} />;
+  if (kind === "bones")
+    return <div className="dgs-decor" style={{ inset: 0, backgroundImage: `url("${bone(color)}")`, backgroundSize: "150px 66px", opacity: dark ? 0.07 : 0.13 }} />;
+  if (kind === "spots")
+    return <div className="dgs-decor" style={{ inset: 0, backgroundImage: `url("${spotsTile(color)}")`, backgroundSize: "300px 300px", opacity: dark ? 0.09 : 0.15 }} />;
+  if (kind === "hydrant")
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img className="dgs-decor" src={hydrant(color)} alt="" style={{ width: 360, bottom: -34, right: -44, opacity: dark ? 0.1 : 0.17, transform: "rotate(-8deg)" }} />;
+  if (kind === "pawtrail") {
+    const op = dark ? 0.07 : 0.26;
+    return (<>{PAW_TRAIL.map((p, i) => (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img key={i} className="dgs-decor" src={paw(color)} alt="" style={{ width: p.s, left: p.x, top: p.y, opacity: op, transform: `rotate(${p.r}deg)` }} />
+    ))}</>);
+  }
   // paws (default)
   const op = dark ? 0.06 : 0.28;
   return (<>

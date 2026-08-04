@@ -27,7 +27,7 @@ export const THEMES: Record<Theme, ThemeStyle> = {
 
 export type LayoutId = "cover" | "stat" | "list" | "statement" | "checklist" | "cta";
 export type FontStyle = "sans" | "display";
-export type Decor = "paws" | "blob" | "stripe" | "dots" | "none";
+export type Decor = "paws" | "pawtrail" | "bones" | "spots" | "hydrant" | "blob" | "stripe" | "dots" | "none";
 
 export const FONTS: { id: FontStyle; label: string }[] = [
   { id: "sans", label: "Clean (Montserrat)" },
@@ -45,6 +45,10 @@ export const GRADIENTS: GradientDef[] = [
 ];
 export const DECORS: { id: Decor; label: string }[] = [
   { id: "paws", label: "Paw prints" },
+  { id: "pawtrail", label: "Paw trail 🐾" },
+  { id: "bones", label: "Dog bones 🦴" },
+  { id: "spots", label: "Dalmatian spots" },
+  { id: "hydrant", label: "Fire hydrant" },
   { id: "blob", label: "Soft blob" },
   { id: "stripe", label: "Accent stripe" },
   { id: "dots", label: "Dot grid" },
@@ -234,6 +238,102 @@ export const TEMPLATES: TemplateDef[] = [
       s("statement", "ink", "display", "none", { statement: "The before. 💀", subtitle: "Every dog owner knows this yard." }, { bgImage: photoPlaceholder("BEFORE"), overlay: 0.5 }),
       s("statement", "ink", "display", "none", { statement: "The **glow-up**. ✨", subtitle: "Same yard. Zero effort from you." }, { bgImage: photoPlaceholder("AFTER"), overlay: 0.4 }),
       s("cta", "blue", "display", "blob", { kicker: "Ready for your glow-up?", lead: "Free quote 👇", big: "SCOOP", p: "Comment **SCOOP** to get started. 🐾", footer: FOOT }, { showSwipe: false }),
+    ],
+  },
+
+  // ── 2026 trend batch — recreations of formats blowing up right now ───────────
+  {
+    id: "hidden-cost", name: "Hidden Cost 💸", desc: "The 'what it's really costing you' money-hook format. Specific-outcome hook → cost list → payoff.",
+    tags: ["trending", "cost", "hook"],
+    slides: [
+      s("cover", "navy", "display", "bones", { eyebrow: "💸 Dog owners, read this", title: "The **hidden cost** of skipping the scoop.", subtitle: "It's way more than the mess. Swipe 👉" }),
+      s("list", "white", "sans", "dots", { eyebrow: "Where it adds up", title: "Left too long, dog waste quietly costs you:", items: ["Vet bills when your dog re-infects itself", "A patchy, 'burned' brown lawn", "HOA fines & neighbor complaints", "Every single weekend", "…more than a scooping service would"], lastRed: true }),
+      s("stat", "blue", "display", "blob", { eyebrow: "Do the math", stat: "$20", statLabel: "a week and it's **handled** — no time, no mess, no surprises." }),
+      s("cta", "navy", "display", "paws", { kicker: "Stop paying for it the hard way.", lead: "Free quote 👇", big: "SCOOP", p: "Comment **SCOOP** and we'll send pricing. 🐾", footer: FOOT }, { showSwipe: false }),
+    ],
+  },
+  {
+    id: "green-flags", name: "Green Flags 🟢", desc: "The 'green flags' save-bait format — signs of a great service, then we tick every box.",
+    tags: ["trending", "green-flags", "trust"],
+    slides: [
+      s("cover", "mint", "sans", "pawtrail", { eyebrow: "🟢 Green flags", title: "Signs you found a **great scooper**.", subtitle: "Save this before you hire anyone. Swipe 👉" }),
+      s("checklist", "white", "sans", "none", { eyebrow: "The green flags", title: "A pro worth hiring will:", items: ["Show up the same day, every week", "Text you a 'done' when they leave", "Latch every gate — pet-safe, always", "Get 100% of it, not 90%", "Have real local reviews"] }),
+      s("statement", "mint", "display", "spots", { statement: "We check **every single box**. 🐾", subtitle: "That's just how we scoop." }),
+      s("cta", "blue", "sans", "paws", { kicker: "Want a scooper you can trust?", lead: "Free quote 👇", big: "SCOOP", p: "Comment **SCOOP** to get started. 🐾", footer: FOOT }, { showSwipe: false }),
+    ],
+  },
+  {
+    id: "hiring-red-flags", name: "Hiring Red Flags 🚩", desc: "The 'red flags' format aimed at choosing a service — warning signs to walk away from.",
+    tags: ["trending", "red-flags", "hook"],
+    slides: [
+      s("cover", "alert", "display", "hydrant", { eyebrow: "🚩 Before you hire", title: "Red flags in a **scooping service**.", subtitle: "Spot these? Keep looking. Swipe 👉" }),
+      s("list", "white", "display", "stripe", { eyebrow: "Walk away if they", title: "You should keep looking if they:", items: ["No-show with no heads-up", "Say 'we'll get it next time'", "Leave your gate wide open", "Are cash-only with no receipts", "Can't name one local reference"], lastRed: true }),
+      s("cta", "navy", "display", "paws", { kicker: "We're the opposite of all that.", lead: "Free quote 👇", big: "SCOOP", p: "Comment **SCOOP** and see the difference. 🐾", footer: FOOT }, { showSwipe: false }),
+    ],
+  },
+  {
+    id: "pov-2026", name: "POV: It's 2026", desc: "The 'POV: [ordinary thing] in 2026' realism hook. Highly relatable, big reach.",
+    tags: ["trending", "pov", "relatable"],
+    slides: [
+      s("cover", "ink", "display", "pawtrail", { eyebrow: "POV 👀", title: "POV: it's 2026 and you **still** scoop your own yard.", subtitle: "There's a better timeline. Swipe 👉" }),
+      s("statement", "white", "display", "none", { statement: "Your neighbors already **outsourced it**.", subtitle: "Weekends off. Yard always clean. Zero thought." }),
+      s("cta", "blue", "display", "blob", { kicker: "Join the good timeline.", lead: "Free quote 👇", big: "SCOOP", p: "Comment **SCOOP** and we'll take it from here. 🐾", footer: FOOT }, { showSwipe: false }),
+    ],
+  },
+  {
+    id: "unpopular-opinion", name: "Unpopular Opinion", desc: "The 'unpopular opinion / hot take' contradiction hook. Punchy and shareable.",
+    tags: ["trending", "hot-take", "hook"],
+    slides: [
+      s("statement", "sun", "display", "none", { statement: "Unpopular opinion: scooping your own yard is a **waste of your time**.", subtitle: "Hear me out 👉" }),
+      s("checklist", "white", "sans", "bones", { eyebrow: "What you get back", title: "That hour a week could be:", items: ["Actually playing with your dog", "A slow coffee, not a chore", "Zero 'ugh, I forgot again' guilt", "A yard that's always guest-ready"] }),
+      s("cta", "navy", "sans", "paws", { kicker: "Buy your time back.", lead: "Free quote 👇", big: "SCOOP", p: "Comment **SCOOP** — weekly service from **$20**. 🐾", footer: FOOT }, { showSwipe: false }),
+    ],
+  },
+  {
+    id: "if-youve-ever", name: "If You've Ever…", desc: "The hyper-specific relatability hook. Names the exact moment so people tag a friend.",
+    tags: ["trending", "relatable", "hook"],
+    slides: [
+      s("cover", "blue", "display", "spots", { eyebrow: "Be honest 🙋", title: "If you've ever **stepped in it** on the way to your car…", subtitle: "…this one's for you. Swipe 👉" }),
+      s("statement", "white", "display", "none", { statement: "You don't have a dog problem. You have a ~~scooping problem~~.", subtitle: "And it's the easy kind to fix." }),
+      s("cta", "mint", "sans", "blob", { kicker: "Never again.", lead: "Free quote 👇", big: "SCOOP", p: "Comment **SCOOP** and we'll handle the rest. 🐾", footer: FOOT }, { showSwipe: false }),
+    ],
+  },
+  {
+    id: "diy-vs-pro", name: "DIY vs Pro", desc: "The 'this vs that' comparison format. Sets up the grind, sells the relief.",
+    tags: ["trending", "comparison"],
+    slides: [
+      s("statement", "ink", "display", "stripe", { statement: "DIY scooping vs a **pro**. 👇", subtitle: "Swipe for the honest comparison." }),
+      s("statement", "alert", "display", "none", { statement: "DIY: ~~every weekend~~, forever.", subtitle: "Rain, heat, or 'I'll do it tomorrow.'" }),
+      s("statement", "blue", "display", "blob", { statement: "Pro: **done for you**, every week.", subtitle: "You genuinely never think about it again." }),
+      s("cta", "navy", "display", "paws", { kicker: "Which sounds better?", lead: "Free quote 👇", big: "SCOOP", p: "Comment **SCOOP** to go pro. 🐾", footer: FOOT }, { showSwipe: false }),
+    ],
+  },
+  {
+    id: "first-week", name: "The First Week", desc: "The fast-timeframe-win format ('X time is all it takes'). Momentum → what you get.",
+    tags: ["trending", "timeframe", "value"],
+    slides: [
+      s("stat", "navy", "display", "bones", { eyebrow: "What changes fast", stat: "1 week", statLabel: "is all it takes to get your **yard back**." }),
+      s("checklist", "white", "sans", "none", { eyebrow: "Month one", title: "In your first month you get:", items: ["A spotless yard from day one", "Consistent weekly visits", "No more 'minefield' walks", "A photo/notification after each visit"] }),
+      s("cta", "blue", "display", "paws", { kicker: "Start this week.", lead: "Free quote 👇", big: "SCOOP", p: "Comment **SCOOP** and we'll get you on the schedule. 🐾", footer: FOOT }, { showSwipe: false }),
+    ],
+  },
+  {
+    id: "save-this-yard", name: "Save This (Yard)", desc: "The save-bait micro-hook listicle. '#4 surprises everyone' keeps them swiping.",
+    tags: ["trending", "listicle", "save"],
+    slides: [
+      s("cover", "white", "display", "dots", { eyebrow: "Save this 🔖", title: "5 things dog poop is doing to your **yard right now**.", subtitle: "#4 surprises everyone. Swipe 👉" }),
+      s("list", "navy", "sans", "pawtrail", { eyebrow: "Right now", title: "Left in the grass, it's:", items: ["Burning yellow 'dead' spots", "Attracting flies & pests", "Spreading parasites your dog re-catches", "Seeping into the soil after every rain", "Making the whole yard smell"], lastRed: false }),
+      s("cta", "navy", "sans", "paws", { kicker: "Want it gone for good?", lead: "Free quote 👇", big: "SCOOP", p: "Comment **SCOOP** and we'll handle it weekly. 🐾", footer: FOOT }, { showSwipe: false }),
+    ],
+  },
+  {
+    id: "plan-abc", name: "Plan A / B / C", desc: "The interactive 'Plan A, B, C' format — only one option actually sticks.",
+    tags: ["trending", "interactive", "list"],
+    slides: [
+      s("cover", "mint", "display", "spots", { eyebrow: "Pick your plan 👇", title: "3 ways to get a **clean yard**.", subtitle: "Only one actually sticks. Swipe 👉" }),
+      s("list", "white", "sans", "bones", { eyebrow: "Choose wisely", title: "Your options:", items: ["Plan A: scoop it all yourself (good luck)", "Plan B: nag someone else to do it (ha)", "Plan C: we handle it, every single week"], lastRed: false }),
+      s("statement", "blue", "display", "blob", { statement: "Plan **C** it is. 🐾", subtitle: "Set it, forget it, enjoy your yard." }),
+      s("cta", "navy", "display", "paws", { kicker: "Go with Plan C.", lead: "Free quote 👇", big: "SCOOP", p: "Comment **SCOOP** to get started. 🐾", footer: FOOT }, { showSwipe: false }),
     ],
   },
 ];

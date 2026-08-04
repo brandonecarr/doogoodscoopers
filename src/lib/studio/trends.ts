@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import prisma from "@/lib/prisma";
-import { LAYOUTS, GRADIENTS, TEMPLATES, type Slide, type Format } from "@/lib/studio/templates";
+import { LAYOUTS, GRADIENTS, DECORS, TEMPLATES, type Slide, type Format } from "@/lib/studio/templates";
 
 /**
  * AI trend engine for the Content Studio.
@@ -34,7 +34,7 @@ export interface GenTemplate {
 const LAYOUT_IDS = Object.keys(LAYOUTS);
 const THEME_IDS = ["navy", "blue", "white", "mint", "ink", "alert", "sun"];
 const FONT_IDS = ["sans", "display"];
-const DECOR_IDS = ["paws", "blob", "stripe", "dots", "none"];
+const DECOR_IDS: string[] = DECORS.map((d) => d.id);
 const POS_IDS = ["top", "center", "bottom"];
 const GRADIENT_IDS = GRADIENTS.map((g) => g.id);
 
