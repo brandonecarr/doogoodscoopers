@@ -100,9 +100,15 @@ export function blankSlide(layout: LayoutId, theme: Theme = "white"): Slide {
 export interface TemplateDef { id: string; name: string; desc: string; tags: string[]; slides: Omit<Slide, "id">[] }
 
 const FOOT = "doogoodscoopers.com  •  (909) 366-3744";
-type Extra = Partial<Pick<Slide, "showSwipe" | "font" | "decor" | "showLogo">>;
+type Extra = Partial<Pick<Slide, "showSwipe" | "font" | "decor" | "showLogo" | "bgImage" | "overlay">>;
 const s = (layout: LayoutId, theme: Theme, font: FontStyle, decor: Decor, fields: Record<string, string | string[] | boolean>, extra?: Extra): Omit<Slide, "id"> =>
   ({ layout, theme, font, decor, showLogo: extra?.showLogo ?? true, showSwipe: extra?.showSwipe ?? true, fields, ...extra });
+
+// A neutral placeholder shown until the user uploads their own photo.
+const photoPlaceholder = (label: string) =>
+  "data:image/svg+xml," + encodeURIComponent(
+    `<svg xmlns='http://www.w3.org/2000/svg' width='1080' height='1080'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='#4b5563'/><stop offset='1' stop-color='#1f2937'/></linearGradient></defs><rect width='1080' height='1080' fill='url(#g)'/><g fill='#ffffff' fill-opacity='0.30' font-family='Montserrat,Arial,sans-serif' text-anchor='middle'><text x='540' y='520' font-size='58' font-weight='800'>${label}</text><text x='540' y='585' font-size='28' font-weight='600'>Tap “Replace” to add your photo</text></g></svg>`
+  );
 
 // ── Template library — each has a distinct look (theme + font + decor) ────────
 export const TEMPLATES: TemplateDef[] = [
@@ -187,6 +193,25 @@ export const TEMPLATES: TemplateDef[] = [
       s("stat", "navy", "sans", "blob", { eyebrow: "The Inland Empire trusts us", stat: "5.0★", statLabel: "across **45+ reviews** on Google." }),
       s("statement", "white", "sans", "dots", { statement: "“Great team who came out and cleaned my backyard — they got it **all**!”", subtitle: "— a happy DooGoodScoopers client" }),
       s("cta", "blue", "sans", "paws", { kicker: "Join hundreds of happy dog owners.", lead: "Free quote 👇", big: "SCOOP", p: "Comment **SCOOP** to get started. 🐾", footer: FOOT }, { showSwipe: false }),
+    ],
+  },
+  {
+    id: "before-after-photo", name: "Before / After (Photo)", desc: "Photo-first transformation. Drop in your BEFORE & AFTER shots.",
+    tags: ["photo", "before-after", "transformation"],
+    slides: [
+      s("cover", "navy", "display", "none", { eyebrow: "🐾 Real results", title: "A real yard **transformation**.", subtitle: "Swipe to see the before & after 👉" }, { bgImage: photoPlaceholder("COVER PHOTO"), overlay: 0.45 }),
+      s("cover", "navy", "display", "none", { eyebrow: "BEFORE 😬", title: "A yard you **avoid**.", subtitle: "Waste everywhere, flies, and the smell." }, { bgImage: photoPlaceholder("BEFORE"), overlay: 0.5 }),
+      s("cover", "navy", "display", "none", { eyebrow: "AFTER ✨", title: "A yard you **love**.", subtitle: "Spotless, fresh, and done for you — every week." }, { bgImage: photoPlaceholder("AFTER"), overlay: 0.4 }),
+      s("cta", "navy", "display", "paws", { kicker: "Want the 'after'?", lead: "Free quote 👇", big: "SCOOP", p: "Comment **SCOOP** and we'll take it from here. 🐾", footer: FOOT }, { showSwipe: false }),
+    ],
+  },
+  {
+    id: "yard-glowup", name: "Yard Glow-Up ✨", desc: "Trendy 2-photo 'glow-up' — punchy before → after → CTA.",
+    tags: ["photo", "glow-up", "trending"],
+    slides: [
+      s("statement", "ink", "display", "none", { statement: "The before. 💀", subtitle: "Every dog owner knows this yard." }, { bgImage: photoPlaceholder("BEFORE"), overlay: 0.5 }),
+      s("statement", "ink", "display", "none", { statement: "The **glow-up**. ✨", subtitle: "Same yard. Zero effort from you." }, { bgImage: photoPlaceholder("AFTER"), overlay: 0.4 }),
+      s("cta", "blue", "display", "blob", { kicker: "Ready for your glow-up?", lead: "Free quote 👇", big: "SCOOP", p: "Comment **SCOOP** to get started. 🐾", footer: FOOT }, { showSwipe: false }),
     ],
   },
 ];
