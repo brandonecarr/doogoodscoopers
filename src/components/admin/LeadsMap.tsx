@@ -100,6 +100,7 @@ export function LeadsMap({ points, token }: { points: MapPoint[]; token: string 
   const markersRef = useRef<any[]>([]);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mode, setMode] = useState<"pins" | "heat">("pins");
 
   // Statuses actually present, in pipeline order — drives the legend.
   const legend = useMemo(() => {
@@ -187,12 +188,54 @@ export function LeadsMap({ points, token }: { points: MapPoint[]; token: string 
       bounds.extend([p.lng, p.lat]);
     }
 
+    // Heatmap source/layer weighted by lead count per zip.
+    const fc = {
+      type: "FeatureCollection",
+      features: points.map((p) => ({ type: "Feature", geometry: { type: "Point", coordinates: [p.lng, p.lat] }, properties: { count: p.count } })),
+    };
+    const maxCount = Math.max(max, 1);
+    if (map.getSource("leads-heat")) {
+      map.getSource("leads-heat").setData(fc);
+    } else {
+      map.addSource("leads-heat", { type: "geojson", data: fc });
+      map.addLayer({
+        id: "leads-heat-layer",
+        type: "heatmap",
+        source: "leads-heat",
+        layout: { visibility: "none" },
+        paint: {
+          "heatmap-weight": ["interpolate", ["linear"], ["get", "count"], 0, 0, maxCount, 1],
+          "heatmap-intensity": ["interpolate", ["linear"], ["zoom"], 0, 1, 11, 3],
+          "heatmap-radius": ["interpolate", ["linear"], ["zoom"], 0, 12, 9, 30, 12, 48],
+          "heatmap-opacity": 0.82,
+          "heatmap-color": ["interpolate", ["linear"], ["heatmap-density"],
+            0, "rgba(13,148,136,0)",
+            0.2, "#99f6e4",
+            0.4, "#2dd4bf",
+            0.6, "#facc15",
+            0.8, "#f97316",
+            1, "#ef4444",
+          ],
+        },
+      });
+    }
+
     if (points.length === 1) {
       map.easeTo({ center: [points[0].lng, points[0].lat], zoom: 10, duration: 500 });
     } else {
       map.fitBounds(bounds, { padding: 70, maxZoom: 11, duration: 500 });
     }
   }, [points, ready]);
+
+  // Toggle between donut pins and the heatmap layer.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map) return;
+    markersRef.current.forEach((m) => { m.getElement().style.display = mode === "heat" ? "none" : ""; });
+    if (map.getLayer("leads-heat-layer")) {
+      map.setLayoutProperty("leads-heat-layer", "visibility", mode === "heat" ? "visible" : "none");
+    }
+  }, [mode, ready, points]);
 
   if (!token) {
     return (
@@ -210,7 +253,15 @@ export function LeadsMap({ points, token }: { points: MapPoint[]; token: string 
   return (
     <div className="relative">
       <div ref={containerRef} className="w-full rounded-xl overflow-hidden border border-gray-200" style={{ height: "70vh", minHeight: 420 }} />
-      {legend.length > 0 && (
+
+      {/* Pins / Heatmap toggle */}
+      <div className="absolute top-3 left-3 z-10 flex bg-white rounded-lg shadow border border-gray-200 overflow-hidden text-sm font-medium">
+        <button onClick={() => setMode("pins")} className={`px-3 py-1.5 ${mode === "pins" ? "bg-navy-900 text-white" : "text-gray-600 hover:bg-gray-50"}`}>Pins</button>
+        <button onClick={() => setMode("heat")} className={`px-3 py-1.5 ${mode === "heat" ? "bg-navy-900 text-white" : "text-gray-600 hover:bg-gray-50"}`}>Heatmap</button>
+      </div>
+
+      {/* Legend — status colors for pins, density scale for the heatmap */}
+      {mode === "pins" && legend.length > 0 && (
         <div className="absolute bottom-3 left-3 z-10 bg-white/95 backdrop-blur rounded-lg shadow border border-gray-200 px-3 py-2">
           <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Status</div>
           <div className="flex flex-col gap-1">
@@ -221,6 +272,13 @@ export function LeadsMap({ points, token }: { points: MapPoint[]; token: string 
               </div>
             ))}
           </div>
+        </div>
+      )}
+      {mode === "heat" && points.length > 0 && (
+        <div className="absolute bottom-3 left-3 z-10 bg-white/95 backdrop-blur rounded-lg shadow border border-gray-200 px-3 py-2">
+          <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Lead density</div>
+          <div className="h-2 w-32 rounded" style={{ background: "linear-gradient(90deg,#99f6e4,#2dd4bf,#facc15,#f97316,#ef4444)" }} />
+          <div className="flex justify-between text-[10px] text-gray-400 mt-0.5"><span>Low</span><span>High</span></div>
         </div>
       )}
       {error && (
