@@ -190,7 +190,6 @@ export default function NewCampaignPage() {
               placeholder="e.g. 90"
               className="w-28 px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
             />
-            <p className="text-[11px] text-gray-400 mt-1 max-w-[11rem]">Combine both to target a window (e.g. 30–90 days old).</p>
           </div>
         </div>
       </div>
