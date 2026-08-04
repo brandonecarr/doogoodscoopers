@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Plus, Download, Trash2, ArrowUp, ArrowDown, Copy, LayoutGrid, Loader2, Image as ImageIcon, Square, RectangleVertical, Save, FolderOpen, Type, Flame, Sparkles } from "lucide-react";
 import {
   DIMS, LAYOUTS, THEMES, TEMPLATES, FONTS, DECORS, GRADIENTS, DEFAULT_SWIPE, blankSlide, newId,
@@ -32,6 +32,17 @@ function triggerDownload(href: string, name: string) {
   a.href = href; a.download = name; document.body.appendChild(a); a.click(); a.remove();
 }
 
+// Turn a PNG data URL into a File so it can go through the Web Share sheet
+// (the only way to get images into the iOS/Android camera roll from a web app).
+function dataUrlToFile(dataUrl: string, filename: string): File {
+  const [meta, b64] = dataUrl.split(",");
+  const mime = /:(.*?);/.exec(meta)?.[1] || "image/png";
+  const bin = atob(b64);
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return new File([arr], filename, { type: mime });
+}
+
 // Make sure every <img> in a slide (photo background, logo, decor) is fully
 // decoded before html-to-image snapshots it — otherwise the capture can come
 // out missing the background.
@@ -60,6 +71,12 @@ export function StudioApp() {
   const [draftName, setDraftName] = useState("");
   const [flash, setFlash] = useState("");
   const showFlash = (m: string) => { setFlash(m); setTimeout(() => setFlash(""), 1600); };
+
+  // Warm the embedded-font CSS up front so export (and the mobile share sheet)
+  // fire with minimal delay — important for keeping iOS's user-activation window.
+  useEffect(() => {
+    fetch("/studio-fonts.css").then((r) => (r.ok ? r.text() : "")).then((t) => { fontCssRef.current = t; }).catch(() => { fontCssRef.current = ""; });
+  }, []);
 
   const total = slides.length;
   const cur = slides[selected];
@@ -176,30 +193,48 @@ export function StudioApp() {
       // URLs (our photo backgrounds) and drops them from the export.
       const opts = { width: w, height: h, pixelRatio: 1, cacheBust: false, fontEmbedCSS: fontCssRef.current || undefined };
       const idxs = all ? slides.map((_, i) => i) : [selected];
-      if (all) {
+
+      // Render each target slide to a PNG data URL.
+      const pngs: { name: string; dataUrl: string }[] = [];
+      for (const i of idxs) {
+        const node = exportRefs.current[i];
+        if (!node) continue;
+        await decodeNodeImages(node);
+        // First snapshot warms the clone's image cache; the second reliably
+        // includes the photo background (html-to-image can blank it on run 1).
+        await toPng(node, opts);
+        pngs.push({ name: `doogood-slide-${String(i + 1).padStart(2, "0")}-${format}.png`, dataUrl: await toPng(node, opts) });
+      }
+      if (pngs.length === 0) return;
+
+      // On phones/tablets, hand the images to the native share sheet so the user
+      // can "Save Image(s)" straight to their camera roll — the <a download>
+      // trick below is a no-op on iOS Safari.
+      const files = pngs.map((p) => dataUrlToFile(p.dataUrl, p.name));
+      const canShareFiles = typeof navigator !== "undefined" && !!navigator.canShare && navigator.canShare({ files });
+      const isTouch = typeof window !== "undefined" && !!window.matchMedia?.("(pointer: coarse)")?.matches;
+      if (canShareFiles && isTouch) {
+        try {
+          await navigator.share({ files, title: "DooGoodScoopers carousel" });
+          showFlash("Saved ✓");
+          return;
+        } catch (err) {
+          if ((err as Error)?.name === "AbortError") return; // user dismissed the sheet
+          // any other share failure → fall through to the download path
+        }
+      }
+
+      // Desktop / fallback: a zip for the whole set, a direct PNG for one slide.
+      if (pngs.length > 1) {
         const JSZip = (await import("jszip")).default;
         const zip = new JSZip();
-        for (const i of idxs) {
-          const node = exportRefs.current[i];
-          if (!node) continue;
-          await decodeNodeImages(node);
-          // First snapshot warms the clone's image cache; the second reliably
-          // includes the photo background (html-to-image can blank it on run 1).
-          await toPng(node, opts);
-          const dataUrl = await toPng(node, opts);
-          zip.file(`slide-${String(i + 1).padStart(2, "0")}.png`, dataUrl.split(",")[1], { base64: true });
-        }
+        for (const p of pngs) zip.file(p.name, p.dataUrl.split(",")[1], { base64: true });
         const blob = await zip.generateAsync({ type: "blob" });
         const url = URL.createObjectURL(blob);
         triggerDownload(url, `doogood-carousel-${format}.zip`);
         setTimeout(() => URL.revokeObjectURL(url), 4000);
       } else {
-        const node = exportRefs.current[selected];
-        if (node) {
-          await decodeNodeImages(node);
-          await toPng(node, opts);
-          triggerDownload(await toPng(node, opts), `slide-${selected + 1}-${format}.png`);
-        }
+        triggerDownload(pngs[0].dataUrl, pngs[0].name);
       }
     } catch (e) {
       console.error("[studio] export failed", e);
@@ -256,32 +291,38 @@ export function StudioApp() {
   return (
     <div className="space-y-4 pb-20 lg:pb-6">
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-3 justify-between">
-        <div className="flex items-center gap-2">
-          <button onClick={openGallery} className="inline-flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50">
+      <div className="space-y-2 lg:space-y-0 lg:flex lg:flex-wrap lg:items-center lg:justify-between lg:gap-3">
+        {/* Setup: templates / open / format */}
+        <div className="grid grid-cols-2 gap-2 lg:flex lg:items-center">
+          <button onClick={openGallery} className="inline-flex min-w-0 w-full lg:w-auto items-center justify-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 whitespace-nowrap">
             <LayoutGrid className="w-4 h-4" /> Templates
           </button>
-          <button onClick={openDrafts} className="inline-flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50">
+          <button onClick={openDrafts} className="inline-flex min-w-0 w-full lg:w-auto items-center justify-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 whitespace-nowrap">
             <FolderOpen className="w-4 h-4" /> Open
           </button>
-          <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden">
-            <button onClick={() => setFormat("square")} className={`inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium ${format === "square" ? "bg-navy-900 text-white" : "bg-white text-gray-600"}`}><Square className="w-4 h-4" /> Square</button>
-            <button onClick={() => setFormat("portrait")} className={`inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium ${format === "portrait" ? "bg-navy-900 text-white" : "bg-white text-gray-600"}`}><RectangleVertical className="w-4 h-4" /> Portrait</button>
+          <div className="col-span-2 lg:col-span-1 inline-flex w-full lg:w-auto rounded-lg border border-gray-200 overflow-hidden">
+            <button onClick={() => setFormat("square")} className={`flex-1 lg:flex-none inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium ${format === "square" ? "bg-navy-900 text-white" : "bg-white text-gray-600"}`}><Square className="w-4 h-4" /> Square</button>
+            <button onClick={() => setFormat("portrait")} className={`flex-1 lg:flex-none inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium ${format === "portrait" ? "bg-navy-900 text-white" : "bg-white text-gray-600"}`}><RectangleVertical className="w-4 h-4" /> Portrait</button>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          {flash && <span className="text-xs font-semibold text-teal-600">{flash}</span>}
-          <button onClick={openCaption} className="inline-flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50">
+
+        {/* Actions: caption / save / export */}
+        <div className="grid grid-cols-2 gap-2 lg:flex lg:items-center">
+          {flash && <span className="col-span-2 lg:hidden text-center text-xs font-semibold text-teal-600">{flash}</span>}
+          <button onClick={openCaption} className="inline-flex min-w-0 w-full lg:w-auto items-center justify-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 whitespace-nowrap">
             <Type className="w-4 h-4" /> Caption
           </button>
-          <button onClick={saveDraft} className="inline-flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50">
+          <button onClick={saveDraft} className="inline-flex min-w-0 w-full lg:w-auto items-center justify-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 whitespace-nowrap">
             <Save className="w-4 h-4" /> Save
           </button>
-          <button onClick={() => exportImages(false)} disabled={exporting} className="inline-flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-50">
-            <ImageIcon className="w-4 h-4" /> This slide
+          {flash && <span className="hidden lg:inline text-xs font-semibold text-teal-600">{flash}</span>}
+          <button onClick={() => exportImages(false)} disabled={exporting} className="inline-flex min-w-0 w-full lg:w-auto items-center justify-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-50 whitespace-nowrap">
+            <ImageIcon className="w-4 h-4 flex-shrink-0" /> This slide
           </button>
-          <button onClick={() => exportImages(true)} disabled={exporting} className="inline-flex items-center gap-1.5 px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-semibold hover:bg-teal-700 disabled:opacity-50">
-            {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />} Download all ({total})
+          <button onClick={() => exportImages(true)} disabled={exporting} className="inline-flex min-w-0 w-full lg:w-auto items-center justify-center gap-1.5 px-3 lg:px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-semibold hover:bg-teal-700 disabled:opacity-50 whitespace-nowrap">
+            {exporting ? <Loader2 className="w-4 h-4 animate-spin flex-shrink-0" /> : <Download className="w-4 h-4 flex-shrink-0" />}
+            <span className="lg:hidden">Download ({total})</span>
+            <span className="hidden lg:inline">Download all ({total})</span>
           </button>
         </div>
       </div>
