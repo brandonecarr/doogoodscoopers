@@ -104,8 +104,11 @@ export type TextPos = "top" | "center" | "bottom";
 // Brand kit — applies to every slide in a design (logo + swipe label).
 // logo is an optional custom logo data URL; when unset the built-in
 // light/dark DooGoodScoopers logo is used per theme.
-export interface Brand { logo?: string; swipeText?: string }
+// logoScale / swipeScale are multipliers on the base sizes (1 = default).
+export interface Brand { logo?: string; swipeText?: string; logoScale?: number; swipeScale?: number }
 export const DEFAULT_SWIPE = "SWIPE →";
+export const LOGO_BASE_H = 44; // px at 1080 canvas
+export const SWIPE_BASE_PX = 26;
 
 let _id = 0;
 export const newId = () => `s${Date.now().toString(36)}${_id++}`;

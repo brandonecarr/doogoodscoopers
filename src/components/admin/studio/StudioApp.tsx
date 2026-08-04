@@ -443,12 +443,20 @@ export function StudioApp() {
                 </label>
               )}
               <p className="text-[10px] text-gray-400 mt-1">Default is the DooGoodScoopers logo (auto light/dark per color). PNG with transparency works best.</p>
+              <label className="block text-[11px] text-gray-500 mt-2">Logo size ({Math.round((brand.logoScale ?? 1) * 100)}%)
+                <input type="range" min={0.5} max={2} step={0.05} value={brand.logoScale ?? 1}
+                  onChange={(e) => setBrand((b) => ({ ...b, logoScale: parseFloat(e.target.value) }))} className="w-full accent-teal-600" />
+              </label>
             </div>
             <label className="block">
               <span className="text-[11px] text-gray-500 block mb-1">Swipe label</span>
               <input className={inputCls} value={brand.swipeText ?? ""} placeholder={DEFAULT_SWIPE}
                 onChange={(e) => setBrand((b) => ({ ...b, swipeText: e.target.value }))} />
               <span className="text-[10px] text-gray-400 mt-1 block">Shown bottom-left on every slide except the last. Leave blank to hide it everywhere.</span>
+              <span className="block text-[11px] text-gray-500 mt-2">Swipe size ({Math.round((brand.swipeScale ?? 1) * 100)}%)
+                <input type="range" min={0.5} max={2} step={0.05} value={brand.swipeScale ?? 1}
+                  onChange={(e) => setBrand((b) => ({ ...b, swipeScale: parseFloat(e.target.value) }))} className="w-full accent-teal-600" />
+              </span>
             </label>
           </div>
 

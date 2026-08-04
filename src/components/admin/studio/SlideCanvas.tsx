@@ -1,7 +1,7 @@
 "use client";
 
 import { forwardRef, type ReactNode } from "react";
-import { DIMS, THEMES, DEFAULT_SWIPE, type Slide, type Format, type Brand } from "@/lib/studio/templates";
+import { DIMS, THEMES, DEFAULT_SWIPE, LOGO_BASE_H, SWIPE_BASE_PX, type Slide, type Format, type Brand } from "@/lib/studio/templates";
 
 function paw(fill: string): string {
   const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><g fill='${fill}'><ellipse cx='50' cy='63' rx='23' ry='19'/><ellipse cx='24' cy='41' rx='9.5' ry='13'/><ellipse cx='41' cy='27' rx='9.5' ry='13'/><ellipse cx='59' cy='27' rx='9.5' ry='13'/><ellipse cx='76' cy='41' rx='9.5' ry='13'/></g></svg>`;
@@ -103,6 +103,8 @@ export const SlideCanvas = forwardRef<HTMLDivElement, { slide: Slide; format: Fo
     const decorColor = light ? "#ffffff" : t.decorColor;
     const logoSrc = brand?.logo || ((light ? "light" : t.logo) === "light" ? "/logo-light.png" : "/logo-dark.png");
     const swipeText = brand?.swipeText ?? DEFAULT_SWIPE;
+    const logoH = Math.round(LOGO_BASE_H * (brand?.logoScale ?? 1));
+    const swipePx = Math.round(SWIPE_BASE_PX * (brand?.swipeScale ?? 1));
     const o = Math.min(0.85, Math.max(0.15, slide.overlay ?? 0.5));
     const scrim = `linear-gradient(180deg, rgba(0,0,0,${o}) 0%, rgba(0,0,0,${(o * 0.55).toFixed(3)}) 42%, rgba(0,0,0,${Math.min(0.9, o * 1.1).toFixed(3)}) 100%)`;
 
@@ -179,11 +181,11 @@ export const SlideCanvas = forwardRef<HTMLDivElement, { slide: Slide; format: Fo
         )}
         {slide.showLogo && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img className="dgs-logo" src={logoSrc} alt="" />
+          <img className="dgs-logo" src={logoSrc} alt="" style={{ height: logoH }} />
         )}
         <div className="dgs-body">{body}</div>
         {footerText && <div className="dgs-ctafoot">{footerText}</div>}
-        {slide.showSwipe && swipeText.trim() && index < total - 1 && <div className="dgs-swipe">{swipeText}</div>}
+        {slide.showSwipe && swipeText.trim() && index < total - 1 && <div className="dgs-swipe" style={{ fontSize: swipePx }}>{swipeText}</div>}
         <div className="dgs-pageno" style={{ color: isDark ? "#C7D6E6" : "#9aa1a8" }}>{index + 1}/{total}</div>
       </div>
     );
