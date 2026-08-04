@@ -7,6 +7,7 @@ import {
   type Format, type LayoutId, type Slide, type Theme, type FontStyle, type Decor, type TextPos,
 } from "@/lib/studio/templates";
 import { generateCaption, CAPTION_STYLES } from "@/lib/studio/caption";
+import { compressImage } from "@/lib/studio/image";
 import { SlideCanvas } from "./SlideCanvas";
 
 const THEME_LIST: Theme[] = ["navy", "blue", "white", "mint", "ink", "alert", "sun"];
@@ -52,13 +53,19 @@ export function StudioApp() {
   const setField = (key: string, value: string | string[] | boolean) =>
     update(selected, { fields: { ...cur.fields, [key]: value } });
 
-  const onPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const onPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => update(selected, { bgImage: reader.result as string, overlay: cur.overlay ?? 0.5 });
-    reader.readAsDataURL(file);
     e.target.value = "";
+    try {
+      const dataUrl = await compressImage(file);
+      update(selected, { bgImage: dataUrl, overlay: cur.overlay ?? 0.5 });
+    } catch {
+      // Fallback: use the original if compression/decoding fails (e.g. HEIC).
+      const reader = new FileReader();
+      reader.onload = () => update(selected, { bgImage: reader.result as string, overlay: cur.overlay ?? 0.5 });
+      reader.readAsDataURL(file);
+    }
   };
 
   const addSlide = (layout: LayoutId) => {
