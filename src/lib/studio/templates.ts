@@ -165,4 +165,50 @@ export const TEMPLATES: TemplateDef[] = [
       s("cta", "navy", { kicker: "Want a lawn you can actually enjoy?", lead: "Let's talk 👇", big: "SCOOP", p: "Comment **SCOOP** for a free quote. 🐾", footer: "doogoodscoopers.com  •  (909) 366-3744" }, { showSwipe: false }),
     ],
   },
+  {
+    id: "pov-relatable", name: "POV (Relatable)", desc: "Trend-y 'POV' hook — highly relatable, great reach.",
+    tags: ["pov", "relatable", "trending"],
+    slides: [
+      s("cover", "navy", { eyebrow: "POV 👀", title: "It's Saturday morning and your backyard is a **minefield**. 💩", subtitle: "Every dog owner knows the feeling. There's a better way 👉" }),
+      s("statement", "white", { statement: "You could spend your weekend scooping… or you could ~~never touch it again~~.", subtitle: "That's exactly where we come in." }),
+      s("cta", "blue", { kicker: "Get your weekend back.", lead: "Free quote 👇", big: "SCOOP", p: "Comment **SCOOP** and we'll send the details. 🐾", footer: "doogoodscoopers.com  •  (909) 366-3744" }, { showSwipe: false }),
+    ],
+  },
+  {
+    id: "three-reasons", name: "3 Reasons", desc: "The 'X reasons' save-worthy format. Punchy list + CTA.",
+    tags: ["list", "reasons", "trending"],
+    slides: [
+      s("cover", "navy", { eyebrow: "Save this 🔖", title: "3 reasons to **never scoop poop** again.", subtitle: "Swipe — #3 is the one nobody thinks about." }),
+      s("list", "white", { eyebrow: "Here's why", title: "Hiring a pro means:", items: ["Your weekends are actually yours", "A cleaner, safer yard for the kids", "We never forget — you never think about it"], lastRed: false }),
+      s("cta", "navy", { kicker: "Ready to hand it off?", lead: "Free quote 👇", big: "SCOOP", p: "Comment **SCOOP** for pricing — from **$20/week**. 🐾", footer: "doogoodscoopers.com  •  (909) 366-3744" }, { showSwipe: false }),
+    ],
+  },
+  {
+    id: "red-flags", name: "Red Flags 🚩", desc: "The 'warning signs' format — scroll-stopping and educational.",
+    tags: ["red-flags", "educational", "trending"],
+    slides: [
+      s("cover", "navy", { eyebrow: "🚩 Red flags", title: "5 signs your backyard is a **health hazard**.", subtitle: "If you spot these, it's time to act. Swipe 👉" }),
+      s("list", "white", { eyebrow: "Watch for these", title: "Your yard might be unsafe if:", items: ["There's a lingering smell", "You see flies swarming", "Brown 'burn' spots on the grass", "Your dog keeps getting sick", "You won't walk out there barefoot"], lastRed: true }),
+      s("statement", "mint", { statement: "The good news? Every one of these is **fixable** — fast.", subtitle: "" }),
+      s("cta", "navy", { kicker: "Let's clean it up.", lead: "Free quote 👇", big: "SCOOP", p: "Comment **SCOOP** to get started. 🐾", footer: "doogoodscoopers.com  •  (909) 366-3744" }, { showSwipe: false }),
+    ],
+  },
+  {
+    id: "before-after", name: "Before vs After", desc: "Transformation format — sets up the pain, sells the relief.",
+    tags: ["transformation", "before-after"],
+    slides: [
+      s("statement", "navy", { statement: "BEFORE: a backyard you ~~can't even enjoy~~.", subtitle: "Poop everywhere, flies, and that smell. Sound familiar? 👉" }),
+      s("statement", "blue", { statement: "AFTER: a clean yard, **every single week**.", subtitle: "Fresh, safe, and completely done for you." }),
+      s("cta", "navy", { kicker: "Want the 'after'?", lead: "Free quote 👇", big: "SCOOP", p: "Comment **SCOOP** and we'll take it from here. 🐾", footer: "doogoodscoopers.com  •  (909) 366-3744" }, { showSwipe: false }),
+    ],
+  },
+  {
+    id: "social-proof", name: "Social Proof", desc: "Reviews + a client quote — build trust, then convert.",
+    tags: ["testimonial", "social-proof", "trust"],
+    slides: [
+      s("stat", "navy", { eyebrow: "The Inland Empire trusts us", stat: "5.0★", statLabel: "across **45+ reviews** on Google." }),
+      s("statement", "white", { statement: "“Great team who came out and cleaned my backyard — they got it **all**!”", subtitle: "— a happy DooGoodScoopers client" }),
+      s("cta", "blue", { kicker: "Join hundreds of happy dog owners.", lead: "Free quote 👇", big: "SCOOP", p: "Comment **SCOOP** to get started. 🐾", footer: "doogoodscoopers.com  •  (909) 366-3744" }, { showSwipe: false }),
+    ],
+  },
 ];
