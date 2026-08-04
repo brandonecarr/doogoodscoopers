@@ -162,12 +162,20 @@ export function LeadsMap({ points, token }: { points: MapPoint[]; token: string 
       const size = markerSize(p.count, max);
       const thickness = Math.max(5, Math.round(size * 0.2)); // donut ring width
 
-      // Outer ring = conic gradient of the zip's status mix.
+      // Marker root — Mapbox sets position:absolute + transform on this to place
+      // it by lng/lat, so we must NOT override its position. The donut lives as a
+      // child (position:relative) so the inner hole positions against it, not here.
       const el = document.createElement("div");
-      Object.assign(el.style, {
+      el.style.cursor = "pointer";
+      el.style.width = `${size}px`;
+      el.style.height = `${size}px`;
+
+      // Outer ring = conic gradient of the zip's status mix.
+      const donut = document.createElement("div");
+      Object.assign(donut.style, {
         width: `${size}px`, height: `${size}px`, borderRadius: "50%",
         background: ringGradient(p.statusCounts, p.count),
-        boxShadow: "0 1px 4px rgba(0,0,0,0.35)", cursor: "pointer", position: "relative",
+        boxShadow: "0 1px 4px rgba(0,0,0,0.35)", position: "relative",
       } as Partial<CSSStyleDeclaration>);
 
       // Inner white hole with the total count.
@@ -180,7 +188,8 @@ export function LeadsMap({ points, token }: { points: MapPoint[]; token: string 
         fontSize: `${Math.max(10, Math.min(15, innerSize / 2.3))}px`,
         display: "flex", alignItems: "center", justifyContent: "center",
       } as Partial<CSSStyleDeclaration>);
-      el.appendChild(inner);
+      donut.appendChild(inner);
+      el.appendChild(donut);
 
       const popup = new mapboxgl.Popup({ offset: size / 2 + 4, closeButton: true, maxWidth: "280px" }).setHTML(popupHTML(p));
       const marker = new mapboxgl.Marker({ element: el }).setLngLat([p.lng, p.lat]).setPopup(popup).addTo(map);
