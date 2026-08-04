@@ -44,6 +44,15 @@ export function StudioApp() {
   const setField = (key: string, value: string | string[] | boolean) =>
     update(selected, { fields: { ...cur.fields, [key]: value } });
 
+  const onPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => update(selected, { bgImage: reader.result as string, overlay: cur.overlay ?? 0.5 });
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
   const addSlide = (layout: LayoutId) => {
     const ns = blankSlide(layout, cur?.theme ?? "white");
     setSlides((prev) => { const n = [...prev]; n.splice(selected + 1, 0, ns); return n; });
@@ -216,6 +225,30 @@ export function StudioApp() {
                 {DECORS.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}
               </select>
             </label>
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Background photo</label>
+            {cur.bgImage ? (
+              <div className="mt-1.5 space-y-2">
+                <div className="flex items-center gap-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={cur.bgImage} alt="" className="w-14 h-14 rounded-lg object-cover border border-gray-200" />
+                  <label className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+                    Replace<input type="file" accept="image/*" className="hidden" onChange={onPhoto} />
+                  </label>
+                  <button onClick={() => update(selected, { bgImage: undefined })} className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs border border-gray-200 rounded-lg text-red-600 hover:bg-red-50"><Trash2 className="w-3.5 h-3.5" /> Remove</button>
+                </div>
+                <label className="block text-xs text-gray-500">Overlay darkness ({Math.round((cur.overlay ?? 0.5) * 100)}%)
+                  <input type="range" min={0.2} max={0.8} step={0.05} value={cur.overlay ?? 0.5} onChange={(e) => update(selected, { overlay: parseFloat(e.target.value) })} className="w-full accent-teal-600" />
+                </label>
+              </div>
+            ) : (
+              <label className="mt-1.5 flex items-center justify-center gap-1.5 px-3 py-3 border border-dashed border-gray-300 rounded-lg text-sm text-gray-600 cursor-pointer hover:bg-gray-50">
+                <ImageIcon className="w-4 h-4" /> Upload photo
+                <input type="file" accept="image/*" className="hidden" onChange={onPhoto} />
+              </label>
+            )}
           </div>
 
           {fields.map((fd) => {

@@ -78,6 +78,10 @@ const CSS = `
 .dgs-display .dgs-statbig{font-size:260px;letter-spacing:0;}
 .dgs-display .dgs-ctabig{font-size:112px;}
 .dgs-decor{position:absolute;pointer-events:none;}
+.dgs-photobg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;}
+.dgs-scrim{position:absolute;inset:0;z-index:1;}
+.dgs-photo .dgs-eyebrow,.dgs-photo .dgs-h1,.dgs-photo .dgs-sub,.dgs-photo .dgs-statbig,.dgs-photo .dgs-statlabel,.dgs-photo .dgs-thead,.dgs-photo .dgs-list,.dgs-photo .dgs-checkwrap,.dgs-photo .dgs-statement,.dgs-photo .dgs-kicker,.dgs-photo .dgs-ctabox{position:relative;z-index:2;}
+.dgs-photo .dgs-logo,.dgs-photo .dgs-swipe,.dgs-photo .dgs-pageno{z-index:3;}
 `;
 
 export const SlideCanvas = forwardRef<HTMLDivElement, { slide: Slide; format: Format; index: number; total: number }>(
@@ -88,12 +92,18 @@ export const SlideCanvas = forwardRef<HTMLDivElement, { slide: Slide; format: Fo
     const str = (k: string) => (typeof f[k] === "string" ? (f[k] as string) : "");
     const arr = (k: string) => (Array.isArray(f[k]) ? (f[k] as string[]) : []).filter((x) => x.trim() !== "");
     const R = (text: string) => rich(text, t.hl, t.red);
-    const logoSrc = t.logo === "light" ? "/logo-light.png" : "/logo-dark.png";
+    const photo = !!slide.bgImage;
+    const fg = photo ? "#ffffff" : t.fg;
+    const subC = photo ? "rgba(255,255,255,.92)" : t.sub;
+    const eyebrowC = photo ? t.hl : t.eyebrow;
+    const isDark = photo ? true : t.dark;
+    const logoSrc = (photo ? "light" : t.logo) === "light" ? "/logo-light.png" : "/logo-dark.png";
+    const o = Math.min(0.85, Math.max(0.15, slide.overlay ?? 0.5));
+    const scrim = `linear-gradient(180deg, rgba(0,0,0,${o}) 0%, rgba(0,0,0,${(o * 0.55).toFixed(3)}) 42%, rgba(0,0,0,${Math.min(0.9, o * 1.1).toFixed(3)}) 100%)`;
 
     const rootStyle: React.CSSProperties = {
-      width: w, height: h, background: t.bg, color: t.fg,
-      // theme vars for the CSS
-      ["--hl" as string]: t.hl, ["--red" as string]: t.red, ["--sub" as string]: t.sub, ["--eyebrow" as string]: t.eyebrow,
+      width: w, height: h, background: photo ? "#000" : t.bg, color: fg,
+      ["--hl" as string]: t.hl, ["--red" as string]: t.red, ["--sub" as string]: subC, ["--eyebrow" as string]: eyebrowC,
     };
 
     let body: ReactNode = null;
@@ -127,7 +137,7 @@ export const SlideCanvas = forwardRef<HTMLDivElement, { slide: Slide; format: Fo
         body = (<>
           {str("eyebrow") && <div className="dgs-eyebrow">{str("eyebrow")}</div>}
           <div className="dgs-thead">{R(str("title"))}</div>
-          <div style={{ marginTop: 40 }}>
+          <div className="dgs-checkwrap" style={{ marginTop: 40 }}>
             {arr("items").map((it, i) => <div key={i} className="dgs-check"><span className="ck">✓</span><span>{it}</span></div>)}
           </div>
         </>); break;
@@ -153,9 +163,17 @@ export const SlideCanvas = forwardRef<HTMLDivElement, { slide: Slide; format: Fo
     }
 
     return (
-      <div ref={ref} className={`dgs-slide${t.dark ? " dark" : ""}${slide.font === "display" ? " dgs-display" : ""}`} style={rootStyle}>
+      <div ref={ref} className={`dgs-slide${isDark ? " dark" : ""}${slide.font === "display" ? " dgs-display" : ""}${photo ? " dgs-photo" : ""}`} style={rootStyle}>
         <style dangerouslySetInnerHTML={{ __html: CSS }} />
-        <Decor kind={slide.decor} color={t.decorColor} dark={t.dark} />
+        {photo ? (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img className="dgs-photobg" src={slide.bgImage} alt="" />
+            <div className="dgs-scrim" style={{ background: scrim }} />
+          </>
+        ) : (
+          <Decor kind={slide.decor} color={t.decorColor} dark={t.dark} />
+        )}
         {slide.showLogo && (
           // eslint-disable-next-line @next/next/no-img-element
           <img className="dgs-logo" src={logoSrc} alt="" />

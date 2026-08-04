@@ -83,6 +83,8 @@ export const LAYOUTS: Record<LayoutId, LayoutDef> = {
 export interface Slide {
   id: string; layout: LayoutId; theme: Theme; font: FontStyle; decor: Decor;
   showLogo: boolean; showSwipe: boolean;
+  bgImage?: string;   // data URL of an uploaded photo background
+  overlay?: number;   // 0.2–0.8 scrim darkness over the photo
   fields: Record<string, string | string[] | boolean>;
 }
 
