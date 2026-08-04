@@ -9,7 +9,9 @@ function paw(fill: string): string {
 }
 
 function bone(fill: string): string {
-  const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 44'><g fill='${fill}'><circle cx='16' cy='13' r='13'/><circle cx='16' cy='31' r='13'/><circle cx='84' cy='13' r='13'/><circle cx='84' cy='31' r='13'/><rect x='16' y='9' width='68' height='26' rx='10'/></g></svg>`;
+  // A recognizable dog bone: thin connecting bar + four distinct end-knobs,
+  // centered in a padded tile (with a slight tilt) so it repeats with breathing room.
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 170 130'><g fill='${fill}' transform='rotate(-18 85 65)'><rect x='50' y='58' width='70' height='14' rx='7'/><circle cx='50' cy='53' r='14'/><circle cx='50' cy='77' r='14'/><circle cx='120' cy='53' r='14'/><circle cx='120' cy='77' r='14'/></g></svg>`;
   return "data:image/svg+xml," + encodeURIComponent(svg);
 }
 
@@ -42,7 +44,7 @@ function Decor({ kind, color, dark }: { kind: string; color: string; dark: boole
   if (kind === "dots")
     return <div className="dgs-decor" style={{ inset: 0, backgroundImage: `radial-gradient(${color} 3px, transparent 3px)`, backgroundSize: "50px 50px", opacity: dark ? 0.08 : 0.14 }} />;
   if (kind === "bones")
-    return <div className="dgs-decor" style={{ inset: 0, backgroundImage: `url("${bone(color)}")`, backgroundSize: "150px 66px", opacity: dark ? 0.07 : 0.13 }} />;
+    return <div className="dgs-decor" style={{ inset: 0, backgroundImage: `url("${bone(color)}")`, backgroundSize: "185px 142px", opacity: dark ? 0.09 : 0.15 }} />;
   if (kind === "spots")
     return <div className="dgs-decor" style={{ inset: 0, backgroundImage: `url("${spotsTile(color)}")`, backgroundSize: "300px 300px", opacity: dark ? 0.09 : 0.15 }} />;
   if (kind === "hydrant")
