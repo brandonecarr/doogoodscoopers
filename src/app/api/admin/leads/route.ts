@@ -65,7 +65,9 @@ export async function GET(request: NextRequest) {
     const days = Math.max(0, parseInt(searchParams.get("days") || "0")); // 0 = all time
     const sortBy = searchParams.get("sort") === "grade" ? "grade" : "newest";
 
-    const pageSize = 20;
+    const ALLOWED_PER_PAGE = [10, 20, 50, 100];
+    const reqPerPage = parseInt(searchParams.get("perPage") || "20");
+    const pageSize = ALLOWED_PER_PAGE.includes(reqPerPage) ? reqPerPage : 20;
     const statusFilter = status && status !== "all" ? (status as LeadStatus) : undefined;
     const includeQuote = !sourceFilter || sourceFilter === "all" || sourceFilter === "quote";
     const includeAd = !sourceFilter || sourceFilter === "all" || sourceFilter === "ad";

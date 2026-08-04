@@ -105,6 +105,9 @@ const LS_ASSIGNMENTS = "dgs_kanban_assignments";
 const LS_VIEW        = "dgs_leads_view";
 const LS_WINDOW      = "dgs_leads_window";
 const LS_SORT        = "dgs_leads_sort";
+const LS_PAGESIZE    = "dgs_leads_pagesize";
+
+const PAGE_SIZES = [10, 20, 50, 100];
 
 const PER_PAGE   = 4; // cards shown per column page
 const DOT_WINDOW = 5; // max page-dots shown at once
@@ -231,7 +234,7 @@ export default function LeadsPage() {
   const [selected,     setSelected]     = useState<Set<string>>(new Set());
 
   const currentPage = parseInt(searchParams.get("page") || "1");
-  const pageSize    = 20;
+  const [pageSize, setPageSize] = useState(20);
 
   // Load persisted prefs
   useEffect(() => {
@@ -254,6 +257,8 @@ export default function LeadsPage() {
       if (storedWindow) setWindowDays(parseInt(storedWindow) || 0);
       const storedSort = localStorage.getItem(LS_SORT);
       if (storedSort === "grade" || storedSort === "newest") setSortBy(storedSort);
+      const storedPageSize = localStorage.getItem(LS_PAGESIZE);
+      if (storedPageSize && PAGE_SIZES.includes(parseInt(storedPageSize))) setPageSize(parseInt(storedPageSize));
     } catch {}
   }, []);
 
@@ -265,6 +270,18 @@ export default function LeadsPage() {
   function changeWindow(d: number) {
     setWindowDays(d);
     try { localStorage.setItem(LS_WINDOW, String(d)); } catch {}
+  }
+  function changePageSize(n: number) {
+    setPageSize(n);
+    try { localStorage.setItem(LS_PAGESIZE, String(n)); } catch {}
+    // Jump back to page 1 so we're never stranded on a now-out-of-range page.
+    if (currentPage !== 1) {
+      const params = new URLSearchParams();
+      if (searchValue) params.set("search", searchValue);
+      if (statusFilter && statusFilter !== "all") params.set("status", statusFilter);
+      if (sourceFilter && sourceFilter !== "all") params.set("source", sourceFilter);
+      router.push(`/admin/leads?${params}`);
+    }
   }
   function changeSort(s: "newest" | "grade") {
     setSortBy(s);
@@ -288,7 +305,7 @@ export default function LeadsPage() {
     try {
       const params = buildParams();
       if (view === "kanban") params.set("view", "kanban");
-      else params.set("page", currentPage.toString());
+      else { params.set("page", currentPage.toString()); params.set("perPage", String(pageSize)); }
       const res = await fetch(`/api/admin/leads?${params}`);
       if (res.ok) {
         const data = await res.json();
@@ -302,7 +319,7 @@ export default function LeadsPage() {
     } finally {
       setLoading(false);
     }
-  }, [buildParams, currentPage, view]);
+  }, [buildParams, currentPage, view, pageSize]);
 
   useEffect(() => { fetchLeads(); }, [fetchLeads]);
 
@@ -673,12 +690,23 @@ export default function LeadsPage() {
               </tbody>
             </table>
           </div>
-          {totalPages > 1 && (
-            <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
+          {total > 0 && (
+            <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between gap-3 flex-wrap">
               <div className="text-sm text-gray-500">
                 Showing {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, total)} of {total}
               </div>
-              <div className="flex gap-2">
+              <div className="flex items-center gap-2">
+                <label className="flex items-center gap-1.5 text-sm text-gray-500">
+                  <span className="hidden sm:inline">Show</span>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => changePageSize(parseInt(e.target.value))}
+                    title="Leads per page"
+                    className="px-2 py-1 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 text-sm appearance-none bg-white"
+                  >
+                    {PAGE_SIZES.map((n) => <option key={n} value={n}>{n} / page</option>)}
+                  </select>
+                </label>
                 {currentPage > 1 && (
                   <Link href={`/admin/leads?page=${currentPage - 1}${statusFilter !== "all" ? `&status=${statusFilter}` : ""}${sourceFilter !== "all" ? `&source=${sourceFilter}` : ""}${searchValue ? `&search=${searchValue}` : ""}`} className="px-3 py-1 border border-gray-200 rounded-lg hover:bg-gray-50 text-sm">Previous</Link>
                 )}
