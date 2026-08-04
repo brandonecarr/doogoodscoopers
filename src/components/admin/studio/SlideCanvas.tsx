@@ -1,7 +1,7 @@
 "use client";
 
 import { forwardRef, type ReactNode } from "react";
-import { DIMS, THEMES, type Slide, type Format } from "@/lib/studio/templates";
+import { DIMS, THEMES, DEFAULT_SWIPE, type Slide, type Format, type Brand } from "@/lib/studio/templates";
 
 function paw(fill: string): string {
   const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><g fill='${fill}'><ellipse cx='50' cy='63' rx='23' ry='19'/><ellipse cx='24' cy='41' rx='9.5' ry='13'/><ellipse cx='41' cy='27' rx='9.5' ry='13'/><ellipse cx='59' cy='27' rx='9.5' ry='13'/><ellipse cx='76' cy='41' rx='9.5' ry='13'/></g></svg>`;
@@ -85,8 +85,8 @@ const CSS = `
 .dgs-photo .dgs-logo,.dgs-photo .dgs-swipe,.dgs-photo .dgs-pageno,.dgs-photo .dgs-ctafoot{z-index:3;}
 `;
 
-export const SlideCanvas = forwardRef<HTMLDivElement, { slide: Slide; format: Format; index: number; total: number }>(
-  function SlideCanvas({ slide, format, index, total }, ref) {
+export const SlideCanvas = forwardRef<HTMLDivElement, { slide: Slide; format: Format; index: number; total: number; brand?: Brand }>(
+  function SlideCanvas({ slide, format, index, total, brand }, ref) {
     const t = THEMES[slide.theme];
     const { w, h } = DIMS[format];
     const f = slide.fields;
@@ -101,7 +101,8 @@ export const SlideCanvas = forwardRef<HTMLDivElement, { slide: Slide; format: Fo
     const eyebrowC = light ? t.hl : t.eyebrow;
     const isDark = light ? true : t.dark;
     const decorColor = light ? "#ffffff" : t.decorColor;
-    const logoSrc = (light ? "light" : t.logo) === "light" ? "/logo-light.png" : "/logo-dark.png";
+    const logoSrc = brand?.logo || ((light ? "light" : t.logo) === "light" ? "/logo-light.png" : "/logo-dark.png");
+    const swipeText = brand?.swipeText ?? DEFAULT_SWIPE;
     const o = Math.min(0.85, Math.max(0.15, slide.overlay ?? 0.5));
     const scrim = `linear-gradient(180deg, rgba(0,0,0,${o}) 0%, rgba(0,0,0,${(o * 0.55).toFixed(3)}) 42%, rgba(0,0,0,${Math.min(0.9, o * 1.1).toFixed(3)}) 100%)`;
 
@@ -182,7 +183,7 @@ export const SlideCanvas = forwardRef<HTMLDivElement, { slide: Slide; format: Fo
         )}
         <div className="dgs-body">{body}</div>
         {footerText && <div className="dgs-ctafoot">{footerText}</div>}
-        {slide.showSwipe && index < total - 1 && <div className="dgs-swipe">SWIPE →</div>}
+        {slide.showSwipe && swipeText.trim() && index < total - 1 && <div className="dgs-swipe">{swipeText}</div>}
         <div className="dgs-pageno" style={{ color: isDark ? "#C7D6E6" : "#9aa1a8" }}>{index + 1}/{total}</div>
       </div>
     );

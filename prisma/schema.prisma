@@ -382,6 +382,24 @@ model StudioDraft {
   @@index([updatedAt])
 }
 
+// AI-generated "trending" carousel templates for the Content Studio.
+// A weekly cron researches current trending formats and appends fresh ones.
+model StudioTemplate {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  name        String
+  description String   @default("")
+  tags        String[] @default([])
+  format      String   @default("square") // "square" | "portrait"
+  data        Json // Omit<Slide,"id">[]
+  source      String   @default("ai") // "ai" | "manual"
+  trend       String   @default("") // the trend/insight this was based on
+  active      Boolean  @default(true)
+
+  @@index([active, createdAt])
+}
+
 // =====================
 // ADMIN PUSH SUBSCRIPTIONS
 // =====================

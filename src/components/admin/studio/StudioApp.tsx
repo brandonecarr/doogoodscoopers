@@ -1,10 +1,10 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Plus, Download, Trash2, ArrowUp, ArrowDown, Copy, LayoutGrid, Loader2, Image as ImageIcon, Square, RectangleVertical, Save, FolderOpen, Type } from "lucide-react";
+import { Plus, Download, Trash2, ArrowUp, ArrowDown, Copy, LayoutGrid, Loader2, Image as ImageIcon, Square, RectangleVertical, Save, FolderOpen, Type, Flame, Sparkles } from "lucide-react";
 import {
-  DIMS, LAYOUTS, THEMES, TEMPLATES, FONTS, DECORS, GRADIENTS, blankSlide, newId,
-  type Format, type LayoutId, type Slide, type Theme, type FontStyle, type Decor, type TextPos,
+  DIMS, LAYOUTS, THEMES, TEMPLATES, FONTS, DECORS, GRADIENTS, DEFAULT_SWIPE, blankSlide, newId,
+  type Format, type LayoutId, type Slide, type Theme, type FontStyle, type Decor, type TextPos, type Brand,
 } from "@/lib/studio/templates";
 import { generateCaption, CAPTION_STYLES } from "@/lib/studio/caption";
 import { compressImage } from "@/lib/studio/image";
@@ -12,13 +12,16 @@ import { SlideCanvas } from "./SlideCanvas";
 
 const THEME_LIST: Theme[] = ["navy", "blue", "white", "mint", "ink", "alert", "sun"];
 
-function ScaledSlide({ slide, format, index, total, targetW }: { slide: Slide; format: Format; index: number; total: number; targetW: number }) {
+// An AI-generated "trending" template loaded from the DB.
+type TrendTemplate = { id: string; name: string; description: string; tags: string[]; format: Format; trend: string; createdAt: string; slides: Omit<Slide, "id">[] };
+
+function ScaledSlide({ slide, format, index, total, targetW, brand }: { slide: Slide; format: Format; index: number; total: number; targetW: number; brand?: Brand }) {
   const { w, h } = DIMS[format];
   const scale = targetW / w;
   return (
     <div style={{ width: targetW, height: Math.round(h * scale), overflow: "hidden", position: "relative" }}>
       <div style={{ position: "absolute", top: 0, left: 0, transform: `scale(${scale})`, transformOrigin: "top left" }}>
-        <SlideCanvas slide={slide} format={format} index={index} total={total} />
+        <SlideCanvas slide={slide} format={format} index={index} total={total} brand={brand} />
       </div>
     </div>
   );
@@ -32,9 +35,12 @@ function triggerDownload(href: string, name: string) {
 export function StudioApp() {
   const [format, setFormat] = useState<Format>("square");
   const [slides, setSlides] = useState<Slide[]>(() => TEMPLATES[0].slides.map((s) => ({ ...s, id: newId() })));
+  const [brand, setBrand] = useState<Brand>({ swipeText: DEFAULT_SWIPE });
   const [selected, setSelected] = useState(0);
   const [exporting, setExporting] = useState(false);
   const [gallery, setGallery] = useState(false);
+  const [trending, setTrending] = useState<TrendTemplate[]>([]);
+  const [finding, setFinding] = useState(false);
   const exportRefs = useRef<(HTMLDivElement | null)[]>([]);
   const fontCssRef = useRef<string | null>(null);
   const [caption, setCaption] = useState<{ open: boolean; style: number; text: string }>({ open: false, style: 0, text: "" });
@@ -68,6 +74,21 @@ export function StudioApp() {
     }
   };
 
+  const onLogo = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+    try {
+      // Keep PNG so a transparent logo stays transparent; downscale to keep drafts small.
+      const dataUrl = await compressImage(file, 640, 0.92, "image/png");
+      setBrand((b) => ({ ...b, logo: dataUrl }));
+    } catch {
+      const reader = new FileReader();
+      reader.onload = () => setBrand((b) => ({ ...b, logo: reader.result as string }));
+      reader.readAsDataURL(file);
+    }
+  };
+
   const addSlide = (layout: LayoutId) => {
     const ns = blankSlide(layout, cur?.theme ?? "white");
     setSlides((prev) => { const n = [...prev]; n.splice(selected + 1, 0, ns); return n; });
@@ -91,6 +112,39 @@ export function StudioApp() {
     const t = TEMPLATES.find((x) => x.id === id); if (!t) return;
     setSlides(t.slides.map((s) => ({ ...s, id: newId() })));
     setSelected(0); setGallery(false);
+  };
+
+  // ── AI trending templates (auto-generated, loaded from the DB) ───────────────
+  const loadTrendingList = async () => {
+    try {
+      const res = await fetch("/api/admin/studio-templates");
+      if (res.ok) setTrending((await res.json()).templates ?? []);
+    } catch {}
+  };
+  const openGallery = () => { setGallery(true); loadTrendingList(); };
+  const loadTrend = (t: TrendTemplate) => {
+    if (!t.slides?.length) return;
+    setFormat(t.format === "portrait" ? "portrait" : "square");
+    setSlides(t.slides.map((s) => ({ ...s, id: newId() })));
+    setSelected(0); setGallery(false);
+  };
+  const deleteTrend = async (id: string) => {
+    setTrending((list) => list.filter((t) => t.id !== id));
+    await fetch(`/api/admin/studio-templates/${id}`, { method: "DELETE" }).catch(() => {});
+  };
+  const findTrends = async () => {
+    setFinding(true);
+    try {
+      const res = await fetch("/api/admin/studio-templates", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+      const j = await res.json().catch(() => ({}));
+      if (res.ok) {
+        await loadTrendingList();
+        showFlash(j.added ? `Added ${j.added} fresh template${j.added === 1 ? "" : "s"} ✓` : (j.message || "No new trends found"));
+      } else {
+        showFlash(j.error || "Trend search unavailable");
+      }
+    } catch { showFlash("Trend search failed"); }
+    finally { setFinding(false); }
   };
 
   async function exportImages(all: boolean) {
@@ -147,7 +201,7 @@ export function StudioApp() {
     try {
       const res = await fetch("/api/admin/studio-drafts", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: draftId || undefined, name: name.trim(), data: { format, slides } }),
+        body: JSON.stringify({ id: draftId || undefined, name: name.trim(), data: { format, slides, brand } }),
       });
       if (res.ok) { const d = await res.json(); setDraftId(d.id); setDraftName(d.name); showFlash("Saved ✓"); }
       else showFlash("Save failed");
@@ -161,9 +215,10 @@ export function StudioApp() {
     try {
       const res = await fetch(`/api/admin/studio-drafts/${id}`); if (!res.ok) return;
       const { draft } = await res.json();
-      const data = draft.data as { format?: Format; slides?: Slide[] };
+      const data = draft.data as { format?: Format; slides?: Slide[]; brand?: Brand };
       setFormat(data.format || "square");
       setSlides((data.slides && data.slides.length ? data.slides : slides).map((s) => ({ ...s })));
+      setBrand(data.brand ?? { swipeText: DEFAULT_SWIPE });
       setSelected(0); setDraftId(draft.id); setDraftName(draft.name); setDraftsOpen(false);
     } catch {}
   };
@@ -183,7 +238,7 @@ export function StudioApp() {
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-3 justify-between">
         <div className="flex items-center gap-2">
-          <button onClick={() => setGallery(true)} className="inline-flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50">
+          <button onClick={openGallery} className="inline-flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50">
             <LayoutGrid className="w-4 h-4" /> Templates
           </button>
           <button onClick={openDrafts} className="inline-flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50">
@@ -230,7 +285,7 @@ export function StudioApp() {
           <div className="space-y-2 max-h-[70vh] overflow-y-auto pr-1">
             {slides.map((s, i) => (
               <div key={s.id} onClick={() => setSelected(i)} className={`relative rounded-lg overflow-hidden border-2 cursor-pointer ${i === selected ? "border-teal-500" : "border-transparent hover:border-gray-200"}`}>
-                <ScaledSlide slide={s} format={format} index={i} total={total} targetW={190} />
+                <ScaledSlide slide={s} format={format} index={i} total={total} targetW={190} brand={brand} />
                 <span className="absolute top-1 left-1 bg-black/55 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">{i + 1}</span>
               </div>
             ))}
@@ -240,7 +295,7 @@ export function StudioApp() {
         {/* Preview */}
         <div className="flex flex-col items-center">
           <div className="rounded-xl shadow-lg ring-1 ring-gray-200 overflow-hidden">
-            <ScaledSlide slide={cur} format={format} index={selected} total={total} targetW={previewW} />
+            <ScaledSlide slide={cur} format={format} index={selected} total={total} targetW={previewW} brand={brand} />
           </div>
           <div className="flex items-center gap-1 mt-3">
             <button onClick={() => move(selected, -1)} disabled={selected === 0} className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40" title="Move up"><ArrowUp className="w-4 h-4" /></button>
@@ -364,12 +419,45 @@ export function StudioApp() {
             );
           })}
 
+          {/* Brand kit — applies to every slide */}
+          <div className="pt-3 border-t border-gray-100 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Brand kit</span>
+              <span className="text-[10px] text-gray-400">applies to all slides</span>
+            </div>
+            <div>
+              <span className="text-[11px] text-gray-500 block mb-1">Logo</span>
+              {brand.logo ? (
+                <div className="flex items-center gap-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={brand.logo} alt="" className="h-8 max-w-[110px] object-contain rounded bg-gray-100 border border-gray-200 px-1.5" />
+                  <label className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+                    Replace<input type="file" accept="image/*" className="hidden" onChange={onLogo} />
+                  </label>
+                  <button onClick={() => setBrand((b) => ({ ...b, logo: undefined }))} className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50" title="Back to default logo">Default</button>
+                </div>
+              ) : (
+                <label className="flex items-center justify-center gap-1.5 px-3 py-2 border border-dashed border-gray-300 rounded-lg text-xs text-gray-600 cursor-pointer hover:bg-gray-50">
+                  <ImageIcon className="w-4 h-4" /> Upload custom logo
+                  <input type="file" accept="image/*" className="hidden" onChange={onLogo} />
+                </label>
+              )}
+              <p className="text-[10px] text-gray-400 mt-1">Default is the DooGoodScoopers logo (auto light/dark per color). PNG with transparency works best.</p>
+            </div>
+            <label className="block">
+              <span className="text-[11px] text-gray-500 block mb-1">Swipe label</span>
+              <input className={inputCls} value={brand.swipeText ?? ""} placeholder={DEFAULT_SWIPE}
+                onChange={(e) => setBrand((b) => ({ ...b, swipeText: e.target.value }))} />
+              <span className="text-[10px] text-gray-400 mt-1 block">Shown bottom-left on every slide except the last. Leave blank to hide it everywhere.</span>
+            </label>
+          </div>
+
           <div className="pt-2 border-t border-gray-100 flex flex-col gap-2">
             <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-              <input type="checkbox" checked={cur.showLogo} onChange={(e) => update(selected, { showLogo: e.target.checked })} className="rounded" /> Show logo
+              <input type="checkbox" checked={cur.showLogo} onChange={(e) => update(selected, { showLogo: e.target.checked })} className="rounded" /> Show logo <span className="text-gray-400">(this slide)</span>
             </label>
             <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-              <input type="checkbox" checked={cur.showSwipe} onChange={(e) => update(selected, { showSwipe: e.target.checked })} className="rounded" /> Show “SWIPE →” (hidden on last slide)
+              <input type="checkbox" checked={cur.showSwipe} onChange={(e) => update(selected, { showSwipe: e.target.checked })} className="rounded" /> Show swipe label <span className="text-gray-400">(this slide)</span>
             </label>
           </div>
           <p className="text-[11px] text-gray-400">Tip: wrap words in <code className="bg-gray-100 px-1 rounded">**stars**</code> to highlight, <code className="bg-gray-100 px-1 rounded">~~tildes~~</code> for red.</p>
@@ -380,7 +468,7 @@ export function StudioApp() {
       <div style={{ position: "fixed", left: -99999, top: 0, pointerEvents: "none", opacity: 0 }} aria-hidden>
         {slides.map((s, i) => (
           <div key={s.id} ref={(el) => { exportRefs.current[i] = el; }}>
-            <SlideCanvas slide={s} format={format} index={i} total={total} />
+            <SlideCanvas slide={s} format={format} index={i} total={total} brand={brand} />
           </div>
         ))}
       </div>
@@ -390,14 +478,59 @@ export function StudioApp() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setGallery(false)}>
           <div className="absolute inset-0 bg-black/40" />
           <div className="relative bg-white rounded-2xl shadow-xl max-w-3xl w-full max-h-[85vh] overflow-y-auto p-6" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-bold text-navy-900 mb-1">Start from a template</h2>
-            <p className="text-sm text-gray-500 mb-4">Pick a layout set, then edit the text. This replaces the current slides.</p>
+            <div className="flex items-start justify-between gap-3 mb-1">
+              <div>
+                <h2 className="text-lg font-bold text-navy-900">Start from a template</h2>
+                <p className="text-sm text-gray-500">Pick a layout set, then edit the text. This replaces the current slides.</p>
+              </div>
+              <button onClick={findTrends} disabled={finding}
+                className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-orange-500 to-pink-500 text-white rounded-lg text-sm font-semibold hover:opacity-90 disabled:opacity-60">
+                {finding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />} {finding ? "Searching trends…" : "Find fresh trends"}
+              </button>
+            </div>
+
+            {/* AI trending templates */}
+            <div className="mt-4">
+              <div className="flex items-center gap-1.5 mb-2">
+                <Flame className="w-4 h-4 text-orange-500" />
+                <h3 className="text-sm font-bold text-navy-900">Trending now</h3>
+                <span className="text-[11px] text-gray-400">· auto-updated weekly by AI</span>
+              </div>
+              {trending.length === 0 ? (
+                <p className="text-xs text-gray-400 border border-dashed border-gray-200 rounded-xl px-3 py-4 mb-5">
+                  No trending templates yet. Hit <span className="font-semibold text-orange-500">Find fresh trends</span> — the AI researches what carousel formats are popping off right now and builds a few on-brand ones for you. New batches also land automatically each week.
+                </p>
+              ) : (
+                <div className="grid sm:grid-cols-2 gap-4 mb-5">
+                  {trending.map((t) => (
+                    <div key={t.id} className="relative text-left border border-orange-200 bg-orange-50/40 rounded-xl p-3 hover:border-orange-400 hover:shadow-sm transition">
+                      <button onClick={() => deleteTrend(t.id)} title="Remove" className="absolute top-2 right-2 z-10 p-1 rounded-full bg-white/90 border border-gray-200 text-gray-400 hover:text-red-500"><Trash2 className="w-3.5 h-3.5" /></button>
+                      <button onClick={() => loadTrend(t)} className="block w-full text-left">
+                        <div className="flex gap-1.5 mb-2 overflow-hidden rounded-md">
+                          {t.slides.slice(0, 4).map((s, i) => (
+                            <ScaledSlide key={i} slide={{ ...s, id: `tr${i}` }} format={t.format} index={i} total={t.slides.length} targetW={78} brand={brand} />
+                          ))}
+                        </div>
+                        <p className="font-semibold text-navy-900 text-sm">{t.name}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">{t.description}</p>
+                        {t.trend && <p className="text-[11px] text-orange-600 mt-1 flex items-start gap-1"><Flame className="w-3 h-3 mt-0.5 shrink-0" /><span>{t.trend}</span></p>}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-1.5 mb-2 pt-1 border-t border-gray-100">
+              <LayoutGrid className="w-4 h-4 text-gray-400 mt-2" />
+              <h3 className="text-sm font-bold text-navy-900 mt-2">Core templates</h3>
+            </div>
             <div className="grid sm:grid-cols-2 gap-4">
               {TEMPLATES.map((t) => (
                 <button key={t.id} onClick={() => loadTemplate(t.id)} className="text-left border border-gray-200 rounded-xl p-3 hover:border-teal-400 hover:shadow-sm transition">
                   <div className="flex gap-1.5 mb-2 overflow-hidden rounded-md">
                     {t.slides.slice(0, 4).map((s, i) => (
-                      <ScaledSlide key={i} slide={{ ...s, id: `t${i}` }} format="square" index={i} total={t.slides.length} targetW={78} />
+                      <ScaledSlide key={i} slide={{ ...s, id: `t${i}` }} format="square" index={i} total={t.slides.length} targetW={78} brand={brand} />
                     ))}
                   </div>
                   <p className="font-semibold text-navy-900 text-sm">{t.name}</p>

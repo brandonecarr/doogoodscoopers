@@ -1,7 +1,8 @@
 // Client-side image compression for Content Studio photo backgrounds.
 // Downscales to fit the canvas and re-encodes as JPEG so a multi-MB phone photo
 // becomes a few hundred KB — keeps slide state light and drafts small.
-export async function compressImage(file: File, maxDim = 1440, quality = 0.82): Promise<string> {
+// Pass mime "image/png" for logos so transparency is preserved.
+export async function compressImage(file: File, maxDim = 1440, quality = 0.82, mime = "image/jpeg"): Promise<string> {
   const dataUrl = await new Promise<string>((resolve, reject) => {
     const r = new FileReader();
     r.onload = () => resolve(r.result as string);
@@ -25,7 +26,7 @@ export async function compressImage(file: File, maxDim = 1440, quality = 0.82): 
   const ctx = canvas.getContext("2d");
   if (!ctx) return dataUrl;
   ctx.drawImage(img, 0, 0, w, h);
-  const out = canvas.toDataURL("image/jpeg", quality);
+  const out = canvas.toDataURL(mime, quality);
   // Keep whichever is smaller (tiny already-small images can grow when re-encoded).
   return out.length < dataUrl.length ? out : dataUrl;
 }
