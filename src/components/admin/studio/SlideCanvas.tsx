@@ -8,6 +8,24 @@ function paw(fill: string): string {
   return "data:image/svg+xml," + encodeURIComponent(svg);
 }
 
+function Decor({ kind, color, dark }: { kind: string; color: string; dark: boolean }) {
+  if (kind === "none") return null;
+  if (kind === "blob")
+    return <div className="dgs-decor" style={{ width: 700, height: 700, borderRadius: "50%", background: color, opacity: dark ? 0.1 : 0.16, top: -210, right: -230, filter: "blur(2px)" }} />;
+  if (kind === "stripe")
+    return <div className="dgs-decor" style={{ width: 1700, height: 176, background: color, opacity: dark ? 0.12 : 0.16, transform: "rotate(-22deg)", bottom: 150, left: -160 }} />;
+  if (kind === "dots")
+    return <div className="dgs-decor" style={{ inset: 0, backgroundImage: `radial-gradient(${color} 3px, transparent 3px)`, backgroundSize: "50px 50px", opacity: dark ? 0.08 : 0.14 }} />;
+  // paws (default)
+  const op = dark ? 0.06 : 0.28;
+  return (<>
+    {/* eslint-disable-next-line @next/next/no-img-element */}
+    <img className="dgs-decor" src={paw(color)} alt="" style={{ width: 520, top: -120, right: -120, opacity: op, transform: "rotate(18deg)" }} />
+    {/* eslint-disable-next-line @next/next/no-img-element */}
+    <img className="dgs-decor" src={paw(color)} alt="" style={{ width: 300, bottom: 90, left: -80, opacity: op * 0.9, transform: "rotate(-12deg)" }} />
+  </>);
+}
+
 // **x** → highlight, ~~x~~ → red, \n → line break
 function rich(text: string, hl: string, red: string): ReactNode[] {
   const out: ReactNode[] = [];
@@ -52,6 +70,14 @@ const CSS = `
 .dgs-ctabig{font-weight:900;font-size:92px;line-height:1;margin:24px 0;letter-spacing:-1px;color:#0E2A47;}
 .dgs-ctap{font-size:38px;font-weight:600;color:#3a3f43;line-height:1.42;}
 .dgs-ctafoot{position:absolute;bottom:54px;left:0;right:0;text-align:center;color:var(--sub);font-weight:800;font-size:30px;}
+.dgs-display .dgs-h1,.dgs-display .dgs-statement,.dgs-display .dgs-thead,.dgs-display .dgs-kicker,.dgs-display .dgs-ctabig,.dgs-display .dgs-statbig{font-family:var(--font-bebas),'Bebas Neue',Impact,sans-serif;letter-spacing:.5px;line-height:.92;font-weight:400;overflow-wrap:break-word;}
+.dgs-display .dgs-h1{font-size:106px;}
+.dgs-display .dgs-statement{font-size:102px;}
+.dgs-display .dgs-thead{font-size:88px;}
+.dgs-display .dgs-kicker{font-size:68px;}
+.dgs-display .dgs-statbig{font-size:260px;letter-spacing:0;}
+.dgs-display .dgs-ctabig{font-size:112px;}
+.dgs-decor{position:absolute;pointer-events:none;}
 `;
 
 export const SlideCanvas = forwardRef<HTMLDivElement, { slide: Slide; format: Format; index: number; total: number }>(
@@ -62,8 +88,6 @@ export const SlideCanvas = forwardRef<HTMLDivElement, { slide: Slide; format: Fo
     const str = (k: string) => (typeof f[k] === "string" ? (f[k] as string) : "");
     const arr = (k: string) => (Array.isArray(f[k]) ? (f[k] as string[]) : []).filter((x) => x.trim() !== "");
     const R = (text: string) => rich(text, t.hl, t.red);
-    const pawFill = t.dark ? "#ffffff" : "#9CD5CF";
-    const pawOp = t.dark ? 0.06 : 0.4;
     const logoSrc = t.logo === "light" ? "/logo-light.png" : "/logo-dark.png";
 
     const rootStyle: React.CSSProperties = {
@@ -129,13 +153,9 @@ export const SlideCanvas = forwardRef<HTMLDivElement, { slide: Slide; format: Fo
     }
 
     return (
-      <div ref={ref} className={`dgs-slide${t.dark ? " dark" : ""}`} style={rootStyle}>
+      <div ref={ref} className={`dgs-slide${t.dark ? " dark" : ""}${slide.font === "display" ? " dgs-display" : ""}`} style={rootStyle}>
         <style dangerouslySetInnerHTML={{ __html: CSS }} />
-        {/* paw watermarks */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img className="dgs-paw" src={paw(pawFill)} alt="" style={{ width: 520, top: -120, right: -120, opacity: pawOp, transform: "rotate(18deg)" }} />
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img className="dgs-paw" src={paw(pawFill)} alt="" style={{ width: 300, bottom: 90, left: -80, opacity: pawOp * 0.9, transform: "rotate(-12deg)" }} />
+        <Decor kind={slide.decor} color={t.decorColor} dark={t.dark} />
         {slide.showLogo && (
           // eslint-disable-next-line @next/next/no-img-element
           <img className="dgs-logo" src={logoSrc} alt="" />

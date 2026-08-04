@@ -3,12 +3,12 @@
 import { useRef, useState } from "react";
 import { Plus, Download, Trash2, ArrowUp, ArrowDown, Copy, LayoutGrid, Loader2, Image as ImageIcon, Square, RectangleVertical } from "lucide-react";
 import {
-  DIMS, LAYOUTS, THEMES, TEMPLATES, blankSlide, newId,
-  type Format, type LayoutId, type Slide, type Theme,
+  DIMS, LAYOUTS, THEMES, TEMPLATES, FONTS, DECORS, blankSlide, newId,
+  type Format, type LayoutId, type Slide, type Theme, type FontStyle, type Decor,
 } from "@/lib/studio/templates";
 import { SlideCanvas } from "./SlideCanvas";
 
-const THEME_LIST: Theme[] = ["navy", "blue", "white", "mint"];
+const THEME_LIST: Theme[] = ["navy", "blue", "white", "mint", "ink", "alert", "sun"];
 
 function ScaledSlide({ slide, format, index, total, targetW }: { slide: Slide; format: Format; index: number; total: number; targetW: number }) {
   const { w, h } = DIMS[format];
@@ -189,13 +189,33 @@ export function StudioApp() {
 
           <div>
             <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Color</label>
-            <div className="flex gap-2 mt-1.5">
+            <div className="flex flex-wrap gap-2 mt-1.5">
               {THEME_LIST.map((th) => (
                 <button key={th} onClick={() => update(selected, { theme: th })} title={th}
                   className={`w-9 h-9 rounded-lg border-2 ${cur.theme === th ? "border-teal-500" : "border-gray-200"}`}
                   style={{ background: THEMES[th].bg }} />
               ))}
             </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Font</label>
+              <div className="inline-flex mt-1.5 rounded-lg border border-gray-200 overflow-hidden w-full">
+                {FONTS.map((ft) => (
+                  <button key={ft.id} onClick={() => update(selected, { font: ft.id as FontStyle })}
+                    className={`flex-1 px-2 py-2 text-xs font-semibold ${cur.font === ft.id ? "bg-navy-900 text-white" : "bg-white text-gray-600"}`}>
+                    {ft.id === "display" ? "Bold" : "Clean"}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <label className="block">
+              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Decoration</span>
+              <select value={cur.decor} onChange={(e) => update(selected, { decor: e.target.value as Decor })} className={inputCls + " mt-1.5 bg-white"}>
+                {DECORS.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}
+              </select>
+            </label>
           </div>
 
           {fields.map((fd) => {
