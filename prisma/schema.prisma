@@ -382,6 +382,16 @@ model StudioDraft {
   @@index([updatedAt])
 }
 
+// Cache of zip code → coordinates so the Leads map doesn't re-geocode.
+// Populated on demand the first time a zip appears on the map.
+model ZipGeo {
+  zip       String   @id
+  lat       Float
+  lng       Float
+  place     String   @default("")
+  createdAt DateTime @default(now())
+}
+
 // AI-generated "trending" carousel templates for the Content Studio.
 // A weekly cron researches current trending formats and appends fresh ones.
 model StudioTemplate {

@@ -3,12 +3,14 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import {
   Search,
   Filter,
   Loader2,
   LayoutList,
   LayoutGrid,
+  Map as MapIcon,
   Plus,
   MoreHorizontal,
   FileText,
@@ -24,6 +26,16 @@ import {
 } from "lucide-react";
 import type { LeadStatus } from "@/types/leads";
 import { CallIntelCard } from "@/components/admin/CallIntelCard";
+import type { MapPoint } from "@/components/admin/LeadsMap";
+
+// mapbox-gl is heavy and touches window — load it only when the Map view opens.
+const LeadsMap = dynamic(() => import("@/components/admin/LeadsMap").then((m) => m.LeadsMap), {
+  ssr: false,
+  loading: () => <div className="flex items-center justify-center bg-white rounded-xl border border-gray-100" style={{ height: "70vh" }}><Loader2 className="w-8 h-8 animate-spin text-teal-600" /></div>,
+});
+
+type LeadsView = "list" | "kanban" | "map";
+interface MapMeta { configured: boolean; totalLeads: number; mappedLeads: number; noZip: number; ungeocoded: number }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -190,7 +202,10 @@ export default function LeadsPage() {
   const [counts,       setCounts]       = useState<Record<string, number>>({});
   const [loadingMore,  setLoadingMore]  = useState<string | null>(null);
   const [loading,      setLoading]      = useState(true);
-  const [view,         setView]         = useState<"list" | "kanban">("list");
+  const [view,         setView]         = useState<LeadsView>("list");
+  const [mapPoints,    setMapPoints]    = useState<MapPoint[]>([]);
+  const [mapMeta,      setMapMeta]      = useState<MapMeta | null>(null);
+  const [mapLoading,   setMapLoading]   = useState(false);
   const [searchValue,  setSearchValue]  = useState(searchParams.get("search") || "");
   const [statusFilter, setStatusFilter] = useState(searchParams.get("status") || "all");
   const [sourceFilter, setSourceFilter] = useState(searchParams.get("source") || "all");
@@ -233,7 +248,7 @@ export default function LeadsPage() {
       const storedAssign = localStorage.getItem(LS_ASSIGNMENTS);
       if (storedAssign) setAssignments(JSON.parse(storedAssign));
       const storedView = localStorage.getItem(LS_VIEW);
-      if (storedView === "kanban" || storedView === "list") setView(storedView);
+      if (storedView === "kanban" || storedView === "list" || storedView === "map") setView(storedView);
       const storedWindow = localStorage.getItem(LS_WINDOW);
       if (storedWindow) setWindowDays(parseInt(storedWindow) || 0);
       const storedSort = localStorage.getItem(LS_SORT);
@@ -241,9 +256,9 @@ export default function LeadsPage() {
     } catch {}
   }, []);
 
-  function selectView(v: "list" | "kanban") {
+  function selectView(v: LeadsView) {
     setView(v);
-    if (v === "list") { setSelectMode(false); setSelected(new Set()); }
+    if (v !== "kanban") { setSelectMode(false); setSelected(new Set()); }
     try { localStorage.setItem(LS_VIEW, v); } catch {}
   }
   function changeWindow(d: number) {
@@ -267,6 +282,7 @@ export default function LeadsPage() {
   }, [statusFilter, sourceFilter, searchValue, windowDays, sortBy]);
 
   const fetchLeads = useCallback(async () => {
+    if (view === "map") return; // map has its own fetch
     setLoading(true);
     try {
       const params = buildParams();
@@ -288,6 +304,25 @@ export default function LeadsPage() {
   }, [buildParams, currentPage, view]);
 
   useEffect(() => { fetchLeads(); }, [fetchLeads]);
+
+  // Map view fetches points grouped by zip (respects the active filters).
+  const fetchMap = useCallback(async () => {
+    setMapLoading(true);
+    try {
+      const res = await fetch(`/api/admin/leads/map?${buildParams()}`);
+      if (res.ok) {
+        const data = await res.json();
+        setMapPoints(data.points || []);
+        setMapMeta({ configured: data.configured, totalLeads: data.totalLeads, mappedLeads: data.mappedLeads, noZip: data.noZip, ungeocoded: data.ungeocoded });
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setMapLoading(false);
+    }
+  }, [buildParams]);
+
+  useEffect(() => { if (view === "map") fetchMap(); }, [view, fetchMap]);
 
   function saveColumns(cols: KanbanColumn[]) {
     setColumns(cols);
@@ -446,7 +481,7 @@ export default function LeadsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-navy-900">Leads</h1>
-          <p className="text-navy-600 mt-1">{total} total leads</p>
+          <p className="text-navy-600 mt-1">{(view === "map" ? mapMeta?.totalLeads ?? total : total)} total leads</p>
         </div>
         <div className="flex items-center gap-2">
           {view === "kanban" && (
@@ -478,6 +513,15 @@ export default function LeadsPage() {
             >
               <LayoutGrid className="w-4 h-4" />
               <span className="hidden sm:inline">Board</span>
+            </button>
+            <button
+              onClick={() => selectView("map")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                view === "map" ? "bg-white text-navy-900 shadow-sm" : "text-gray-500 hover:text-gray-800"
+              }`}
+            >
+              <MapIcon className="w-4 h-4" />
+              <span className="hidden sm:inline">Map</span>
             </button>
           </div>
           <Link
@@ -558,7 +602,18 @@ export default function LeadsPage() {
       </div>
 
       {/* Content */}
-      {loading ? (
+      {view === "map" ? (
+        /* ── MAP VIEW ───────────────────────────────────────────────────── */
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
+            <span><b className="text-navy-900">{mapMeta?.mappedLeads ?? 0}</b> leads mapped across <b className="text-navy-900">{mapPoints.length}</b> zip code{mapPoints.length === 1 ? "" : "s"}</span>
+            {mapMeta && mapMeta.noZip > 0 && <span>· {mapMeta.noZip} without a zip code</span>}
+            {mapMeta && mapMeta.ungeocoded > 0 && <span>· {mapMeta.ungeocoded} in a zip we couldn&apos;t locate</span>}
+            {mapLoading && <span className="inline-flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> refreshing…</span>}
+          </div>
+          <LeadsMap points={mapPoints} token={process.env.NEXT_PUBLIC_MAPBOX_TOKEN} />
+        </div>
+      ) : loading ? (
         <div className="flex items-center justify-center py-16">
           <Loader2 className="w-8 h-8 animate-spin text-teal-600" />
         </div>
