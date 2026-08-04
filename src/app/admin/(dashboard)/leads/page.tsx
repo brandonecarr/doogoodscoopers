@@ -206,6 +206,7 @@ export default function LeadsPage() {
   const [mapPoints,    setMapPoints]    = useState<MapPoint[]>([]);
   const [mapMeta,      setMapMeta]      = useState<MapMeta | null>(null);
   const [mapLoading,   setMapLoading]   = useState(false);
+  const [convertedOnly, setConvertedOnly] = useState(false);
   const [searchValue,  setSearchValue]  = useState(searchParams.get("search") || "");
   const [statusFilter, setStatusFilter] = useState(searchParams.get("status") || "all");
   const [sourceFilter, setSourceFilter] = useState(searchParams.get("source") || "all");
@@ -309,7 +310,9 @@ export default function LeadsPage() {
   const fetchMap = useCallback(async () => {
     setMapLoading(true);
     try {
-      const res = await fetch(`/api/admin/leads/map?${buildParams()}`);
+      const p = buildParams();
+      if (convertedOnly) p.set("status", "CONVERTED"); // map-only quick filter, overrides the dropdown
+      const res = await fetch(`/api/admin/leads/map?${p}`);
       if (res.ok) {
         const data = await res.json();
         setMapPoints(data.points || []);
@@ -320,7 +323,7 @@ export default function LeadsPage() {
     } finally {
       setMapLoading(false);
     }
-  }, [buildParams]);
+  }, [buildParams, convertedOnly]);
 
   useEffect(() => { if (view === "map") fetchMap(); }, [view, fetchMap]);
 
@@ -605,11 +608,23 @@ export default function LeadsPage() {
       {view === "map" ? (
         /* ── MAP VIEW ───────────────────────────────────────────────────── */
         <div className="space-y-3">
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
-            <span><b className="text-navy-900">{mapMeta?.mappedLeads ?? 0}</b> leads mapped across <b className="text-navy-900">{mapPoints.length}</b> zip code{mapPoints.length === 1 ? "" : "s"}</span>
-            {mapMeta && mapMeta.noZip > 0 && <span>· {mapMeta.noZip} without a zip code</span>}
-            {mapMeta && mapMeta.ungeocoded > 0 && <span>· {mapMeta.ungeocoded} in a zip we couldn&apos;t locate</span>}
-            {mapLoading && <span className="inline-flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> refreshing…</span>}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
+              <span><b className="text-navy-900">{mapMeta?.mappedLeads ?? 0}</b> {convertedOnly ? "converted " : ""}leads mapped across <b className="text-navy-900">{mapPoints.length}</b> zip code{mapPoints.length === 1 ? "" : "s"}</span>
+              {mapMeta && mapMeta.noZip > 0 && <span>· {mapMeta.noZip} without a zip code</span>}
+              {mapMeta && mapMeta.ungeocoded > 0 && <span>· {mapMeta.ungeocoded} in a zip we couldn&apos;t locate</span>}
+              {mapLoading && <span className="inline-flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> refreshing…</span>}
+            </div>
+            <button
+              onClick={() => setConvertedOnly((v) => !v)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                convertedOnly ? "bg-green-600 text-white border-green-600" : "border-gray-200 text-navy-900 hover:bg-gray-50"
+              }`}
+              title="Show only converted (Won) leads"
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              Converted only
+            </button>
           </div>
           <LeadsMap points={mapPoints} token={process.env.NEXT_PUBLIC_MAPBOX_TOKEN} />
         </div>
