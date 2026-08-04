@@ -85,8 +85,10 @@ export interface Slide {
   showLogo: boolean; showSwipe: boolean;
   bgImage?: string;   // data URL of an uploaded photo background
   overlay?: number;   // 0.2–0.8 scrim darkness over the photo
+  textPos?: "top" | "center" | "bottom"; // vertical position of the text block
   fields: Record<string, string | string[] | boolean>;
 }
+export type TextPos = "top" | "center" | "bottom";
 
 let _id = 0;
 export const newId = () => `s${Date.now().toString(36)}${_id++}`;
@@ -100,7 +102,7 @@ export function blankSlide(layout: LayoutId, theme: Theme = "white"): Slide {
 export interface TemplateDef { id: string; name: string; desc: string; tags: string[]; slides: Omit<Slide, "id">[] }
 
 const FOOT = "doogoodscoopers.com  •  (909) 366-3744";
-type Extra = Partial<Pick<Slide, "showSwipe" | "font" | "decor" | "showLogo" | "bgImage" | "overlay">>;
+type Extra = Partial<Pick<Slide, "showSwipe" | "font" | "decor" | "showLogo" | "bgImage" | "overlay" | "textPos">>;
 const s = (layout: LayoutId, theme: Theme, font: FontStyle, decor: Decor, fields: Record<string, string | string[] | boolean>, extra?: Extra): Omit<Slide, "id"> =>
   ({ layout, theme, font, decor, showLogo: extra?.showLogo ?? true, showSwipe: extra?.showSwipe ?? true, fields, ...extra });
 

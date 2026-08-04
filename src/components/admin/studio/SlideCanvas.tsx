@@ -80,8 +80,9 @@ const CSS = `
 .dgs-decor{position:absolute;pointer-events:none;}
 .dgs-photobg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;}
 .dgs-scrim{position:absolute;inset:0;z-index:1;}
-.dgs-photo .dgs-eyebrow,.dgs-photo .dgs-h1,.dgs-photo .dgs-sub,.dgs-photo .dgs-statbig,.dgs-photo .dgs-statlabel,.dgs-photo .dgs-thead,.dgs-photo .dgs-list,.dgs-photo .dgs-checkwrap,.dgs-photo .dgs-statement,.dgs-photo .dgs-kicker,.dgs-photo .dgs-ctabox{position:relative;z-index:2;}
-.dgs-photo .dgs-logo,.dgs-photo .dgs-swipe,.dgs-photo .dgs-pageno{z-index:3;}
+.dgs-body{display:flex;flex-direction:column;width:100%;}
+.dgs-photo .dgs-body{position:relative;z-index:2;}
+.dgs-photo .dgs-logo,.dgs-photo .dgs-swipe,.dgs-photo .dgs-pageno,.dgs-photo .dgs-ctafoot{z-index:3;}
 `;
 
 export const SlideCanvas = forwardRef<HTMLDivElement, { slide: Slide; format: Format; index: number; total: number }>(
@@ -101,8 +102,13 @@ export const SlideCanvas = forwardRef<HTMLDivElement, { slide: Slide; format: Fo
     const o = Math.min(0.85, Math.max(0.15, slide.overlay ?? 0.5));
     const scrim = `linear-gradient(180deg, rgba(0,0,0,${o}) 0%, rgba(0,0,0,${(o * 0.55).toFixed(3)}) 42%, rgba(0,0,0,${Math.min(0.9, o * 1.1).toFixed(3)}) 100%)`;
 
+    const posDefault = slide.layout === "cover" || slide.layout === "list" || slide.layout === "checklist" ? "top" : "center";
+    const pos = slide.textPos ?? posDefault;
+    const justify = pos === "top" ? "flex-start" : pos === "bottom" ? "flex-end" : "center";
+    const footerText = slide.layout === "cta" ? str("footer") : "";
+
     const rootStyle: React.CSSProperties = {
-      width: w, height: h, background: photo ? "#000" : t.bg, color: fg,
+      width: w, height: h, background: photo ? "#000" : t.bg, color: fg, justifyContent: justify,
       ["--hl" as string]: t.hl, ["--red" as string]: t.red, ["--sub" as string]: subC, ["--eyebrow" as string]: eyebrowC,
     };
 
@@ -116,11 +122,9 @@ export const SlideCanvas = forwardRef<HTMLDivElement, { slide: Slide; format: Fo
         </>); break;
       case "stat":
         body = (<>
-          {str("eyebrow") && <div className="dgs-eyebrow">{str("eyebrow")}</div>}
-          <div className="dgs-spacer" />
+          {str("eyebrow") && <div className="dgs-eyebrow" style={{ marginBottom: 20 }}>{str("eyebrow")}</div>}
           <div className="dgs-statbig">{str("stat")}</div>
           <div className="dgs-statlabel">{R(str("statLabel"))}</div>
-          <div className="dgs-spacer" />
         </>); break;
       case "list":
         body = (<>
@@ -143,22 +147,17 @@ export const SlideCanvas = forwardRef<HTMLDivElement, { slide: Slide; format: Fo
         </>); break;
       case "statement":
         body = (<>
-          <div className="dgs-spacer" />
           <div className="dgs-statement">{R(str("statement"))}</div>
           {str("subtitle") && <div className="dgs-sub">{R(str("subtitle"))}</div>}
-          <div className="dgs-spacer" />
         </>); break;
       case "cta":
         body = (<>
-          <div className="dgs-spacer" />
           {str("kicker") && <div className="dgs-kicker">{R(str("kicker"))}</div>}
           <div className="dgs-ctabox">
             {str("lead") && <div className="dgs-ctalead">{str("lead")}</div>}
             <div className="dgs-ctabig">Comment<br /><span style={{ color: t.hl }}>“{str("big")}”</span></div>
             {str("p") && <div className="dgs-ctap">{R(str("p"))}</div>}
           </div>
-          <div className="dgs-spacer" />
-          {str("footer") && <div className="dgs-ctafoot">{str("footer")}</div>}
         </>); break;
     }
 
@@ -178,9 +177,10 @@ export const SlideCanvas = forwardRef<HTMLDivElement, { slide: Slide; format: Fo
           // eslint-disable-next-line @next/next/no-img-element
           <img className="dgs-logo" src={logoSrc} alt="" />
         )}
-        {body}
+        <div className="dgs-body">{body}</div>
+        {footerText && <div className="dgs-ctafoot">{footerText}</div>}
         {slide.showSwipe && index < total - 1 && <div className="dgs-swipe">SWIPE →</div>}
-        <div className="dgs-pageno" style={{ color: t.dark ? "#C7D6E6" : "#9aa1a8" }}>{index + 1}/{total}</div>
+        <div className="dgs-pageno" style={{ color: isDark ? "#C7D6E6" : "#9aa1a8" }}>{index + 1}/{total}</div>
       </div>
     );
   },

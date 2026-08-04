@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { Plus, Download, Trash2, ArrowUp, ArrowDown, Copy, LayoutGrid, Loader2, Image as ImageIcon, Square, RectangleVertical } from "lucide-react";
 import {
   DIMS, LAYOUTS, THEMES, TEMPLATES, FONTS, DECORS, blankSlide, newId,
-  type Format, type LayoutId, type Slide, type Theme, type FontStyle, type Decor,
+  type Format, type LayoutId, type Slide, type Theme, type FontStyle, type Decor, type TextPos,
 } from "@/lib/studio/templates";
 import { SlideCanvas } from "./SlideCanvas";
 
@@ -225,6 +225,20 @@ export function StudioApp() {
                 {DECORS.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}
               </select>
             </label>
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Text position</label>
+            <div className="inline-flex mt-1.5 rounded-lg border border-gray-200 overflow-hidden w-full">
+              {(["top", "center", "bottom"] as TextPos[]).map((p) => {
+                const def = cur.layout === "cover" || cur.layout === "list" || cur.layout === "checklist" ? "top" : "center";
+                const active = (cur.textPos ?? def) === p;
+                return (
+                  <button key={p} onClick={() => update(selected, { textPos: p })}
+                    className={`flex-1 px-2 py-2 text-xs font-semibold capitalize ${active ? "bg-navy-900 text-white" : "bg-white text-gray-600"}`}>{p}</button>
+                );
+              })}
+            </div>
           </div>
 
           <div>
