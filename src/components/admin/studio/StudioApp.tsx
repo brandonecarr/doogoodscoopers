@@ -32,6 +32,16 @@ function triggerDownload(href: string, name: string) {
   a.href = href; a.download = name; document.body.appendChild(a); a.click(); a.remove();
 }
 
+// Make sure every <img> in a slide (photo background, logo, decor) is fully
+// decoded before html-to-image snapshots it — otherwise the capture can come
+// out missing the background.
+async function decodeNodeImages(node: HTMLElement) {
+  const imgs = Array.from(node.querySelectorAll("img"));
+  await Promise.all(
+    imgs.map((img) => (img.complete && img.naturalWidth > 0 ? Promise.resolve() : img.decode().catch(() => {}))),
+  );
+}
+
 export function StudioApp() {
   const [format, setFormat] = useState<Format>("square");
   const [slides, setSlides] = useState<Slide[]>(() => TEMPLATES[0].slides.map((s) => ({ ...s, id: newId() })));
@@ -162,7 +172,9 @@ export function StudioApp() {
         catch { fontCssRef.current = ""; }
       }
       const { w, h } = DIMS[format];
-      const opts = { width: w, height: h, pixelRatio: 1, cacheBust: true, fontEmbedCSS: fontCssRef.current || undefined };
+      // No cacheBust: it appends "?<ts>" to image URLs, which corrupts data:
+      // URLs (our photo backgrounds) and drops them from the export.
+      const opts = { width: w, height: h, pixelRatio: 1, cacheBust: false, fontEmbedCSS: fontCssRef.current || undefined };
       const idxs = all ? slides.map((_, i) => i) : [selected];
       if (all) {
         const JSZip = (await import("jszip")).default;
@@ -170,6 +182,10 @@ export function StudioApp() {
         for (const i of idxs) {
           const node = exportRefs.current[i];
           if (!node) continue;
+          await decodeNodeImages(node);
+          // First snapshot warms the clone's image cache; the second reliably
+          // includes the photo background (html-to-image can blank it on run 1).
+          await toPng(node, opts);
           const dataUrl = await toPng(node, opts);
           zip.file(`slide-${String(i + 1).padStart(2, "0")}.png`, dataUrl.split(",")[1], { base64: true });
         }
@@ -179,7 +195,11 @@ export function StudioApp() {
         setTimeout(() => URL.revokeObjectURL(url), 4000);
       } else {
         const node = exportRefs.current[selected];
-        if (node) triggerDownload(await toPng(node, opts), `slide-${selected + 1}-${format}.png`);
+        if (node) {
+          await decodeNodeImages(node);
+          await toPng(node, opts);
+          triggerDownload(await toPng(node, opts), `slide-${selected + 1}-${format}.png`);
+        }
       }
     } catch (e) {
       console.error("[studio] export failed", e);
@@ -385,6 +405,22 @@ export function StudioApp() {
                 </div>
                 <label className="block text-xs text-gray-500">Overlay darkness ({Math.round((cur.overlay ?? 0.5) * 100)}%)
                   <input type="range" min={0.2} max={0.8} step={0.05} value={cur.overlay ?? 0.5} onChange={(e) => update(selected, { overlay: parseFloat(e.target.value) })} className="w-full accent-teal-600" />
+                </label>
+                <div>
+                  <span className="text-xs text-gray-500 block mb-1">Fit</span>
+                  <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden w-full">
+                    {(["cover", "contain"] as const).map((fit) => (
+                      <button key={fit} onClick={() => update(selected, { bgFit: fit })}
+                        className={`flex-1 px-2 py-1.5 text-xs font-semibold capitalize ${(cur.bgFit ?? "cover") === fit ? "bg-navy-900 text-white" : "bg-white text-gray-600"}`}>{fit}</button>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-1">{(cur.bgFit ?? "cover") === "cover" ? "Fills the slide, cropping to fit." : "Shows the whole photo (may letterbox)."}</p>
+                </div>
+                <label className="block text-xs text-gray-500">Position X ({Math.round(cur.bgPosX ?? 50)}%)
+                  <input type="range" min={0} max={100} step={1} value={cur.bgPosX ?? 50} onChange={(e) => update(selected, { bgPosX: parseInt(e.target.value) })} className="w-full accent-teal-600" />
+                </label>
+                <label className="block text-xs text-gray-500">Position Y ({Math.round(cur.bgPosY ?? 50)}%)
+                  <input type="range" min={0} max={100} step={1} value={cur.bgPosY ?? 50} onChange={(e) => update(selected, { bgPosY: parseInt(e.target.value) })} className="w-full accent-teal-600" />
                 </label>
               </div>
             ) : (

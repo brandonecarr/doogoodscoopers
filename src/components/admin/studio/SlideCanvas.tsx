@@ -214,7 +214,8 @@ export const SlideCanvas = forwardRef<HTMLDivElement, { slide: Slide; format: Fo
         {photo ? (
           <>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img className="dgs-photobg" src={slide.bgImage} alt="" />
+            <img className="dgs-photobg" src={slide.bgImage} alt=""
+              style={{ objectFit: slide.bgFit ?? "cover", objectPosition: `${slide.bgPosX ?? 50}% ${slide.bgPosY ?? 50}%` }} />
             <div className="dgs-scrim" style={{ background: scrim }} />
           </>
         ) : (

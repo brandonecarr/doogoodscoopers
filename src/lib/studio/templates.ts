@@ -99,6 +99,9 @@ export interface Slide {
   showLogo: boolean; showSwipe: boolean;
   bgImage?: string;   // data URL of an uploaded photo background
   overlay?: number;   // 0.2–0.8 scrim darkness over the photo
+  bgFit?: "cover" | "contain"; // how the photo fills the slide (default cover)
+  bgPosX?: number;    // 0–100 horizontal focal point of the photo (default 50)
+  bgPosY?: number;    // 0–100 vertical focal point of the photo (default 50)
   gradient?: string;  // CSS gradient background (overrides theme bg; photo wins over both)
   textPos?: "top" | "center" | "bottom"; // vertical position of the text block
   fields: Record<string, string | string[] | boolean>;
@@ -126,7 +129,7 @@ export function blankSlide(layout: LayoutId, theme: Theme = "white"): Slide {
 export interface TemplateDef { id: string; name: string; desc: string; tags: string[]; slides: Omit<Slide, "id">[] }
 
 const FOOT = "doogoodscoopers.com  •  (909) 366-3744";
-type Extra = Partial<Pick<Slide, "showSwipe" | "font" | "decor" | "showLogo" | "bgImage" | "overlay" | "textPos" | "gradient">>;
+type Extra = Partial<Pick<Slide, "showSwipe" | "font" | "decor" | "showLogo" | "bgImage" | "overlay" | "bgFit" | "bgPosX" | "bgPosY" | "textPos" | "gradient">>;
 const s = (layout: LayoutId, theme: Theme, font: FontStyle, decor: Decor, fields: Record<string, string | string[] | boolean>, extra?: Extra): Omit<Slide, "id"> =>
   ({ layout, theme, font, decor, showLogo: extra?.showLogo ?? true, showSwipe: extra?.showSwipe ?? true, fields, ...extra });
 
