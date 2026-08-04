@@ -40,6 +40,7 @@ export default function NewCampaignPage() {
   const [statuses, setStatuses] = useState<string[]>([]);
   const [grades, setGrades] = useState<string[]>([]);
   const [withinDays, setWithinDays] = useState<string>("");
+  const [olderThanDays, setOlderThanDays] = useState<string>("");
 
   const [recipients, setRecipients] = useState<Recipient[]>([]);
   const [excluded, setExcluded] = useState<Set<string>>(new Set());
@@ -77,6 +78,7 @@ export default function NewCampaignPage() {
             statuses,
             grades,
             withinDays: withinDays ? parseInt(withinDays, 10) : undefined,
+            olderThanDays: olderThanDays ? parseInt(olderThanDays, 10) : undefined,
           }),
         });
         const data = await res.json();
@@ -86,7 +88,7 @@ export default function NewCampaignPage() {
         setLoadingPreview(false);
       }
     }, 400);
-  }, [leadTypes, statuses, grades, withinDays]);
+  }, [leadTypes, statuses, grades, withinDays, olderThanDays]);
 
   const selected = useMemo(() => recipients.filter((r) => !excluded.has(key(r))), [recipients, excluded]);
 
@@ -102,7 +104,7 @@ export default function NewCampaignPage() {
         body: JSON.stringify({
           name: name.trim(),
           body: body.trim(),
-          audienceFilter: { leadTypes, statuses, grades, withinDays: withinDays || null },
+          audienceFilter: { leadTypes, statuses, grades, withinDays: withinDays || null, olderThanDays: olderThanDays || null },
           recipients: selected.map((r) => ({ leadType: r.leadType, leadId: r.leadId, phone: r.phone, name: r.name })),
         }),
       });
@@ -177,6 +179,18 @@ export default function NewCampaignPage() {
               placeholder="e.g. 14"
               className="w-28 px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
             />
+          </div>
+          <div>
+            <p className="text-sm text-gray-500 mb-2">Older than (days)</p>
+            <input
+              type="number"
+              min={0}
+              value={olderThanDays}
+              onChange={(e) => setOlderThanDays(e.target.value)}
+              placeholder="e.g. 90"
+              className="w-28 px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+            />
+            <p className="text-[11px] text-gray-400 mt-1 max-w-[11rem]">Combine both to target a window (e.g. 30–90 days old).</p>
           </div>
         </div>
       </div>

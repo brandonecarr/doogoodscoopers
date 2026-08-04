@@ -15,6 +15,7 @@ export interface AudienceFilter {
   statuses?: string[]; // LeadStatus values
   grades?: string[]; // "A".."F"
   withinDays?: number; // only leads created within the last N days
+  olderThanDays?: number; // only leads created more than N days ago
 }
 
 export interface Recipient {
@@ -31,9 +32,13 @@ function commonWhere(filters: AudienceFilter) {
   const where: Record<string, unknown> = { archived: false };
   if (filters.statuses?.length) where.status = { in: filters.statuses };
   if (filters.grades?.length) where.grade = { in: filters.grades };
-  if (filters.withinDays && filters.withinDays > 0) {
-    where.createdAt = { gte: new Date(Date.now() - filters.withinDays * 24 * 3600 * 1000) };
-  }
+  // Age bounds combine into a window: withinDays = newer than N days (gte),
+  // olderThanDays = older than N days (lte). Setting both selects a range.
+  const day = 24 * 3600 * 1000;
+  const createdAt: Record<string, Date> = {};
+  if (filters.withinDays && filters.withinDays > 0) createdAt.gte = new Date(Date.now() - filters.withinDays * day);
+  if (filters.olderThanDays && filters.olderThanDays > 0) createdAt.lte = new Date(Date.now() - filters.olderThanDays * day);
+  if (Object.keys(createdAt).length) where.createdAt = createdAt;
   return where;
 }
 
