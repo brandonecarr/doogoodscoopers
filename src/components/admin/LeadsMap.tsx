@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import "mapbox-gl/dist/mapbox-gl.css";
 import type { LeadStatus } from "@/types/leads";
 
@@ -18,6 +18,7 @@ export interface MapPoint {
   lng: number;
   place: string;
   count: number;
+  statusCounts: Record<string, number>;
   leads: MapLead[];
 }
 
@@ -25,6 +26,35 @@ const STATUS_LABEL: Record<LeadStatus, string> = {
   NEW: "New", CONTACTED: "Contacted", NO_ANSWER: "No Answer",
   NOT_INTERESTED: "Lost", WAITING_FOR_SIGNUP: "Quoted", CONVERTED: "Won", PHONE_REVIEW: "Phone Review",
 };
+
+// Pin segment colors — matched to the status badges used across the leads UI.
+const STATUS_COLOR: Record<LeadStatus, string> = {
+  PHONE_REVIEW: "#eab308",       // yellow
+  NEW: "#14b8a6",                // teal
+  CONTACTED: "#3b82f6",          // blue
+  NO_ANSWER: "#f97316",          // orange
+  WAITING_FOR_SIGNUP: "#a855f7", // purple (Quoted)
+  CONVERTED: "#22c55e",          // green (Won)
+  NOT_INTERESTED: "#9ca3af",     // gray (Lost)
+};
+// Draw order for the donut segments (pipeline order).
+const STATUS_ORDER: LeadStatus[] = ["PHONE_REVIEW", "NEW", "CONTACTED", "NO_ANSWER", "WAITING_FOR_SIGNUP", "CONVERTED", "NOT_INTERESTED"];
+
+// Build a conic-gradient ring from a zip's status breakdown.
+function ringGradient(counts: Record<string, number>, total: number): string {
+  if (total <= 0) return "#0d9488";
+  const segs: string[] = [];
+  let acc = 0;
+  for (const s of STATUS_ORDER) {
+    const c = counts[s] || 0;
+    if (!c) continue;
+    const start = (acc / total) * 100;
+    acc += c;
+    const end = (acc / total) * 100;
+    segs.push(`${STATUS_COLOR[s]} ${start}% ${end}%`);
+  }
+  return segs.length ? `conic-gradient(${segs.join(",")})` : "#0d9488";
+}
 
 const detailPath = (l: MapLead) =>
   `/admin/${l.type === "quote" ? "quote-leads" : l.type === "instagram" ? "instagram-leads" : "ad-leads"}/${l.id}`;
@@ -70,6 +100,13 @@ export function LeadsMap({ points, token }: { points: MapPoint[]; token: string 
   const markersRef = useRef<any[]>([]);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Statuses actually present, in pipeline order — drives the legend.
+  const legend = useMemo(() => {
+    const seen = new Set<string>();
+    for (const p of points) for (const s in p.statusCounts) if (p.statusCounts[s]) seen.add(s);
+    return STATUS_ORDER.filter((s) => seen.has(s));
+  }, [points]);
 
   // Create the map once we have a token + container.
   useEffect(() => {
@@ -122,15 +159,27 @@ export function LeadsMap({ points, token }: { points: MapPoint[]; token: string 
 
     for (const p of points) {
       const size = markerSize(p.count, max);
+      const thickness = Math.max(5, Math.round(size * 0.2)); // donut ring width
+
+      // Outer ring = conic gradient of the zip's status mix.
       const el = document.createElement("div");
-      el.textContent = String(p.count);
       Object.assign(el.style, {
         width: `${size}px`, height: `${size}px`, borderRadius: "50%",
-        background: "rgba(13,148,136,0.88)", border: "2px solid #ffffff",
-        boxShadow: "0 1px 4px rgba(0,0,0,0.35)", color: "#ffffff",
-        fontWeight: "700", fontSize: `${Math.max(11, Math.min(16, size / 3))}px`,
-        display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
+        background: ringGradient(p.statusCounts, p.count),
+        boxShadow: "0 1px 4px rgba(0,0,0,0.35)", cursor: "pointer", position: "relative",
       } as Partial<CSSStyleDeclaration>);
+
+      // Inner white hole with the total count.
+      const inner = document.createElement("div");
+      inner.textContent = String(p.count);
+      const innerSize = size - thickness * 2;
+      Object.assign(inner.style, {
+        position: "absolute", inset: `${thickness}px`, borderRadius: "50%",
+        background: "#ffffff", color: "#0f172a", fontWeight: "700",
+        fontSize: `${Math.max(10, Math.min(15, innerSize / 2.3))}px`,
+        display: "flex", alignItems: "center", justifyContent: "center",
+      } as Partial<CSSStyleDeclaration>);
+      el.appendChild(inner);
 
       const popup = new mapboxgl.Popup({ offset: size / 2 + 4, closeButton: true, maxWidth: "280px" }).setHTML(popupHTML(p));
       const marker = new mapboxgl.Marker({ element: el }).setLngLat([p.lng, p.lat]).setPopup(popup).addTo(map);
@@ -161,6 +210,19 @@ export function LeadsMap({ points, token }: { points: MapPoint[]; token: string 
   return (
     <div className="relative">
       <div ref={containerRef} className="w-full rounded-xl overflow-hidden border border-gray-200" style={{ height: "70vh", minHeight: 420 }} />
+      {legend.length > 0 && (
+        <div className="absolute bottom-3 left-3 z-10 bg-white/95 backdrop-blur rounded-lg shadow border border-gray-200 px-3 py-2">
+          <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Status</div>
+          <div className="flex flex-col gap-1">
+            {legend.map((s) => (
+              <div key={s} className="flex items-center gap-1.5 text-xs text-gray-700">
+                <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: STATUS_COLOR[s] }} />
+                {STATUS_LABEL[s]}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       {error && (
         <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-red-600 text-white text-sm px-3 py-1.5 rounded-lg shadow">{error}</div>
       )}

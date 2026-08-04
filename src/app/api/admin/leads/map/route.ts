@@ -21,6 +21,7 @@ interface MapPoint {
   lng: number;
   place: string;
   count: number;
+  statusCounts: Record<string, number>; // full breakdown (not capped)
   leads: MapLead[];
 }
 
@@ -101,10 +102,11 @@ export async function GET(request: NextRequest) {
       if (!c) continue; // couldn't geocode this zip
       let p = byZip.get(zip);
       if (!p) {
-        p = { zip, lat: c.lat, lng: c.lng, place: c.place, count: 0, leads: [] };
+        p = { zip, lat: c.lat, lng: c.lng, place: c.place, count: 0, statusCounts: {}, leads: [] };
         byZip.set(zip, p);
       }
       p.count++;
+      p.statusCounts[l.status] = (p.statusCounts[l.status] || 0) + 1;
       if (p.leads.length < LEADS_PER_POINT) {
         const { id, type, name, status: s, grade, createdAt } = l;
         p.leads.push({ id, type, name, status: s, grade, createdAt });
