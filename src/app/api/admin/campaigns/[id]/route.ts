@@ -31,7 +31,19 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;
-  const { active } = await request.json();
+  const body = await request.json();
+
+  // Activate a draft: go live now. Reset createdAt so trigger-based auto-enroll
+  // starts from activation time (not draft-creation) and doesn't backfill.
+  if (body.activate === true) {
+    const campaign = await prisma.campaign.update({
+      where: { id },
+      data: { active: true, status: "ACTIVE", createdAt: new Date() },
+    });
+    return NextResponse.json({ success: true, campaign });
+  }
+
+  const { active } = body;
   if (typeof active !== "boolean") {
     return NextResponse.json({ error: "active (boolean) required" }, { status: 400 });
   }

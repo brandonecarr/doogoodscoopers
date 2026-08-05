@@ -99,10 +99,16 @@ export default async function CampaignsPage() {
                   {isDrip ? (
                     <>
                       <div className="flex items-center gap-2">
-                        <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${c.active ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"}`}>
-                          {c.active ? "Active" : "Paused"}
-                        </span>
-                        <CampaignPauseToggle campaignId={c.id} active={c.active} />
+                        {c.status === "DRAFT" ? (
+                          <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 text-amber-800">Draft</span>
+                        ) : (
+                          <>
+                            <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${c.active ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"}`}>
+                              {c.active ? "Active" : "Paused"}
+                            </span>
+                            <CampaignPauseToggle campaignId={c.id} active={c.active} />
+                          </>
+                        )}
                       </div>
                       <p className="text-xs text-gray-500">
                         {c.totalRecipients} enrolled · {c.sentCount} sent{c.failedCount ? ` · ${c.failedCount} failed` : ""}

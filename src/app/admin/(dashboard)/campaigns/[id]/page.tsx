@@ -6,6 +6,7 @@ import type { LeadSource } from "@prisma/client";
 import { CampaignPauseToggle } from "@/components/admin/CampaignPauseToggle";
 import { RecipientStopButton } from "@/components/admin/RecipientStopButton";
 import { AddCustomersButton } from "@/components/admin/AddCustomersButton";
+import { CampaignActivateButton } from "@/components/admin/CampaignActivateButton";
 import { loadSendWindow } from "@/lib/send-window";
 
 export const dynamic = "force-dynamic";
@@ -58,6 +59,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
   if (!campaign) notFound();
 
   const isDrip = campaign.type === "DRIP";
+  const isDraft = campaign.status === "DRAFT";
   const { timeZone } = await loadSendWindow();
   const [recipients, messages, sentPerLead] = await Promise.all([
     prisma.campaignRecipient.findMany({ where: { campaignId: id }, orderBy: { createdAt: "desc" }, take: 300 }),
@@ -102,9 +104,13 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
               {isDrip ? "DRIP" : "BLAST"}
             </span>
             {isDrip && (
-              <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${campaign.active ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"}`}>
-                {campaign.active ? "Active" : "Paused"}
-              </span>
+              isDraft ? (
+                <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 text-amber-800">Draft</span>
+              ) : (
+                <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${campaign.active ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"}`}>
+                  {campaign.active ? "Active" : "Paused"}
+                </span>
+              )
             )}
           </div>
           {isDrip && (
@@ -113,7 +119,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
             </p>
           )}
         </div>
-        {isDrip && <CampaignPauseToggle campaignId={campaign.id} active={campaign.active} size="md" />}
+        {isDrip && (isDraft ? <CampaignActivateButton campaignId={campaign.id} /> : <CampaignPauseToggle campaignId={campaign.id} active={campaign.active} size="md" />)}
         <Link
           href={`/admin/campaigns/${campaign.id}/edit`}
           className="flex items-center gap-1.5 px-4 py-2 bg-navy-600 text-white rounded-lg hover:bg-navy-700 transition-colors text-sm font-medium"

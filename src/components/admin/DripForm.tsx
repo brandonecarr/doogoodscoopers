@@ -51,7 +51,7 @@ export function DripForm({ mode, campaignId, initial }: DripFormProps) {
   const [stopOnReply, setStopOnReply] = useState(initial?.stopOnReply ?? true);
   const [steps, setSteps] = useState<DripStep[]>(initial?.steps ?? [{ body: "", delayValue: 0, delayUnit: "days" }]);
   const [templates, setTemplates] = useState<Template[]>([]);
-  const [saving, setSaving] = useState(false);
+  const [saving, setSaving] = useState<null | "draft" | "launch">(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -66,15 +66,19 @@ export function DripForm({ mode, campaignId, initial }: DripFormProps) {
   const addStep = () => setSteps((s) => [...s, { body: "", delayValue: 3, delayUnit: "days" }]);
   const removeStep = (i: number) => setSteps((s) => s.filter((_, idx) => idx !== i));
 
-  const save = async () => {
+  const save = async (asDraft = false) => {
     setError(null);
     if (!name.trim()) return setError("Give the drip a name.");
-    if (leadTypes.length === 0) return setError("Pick at least one trigger lead type.");
-    if (!steps.some((s) => s.body.trim())) return setError("Add at least one message.");
-    setSaving(true);
+    // A draft can be incomplete; a live campaign needs a trigger + a message.
+    if (!asDraft) {
+      if (leadTypes.length === 0) return setError("Pick at least one trigger lead type.");
+      if (!steps.some((s) => s.body.trim())) return setError("Add at least one message.");
+    }
+    setSaving(asDraft ? "draft" : "launch");
     try {
       const payload = {
         type: "drip",
+        draft: asDraft,
         name: name.trim(),
         leadTypes,
         stopOnReply,
@@ -88,12 +92,12 @@ export function DripForm({ mode, campaignId, initial }: DripFormProps) {
         body: JSON.stringify(payload),
       });
       const data = await res.json();
-      if (res.ok) router.push("/admin/campaigns");
+      if (res.ok) router.push(asDraft && data.campaign?.id ? `/admin/campaigns/${data.campaign.id}` : "/admin/campaigns");
       else setError(data.error || "Failed to save drip");
     } catch {
       setError("Failed to save drip");
     } finally {
-      setSaving(false);
+      setSaving(null);
     }
   };
 
@@ -239,14 +243,27 @@ export function DripForm({ mode, campaignId, initial }: DripFormProps) {
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
-      <button
-        onClick={save}
-        disabled={saving}
-        className="flex items-center gap-2 px-5 py-2.5 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 font-medium"
-      >
-        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
-        {saving ? "Saving…" : mode === "edit" ? "Save changes" : "Create drip"}
-      </button>
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          onClick={() => save(false)}
+          disabled={saving !== null}
+          className="flex items-center gap-2 px-5 py-2.5 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 font-medium"
+        >
+          {saving === "launch" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+          {saving === "launch" ? "Saving…" : mode === "edit" ? "Save changes" : "Create & activate"}
+        </button>
+        {mode === "create" && (
+          <button
+            onClick={() => save(true)}
+            disabled={saving !== null}
+            className="flex items-center gap-2 px-5 py-2.5 border border-gray-200 text-navy-900 rounded-lg hover:bg-gray-50 disabled:opacity-50 font-medium"
+          >
+            {saving === "draft" ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+            {saving === "draft" ? "Saving…" : "Save as draft"}
+          </button>
+        )}
+      </div>
+      {mode === "create" && <p className="text-xs text-gray-400 -mt-3">A draft won&apos;t enroll or message anyone until you activate it.</p>}
     </div>
   );
 }

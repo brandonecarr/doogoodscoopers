@@ -23,6 +23,7 @@ interface CreateBody {
   leadTypes?: string[];
   steps?: Array<{ body: string; delayMinutes?: number }>;
   stopOnReply?: boolean;
+  draft?: boolean;
 }
 
 // POST → create a blast (queued recipients) or a drip (trigger + steps; the
@@ -36,21 +37,24 @@ export async function POST(request: Request) {
 
   // ── Drip ──────────────────────────────────────────────────────────────────
   if (b.type === "drip") {
-    if (!b.leadTypes?.length) {
-      return NextResponse.json({ error: "Pick at least one trigger lead type" }, { status: 400 });
-    }
+    const isDraft = b.draft === true;
     const steps = (b.steps || []).filter((s) => s.body?.trim());
-    if (steps.length === 0) return NextResponse.json({ error: "Add at least one message" }, { status: 400 });
+    // A draft can be saved incomplete; a live drip needs a trigger + a message.
+    if (!isDraft) {
+      if (!b.leadTypes?.length) return NextResponse.json({ error: "Pick at least one trigger lead type" }, { status: 400 });
+      if (steps.length === 0) return NextResponse.json({ error: "Add at least one message" }, { status: 400 });
+    }
 
     const campaign = await prisma.campaign.create({
       data: {
         name: b.name.trim(),
-        body: steps[0].body.trim(), // first message, for list display
+        body: steps[0]?.body.trim() || "", // first message, for list display
         type: "DRIP",
-        status: "ACTIVE",
-        active: true,
+        // Draft = parked and inert (the process-drips cron only runs active drips).
+        status: isDraft ? "DRAFT" : "ACTIVE",
+        active: !isDraft,
         stopOnReply: b.stopOnReply !== false,
-        audienceFilter: { leadTypes: b.leadTypes },
+        audienceFilter: { leadTypes: b.leadTypes || [] },
         adminEmail: session.email,
         totalRecipients: 0,
         steps: {
