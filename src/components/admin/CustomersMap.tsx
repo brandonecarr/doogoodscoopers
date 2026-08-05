@@ -76,6 +76,8 @@ export function CustomersMap({ customers, token, uncoded }: { customers: MapCust
   useEffect(() => {
     const map = mapRef.current, mapboxgl = glRef.current;
     if (!ready || !map || !mapboxgl) return;
+    map.resize(); // make sure the canvas is sized before fitBounds projects — a
+                  // 0-size canvas yields NaN bounds and a permanently blank map.
     markersRef.current.forEach((m) => m.remove());
     markersRef.current = [];
     if (customers.length === 0) return;
@@ -109,8 +111,10 @@ export function CustomersMap({ customers, token, uncoded }: { customers: MapCust
   };
 
   return (
-    <div className="relative w-full rounded-2xl overflow-hidden bg-gray-200" style={{ height: "calc(100vh - 210px)", minHeight: 560 }}>
-      <div ref={containerRef} className="absolute inset-0" />
+    <div className="relative w-full">
+      {/* Explicitly-sized, in-flow map div (like the leads map) so Mapbox gets a
+          real height at init — an absolute inset-0 div can init at 0 and render blank. */}
+      <div ref={containerRef} className="w-full rounded-2xl overflow-hidden bg-gray-200" style={{ height: "calc(100vh - 210px)", minHeight: 560 }} />
 
       {!token && (
         <div className="absolute inset-0 flex items-center justify-center text-center p-6 bg-[#0b0f1a]">

@@ -55,10 +55,11 @@ export function CustomerMapView({ customer, token }: { customer: MapCustomer; to
   }, [token, customer.lng, customer.lat]);
 
   return (
-    <div className="relative w-full rounded-2xl overflow-hidden bg-gray-200 flex flex-col lg:block" style={{ height: "calc(100vh - 130px)", minHeight: 560 }}>
-      <div ref={containerRef} className="w-full h-64 lg:h-full lg:absolute lg:inset-0" />
+    <div className="relative w-full">
+      {/* In-flow, explicitly-sized map div so Mapbox gets a real height at init. */}
+      <div ref={containerRef} className="w-full rounded-2xl overflow-hidden bg-gray-200" style={{ height: "calc(100vh - 130px)", minHeight: 560 }} />
       {!token && (
-        <div className="absolute inset-0 flex items-center justify-center text-center p-6 bg-[#0b0f1a]">
+        <div className="absolute inset-0 flex items-center justify-center text-center p-6 bg-[#0b0f1a] rounded-2xl">
           <p className="text-sm text-white/80 max-w-sm">Set <code className="bg-white/10 px-1 rounded">NEXT_PUBLIC_MAPBOX_TOKEN</code> in Vercel to enable the map.</p>
         </div>
       )}
