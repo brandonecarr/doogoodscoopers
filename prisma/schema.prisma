@@ -633,6 +633,8 @@ model SweepandgoCustomer {
   email             String?
   address           String?
   zipCode           String?
+  lat               Float? // geocoded from address for the customer map view
+  lng               Float?
   homePhone         String?
   cellPhone         String?
   subscriptionNames String? // comma-joined, e.g. "2d-1xW,Sanitize w/ Regular Service"

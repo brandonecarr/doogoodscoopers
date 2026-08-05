@@ -170,6 +170,10 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
           </div>
           <p className="text-navy-600 text-sm mt-1">Customer since {fmtDate(customer.startDate ?? customer.firstSeenAt)}</p>
         </div>
+        <Link href={`/admin/customers/${customer.id}/map`}
+          className="inline-flex items-center gap-1.5 px-3 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors text-sm font-medium flex-shrink-0">
+          <MapPin className="w-4 h-4" /> <span className="hidden sm:inline">View on map</span>
+        </Link>
         <div className="w-12 h-12 rounded-xl bg-teal-50 flex items-center justify-center flex-shrink-0">
           <Dog className="w-6 h-6 text-teal-600" />
         </div>

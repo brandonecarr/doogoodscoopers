@@ -45,6 +45,37 @@ async function geocodeZip(zip: string, token: string): Promise<ZipPoint | null> 
   }
 }
 
+/**
+ * Geocode a full street address (for the customer map pin). Falls back to the
+ * zip-code centroid when the address can't be resolved. Returns null only when
+ * nothing at all resolves or Mapbox isn't configured.
+ */
+export async function geocodeAddress(address: string | null | undefined, zip: string | null | undefined): Promise<ZipPoint | null> {
+  const token = mapboxToken();
+  if (!token) return null;
+  const zip5 = normalizeZip(zip);
+  const query = [address?.trim(), zip5, "CA", "USA"].filter(Boolean).join(", ");
+  if (address?.trim()) {
+    const url =
+      `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json` +
+      `?country=US&types=address&limit=1&access_token=${encodeURIComponent(token)}`;
+    try {
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = (await res.json()) as { features?: { center?: [number, number]; place_name?: string }[] };
+        const f = data.features?.[0];
+        if (f?.center && f.center.length >= 2) return { lat: f.center[1], lng: f.center[0], place: f.place_name || "" };
+      }
+    } catch { /* fall through to zip centroid */ }
+  }
+  // Fallback: zip centroid.
+  if (zip5) {
+    const map = await resolveZips([zip5]);
+    return map.get(zip5) ?? null;
+  }
+  return null;
+}
+
 // Small concurrency cap so a batch of new zips doesn't hammer Mapbox at once.
 async function mapLimited<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
   const out: R[] = new Array(items.length);
