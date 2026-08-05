@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Search, Archive, RefreshCw, ArrowUp, ArrowDown, LayoutList, LayoutGrid, Map as MapIcon } from "lucide-react";
+import { Search, Archive, RefreshCw, ArrowUp, ArrowDown, LayoutList, Map as MapIcon } from "lucide-react";
 import type { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { CustomerReviewControl } from "@/components/admin/CustomerReviewControl";
@@ -43,15 +43,9 @@ const SORTS: Record<string, (dir: "asc" | "desc") => Prisma.SweepandgoCustomerOr
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Cust = any;
 
-const REVIEW_COLUMNS = [
-  { key: "NO_REVIEW", label: "Not requested", color: "bg-gray-100 text-gray-700", dot: "bg-gray-400" },
-  { key: "REQUEST_SENT", label: "Requested", color: "bg-blue-100 text-blue-800", dot: "bg-blue-500" },
-  { key: "REVIEW_COMPLETE", label: "Completed", color: "bg-green-100 text-green-800", dot: "bg-green-500" },
-];
-
 export default async function CustomersPage({ searchParams }: PageProps) {
   const { search, sort: sortRaw, dir: dirRaw, view: viewRaw } = await searchParams;
-  const view = viewRaw === "board" || viewRaw === "map" ? viewRaw : "list";
+  const view = viewRaw === "map" ? "map" : "list";
   let sortKey = sortRaw;
   let dirKey = dirRaw;
   if (sortRaw?.includes(":")) { const [s, d] = sortRaw.split(":"); sortKey = s; dirKey = d; }
@@ -161,7 +155,6 @@ export default async function CustomersPage({ searchParams }: PageProps) {
         </div>
         <div className="flex items-center bg-gray-100 rounded-lg p-1">
           {viewBtn("list", "List", LayoutList)}
-          {viewBtn("board", "Board", LayoutGrid)}
           {viewBtn("map", "Map", MapIcon)}
         </div>
       </div>
@@ -211,40 +204,6 @@ export default async function CustomersPage({ searchParams }: PageProps) {
       {/* ── MAP ─────────────────────────────────────────────────────────────── */}
       {view === "map" ? (
         <CustomersMapClient customers={mapCustomers} token={token} uncoded={uncoded} />
-      ) : view === "board" ? (
-        /* ── BOARD (by review status) ─────────────────────────────────────── */
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {REVIEW_COLUMNS.map((col) => {
-            const items = customers.filter((c: Cust) => (c.reviewStatus || "NO_REVIEW") === col.key);
-            return (
-              <div key={col.key} className="bg-gray-50 rounded-xl border border-gray-100 p-3">
-                <div className="flex items-center justify-between px-1 mb-3">
-                  <span className="flex items-center gap-2 text-sm font-semibold text-navy-900">
-                    <span className={`w-2 h-2 rounded-full ${col.dot}`} /> {col.label}
-                  </span>
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${col.color}`}>{items.length}</span>
-                </div>
-                <div className="space-y-2 max-h-[70vh] overflow-y-auto pr-1">
-                  {items.length === 0 ? (
-                    <p className="text-xs text-gray-400 text-center py-6">None</p>
-                  ) : items.map((c: Cust) => (
-                    <div key={c.id} className="bg-white rounded-lg border border-gray-200 p-3 shadow-sm">
-                      <Link href={`/admin/customers/${c.id}`} className="font-medium text-navy-900 hover:text-teal-600 hover:underline text-sm">
-                        {[c.firstName, c.lastName].filter(Boolean).join(" ") || "Unknown"}
-                      </Link>
-                      <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-                        {c.numberOfDogs != null && <span className="text-[11px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded">{c.numberOfDogs} {c.numberOfDogs === 1 ? "dog" : "dogs"}</span>}
-                        {c.cleanupFrequency && <span className="text-[11px] bg-violet-50 text-violet-700 px-1.5 py-0.5 rounded">{c.cleanupFrequency}</span>}
-                      </div>
-                      <p className="text-[11px] text-gray-400 mt-1.5">{c.serviceDays || "—"} · {c.assignedTo || "—"}</p>
-                      <div className="mt-2"><CustomerReviewControl customerId={c.id} value={c.reviewStatus} /></div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
       ) : (
         /* ── LIST (table) ─────────────────────────────────────────────────── */
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
