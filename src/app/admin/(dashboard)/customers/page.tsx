@@ -1,13 +1,16 @@
 import Link from "next/link";
-import { Dog, Search, Archive, RefreshCw, ArrowUp, ArrowDown } from "lucide-react";
+import { Search, Archive, RefreshCw, ArrowUp, ArrowDown, LayoutList, LayoutGrid, Map as MapIcon } from "lucide-react";
 import type { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { CustomerReviewControl } from "@/components/admin/CustomerReviewControl";
+import { CustomersMapClient } from "@/components/admin/CustomersMapClient";
+import type { MapCustomer } from "@/components/admin/CustomerInfoPanels";
+import { geocodeAddress, resolveZips, normalizeZip } from "@/lib/geo/zipgeo";
 
 export const dynamic = "force-dynamic";
 
 interface PageProps {
-  searchParams: Promise<{ search?: string; sort?: string; dir?: string }>;
+  searchParams: Promise<{ search?: string; sort?: string; dir?: string; view?: string }>;
 }
 
 function fmtPhone(raw: string | null) {
@@ -25,7 +28,6 @@ function fmtDate(d: Date | null) {
   return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-// Sort key → Prisma orderBy
 const SORTS: Record<string, (dir: "asc" | "desc") => Prisma.SweepandgoCustomerOrderByWithRelationInput[]> = {
   name:         (d) => [{ lastName: d }, { firstName: d }],
   start:        (d) => [{ startDate: d }, { firstSeenAt: d }],
@@ -38,9 +40,18 @@ const SORTS: Record<string, (dir: "asc" | "desc") => Prisma.SweepandgoCustomerOr
   review:       (d) => [{ reviewStatus: d }],
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Cust = any;
+
+const REVIEW_COLUMNS = [
+  { key: "NO_REVIEW", label: "Not requested", color: "bg-gray-100 text-gray-700", dot: "bg-gray-400" },
+  { key: "REQUEST_SENT", label: "Requested", color: "bg-blue-100 text-blue-800", dot: "bg-blue-500" },
+  { key: "REVIEW_COMPLETE", label: "Completed", color: "bg-green-100 text-green-800", dot: "bg-green-500" },
+];
+
 export default async function CustomersPage({ searchParams }: PageProps) {
-  const { search, sort: sortRaw, dir: dirRaw } = await searchParams;
-  // Headers pass sort + dir separately; the dropdown passes a combined "key:dir".
+  const { search, sort: sortRaw, dir: dirRaw, view: viewRaw } = await searchParams;
+  const view = viewRaw === "board" || viewRaw === "map" ? viewRaw : "list";
   let sortKey = sortRaw;
   let dirKey = dirRaw;
   if (sortRaw?.includes(":")) { const [s, d] = sortRaw.split(":"); sortKey = s; dirKey = d; }
@@ -67,17 +78,60 @@ export default async function CustomersPage({ searchParams }: PageProps) {
   ]);
   const lastSyncedAt = lastSync._max.lastSyncedAt;
 
-  // Build a sortable column header (link that toggles direction).
+  const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+
+  // ── Map view: geocode any missing coords + build the pin data ──────────────
+  let mapCustomers: MapCustomer[] = [];
+  let uncoded = 0;
+  if (view === "map") {
+    const missing = customers.filter((c: Cust) => c.lat == null || c.lng == null).slice(0, 60);
+    // Bounded parallel geocode so first load isn't slow.
+    for (let i = 0; i < missing.length; i += 8) {
+      const chunk = missing.slice(i, i + 8);
+      await Promise.all(chunk.map(async (c: Cust) => {
+        const p = await geocodeAddress(c.address, c.zipCode);
+        if (p) { c.lat = p.lat; c.lng = p.lng; await prisma.sweepandgoCustomer.update({ where: { id: c.id }, data: { lat: p.lat, lng: p.lng } }).catch(() => {}); }
+      }));
+    }
+    const zips = [...new Set(customers.map((c: Cust) => normalizeZip(c.zipCode)).filter(Boolean) as string[])];
+    const zipMap = zips.length ? await resolveZips(zips) : new Map();
+    const located = customers.filter((c: Cust) => c.lat != null && c.lng != null);
+    uncoded = customers.length - located.length;
+    mapCustomers = located.map((c: Cust) => {
+      const zip5 = normalizeZip(c.zipCode);
+      const place = zip5 ? zipMap.get(zip5)?.place || "" : "";
+      const city = place.split(",")[0]?.trim();
+      return {
+        id: c.id,
+        name: [c.firstName, c.lastName].filter(Boolean).join(" ") || "Customer",
+        firstName: c.firstName || "",
+        address: c.address || "",
+        cityLine: city ? `${city}, CA ${zip5}` : zip5 ? `CA ${zip5}` : "",
+        zipCode: zip5 || "",
+        lat: c.lat, lng: c.lng,
+        phone: c.cellPhone || c.homePhone || "",
+        email: c.email || "",
+        numberOfDogs: c.numberOfDogs,
+        cleanupFrequency: c.cleanupFrequency || "",
+        serviceDays: c.serviceDays || "",
+        subscriptionNames: c.subscriptionNames || "",
+        assignedTo: c.assignedTo || "",
+        startDate: (c.startDate ?? c.firstSeenAt)?.toISOString() ?? null,
+        oneTimeClient: c.oneTimeClient,
+      };
+    });
+  }
+
+  // Link helpers that preserve current filters.
   const qs = (params: Record<string, string | undefined>) => {
     const p = new URLSearchParams();
     if (search) p.set("search", search);
     for (const [k, v] of Object.entries(params)) if (v) p.set(k, v);
     return `/admin/customers?${p}`;
   };
+  const viewHref = (v: string) => qs({ view: v === "list" ? undefined : v, sort: sortRaw, dir: dirRaw });
   const renderTh = (label: string, sortKey?: string) => {
-    if (!sortKey) {
-      return <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">{label}</th>;
-    }
+    if (!sortKey) return <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">{label}</th>;
     const active = sort === sortKey;
     const nextDir = active && dir === "asc" ? "desc" : "asc";
     return (
@@ -90,16 +144,25 @@ export default async function CustomersPage({ searchParams }: PageProps) {
     );
   };
 
+  const viewBtn = (v: string, label: string, Icon: typeof LayoutList) => (
+    <Link href={viewHref(v)}
+      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${view === v ? "bg-white text-navy-900 shadow-sm" : "text-gray-500 hover:text-gray-800"}`}>
+      <Icon className="w-4 h-4" /> <span className="hidden sm:inline">{label}</span>
+    </Link>
+  );
+
   return (
     <div className="space-y-6 pb-20 lg:pb-0">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-navy-900">Customers</h1>
           <p className="text-navy-600 mt-1">{totalActive} active Sweep&amp;Go customers</p>
         </div>
-        <div className="w-12 h-12 rounded-xl bg-teal-50 flex items-center justify-center">
-          <Dog className="w-6 h-6 text-teal-600" />
+        <div className="flex items-center bg-gray-100 rounded-lg p-1">
+          {viewBtn("list", "List", LayoutList)}
+          {viewBtn("board", "Board", LayoutGrid)}
+          {viewBtn("map", "Map", MapIcon)}
         </div>
       </div>
 
@@ -119,92 +182,122 @@ export default async function CustomersPage({ searchParams }: PageProps) {
       {/* Search + sort */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
         <form className="flex flex-col sm:flex-row gap-3">
+          {view !== "list" && <input type="hidden" name="view" value={view} />}
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input
-              type="text" name="search" defaultValue={search}
+            <input type="text" name="search" defaultValue={search}
               placeholder="Search by name, address, zip, phone, or email…"
-              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-            />
+              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent" />
           </div>
-          <select
-            name="sort" defaultValue={`${sort}:${dir}`}
-            className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-teal-500"
-          >
-            <option value="name:asc">Name (A–Z)</option>
-            <option value="name:desc">Name (Z–A)</option>
-            <option value="start:asc">Start date (oldest first)</option>
-            <option value="start:desc">Start date (newest first)</option>
-            <option value="address:asc">Address (A–Z)</option>
-            <option value="subscription:asc">Subscription</option>
-            <option value="serviceDay:asc">Service day</option>
-            <option value="frequency:asc">Frequency</option>
-            <option value="tech:asc">Tech</option>
-            <option value="dogs:desc">Dogs (most first)</option>
-            <option value="review:asc">Review status</option>
-          </select>
+          {view === "list" && (
+            <select name="sort" defaultValue={`${sort}:${dir}`} className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-teal-500">
+              <option value="name:asc">Name (A–Z)</option>
+              <option value="name:desc">Name (Z–A)</option>
+              <option value="start:asc">Start date (oldest first)</option>
+              <option value="start:desc">Start date (newest first)</option>
+              <option value="address:asc">Address (A–Z)</option>
+              <option value="subscription:asc">Subscription</option>
+              <option value="serviceDay:asc">Service day</option>
+              <option value="frequency:asc">Frequency</option>
+              <option value="tech:asc">Tech</option>
+              <option value="dogs:desc">Dogs (most first)</option>
+              <option value="review:asc">Review status</option>
+            </select>
+          )}
           <button type="submit" className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors text-sm">Apply</button>
         </form>
-        <p className="text-xs text-gray-400 mt-2">Tip: click a column header to sort, or use the dropdown. Sort by <strong>Start date (oldest first)</strong> for your longest-standing customers.</p>
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-100">
-              <tr>
-                {renderTh("Customer", "name")}
-                {renderTh("Start Date", "start")}
-                {renderTh("Address", "address")}
-                {renderTh("Phone")}
-                {renderTh("Dogs", "dogs")}
-                {renderTh("Subscription", "subscription")}
-                {renderTh("Service Day", "serviceDay")}
-                {renderTh("Frequency", "frequency")}
-                {renderTh("Tech", "tech")}
-                {renderTh("Review", "review")}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {customers.length === 0 ? (
-                <tr>
-                  <td colSpan={10} className="px-6 py-12 text-center text-gray-500">
-                    {search ? "No customers match your search." : "No customers synced yet — the hourly sync will populate this list."}
-                  </td>
-                </tr>
-              ) : (
-                customers.map((c) => (
-                  <tr key={c.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4">
-                      <Link href={`/admin/customers/${c.id}`} className="font-medium text-navy-900 hover:text-teal-600 hover:underline">
+      {/* ── MAP ─────────────────────────────────────────────────────────────── */}
+      {view === "map" ? (
+        <CustomersMapClient customers={mapCustomers} token={token} uncoded={uncoded} />
+      ) : view === "board" ? (
+        /* ── BOARD (by review status) ─────────────────────────────────────── */
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {REVIEW_COLUMNS.map((col) => {
+            const items = customers.filter((c: Cust) => (c.reviewStatus || "NO_REVIEW") === col.key);
+            return (
+              <div key={col.key} className="bg-gray-50 rounded-xl border border-gray-100 p-3">
+                <div className="flex items-center justify-between px-1 mb-3">
+                  <span className="flex items-center gap-2 text-sm font-semibold text-navy-900">
+                    <span className={`w-2 h-2 rounded-full ${col.dot}`} /> {col.label}
+                  </span>
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${col.color}`}>{items.length}</span>
+                </div>
+                <div className="space-y-2 max-h-[70vh] overflow-y-auto pr-1">
+                  {items.length === 0 ? (
+                    <p className="text-xs text-gray-400 text-center py-6">None</p>
+                  ) : items.map((c: Cust) => (
+                    <div key={c.id} className="bg-white rounded-lg border border-gray-200 p-3 shadow-sm">
+                      <Link href={`/admin/customers/${c.id}`} className="font-medium text-navy-900 hover:text-teal-600 hover:underline text-sm">
                         {[c.firstName, c.lastName].filter(Boolean).join(" ") || "Unknown"}
                       </Link>
-                      {c.email && <div className="text-sm text-gray-500">{c.email}</div>}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-700 whitespace-nowrap" suppressHydrationWarning>{fmtDate(c.startDate ?? c.firstSeenAt)}</td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm text-navy-900">{c.address || "-"}</div>
-                      <div className="text-sm text-gray-500">{c.zipCode || ""}</div>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-navy-900 whitespace-nowrap">
-                      {fmtPhone(c.cellPhone) ? <a href={`tel:${c.cellPhone}`} className="hover:text-teal-600">{fmtPhone(c.cellPhone)}</a> : "-"}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-700 whitespace-nowrap">{c.numberOfDogs != null ? `${c.numberOfDogs} ${c.numberOfDogs === 1 ? "dog" : "dogs"}` : "-"}</td>
-                    <td className="px-6 py-4 text-sm text-gray-700">{c.subscriptionNames || "-"}</td>
-                    <td className="px-6 py-4 text-sm text-gray-700 whitespace-nowrap">{c.serviceDays || "-"}</td>
-                    <td className="px-6 py-4 text-sm text-gray-700">{c.cleanupFrequency || "-"}</td>
-                    <td className="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">{c.assignedTo || "-"}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <CustomerReviewControl customerId={c.id} value={c.reviewStatus} />
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                      <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                        {c.numberOfDogs != null && <span className="text-[11px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded">{c.numberOfDogs} {c.numberOfDogs === 1 ? "dog" : "dogs"}</span>}
+                        {c.cleanupFrequency && <span className="text-[11px] bg-violet-50 text-violet-700 px-1.5 py-0.5 rounded">{c.cleanupFrequency}</span>}
+                      </div>
+                      <p className="text-[11px] text-gray-400 mt-1.5">{c.serviceDays || "—"} · {c.assignedTo || "—"}</p>
+                      <div className="mt-2"><CustomerReviewControl customerId={c.id} value={c.reviewStatus} /></div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
-      </div>
+      ) : (
+        /* ── LIST (table) ─────────────────────────────────────────────────── */
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b border-gray-100">
+                <tr>
+                  {renderTh("Customer", "name")}
+                  {renderTh("Start Date", "start")}
+                  {renderTh("Address", "address")}
+                  {renderTh("Phone")}
+                  {renderTh("Dogs", "dogs")}
+                  {renderTh("Subscription", "subscription")}
+                  {renderTh("Service Day", "serviceDay")}
+                  {renderTh("Frequency", "frequency")}
+                  {renderTh("Tech", "tech")}
+                  {renderTh("Review", "review")}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {customers.length === 0 ? (
+                  <tr><td colSpan={10} className="px-6 py-12 text-center text-gray-500">{search ? "No customers match your search." : "No customers synced yet — the hourly sync will populate this list."}</td></tr>
+                ) : (
+                  customers.map((c: Cust) => (
+                    <tr key={c.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-4">
+                        <Link href={`/admin/customers/${c.id}`} className="font-medium text-navy-900 hover:text-teal-600 hover:underline">
+                          {[c.firstName, c.lastName].filter(Boolean).join(" ") || "Unknown"}
+                        </Link>
+                        {c.email && <div className="text-sm text-gray-500">{c.email}</div>}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-700 whitespace-nowrap" suppressHydrationWarning>{fmtDate(c.startDate ?? c.firstSeenAt)}</td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm text-navy-900">{c.address || "-"}</div>
+                        <div className="text-sm text-gray-500">{c.zipCode || ""}</div>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-navy-900 whitespace-nowrap">
+                        {fmtPhone(c.cellPhone) ? <a href={`tel:${c.cellPhone}`} className="hover:text-teal-600">{fmtPhone(c.cellPhone)}</a> : "-"}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-700 whitespace-nowrap">{c.numberOfDogs != null ? `${c.numberOfDogs} ${c.numberOfDogs === 1 ? "dog" : "dogs"}` : "-"}</td>
+                      <td className="px-6 py-4 text-sm text-gray-700">{c.subscriptionNames || "-"}</td>
+                      <td className="px-6 py-4 text-sm text-gray-700 whitespace-nowrap">{c.serviceDays || "-"}</td>
+                      <td className="px-6 py-4 text-sm text-gray-700">{c.cleanupFrequency || "-"}</td>
+                      <td className="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">{c.assignedTo || "-"}</td>
+                      <td className="px-6 py-4 whitespace-nowrap"><CustomerReviewControl customerId={c.id} value={c.reviewStatus} /></td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
