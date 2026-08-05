@@ -4,6 +4,7 @@ import { ArrowLeft, Dog, Mail, Phone, MapPin, Calendar, RefreshCw, Repeat, User,
 import prisma from "@/lib/prisma";
 import { CustomerReviewControl } from "@/components/admin/CustomerReviewControl";
 import { SendReviewRequestButton } from "@/components/admin/SendReviewRequestButton";
+import { AddToReviewCampaign } from "@/components/admin/AddToReviewCampaign";
 import { ArrangeableBoard, type ArrangeableCard } from "@/components/admin/ArrangeableBoard";
 
 export const dynamic = "force-dynamic";
@@ -92,9 +93,10 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
             <h2 className="text-lg font-semibold text-navy-900 flex items-center gap-2">
               <Star className="w-4 h-4 text-amber-400" /> Review
             </h2>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               <CustomerReviewControl customerId={customer.id} value={customer.reviewStatus} size="md" />
               <SendReviewRequestButton customerId={customer.id} hasPhone={!!(customer.cellPhone || customer.homePhone)} />
+              <AddToReviewCampaign customerId={customer.id} reviewStatus={customer.reviewStatus} />
             </div>
           </div>
           <p className="text-xs text-gray-400 mt-2">

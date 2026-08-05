@@ -27,6 +27,8 @@ export interface LeadVars {
   dogs: string;
   /** Just the pluralized noun, "dog" / "dogs". Empty when unknown. */
   dogWord: string;
+  // {{reviewLink}} (Google review link, for review drips) is also provided at
+  // runtime via the index signature below — see getLeadPersonalization.
   [key: string]: string;
 }
 
@@ -38,6 +40,7 @@ export const EMPTY_LEAD_VARS: LeadVars = {
   numberOfDogs: "",
   dogs: "",
   dogWord: "",
+  reviewLink: "",
 };
 
 /**
@@ -76,8 +79,23 @@ function adDogCount(customFields: unknown): string {
   return "";
 }
 
-/** Load the personalization tokens for a single lead. Missing lead → all blank. */
+/** The org's Google "leave a review" link (from settings). Empty if unset. */
+async function getReviewLink(): Promise<string> {
+  const row = await prisma.appSetting.findUnique({ where: { key: "reviews.google.writeUrl" } });
+  return row?.value?.trim() || "";
+}
+
+/**
+ * Load the personalization tokens for a single lead, including {{reviewLink}}
+ * for review drips. Missing lead → all blank.
+ */
 export async function getLeadPersonalization(leadType: LeadSource, leadId: string): Promise<LeadVars> {
+  const [base, reviewLink] = await Promise.all([baseLeadVars(leadType, leadId), getReviewLink()]);
+  base.reviewLink = reviewLink;
+  return base;
+}
+
+async function baseLeadVars(leadType: LeadSource, leadId: string): Promise<LeadVars> {
   switch (leadType) {
     case "QUOTE_FORM": {
       const l = await prisma.quoteLead.findUnique({

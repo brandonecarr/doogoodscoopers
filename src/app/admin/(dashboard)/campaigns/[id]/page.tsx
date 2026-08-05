@@ -5,6 +5,7 @@ import prisma from "@/lib/prisma";
 import type { LeadSource } from "@prisma/client";
 import { CampaignPauseToggle } from "@/components/admin/CampaignPauseToggle";
 import { RecipientStopButton } from "@/components/admin/RecipientStopButton";
+import { AddCustomersButton } from "@/components/admin/AddCustomersButton";
 import { loadSendWindow } from "@/lib/send-window";
 
 export const dynamic = "force-dynamic";
@@ -152,7 +153,10 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
 
       {/* Recipients */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <h2 className="text-lg font-semibold text-navy-900 mb-4">Recipients ({recipients.length})</h2>
+        <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+          <h2 className="text-lg font-semibold text-navy-900">Recipients ({recipients.length})</h2>
+          {isDrip && <AddCustomersButton campaignId={campaign.id} />}
+        </div>
         {recipients.length === 0 ? (
           <p className="text-sm text-gray-500 text-center py-4">
             {isDrip ? "No one enrolled yet — new matching leads will appear here." : "No recipients."}
