@@ -19,6 +19,10 @@ export function CustomersMap({ customers, token, uncoded }: { customers: MapCust
 
   const byId = useMemo(() => new Map(customers.map((c) => [c.id, c])), [customers]);
 
+  // The container height depends on viewport chrome that settles after mount;
+  // resize once it has so the map fills its box instead of half-rendering.
+  useEffect(() => { const t = setTimeout(() => mapRef.current?.resize(), 350); return () => clearTimeout(t); });
+
   useEffect(() => {
     if (!token || !containerRef.current || mapRef.current) return;
     let cancelled = false;
@@ -36,7 +40,7 @@ export function CustomersMap({ customers, token, uncoded }: { customers: MapCust
       mapRef.current = map;
       map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "bottom-right");
       map.on("style.load", () => { try { map.setConfigProperty("basemap", "lightPreset", "day"); } catch {} });
-      map.on("load", () => { if (!cancelled) setReady(true); });
+      map.on("load", () => { if (!cancelled) { setReady(true); map.resize(); } });
     })();
     const onResize = () => mapRef.current?.resize();
     window.addEventListener("resize", onResize);
@@ -60,7 +64,9 @@ export function CustomersMap({ customers, token, uncoded }: { customers: MapCust
     const bounds = new mapboxgl.LngLatBounds();
     for (const c of customers) {
       const el = document.createElement("div");
-      el.style.cssText = "width:34px;height:34px;position:relative;cursor:pointer;filter:drop-shadow(0 3px 5px rgba(0,0,0,.35))";
+      // No position here — Mapbox sets position:absolute on the marker element to
+      // place it by lng/lat; overriding it makes the pins stack in document flow.
+      el.style.cssText = "width:34px;height:34px;cursor:pointer;filter:drop-shadow(0 3px 5px rgba(0,0,0,.35))";
       el.innerHTML = `<div style="width:34px;height:34px;border-radius:50% 50% 50% 6px;transform:rotate(45deg);background:linear-gradient(135deg,#8b5cf6,#6d28d9);display:flex;align-items:center;justify-content:center;border:2px solid #fff"><img src="${pawSvg("#ffffff")}" style="width:16px;height:16px;transform:rotate(-45deg)"/></div>`;
       el.addEventListener("click", (e) => {
         e.stopPropagation();

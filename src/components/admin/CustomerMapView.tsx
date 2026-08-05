@@ -31,7 +31,8 @@ export function CustomerMapView({ customer, token }: { customer: MapCustomer; to
         try { map.setConfigProperty("basemap", "showPointOfInterestLabels", true); } catch {}
       });
       const el = document.createElement("div");
-      el.style.cssText = "width:52px;height:52px;position:relative;filter:drop-shadow(0 6px 10px rgba(0,0,0,.35))";
+      // No position — Mapbox needs position:absolute on the marker element to place it.
+      el.style.cssText = "width:52px;height:52px;filter:drop-shadow(0 6px 10px rgba(0,0,0,.35))";
       el.innerHTML = `<div style="width:52px;height:52px;border-radius:50% 50% 50% 8px;transform:rotate(45deg);background:linear-gradient(135deg,#8b5cf6,#6d28d9);display:flex;align-items:center;justify-content:center;border:3px solid #fff"><img src="${pawSvg("#ffffff")}" style="width:24px;height:24px;transform:rotate(-45deg)"/></div>`;
       new mapboxgl.Marker({ element: el, anchor: "bottom" }).setLngLat([customer.lng, customer.lat]).addTo(map);
     })();
