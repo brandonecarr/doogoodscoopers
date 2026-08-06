@@ -134,10 +134,30 @@ export function AdminTopNav({ email }: { email: string }) {
                 </Link>
               );
             })}
+
+            {/* On mobile there's no "More" menu — the overflow items scroll inline
+                as pills here (hidden on lg, where the dropdown takes over). */}
+            {moreNav.map((item) => {
+              const active = navMatches(pathname, item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="lg:hidden px-[13px] py-[9px] rounded-[12px] text-[13.5px] font-semibold whitespace-nowrap transition-colors"
+                  style={
+                    active
+                      ? { background: "#101014", color: "#fff" }
+                      : { background: "transparent", color: "#5A5A66" }
+                  }
+                >
+                  {item.short}
+                </Link>
+              );
+            })}
           </div>
 
-          {/* More overflow — kept OUTSIDE the scroller so its dropdown isn't clipped by overflow-x. */}
-          <div className="relative flex-none" ref={moreRef}>
+          {/* More overflow — desktop only. On mobile every item is an inline pill above. */}
+          <div className="relative flex-none hidden lg:block" ref={moreRef}>
               <button
                 onClick={() => setMoreOpen((v) => !v)}
                 className="flex items-center gap-1.5 px-[13px] py-[9px] rounded-[12px] text-[13.5px] font-semibold whitespace-nowrap transition-colors"
