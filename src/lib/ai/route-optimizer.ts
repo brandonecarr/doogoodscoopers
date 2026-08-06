@@ -96,8 +96,9 @@ export class RouteOptimizer {
 
     try {
       const response = await this.client.messages.create({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 1024,
+        model: "claude-sonnet-5",
+        thinking: { type: "disabled" },
+        max_tokens: 1400,
         messages: [
           {
             role: "user",
@@ -145,8 +146,9 @@ export class RouteOptimizer {
 
     try {
       const response = await this.client.messages.create({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 2048,
+        model: "claude-sonnet-5",
+        thinking: { type: "disabled" },
+        max_tokens: 2800,
         messages: [
           {
             role: "user",
@@ -192,8 +194,9 @@ export class RouteOptimizer {
 
     try {
       const response = await this.client.messages.create({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 4096,
+        model: "claude-sonnet-5",
+        thinking: { type: "disabled" },
+        max_tokens: 5500,
         messages: [
           {
             role: "user",
