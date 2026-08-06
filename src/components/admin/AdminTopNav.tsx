@@ -115,8 +115,8 @@ export function AdminTopNav({ email }: { email: string }) {
         </Link>
 
         {/* Center nav */}
-        <nav className="flex-1 min-w-0 flex justify-start lg:justify-center">
-          <div className="flex items-center gap-0.5 overflow-x-auto max-w-full p-0.5 scrollbar-hide">
+        <nav className="flex-1 min-w-0 flex items-center justify-start lg:justify-center gap-0.5">
+          <div className="flex items-center gap-0.5 overflow-x-auto min-w-0 p-0.5 scrollbar-hide">
             {primaryNav.map((item) => {
               const active = navMatches(pathname, item.href);
               return (
@@ -134,9 +134,10 @@ export function AdminTopNav({ email }: { email: string }) {
                 </Link>
               );
             })}
+          </div>
 
-            {/* More overflow */}
-            <div className="relative flex-none" ref={moreRef}>
+          {/* More overflow — kept OUTSIDE the scroller so its dropdown isn't clipped by overflow-x. */}
+          <div className="relative flex-none" ref={moreRef}>
               <button
                 onClick={() => setMoreOpen((v) => !v)}
                 className="flex items-center gap-1.5 px-[13px] py-[9px] rounded-[12px] text-[13.5px] font-semibold whitespace-nowrap transition-colors"
@@ -173,7 +174,6 @@ export function AdminTopNav({ email }: { email: string }) {
                 </div>
               )}
             </div>
-          </div>
         </nav>
 
         {/* Right cluster — existing features preserved */}
