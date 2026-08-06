@@ -214,7 +214,7 @@ export default function ReviewsPage() {
   }
 
   const statCard = (label: string, value: string | number, Icon: typeof Star, tint: string) => (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex items-center gap-3">
+    <div className="dgs-card p-4 flex items-center gap-3">
       <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${tint}`}>
         <Icon className="w-4 h-4" />
       </div>
@@ -230,16 +230,16 @@ export default function ReviewsPage() {
   const lastSynced = sources["google.bp.lastSyncedAt"] ? fmtDate(sources["google.bp.lastSyncedAt"]) : null;
 
   return (
-    <div className="space-y-6 pb-20 lg:pb-0">
+    <div className="space-y-3.5 pb-20 lg:pb-0">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-end justify-between gap-3 flex-wrap px-1">
         <div>
-          <h1 className="text-2xl font-bold text-navy-900">Reviews</h1>
-          <p className="text-navy-600 mt-1">Track review requests and their outcomes</p>
+          <h1 className="dgs-title">Reviews</h1>
+          <p className="dgs-sub">Track review requests and their outcomes</p>
         </div>
         <button
           onClick={() => startEdit("new")}
-          className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors text-sm font-medium"
+          className="flex items-center gap-1.5 px-4 py-2 bg-iris text-white rounded-[12px] hover:bg-iris-deep transition-colors text-[13px] font-bold"
         >
           <Plus className="w-4 h-4" />
           Add Review
@@ -247,14 +247,14 @@ export default function ReviewsPage() {
       </div>
 
       {/* Review sources */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+      <div className="dgs-card p-4">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-semibold text-navy-900 flex items-center gap-2">
             <Link2 className="w-4 h-4 text-gray-400" />
             Review sources
           </h2>
           {!editSources && (
-            <button onClick={startEditSources} className="flex items-center gap-1 text-xs text-teal-600 hover:underline">
+            <button onClick={startEditSources} className="flex items-center gap-1 text-xs text-iris-deep hover:underline">
               <Pencil className="w-3.5 h-3.5" /> Edit links
             </button>
           )}
@@ -269,13 +269,13 @@ export default function ReviewsPage() {
                   value={sourceForm[f.key] ?? ""}
                   onChange={(e) => setSourceForm({ ...sourceForm, [f.key]: e.target.value })}
                   placeholder="https://…"
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-iris"
                 />
                 {f.hint && <p className="text-[11px] text-gray-400 mt-1">{f.hint}</p>}
               </div>
             ))}
             <div className="flex items-center gap-2 pt-1">
-              <button onClick={saveSources} disabled={savingSources} className="flex items-center gap-2 px-4 py-1.5 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 text-sm font-medium">
+              <button onClick={saveSources} disabled={savingSources} className="flex items-center gap-2 px-4 py-1.5 bg-iris text-white rounded-lg hover:bg-iris-deep disabled:opacity-50 text-sm font-medium">
                 {savingSources && <Loader2 className="w-4 h-4 animate-spin" />} Save
               </button>
               <button onClick={() => setEditSources(false)} className="px-4 py-1.5 text-sm text-gray-600 hover:bg-gray-50 rounded-lg border border-gray-200">Cancel</button>
@@ -325,7 +325,7 @@ export default function ReviewsPage() {
       )}
 
       {/* Google Business Profile connection */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+      <div className="dgs-card p-4">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0"><Star className="w-4 h-4 text-blue-500" /></div>
@@ -343,7 +343,7 @@ export default function ReviewsPage() {
           <div className="flex items-center gap-2">
             {connectedEmail ? (
               <>
-                <button onClick={syncGoogle} disabled={syncingGoogle} className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 text-sm font-medium">
+                <button onClick={syncGoogle} disabled={syncingGoogle} className="flex items-center gap-1.5 px-3 py-1.5 bg-iris text-white rounded-lg hover:bg-iris-deep disabled:opacity-50 text-sm font-medium">
                   {syncingGoogle ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Sync now
                 </button>
                 <button onClick={disconnectGoogle} className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 text-sm text-gray-600">
@@ -362,14 +362,14 @@ export default function ReviewsPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {statCard("Total", stats.total, MessageSquareQuote, "bg-teal-50 text-teal-600")}
+        {statCard("Total", stats.total, MessageSquareQuote, "bg-iris-soft text-iris-deep")}
         {statCard("Reviewed", stats.completed, CheckCircle2, "bg-green-50 text-green-600")}
         {statCard("Awaiting", stats.requested, Clock, "bg-blue-50 text-blue-600")}
         {statCard("Avg rating", stats.avgRating ?? "—", Star, "bg-amber-50 text-amber-500")}
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+      <div className="dgs-card p-4">
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -377,7 +377,7 @@ export default function ReviewsPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by name, phone, email…"
-              className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 text-sm"
+              className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-iris text-sm"
             />
           </div>
           <div className="relative">
@@ -400,9 +400,9 @@ export default function ReviewsPage() {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="dgs-card overflow-hidden">
         {loading ? (
-          <div className="flex items-center justify-center py-16"><Loader2 className="w-7 h-7 animate-spin text-teal-600" /></div>
+          <div className="flex items-center justify-center py-16"><Loader2 className="w-7 h-7 animate-spin text-iris-deep" /></div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -428,7 +428,7 @@ export default function ReviewsPage() {
                         value={r.status}
                         onChange={(e) => changeStatus(r.id, e.target.value)}
                         title="Change status"
-                        className={`text-xs font-medium rounded-full pl-2.5 pr-6 py-1 border-0 cursor-pointer appearance-none focus:ring-2 focus:ring-teal-500 ${STATUS_STYLES[r.status] || "bg-gray-100 text-gray-600"}`}
+                        className={`text-xs font-medium rounded-full pl-2.5 pr-6 py-1 border-0 cursor-pointer appearance-none focus:ring-2 focus:ring-iris ${STATUS_STYLES[r.status] || "bg-gray-100 text-gray-600"}`}
                       >
                         {STATUS_ORDER.map((s) => (
                           <option key={s} value={s} className="bg-white text-gray-900">{STATUS_LABELS[s]}</option>
@@ -468,16 +468,16 @@ export default function ReviewsPage() {
             <div className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Customer name *</label>
-                <input value={form.customerName} onChange={(e) => setForm({ ...form, customerName: e.target.value })} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500" />
+                <input value={form.customerName} onChange={(e) => setForm({ ...form, customerName: e.target.value })} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-iris" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                  <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500" />
+                  <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-iris" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                  <input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500" />
+                  <input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-iris" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -512,20 +512,20 @@ export default function ReviewsPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Review link</label>
-                <input value={form.reviewUrl} onChange={(e) => setForm({ ...form, reviewUrl: e.target.value })} placeholder="https://…" className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500" />
+                <input value={form.reviewUrl} onChange={(e) => setForm({ ...form, reviewUrl: e.target.value })} placeholder="https://…" className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-iris" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Review text</label>
-                <textarea value={form.reviewText} onChange={(e) => setForm({ ...form, reviewText: e.target.value })} rows={2} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg resize-none focus:ring-2 focus:ring-teal-500" />
+                <textarea value={form.reviewText} onChange={(e) => setForm({ ...form, reviewText: e.target.value })} rows={2} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg resize-none focus:ring-2 focus:ring-iris" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
-                <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg resize-none focus:ring-2 focus:ring-teal-500" />
+                <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg resize-none focus:ring-2 focus:ring-iris" />
               </div>
             </div>
             <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-gray-100">
               <button onClick={() => setEditing(null)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-lg border border-gray-200">Cancel</button>
-              <button onClick={save} disabled={saving || !form.customerName.trim()} className="flex items-center gap-2 px-5 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 text-sm font-medium">
+              <button onClick={save} disabled={saving || !form.customerName.trim()} className="flex items-center gap-2 px-5 py-2 bg-iris text-white rounded-lg hover:bg-iris-deep disabled:opacity-50 text-sm font-medium">
                 {saving && <Loader2 className="w-4 h-4 animate-spin" />}
                 {editing === "new" ? "Add" : "Save"}
               </button>

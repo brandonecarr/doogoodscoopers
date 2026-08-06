@@ -107,7 +107,7 @@ export default async function CommercialDetailPage({ params }: PageProps) {
       id: "property",
       zone: "main",
       node: (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div className="dgs-card p-6">
           <h2 className="text-lg font-semibold text-navy-900 mb-4">Property Information</h2>
           <div className="flex items-center gap-3 mb-4">
             <div className="w-12 h-12 rounded-lg bg-teal-50 flex items-center justify-center">
@@ -136,7 +136,7 @@ export default async function CommercialDetailPage({ params }: PageProps) {
       id: "contact",
       zone: "main",
       node: (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div className="dgs-card p-6">
           <h2 className="text-lg font-semibold text-navy-900 mb-4">Contact Information</h2>
           <div className="grid grid-cols-1 @lg:grid-cols-2 gap-4">
             <div className="flex items-center gap-3">
@@ -184,7 +184,7 @@ export default async function CommercialDetailPage({ params }: PageProps) {
             id: "inquiry",
             zone: "main" as const,
             node: (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+              <div className="dgs-card p-6">
                 <h2 className="text-lg font-semibold text-navy-900 mb-4">
                   <MessageSquare className="w-5 h-5 inline-block mr-2" />
                   Inquiry Details
@@ -254,7 +254,7 @@ export default async function CommercialDetailPage({ params }: PageProps) {
       id: "timeline",
       zone: "side",
       node: (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div className="dgs-card p-6">
           <h2 className="text-lg font-semibold text-navy-900 mb-4">Timeline</h2>
           <div className="space-y-4">
             <div className="flex items-start gap-3">
@@ -305,21 +305,23 @@ export default async function CommercialDetailPage({ params }: PageProps) {
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <Link
-          href="/admin/commercial"
-          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-        >
-          <ArrowLeft className="w-5 h-5 text-gray-600" />
-        </Link>
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold text-navy-900">{lead.propertyName}</h1>
-          <p className="text-navy-600 mt-1">Commercial Inquiry</p>
-        </div>
-        <div className="flex items-center gap-3">
-          {getGradeBadge(lead.grade)}
-          {getStatusBadge(lead.status)}
+      {/* Header — dark hero */}
+      <div className="dgs-hero p-[22px] sm:p-[26px]">
+        <div className="flex items-center gap-4">
+          <Link
+            href="/admin/commercial"
+            className="p-2 rounded-[10px] bg-white/10 hover:bg-white/15 transition-colors flex-shrink-0"
+          >
+            <ArrowLeft className="w-5 h-5 text-white" />
+          </Link>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-[30px] font-extrabold text-white tracking-[-0.03em] leading-none truncate">{lead.propertyName}</h1>
+            <p className="text-[#9C9CB0] text-[12.5px] mt-2">Commercial Inquiry</p>
+          </div>
+          <div className="flex items-center gap-3 flex-shrink-0">
+            {getGradeBadge(lead.grade)}
+            {getStatusBadge(lead.status)}
+          </div>
         </div>
       </div>
 

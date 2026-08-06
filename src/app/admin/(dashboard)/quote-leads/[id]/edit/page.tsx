@@ -36,7 +36,7 @@ export default async function EditQuoteLeadPage({ params }: PageProps) {
           <ArrowLeft className="w-5 h-5 text-gray-600" />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-navy-900">Edit Lead</h1>
+          <h1 className="dgs-title">Edit Lead</h1>
           <p className="text-navy-600 mt-1">
             {lead.firstName} {lead.lastName || ""}
           </p>

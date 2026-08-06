@@ -1,10 +1,23 @@
 import type { Metadata, Viewport } from "next";
-import { Montserrat, Bebas_Neue, Homemade_Apple } from "next/font/google";
+import { Montserrat, Bebas_Neue, Homemade_Apple, Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
 const montserrat = Montserrat({
   subsets: ["latin"],
   variable: "--font-montserrat",
+  display: "swap",
+});
+
+// Admin dashboard typeface (scoped to the .dgs-admin shell in globals.css).
+const plusJakarta = Plus_Jakarta_Sans({
+  subsets: ["latin"],
+  variable: "--font-jakarta",
+  display: "swap",
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-jetbrains",
   display: "swap",
 });
 
@@ -120,7 +133,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${montserrat.variable} ${bebasNeue.variable} ${homemadeApple.variable}`}>
+    <html lang="en" className={`${montserrat.variable} ${bebasNeue.variable} ${homemadeApple.variable} ${plusJakarta.variable} ${jetbrainsMono.variable}`}>
       <head>
         <link rel="icon" href="/favicon.ico" sizes="any" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />

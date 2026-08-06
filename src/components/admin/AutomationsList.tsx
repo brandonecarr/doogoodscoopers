@@ -28,7 +28,7 @@ export default function AutomationsList({ rows }: { rows: Row[] }) {
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 divide-y divide-gray-100">
+    <div className="dgs-card divide-y divide-gray-100">
       {items.map((r) => (
         <div key={r.id} className="flex items-center gap-4 p-4">
           <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${r.active ? "bg-teal-50" : "bg-gray-100"}`}>

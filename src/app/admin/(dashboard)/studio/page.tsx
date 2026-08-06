@@ -7,7 +7,7 @@ export default function StudioPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-bold text-navy-900 flex items-center gap-2">
+        <h1 className="dgs-title flex items-center gap-2">
           <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#008EEF] to-[#00A6D6] flex items-center justify-center">
             <Sparkles className="w-4 h-4 text-white" />
           </span>

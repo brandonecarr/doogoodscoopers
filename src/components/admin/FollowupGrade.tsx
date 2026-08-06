@@ -148,7 +148,7 @@ export function FollowupGrade({
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-6">
+    <div className="dgs-card p-6 space-y-6">
       {/* Followup Scheduling */}
       <div>
         <h3 className="text-lg font-semibold text-navy-900 mb-3 flex items-center gap-2">

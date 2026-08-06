@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Lock, Mail, Loader2, AlertCircle } from "lucide-react";
-import Image from "next/image";
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -41,24 +40,34 @@ export default function AdminLoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-navy-800 to-navy-900 flex items-center justify-center p-4">
+    <div
+      className="dgs-admin min-h-screen flex items-center justify-center p-4"
+      style={{
+        background:
+          "radial-gradient(760px 380px at 50% -8%, rgba(124,92,252,.35), transparent 70%), #0C0C12",
+      }}
+    >
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-md"
       >
-        <div className="bg-white rounded-2xl shadow-2xl p-8">
-          {/* Logo */}
+        <div className="dgs-card p-8" style={{ borderRadius: 28 }}>
+          {/* Brand */}
           <div className="text-center mb-8">
-            <Image
-              src="/logo-light.webp"
-              alt="DooGoodScoopers"
-              width={180}
-              height={60}
-              className="h-12 w-auto mx-auto mb-4"
-            />
-            <h1 className="text-2xl font-bold text-navy-900">Admin Dashboard</h1>
-            <p className="text-navy-600 text-sm mt-1">Sign in to manage leads</p>
+            <span className="inline-flex items-center gap-2.5 mb-5">
+              <span
+                className="w-[38px] h-[38px] rounded-[12px] flex items-center justify-center"
+                style={{ background: "linear-gradient(150deg,#8B6BFF,#6D3EF0)" }}
+              >
+                <span className="w-[15px] h-[15px] rounded-full border-[2.5px] border-white" />
+              </span>
+              <span className="text-[17px] font-extrabold tracking-[-0.02em] text-ink">
+                DooGood<span className="text-iris-link">Scoopers</span>
+              </span>
+            </span>
+            <h1 className="text-[24px] font-extrabold tracking-[-0.02em] text-ink">Admin Dashboard</h1>
+            <p className="text-muted2 text-[13px] mt-1">Sign in to manage leads</p>
           </div>
 
           {/* Error Message */}
@@ -66,7 +75,7 @@ export default function AdminLoginPage() {
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-red-50 border border-red-200 rounded-lg p-3 mb-6 flex items-center gap-2 text-red-700 text-sm"
+              className="bg-red-50 border border-red-200 rounded-[14px] p-3 mb-6 flex items-center gap-2 text-red-700 text-sm"
             >
               <AlertCircle className="w-4 h-4 flex-shrink-0" />
               {error}
@@ -76,35 +85,35 @@ export default function AdminLoginPage() {
           {/* Login Form */}
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="block text-sm font-medium text-navy-700 mb-1.5">
+              <label className="block text-[13px] font-semibold text-bodytext mb-1.5">
                 Email
               </label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-navy-400" />
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted" />
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   placeholder="admin@doogoodscoopers.com"
-                  className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-200 focus:border-teal-400 focus:ring-2 focus:ring-teal-100 outline-none transition-all"
+                  className="w-full pl-10 pr-4 py-3 rounded-[14px] border border-hair focus:border-iris focus:ring-2 focus:ring-iris-soft outline-none transition-all"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-navy-700 mb-1.5">
+              <label className="block text-[13px] font-semibold text-bodytext mb-1.5">
                 Password
               </label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-navy-400" />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted" />
                 <input
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   placeholder="Enter your password"
-                  className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-200 focus:border-teal-400 focus:ring-2 focus:ring-teal-100 outline-none transition-all"
+                  className="w-full pl-10 pr-4 py-3 rounded-[14px] border border-hair focus:border-iris focus:ring-2 focus:ring-iris-soft outline-none transition-all"
                 />
               </div>
             </div>
@@ -112,7 +121,8 @@ export default function AdminLoginPage() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full py-3 bg-gradient-to-r from-teal-400 to-teal-500 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full py-3 text-white font-bold rounded-[14px] shadow-lg hover:brightness-105 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              style={{ background: "linear-gradient(150deg,#8B6BFF,#6D3EF0)" }}
             >
               {isLoading ? (
                 <>
@@ -126,7 +136,7 @@ export default function AdminLoginPage() {
           </form>
         </div>
 
-        <p className="text-center text-white/60 text-sm mt-6">
+        <p className="text-center text-white/50 text-sm mt-6">
           DooGoodScoopers Admin Portal
         </p>
       </motion.div>

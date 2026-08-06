@@ -49,7 +49,7 @@ export default async function ArchivedCustomersPage({ searchParams }: PageProps)
           <ArrowLeft className="w-5 h-5 text-gray-600" />
         </Link>
         <div className="flex-1">
-          <h1 className="text-2xl font-bold text-navy-900">Former Customers</h1>
+          <h1 className="dgs-title">Former Customers</h1>
           <p className="text-navy-600 mt-1">{customers.length} customers no longer active in Sweep&amp;Go</p>
         </div>
         <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center">
@@ -66,7 +66,7 @@ export default async function ArchivedCustomersPage({ searchParams }: PageProps)
       </div>
 
       {/* Search */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+      <div className="dgs-card p-4">
         <form className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
           <input
@@ -80,7 +80,7 @@ export default async function ArchivedCustomersPage({ searchParams }: PageProps)
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="dgs-card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-100">

@@ -126,7 +126,7 @@ export default function QuoteLeadsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-navy-900">
+          <h1 className="dgs-title">
             {showArchived ? "Archived Leads" : "Quote Leads"}
           </h1>
           <p className="text-navy-600 mt-1">{total} {showArchived ? "archived" : "active"} leads</p>
@@ -159,7 +159,7 @@ export default function QuoteLeadsPage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+      <div className="dgs-card p-4">
         <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-4">
           {/* Search */}
           <div className="flex-1 relative">
@@ -201,7 +201,7 @@ export default function QuoteLeadsPage() {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="dgs-card overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-teal-600" />

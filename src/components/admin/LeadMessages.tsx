@@ -119,7 +119,7 @@ export function LeadMessages({ leadId, leadType, phone, initialMessages, optedOu
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+    <div className="dgs-card p-6">
       <div className="flex items-center gap-2 mb-4">
         <MessageSquare className="w-5 h-5 text-teal-600" />
         <h2 className="text-lg font-semibold text-navy-900">Messages</h2>

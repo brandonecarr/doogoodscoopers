@@ -155,13 +155,13 @@ export default function NewEmailPage() {
         <Link href="/admin/email" className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
           <ArrowLeft className="w-5 h-5 text-gray-600" />
         </Link>
-        <h1 className="text-2xl font-bold text-navy-900">New Email</h1>
+        <h1 className="dgs-title">New Email</h1>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Compose */}
         <div className="space-y-4">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+          <div className="dgs-card p-6 space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Internal name</label>
               <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. July newsletter" className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500" />
@@ -205,7 +205,7 @@ export default function NewEmailPage() {
           </div>
 
           {/* Audience */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-3">
+          <div className="dgs-card p-6 space-y-3">
             <div className="flex items-center gap-2">
               <Users className="w-4 h-4 text-gray-400" />
               <h2 className="text-sm font-semibold text-navy-900">Audience</h2>
@@ -286,13 +286,13 @@ export default function NewEmailPage() {
         {/* Preview + actions */}
         <div className="space-y-4">
           {showPreview && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3">
+            <div className="dgs-card p-3">
               <p className="text-xs text-gray-400 px-2 pb-2">Preview</p>
               <iframe title="preview" className="w-full h-[420px] rounded-lg border border-gray-100 bg-white" srcDoc={html.replace(/\{\{\s*firstName\s*\}\}/g, "Jordan")} />
             </div>
           )}
 
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+          <div className="dgs-card p-6 space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Send a test</label>
               <div className="flex gap-2">

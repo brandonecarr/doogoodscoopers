@@ -79,7 +79,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
   const trigger = ((campaign.audienceFilter as { leadTypes?: string[] } | null)?.leadTypes) || [];
 
   const stat = (label: string, value: number | string, Icon: typeof Users) => (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex items-center gap-3">
+    <div className="dgs-card p-4 flex items-center gap-3">
       <div className="w-9 h-9 rounded-lg bg-teal-50 flex items-center justify-center flex-shrink-0">
         <Icon className="w-4 h-4 text-teal-600" />
       </div>
@@ -92,41 +92,43 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
 
   return (
     <div className="space-y-6 pb-20 lg:pb-0">
-      {/* Header */}
-      <div className="flex items-start gap-3">
-        <Link href="/admin/campaigns" className="p-2 hover:bg-gray-100 rounded-lg transition-colors mt-0.5">
-          <ArrowLeft className="w-5 h-5 text-gray-600" />
-        </Link>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-2xl font-bold text-navy-900 truncate">{campaign.name}</h1>
-            <span className={`px-1.5 py-0.5 text-[10px] rounded ${isDrip ? "bg-purple-100 text-purple-700" : "bg-gray-100 text-gray-600"}`}>
-              {isDrip ? "DRIP" : "BLAST"}
-            </span>
+      {/* Header — dark hero */}
+      <div className="dgs-hero p-[22px] sm:p-[26px]">
+        <div className="flex items-start gap-3">
+          <Link href="/admin/campaigns" className="p-2 rounded-[10px] bg-white/10 hover:bg-white/15 transition-colors mt-0.5 flex-shrink-0">
+            <ArrowLeft className="w-5 h-5 text-white" />
+          </Link>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-[30px] font-extrabold text-white tracking-[-0.03em] leading-none truncate">{campaign.name}</h1>
+              <span className={`px-1.5 py-0.5 text-[10px] rounded ${isDrip ? "bg-purple-100 text-purple-700" : "bg-white/15 text-white/80"}`}>
+                {isDrip ? "DRIP" : "BLAST"}
+              </span>
+              {isDrip && (
+                isDraft ? (
+                  <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 text-amber-800">Draft</span>
+                ) : (
+                  <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${campaign.active ? "bg-green-100 text-green-800" : "bg-white/15 text-white/80"}`}>
+                    {campaign.active ? "Active" : "Paused"}
+                  </span>
+                )
+              )}
+            </div>
             {isDrip && (
-              isDraft ? (
-                <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 text-amber-800">Draft</span>
-              ) : (
-                <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${campaign.active ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"}`}>
-                  {campaign.active ? "Active" : "Paused"}
-                </span>
-              )
+              <p className="text-[#9C9CB0] text-[12.5px] mt-2">
+                Trigger: {trigger.join(", ") || "—"} · stops on reply: {campaign.stopOnReply ? "yes" : "no"}
+              </p>
             )}
           </div>
-          {isDrip && (
-            <p className="text-navy-600 text-sm mt-1">
-              Trigger: {trigger.join(", ") || "—"} · stops on reply: {campaign.stopOnReply ? "yes" : "no"}
-            </p>
-          )}
+          {isDrip && (isDraft ? <CampaignActivateButton campaignId={campaign.id} /> : <CampaignPauseToggle campaignId={campaign.id} active={campaign.active} size="md" />)}
+          <Link
+            href={`/admin/campaigns/${campaign.id}/edit`}
+            className="flex items-center gap-1.5 px-4 py-2 bg-white/10 text-white rounded-[12px] hover:bg-white/15 transition-colors text-sm font-semibold flex-shrink-0"
+          >
+            <Pencil className="w-4 h-4" />
+            Edit
+          </Link>
         </div>
-        {isDrip && (isDraft ? <CampaignActivateButton campaignId={campaign.id} /> : <CampaignPauseToggle campaignId={campaign.id} active={campaign.active} size="md" />)}
-        <Link
-          href={`/admin/campaigns/${campaign.id}/edit`}
-          className="flex items-center gap-1.5 px-4 py-2 bg-navy-600 text-white rounded-lg hover:bg-navy-700 transition-colors text-sm font-medium"
-        >
-          <Pencil className="w-4 h-4" />
-          Edit
-        </Link>
       </div>
 
       {/* Stats */}
@@ -141,7 +143,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
 
       {/* Sequence (drip) */}
       {isDrip && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div className="dgs-card p-6">
           <h2 className="text-lg font-semibold text-navy-900 mb-3">Sequence ({totalSteps} messages)</h2>
           <ol className="space-y-2">
             {campaign.steps.map((s, i) => (
@@ -158,7 +160,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
       )}
 
       {/* Recipients */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+      <div className="dgs-card p-6">
         <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
           <h2 className="text-lg font-semibold text-navy-900">Recipients ({recipients.length})</h2>
           {isDrip && <AddCustomersButton campaignId={campaign.id} />}
@@ -241,7 +243,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
       </div>
 
       {/* Message log */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+      <div className="dgs-card p-6">
         <h2 className="text-lg font-semibold text-navy-900 mb-4 flex items-center gap-2">
           <Clock className="w-4 h-4 text-gray-400" />
           Message log

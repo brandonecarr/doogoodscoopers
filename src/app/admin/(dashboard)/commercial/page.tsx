@@ -93,35 +93,35 @@ export default async function CommercialPage({ searchParams }: PageProps) {
   const totalPages = Math.ceil(total / pageSize);
 
   return (
-    <div className="space-y-6 pb-20 lg:pb-0">
+    <div className="space-y-3.5 pb-20 lg:pb-0">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-end justify-between gap-3 flex-wrap px-1">
         <div>
-          <h1 className="text-2xl font-bold text-navy-900">
+          <h1 className="dgs-title">
             {showArchived ? "Archived Inquiries" : "Commercial Inquiries"}
           </h1>
-          <p className="text-navy-600 mt-1">{total} {showArchived ? "archived" : "total"} inquiries</p>
+          <p className="dgs-sub">{total} {showArchived ? "archived" : "total"} inquiries</p>
         </div>
         <div className="flex items-center gap-3">
           <Link
             href={showArchived ? "/admin/commercial" : "/admin/commercial?archived=true"}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-[12px] text-sm font-semibold transition-colors ${
               showArchived
-                ? "bg-teal-600 text-white hover:bg-teal-700"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                ? "bg-iris text-white hover:bg-iris-deep"
+                : "bg-white text-bodytext hover:bg-surface2 border border-hair"
             }`}
           >
             <Archive className="w-4 h-4" />
             {showArchived ? "View Active" : "View Archived"}
           </Link>
-          <div className="w-12 h-12 rounded-xl bg-teal-50 flex items-center justify-center">
-            <Building2 className="w-6 h-6 text-teal-600" />
+          <div className="w-11 h-11 rounded-[13px] flex items-center justify-center" style={{ background: "linear-gradient(150deg,#9BE7C0,#12A150)" }}>
+            <Building2 className="w-[22px] h-[22px] text-white" />
           </div>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+      <div className="dgs-card p-4">
         <form className="flex flex-col sm:flex-row gap-4">
           {/* Search */}
           <div className="flex-1 relative">
@@ -163,7 +163,7 @@ export default async function CommercialPage({ searchParams }: PageProps) {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="dgs-card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-100">

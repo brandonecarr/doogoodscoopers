@@ -248,7 +248,7 @@ export function LeadsMap({ points, token }: { points: MapPoint[]; token: string 
 
   if (!token) {
     return (
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
+      <div className="dgs-card p-8 text-center">
         <p className="text-navy-900 font-semibold">Map needs a Mapbox token</p>
         <p className="text-sm text-gray-500 mt-2 max-w-md mx-auto">
           Add a free Mapbox access token as <code className="bg-gray-100 px-1 rounded">NEXT_PUBLIC_MAPBOX_TOKEN</code> in your

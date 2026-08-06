@@ -85,7 +85,7 @@ export default function EmailAutomationForm({ automationId }: { automationId?: s
         <h1 className="text-2xl font-bold text-navy-900">{isNew ? "New Automation" : "Edit Automation"}</h1>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+      <div className="dgs-card p-6 space-y-4">
         <h2 className="text-lg font-semibold text-navy-900">1. Trigger</h2>
         <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Automation name (internal)" className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500" />
         <div>
@@ -102,7 +102,7 @@ export default function EmailAutomationForm({ automationId }: { automationId?: s
         </label>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+      <div className="dgs-card p-6 space-y-4">
         <h2 className="text-lg font-semibold text-navy-900">2. Email sequence</h2>
         {steps.map((s, i) => (
           <div key={i} className="border border-gray-100 rounded-lg p-4 space-y-3">

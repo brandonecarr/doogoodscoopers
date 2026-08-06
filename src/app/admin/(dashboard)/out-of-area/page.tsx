@@ -93,7 +93,7 @@ export default async function OutOfAreaPage({ searchParams }: PageProps) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-navy-900">Out of Area Leads</h1>
+          <h1 className="dgs-title">Out of Area Leads</h1>
           <p className="text-navy-600 mt-1">{total} total leads</p>
         </div>
         <div className="w-12 h-12 rounded-xl bg-amber-50 flex items-center justify-center">
@@ -102,7 +102,7 @@ export default async function OutOfAreaPage({ searchParams }: PageProps) {
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+      <div className="dgs-card p-4">
         <form className="flex flex-col sm:flex-row gap-4">
           {/* Search */}
           <div className="flex-1 relative">
@@ -144,7 +144,7 @@ export default async function OutOfAreaPage({ searchParams }: PageProps) {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="dgs-card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-100">

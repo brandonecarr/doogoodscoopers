@@ -49,12 +49,12 @@ function audienceSummary(filter: any): string {
 function Stat({ icon, label, value, sub, tone = "teal" }: { icon: React.ReactNode; label: string; value: string; sub?: string; tone?: string }) {
   const tones: Record<string, string> = { teal: "text-teal-600 bg-teal-50", green: "text-green-600 bg-green-50", blue: "text-blue-600 bg-blue-50", amber: "text-amber-600 bg-amber-50", red: "text-red-600 bg-red-50", gray: "text-gray-500 bg-gray-100" };
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+    <div className="dgs-card p-4">
       <div className="flex items-center gap-2 mb-2">
         <span className={`w-7 h-7 rounded-lg flex items-center justify-center ${tones[tone]}`}>{icon}</span>
         <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">{label}</span>
       </div>
-      <p className="text-2xl font-bold text-navy-900 leading-none">{value}</p>
+      <p className="dgs-title leading-none">{value}</p>
       {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
     </div>
   );
@@ -85,7 +85,7 @@ export default async function EmailCampaignDetail({ params }: { params: Promise<
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold text-navy-900 truncate">{c.name}</h1>
+            <h1 className="dgs-title truncate">{c.name}</h1>
             <span className={`px-2 py-0.5 text-[11px] rounded ${STATUS_STYLES[c.status] || "bg-gray-100 text-gray-600"}`}>{c.status}</span>
           </div>
           <p className="text-navy-600 text-sm mt-1">{c.subject}</p>
@@ -94,7 +94,7 @@ export default async function EmailCampaignDetail({ params }: { params: Promise<
       </div>
 
       {/* Meta */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+      <div className="dgs-card p-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
         <div><p className="text-xs text-gray-400">From</p><p className="text-navy-900">{c.fromName ? `${c.fromName} ` : ""}{c.fromEmail ? `<${c.fromEmail}>` : "default sender"}</p></div>
         <div><p className="text-xs text-gray-400">Reply-to</p><p className="text-navy-900">{c.replyTo || "—"}</p></div>
         <div><p className="text-xs text-gray-400">Created</p><p className="text-navy-900" suppressHydrationWarning>{fmt(c.createdAt)}</p></div>
@@ -115,7 +115,7 @@ export default async function EmailCampaignDetail({ params }: { params: Promise<
       </div>
 
       {/* Recipient breakdown */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="dgs-card overflow-hidden">
         <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
           <h2 className="text-sm font-semibold text-navy-900">Recipients</h2>
           <span className="text-xs text-gray-400">{recipients.length < totalRecipients ? `showing ${recipients.length} of ${totalRecipients}` : `${totalRecipients} total`}</span>
@@ -159,7 +159,7 @@ export default async function EmailCampaignDetail({ params }: { params: Promise<
       </div>
 
       {/* Email preview */}
-      <details className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <details className="dgs-card overflow-hidden">
         <summary className="px-4 py-3 cursor-pointer text-sm font-semibold text-navy-900 select-none">Email preview</summary>
         <div className="border-t border-gray-100 bg-gray-50 p-4">
           <iframe title="Email preview" srcDoc={c.html} className="w-full h-[600px] bg-white rounded-lg border border-gray-200" />

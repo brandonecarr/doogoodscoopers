@@ -74,7 +74,7 @@ export default function TemplatesPage() {
             <ArrowLeft className="w-5 h-5 text-gray-600" />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-navy-900">Message Templates</h1>
+            <h1 className="dgs-title">Message Templates</h1>
             <p className="text-navy-600 text-sm mt-1">Reusable texts for lead replies and campaigns.</p>
           </div>
         </div>
@@ -90,7 +90,7 @@ export default function TemplatesPage() {
       </div>
 
       {editing !== null && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-3">
+        <div className="dgs-card p-6 space-y-3">
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -120,14 +120,14 @@ export default function TemplatesPage() {
       )}
 
       {templates.length === 0 && editing === null ? (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
+        <div className="dgs-card p-12 text-center">
           <MessageSquare className="w-10 h-10 text-gray-300 mx-auto mb-3" />
           <p className="text-gray-500">No templates yet.</p>
         </div>
       ) : (
         <div className="space-y-3">
           {templates.map((t) => (
-            <div key={t.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex items-start gap-4">
+            <div key={t.id} className="dgs-card p-4 flex items-start gap-4">
               <div className="flex-1 min-w-0">
                 <p className="font-medium text-navy-900">{t.name}</p>
                 <p className="text-sm text-gray-600 mt-1 whitespace-pre-wrap">{t.body}</p>

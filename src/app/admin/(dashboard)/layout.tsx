@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { AdminSidebar } from "@/components/admin/AdminSidebar";
-import { AdminHeader } from "@/components/admin/AdminHeader";
+import { AdminTopNav } from "@/components/admin/AdminTopNav";
 import { AdminPushProvider } from "@/components/admin/AdminPushProvider";
 
 export default async function AdminDashboardLayout({
@@ -16,14 +15,11 @@ export default async function AdminDashboardLayout({
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="dgs-admin min-h-screen">
       <AdminPushProvider />
-      <AdminSidebar />
-      <div className="lg:pl-64">
-        <AdminHeader email={session.email} />
-        <main className="py-6 px-4 sm:px-6 lg:px-8">
-          {children}
-        </main>
+      <div className="mx-auto max-w-[1600px] px-3 sm:px-[18px] pt-[10px] sm:pt-[18px] pb-24 lg:pb-10">
+        <AdminTopNav email={session.email} />
+        <main>{children}</main>
       </div>
     </div>
   );

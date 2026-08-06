@@ -107,7 +107,7 @@ export function LeadForm({ lead, mode }: LeadFormProps) {
       )}
 
       {/* Contact Information */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+      <div className="dgs-card p-6">
         <h2 className="text-lg font-semibold text-navy-900 mb-4">Contact Information</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
@@ -164,7 +164,7 @@ export function LeadForm({ lead, mode }: LeadFormProps) {
       </div>
 
       {/* Address Information */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+      <div className="dgs-card p-6">
         <h2 className="text-lg font-semibold text-navy-900 mb-4">Address Information</h2>
         <div className="grid grid-cols-1 gap-4">
           <div>
@@ -210,7 +210,7 @@ export function LeadForm({ lead, mode }: LeadFormProps) {
       </div>
 
       {/* Service Details */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+      <div className="dgs-card p-6">
         <h2 className="text-lg font-semibold text-navy-900 mb-4">Service Details</h2>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
@@ -298,7 +298,7 @@ export function LeadForm({ lead, mode }: LeadFormProps) {
       </div>
 
       {/* Dogs Information */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+      <div className="dgs-card p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-navy-900">Dogs Information</h2>
           <button
@@ -367,7 +367,7 @@ export function LeadForm({ lead, mode }: LeadFormProps) {
       </div>
 
       {/* Status & Notes */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+      <div className="dgs-card p-6">
         <h2 className="text-lg font-semibold text-navy-900 mb-4">Status & Notes</h2>
         <div className="space-y-4">
           <div>

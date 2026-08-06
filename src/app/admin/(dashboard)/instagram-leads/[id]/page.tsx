@@ -48,34 +48,36 @@ export default async function InstagramLeadPage({ params }: { params: Promise<{ 
     || (media as { media_url?: string } | null)?.media_url;
   const likeCount = (comment as { like_count?: number } | null)?.like_count;
 
-  const card = "bg-white rounded-xl shadow-sm border border-gray-100 p-5";
+  const card = "dgs-card p-5";
   const labelCls = "text-xs font-semibold text-gray-500 uppercase tracking-wide";
 
   return (
     <div className="space-y-6 pb-20 lg:pb-6">
-      {/* Header */}
-      <div className="flex items-start gap-3">
-        <Link href="/admin/leads" className="p-2 hover:bg-gray-100 rounded-lg mt-0.5">
-          <ArrowLeft className="w-5 h-5 text-gray-600" />
-        </Link>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#f58529] via-[#dd2a7b] to-[#8134af] flex items-center justify-center flex-shrink-0">
-              <Instagram className="w-4 h-4 text-white" />
-            </span>
-            <h1 className="text-2xl font-bold text-navy-900 truncate">{lead.username ? `@${lead.username}` : "Instagram lead"}</h1>
-            <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${STATUS_STYLE[lead.status] || "bg-gray-100 text-gray-600"}`}>
-              {lead.status.replace(/_/g, " ")}
-            </span>
-            {lead.convertedQuoteLeadId && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-green-50 text-green-700">
-                <CheckCircle2 className="w-3.5 h-3.5" /> Converted
+      {/* Header — dark hero */}
+      <div className="dgs-hero p-[22px] sm:p-[26px]">
+        <div className="flex items-start gap-3">
+          <Link href="/admin/leads" className="p-2 rounded-[10px] bg-white/10 hover:bg-white/15 transition-colors mt-0.5 flex-shrink-0">
+            <ArrowLeft className="w-5 h-5 text-white" />
+          </Link>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#f58529] via-[#dd2a7b] to-[#8134af] flex items-center justify-center flex-shrink-0">
+                <Instagram className="w-4 h-4 text-white" />
               </span>
-            )}
+              <h1 className="text-[30px] font-extrabold text-white tracking-[-0.03em] leading-none truncate">{lead.username ? `@${lead.username}` : "Instagram lead"}</h1>
+              <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${STATUS_STYLE[lead.status] || "bg-gray-100 text-gray-600"}`}>
+                {lead.status.replace(/_/g, " ")}
+              </span>
+              {lead.convertedQuoteLeadId && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-green-50 text-green-700">
+                  <CheckCircle2 className="w-3.5 h-3.5" /> Converted
+                </span>
+              )}
+            </div>
+            <p className="text-[#9C9CB0] text-[12.5px] mt-2">
+              First seen {fmt(lead.createdAt, timeZone)} · {lead.commentCount} matching {lead.commentCount === 1 ? "comment" : "comments"}
+            </p>
           </div>
-          <p className="text-navy-600 text-sm mt-1">
-            First seen {fmt(lead.createdAt, timeZone)} · {lead.commentCount} matching {lead.commentCount === 1 ? "comment" : "comments"}
-          </p>
         </div>
       </div>
 

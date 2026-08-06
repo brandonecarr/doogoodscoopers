@@ -140,50 +140,50 @@ export default async function CustomersPage({ searchParams }: PageProps) {
 
   const viewBtn = (v: string, label: string, Icon: typeof LayoutList) => (
     <Link href={viewHref(v)}
-      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${view === v ? "bg-white text-navy-900 shadow-sm" : "text-gray-500 hover:text-gray-800"}`}>
+      className={`flex items-center gap-1.5 px-3.5 py-2 rounded-[9px] text-[13px] font-semibold transition-colors ${view === v ? "bg-ink text-white shadow-sm" : "text-muted hover:text-ink"}`}>
       <Icon className="w-4 h-4" /> <span className="hidden sm:inline">{label}</span>
     </Link>
   );
 
   return (
-    <div className="space-y-6 pb-20 lg:pb-0">
+    <div className="space-y-3.5 pb-20 lg:pb-0">
       {/* Header */}
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-end justify-between gap-3 flex-wrap px-1">
         <div>
-          <h1 className="text-2xl font-bold text-navy-900">Customers</h1>
-          <p className="text-navy-600 mt-1">{totalActive} active Sweep&amp;Go customers</p>
+          <h1 className="dgs-title">Customers</h1>
+          <p className="dgs-sub">{totalActive} active Sweep&amp;Go customers</p>
         </div>
-        <div className="flex items-center bg-gray-100 rounded-lg p-1">
+        <div className="flex items-center bg-white rounded-[12px] p-1 border border-hair">
           {viewBtn("list", "List", LayoutList)}
           {viewBtn("map", "Map", MapIcon)}
         </div>
       </div>
 
       {/* Source / read-only note */}
-      <div className="bg-teal-50 border border-teal-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center gap-2 sm:justify-between">
-        <p className="text-sm text-teal-900 flex items-center gap-2">
-          <RefreshCw className="w-4 h-4 flex-shrink-0" />
+      <div className="dgs-card p-4 flex flex-col sm:flex-row sm:items-center gap-2 sm:justify-between" style={{ background: "#F7F5FF" }}>
+        <p className="text-[13px] text-bodytext flex items-center gap-2">
+          <RefreshCw className="w-4 h-4 flex-shrink-0 text-iris-deep" />
           Live mirror of your active Sweep&amp;Go customers — refreshes hourly. Read-only here; changes never affect Sweep&amp;Go.
-          <span className="text-teal-700" suppressHydrationWarning>· last synced {fmtSynced(lastSyncedAt)}</span>
+          <span className="text-muted" suppressHydrationWarning>· last synced {fmtSynced(lastSyncedAt)}</span>
         </p>
-        <Link href="/admin/customers/archived" className="text-sm font-medium text-teal-700 hover:underline flex items-center gap-1 flex-shrink-0">
+        <Link href="/admin/customers/archived" className="text-[13px] font-semibold text-iris-deep hover:underline flex items-center gap-1 flex-shrink-0">
           <Archive className="w-4 h-4" />
           Former customers ({archivedCount})
         </Link>
       </div>
 
       {/* Search + sort */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+      <div className="dgs-card p-4">
         <form className="flex flex-col sm:flex-row gap-3">
           {view !== "list" && <input type="hidden" name="view" value={view} />}
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input type="text" name="search" defaultValue={search}
               placeholder="Search by name, address, zip, phone, or email…"
-              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent" />
+              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-iris focus:border-transparent" />
           </div>
           {view === "list" && (
-            <select name="sort" defaultValue={`${sort}:${dir}`} className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-teal-500">
+            <select name="sort" defaultValue={`${sort}:${dir}`} className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-iris">
               <option value="name:asc">Name (A–Z)</option>
               <option value="name:desc">Name (Z–A)</option>
               <option value="start:asc">Start date (oldest first)</option>
@@ -197,7 +197,7 @@ export default async function CustomersPage({ searchParams }: PageProps) {
               <option value="review:asc">Review status</option>
             </select>
           )}
-          <button type="submit" className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors text-sm">Apply</button>
+          <button type="submit" className="px-4 py-2 rounded-lg text-white text-sm font-semibold transition-colors" style={{ background: "#8B6BFF" }}>Apply</button>
         </form>
       </div>
 
@@ -206,10 +206,10 @@ export default async function CustomersPage({ searchParams }: PageProps) {
         <CustomersMapClient customers={mapCustomers} token={token} uncoded={uncoded} />
       ) : (
         /* ── LIST (table) ─────────────────────────────────────────────────── */
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="dgs-card overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-100">
+              <thead className="bg-[#FAFAFC] border-b border-hairline">
                 <tr>
                   {renderTh("Customer", "name")}
                   {renderTh("Start Date", "start")}

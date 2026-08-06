@@ -41,7 +41,7 @@ export function BlastEditForm({ campaignId, initialName, initialBody }: { campai
         <h1 className="text-2xl font-bold text-navy-900">Edit Campaign</h1>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+      <div className="dgs-card p-6 space-y-4">
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}

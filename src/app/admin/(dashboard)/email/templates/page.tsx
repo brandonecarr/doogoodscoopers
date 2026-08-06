@@ -30,7 +30,7 @@ export default function EmailTemplatesPage() {
         <div className="flex items-center gap-3">
           <Link href="/admin/email" className="p-2 hover:bg-gray-100 rounded-lg"><ArrowLeft className="w-5 h-5 text-gray-600" /></Link>
           <div>
-            <h1 className="text-2xl font-bold text-navy-900">Email Templates</h1>
+            <h1 className="dgs-title">Email Templates</h1>
             <p className="text-navy-600 text-sm mt-1">Design reusable emails with the drag-and-drop builder.</p>
           </div>
         </div>
@@ -42,13 +42,13 @@ export default function EmailTemplatesPage() {
       {loading ? (
         <div className="flex justify-center py-16"><Loader2 className="w-7 h-7 animate-spin text-teal-600" /></div>
       ) : templates.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
+        <div className="dgs-card p-12 text-center">
           <LayoutTemplate className="w-10 h-10 text-gray-300 mx-auto mb-3" />
           <p className="text-gray-500">No templates yet.</p>
           <Link href="/admin/email/templates/new" className="text-teal-600 text-sm font-medium hover:underline mt-2 inline-block">Design your first →</Link>
         </div>
       ) : (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 divide-y divide-gray-100">
+        <div className="dgs-card divide-y divide-gray-100">
           {templates.map((t) => (
             <div key={t.id} className="flex items-center gap-4 p-4">
               <div className="w-10 h-10 rounded-lg bg-teal-50 flex items-center justify-center flex-shrink-0"><LayoutTemplate className="w-5 h-5 text-teal-600" /></div>

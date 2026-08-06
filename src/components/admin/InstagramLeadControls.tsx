@@ -48,7 +48,7 @@ export function InstagramLeadControls({
   const sel = "w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-teal-500";
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 space-y-4">
+    <div className="dgs-card p-5 space-y-4">
       <h2 className="text-sm font-semibold text-navy-900">Manage lead</h2>
 
       <label className="block">

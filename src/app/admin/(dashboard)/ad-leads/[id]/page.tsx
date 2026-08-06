@@ -97,7 +97,7 @@ export default async function AdLeadDetailPage({ params }: PageProps) {
       id: "contact",
       zone: "main",
       node: (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div className="dgs-card p-6">
           <h2 className="text-lg font-semibold text-navy-900 mb-4">Contact Information</h2>
           <div className="grid grid-cols-1 @lg:grid-cols-2 gap-4">
             <div className="flex items-start gap-3">
@@ -169,7 +169,7 @@ export default async function AdLeadDetailPage({ params }: PageProps) {
       id: "campaign",
       zone: "main",
       node: (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div className="dgs-card p-6">
           <h2 className="text-lg font-semibold text-navy-900 mb-4">Campaign Information</h2>
           <div className="grid grid-cols-1 @lg:grid-cols-2 gap-4">
             <div className="flex items-start gap-3">
@@ -233,7 +233,7 @@ export default async function AdLeadDetailPage({ params }: PageProps) {
             id: "additional",
             zone: "main" as const,
             node: (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+              <div className="dgs-card p-6">
                 <h2 className="text-lg font-semibold text-navy-900 mb-4">Additional Information</h2>
                 <div className="grid grid-cols-1 @lg:grid-cols-2 gap-4">
                   {customFieldEntries.map(([key, value]) => (
@@ -254,7 +254,7 @@ export default async function AdLeadDetailPage({ params }: PageProps) {
             id: "raw",
             zone: "main" as const,
             node: (
-              <details className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+              <details className="dgs-card p-6">
                 <summary className="text-lg font-semibold text-navy-900 cursor-pointer">Raw Webhook Data</summary>
                 <pre className="mt-4 p-4 bg-gray-50 rounded-lg text-xs overflow-x-auto">
                   {JSON.stringify(typedLead.rawPayload, null, 2)}
@@ -317,7 +317,7 @@ export default async function AdLeadDetailPage({ params }: PageProps) {
       id: "timeline",
       zone: "side",
       node: (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div className="dgs-card p-6">
           <h2 className="text-lg font-semibold text-navy-900 mb-4">Timeline</h2>
           <div className="space-y-4">
             <div className="flex items-start gap-3">
@@ -370,20 +370,22 @@ export default async function AdLeadDetailPage({ params }: PageProps) {
       {/* Duplicate leads banner */}
       <DuplicateBanner leadId={typedLead.id} leadType="adlead" />
 
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <Link
-          href="/admin/ad-leads"
-          className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
-        >
-          <ArrowLeft className="w-5 h-5 text-gray-600" />
-        </Link>
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold text-navy-900">{getDisplayName(typedLead)}</h1>
-          <p className="text-navy-600">Ad Lead Details</p>
-        </div>
-        <div className="w-12 h-12 rounded-xl bg-pink-50 flex items-center justify-center">
-          <Megaphone className="w-6 h-6 text-pink-600" />
+      {/* Header — dark hero */}
+      <div className="dgs-hero p-[22px] sm:p-[26px]">
+        <div className="flex items-center gap-4">
+          <Link
+            href="/admin/ad-leads"
+            className="w-10 h-10 rounded-[10px] bg-white/10 flex items-center justify-center hover:bg-white/15 transition-colors flex-shrink-0"
+          >
+            <ArrowLeft className="w-5 h-5 text-white" />
+          </Link>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-[30px] font-extrabold text-white tracking-[-0.03em] leading-none truncate">{getDisplayName(typedLead)}</h1>
+            <p className="text-[#9C9CB0] text-[12.5px] mt-2">Ad Lead Details</p>
+          </div>
+          <div className="w-12 h-12 rounded-[13px] flex items-center justify-center flex-shrink-0" style={{ background: "linear-gradient(150deg,#FFC9DE,#F0369C)" }}>
+            <Megaphone className="w-6 h-6 text-white" />
+          </div>
         </div>
       </div>
 

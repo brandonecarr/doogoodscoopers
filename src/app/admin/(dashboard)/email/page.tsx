@@ -24,11 +24,11 @@ export default async function EmailPage() {
   const campaigns = await prisma.emailCampaign.findMany({ orderBy: { createdAt: "desc" }, take: 100 });
 
   return (
-    <div className="space-y-6 pb-20 lg:pb-0">
-      <div className="flex items-center justify-between">
+    <div className="space-y-3.5 pb-20 lg:pb-0">
+      <div className="flex items-end justify-between gap-3 flex-wrap px-1">
         <div>
-          <h1 className="text-2xl font-bold text-navy-900">Email</h1>
-          <p className="text-navy-600 text-sm mt-1">Newsletters &amp; broadcasts to your contacts.</p>
+          <h1 className="dgs-title">Email</h1>
+          <p className="dgs-sub">Newsletters &amp; broadcasts to your contacts.</p>
         </div>
         <div className="flex items-center gap-2">
           <Link href="/admin/email/automations" className="flex items-center gap-1.5 px-4 py-2 border border-gray-200 text-navy-900 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium">
@@ -51,13 +51,13 @@ export default async function EmailPage() {
       </div>
 
       {campaigns.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
+        <div className="dgs-card p-12 text-center">
           <Mail className="w-10 h-10 text-gray-300 mx-auto mb-3" />
           <p className="text-gray-500">No emails yet.</p>
           <Link href="/admin/email/new" className="text-teal-600 text-sm font-medium hover:underline mt-2 inline-block">Compose your first email →</Link>
         </div>
       ) : (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 divide-y divide-gray-100">
+        <div className="dgs-card divide-y divide-gray-100">
           {campaigns.map((c) => (
             <Link key={c.id} href={`/admin/email/${c.id}`} className="flex items-center gap-4 p-4 hover:bg-gray-50/70 transition-colors">
               <div className="w-10 h-10 rounded-lg bg-teal-50 flex items-center justify-center flex-shrink-0">

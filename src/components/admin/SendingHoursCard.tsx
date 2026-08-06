@@ -66,7 +66,7 @@ export function SendingHoursCard() {
   const invalid = startHour >= endHour;
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+    <div className="dgs-card p-4">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
         <div className="flex items-center gap-2 mr-auto">
           <div className="w-9 h-9 rounded-lg bg-teal-50 flex items-center justify-center flex-shrink-0">

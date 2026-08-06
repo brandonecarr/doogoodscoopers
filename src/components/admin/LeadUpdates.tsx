@@ -85,7 +85,7 @@ export function LeadUpdates({ leadId, leadType, updates }: LeadUpdatesProps) {
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+    <div className="dgs-card p-6">
       <h2 className="text-lg font-semibold text-navy-900 mb-4">Updates</h2>
 
       {/* Add Update Form */}

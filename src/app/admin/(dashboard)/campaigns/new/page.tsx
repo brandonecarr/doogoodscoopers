@@ -129,11 +129,11 @@ export default function NewCampaignPage() {
         <Link href="/admin/campaigns" className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
           <ArrowLeft className="w-5 h-5 text-gray-600" />
         </Link>
-        <h1 className="text-2xl font-bold text-navy-900">New Campaign</h1>
+        <h1 className="dgs-title">New Campaign</h1>
       </div>
 
       {/* Audience */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+      <div className="dgs-card p-6 space-y-4">
         <h2 className="text-lg font-semibold text-navy-900">1. Audience</h2>
 
         <div>
@@ -195,7 +195,7 @@ export default function NewCampaignPage() {
       </div>
 
       {/* Recipients */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+      <div className="dgs-card p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-navy-900 flex items-center gap-2">
             <Users className="w-5 h-5 text-teal-600" />
@@ -244,7 +244,7 @@ export default function NewCampaignPage() {
       </div>
 
       {/* Compose */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+      <div className="dgs-card p-6 space-y-4">
         <h2 className="text-lg font-semibold text-navy-900">3. Message</h2>
         <input
           value={name}

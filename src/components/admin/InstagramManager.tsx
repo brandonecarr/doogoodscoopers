@@ -120,7 +120,7 @@ export function InstagramManager({ campaigns }: { campaigns: IgCampaign[] }) {
       </div>
 
       {open && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+        <div className="dgs-card p-6 space-y-4">
           <h2 className="text-lg font-semibold text-navy-900">
             {isEditing ? "Edit campaign" : "New comment → DM campaign"}
           </h2>
@@ -165,7 +165,7 @@ export function InstagramManager({ campaigns }: { campaigns: IgCampaign[] }) {
       )}
 
       {campaigns.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 divide-y divide-gray-100">
+        <div className="dgs-card divide-y divide-gray-100">
           {campaigns.map((c) => (
             <div key={c.id} className={`flex items-center gap-4 p-4 ${editingId === c.id ? "bg-teal-50/40" : ""}`}>
               <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-[#f58529] via-[#dd2a7b] to-[#8134af] flex items-center justify-center flex-shrink-0">

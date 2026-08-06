@@ -27,11 +27,11 @@ export default async function CampaignsPage() {
   const campaigns = await prisma.campaign.findMany({ orderBy: { createdAt: "desc" } });
 
   return (
-    <div className="space-y-6 pb-20 lg:pb-0">
-      <div className="flex items-center justify-between">
+    <div className="space-y-3.5 pb-20 lg:pb-0">
+      <div className="flex items-end justify-between gap-3 flex-wrap px-1">
         <div>
-          <h1 className="text-2xl font-bold text-navy-900">Campaigns</h1>
-          <p className="text-navy-600 text-sm mt-1">Bulk text a segment of your leads.</p>
+          <h1 className="dgs-title">Campaigns</h1>
+          <p className="dgs-sub">Bulk text a segment of your leads.</p>
         </div>
         <div className="flex items-center gap-2">
           <Link
@@ -42,14 +42,14 @@ export default async function CampaignsPage() {
           </Link>
           <Link
             href="/admin/campaigns/new-drip"
-            className="flex items-center gap-1.5 px-4 py-2 border border-teal-200 text-teal-700 rounded-lg hover:bg-teal-50 transition-colors text-sm font-medium"
+            className="flex items-center gap-1.5 px-4 py-2 border border-iris text-iris-deep rounded-lg hover:bg-iris-soft transition-colors text-sm font-medium"
           >
             <Zap className="w-4 h-4" />
             New Drip
           </Link>
           <Link
             href="/admin/campaigns/new"
-            className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors text-sm font-medium"
+            className="flex items-center gap-1.5 px-4 py-2 bg-iris text-white rounded-lg hover:bg-iris-deep transition-colors text-sm font-medium"
           >
             <Plus className="w-4 h-4" />
             New Blast
@@ -60,33 +60,33 @@ export default async function CampaignsPage() {
       <SendingHoursCard />
 
       {campaigns.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
+        <div className="dgs-card p-12 text-center">
           <Megaphone className="w-10 h-10 text-gray-300 mx-auto mb-3" />
           <p className="text-gray-500">No campaigns yet.</p>
-          <Link href="/admin/campaigns/new" className="text-teal-600 text-sm font-medium hover:underline mt-2 inline-block">
+          <Link href="/admin/campaigns/new" className="text-iris-deep text-sm font-medium hover:underline mt-2 inline-block">
             Create your first campaign →
           </Link>
         </div>
       ) : (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 divide-y divide-gray-100">
+        <div className="dgs-card divide-y divide-gray-100">
           {campaigns.map((c) => {
             const isDrip = c.type === "DRIP";
             return (
               <div key={c.id} className="flex items-center gap-4 p-4">
-                <div className="w-10 h-10 rounded-lg bg-teal-50 flex items-center justify-center flex-shrink-0">
+                <div className="w-10 h-10 rounded-lg bg-iris-soft flex items-center justify-center flex-shrink-0">
                   {isDrip ? (
-                    <Zap className="w-5 h-5 text-teal-600" />
+                    <Zap className="w-5 h-5 text-iris-deep" />
                   ) : c.status === "SENT" ? (
-                    <CheckCircle2 className="w-5 h-5 text-teal-600" />
+                    <CheckCircle2 className="w-5 h-5 text-iris-deep" />
                   ) : c.status === "SENDING" ? (
-                    <Send className="w-5 h-5 text-teal-600" />
+                    <Send className="w-5 h-5 text-iris-deep" />
                   ) : (
-                    <Clock className="w-5 h-5 text-teal-600" />
+                    <Clock className="w-5 h-5 text-iris-deep" />
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <Link href={`/admin/campaigns/${c.id}`} className="font-medium text-navy-900 truncate hover:text-teal-600 hover:underline">
+                    <Link href={`/admin/campaigns/${c.id}`} className="font-medium text-navy-900 truncate hover:text-iris-deep hover:underline">
                       {c.name}
                     </Link>
                     <span className={`px-1.5 py-0.5 text-[10px] rounded ${isDrip ? "bg-purple-100 text-purple-700" : "bg-gray-100 text-gray-600"}`}>
@@ -125,7 +125,7 @@ export default async function CampaignsPage() {
                     </>
                   )}
                   <p className="text-xs text-gray-400" suppressHydrationWarning>{formatDate(c.createdAt)}</p>
-                  <Link href={`/admin/campaigns/${c.id}/edit`} className="text-xs text-teal-600 hover:underline">
+                  <Link href={`/admin/campaigns/${c.id}/edit`} className="text-xs text-iris-deep hover:underline">
                     Edit
                   </Link>
                 </div>

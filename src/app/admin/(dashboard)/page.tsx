@@ -5,10 +5,9 @@ import {
   Briefcase,
   Building2,
   Megaphone,
-  TrendingUp,
+  ArrowUpRight,
   Clock,
   CheckCircle,
-  AlertCircle,
 } from "lucide-react";
 import prisma from "@/lib/prisma";
 import type { QuoteLead, OutOfAreaLead, CareerApplication, CommercialLead, AdLead } from "@/types/leads";
@@ -91,46 +90,11 @@ async function getRecentActivity() {
 }
 
 const statCards = [
-  {
-    name: "Quote Leads",
-    href: "/admin/quote-leads",
-    icon: FileText,
-    color: "bg-blue-500",
-    lightColor: "bg-blue-50",
-    textColor: "text-blue-600",
-  },
-  {
-    name: "Ad Leads",
-    href: "/admin/ad-leads",
-    icon: Megaphone,
-    color: "bg-pink-500",
-    lightColor: "bg-pink-50",
-    textColor: "text-pink-600",
-  },
-  {
-    name: "Out of Area",
-    href: "/admin/out-of-area",
-    icon: MapPinOff,
-    color: "bg-amber-500",
-    lightColor: "bg-amber-50",
-    textColor: "text-amber-600",
-  },
-  {
-    name: "Career Applications",
-    href: "/admin/careers",
-    icon: Briefcase,
-    color: "bg-purple-500",
-    lightColor: "bg-purple-50",
-    textColor: "text-purple-600",
-  },
-  {
-    name: "Commercial Inquiries",
-    href: "/admin/commercial",
-    icon: Building2,
-    color: "bg-teal-500",
-    lightColor: "bg-teal-50",
-    textColor: "text-teal-600",
-  },
+  { name: "Quote Leads",          href: "/admin/quote-leads", icon: FileText,   grad: "linear-gradient(150deg,#8B6BFF,#6D3EF0)" },
+  { name: "Ad Leads",             href: "/admin/ad-leads",    icon: Megaphone,  grad: "linear-gradient(150deg,#FFC9DE,#F0369C)" },
+  { name: "Out of Area",          href: "/admin/out-of-area", icon: MapPinOff,  grad: "linear-gradient(150deg,#FFD9A8,#F5A623)" },
+  { name: "Career Applications",  href: "/admin/careers",     icon: Briefcase,  grad: "linear-gradient(150deg,#C8B9FF,#7C5CFC)" },
+  { name: "Commercial Inquiries", href: "/admin/commercial",  icon: Building2,  grad: "linear-gradient(150deg,#9BE7C0,#12A150)" },
 ];
 
 function formatDate(date: Date) {
@@ -182,75 +146,85 @@ export default async function AdminDashboardPage() {
   ];
 
   const totalNew = stats.quoteLeads.new + stats.adLeads.new + stats.outOfArea.new + stats.careers.new + stats.commercial.new;
+  const totalLeads = stats.quoteLeads.total + stats.adLeads.total + stats.outOfArea.total + stats.commercial.total;
+  const today = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+
+  const heroKpis = [
+    { label: "New to review", value: totalNew,               icon: "◔", chipBg: "rgba(139,107,255,.22)", chipFg: "#C8B9FF" },
+    { label: "Quote leads",   value: stats.quoteLeads.total, icon: "◆", chipBg: "rgba(139,107,255,.22)", chipFg: "#C8B9FF" },
+    { label: "Ad leads",      value: stats.adLeads.total,    icon: "✦", chipBg: "rgba(240,54,156,.20)",  chipFg: "#FFC9DE" },
+    { label: "Commercial",    value: stats.commercial.total, icon: "▲", chipBg: "rgba(18,161,80,.20)",   chipFg: "#9BE7C0" },
+  ];
 
   return (
-    <div className="space-y-8 pb-20 lg:pb-0">
+    <div className="pb-4">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-navy-900">Dashboard</h1>
-        <p className="text-navy-600 mt-1">Overview of all leads and applications</p>
+      <div className="flex items-end justify-between gap-4 flex-wrap mb-4 px-1">
+        <div>
+          <h1 className="dgs-title">Dashboard</h1>
+          <p className="dgs-sub">
+            {today} · {totalLeads} total leads
+            {totalNew > 0 ? ` · ${totalNew} new to review` : " · all caught up"}
+          </p>
+        </div>
       </div>
 
-      {/* Alert for new leads */}
-      {totalNew > 0 && (
-        <div className="bg-teal-50 border border-teal-200 rounded-xl p-4 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-teal-100 flex items-center justify-center">
-            <AlertCircle className="w-5 h-5 text-teal-600" />
-          </div>
-          <div>
-            <p className="font-medium text-teal-900">
-              You have {totalNew} new lead{totalNew !== 1 ? "s" : ""} to review
-            </p>
-            <p className="text-sm text-teal-700">
-              Check the sections below to see and manage new submissions
-            </p>
-          </div>
+      {/* Dark KPI hero — real counts */}
+      <div className="dgs-hero p-[26px]">
+        <div className="text-[26px] font-extrabold text-white tracking-[-0.03em]">Today&apos;s overview</div>
+        <div className="grid gap-3 mt-5" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))" }}>
+          {heroKpis.map((k) => (
+            <div key={k.label} className="dgs-hero-tile p-[18px]">
+              <div className="text-[12.5px] text-[#9C9CB0]">{k.label}</div>
+              <div className="flex items-center justify-between mt-4">
+                <div className="text-[38px] font-extrabold text-white tracking-[-0.035em] leading-none">{k.value}</div>
+                <div
+                  className="w-[38px] h-[38px] rounded-full flex items-center justify-center text-[15px]"
+                  style={{ background: k.chipBg, color: k.chipFg }}
+                >
+                  {k.icon}
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
-      )}
+      </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 mt-3.5">
         {statsData.map((stat) => (
-          <Link
-            key={stat.name}
-            href={stat.href}
-            className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow group"
-          >
+          <Link key={stat.name} href={stat.href} className="dgs-card dgs-lift p-5 group">
             <div className="flex items-center justify-between">
-              <div className={`w-12 h-12 rounded-xl ${stat.lightColor} flex items-center justify-center`}>
-                <stat.icon className={`w-6 h-6 ${stat.textColor}`} />
+              <div
+                className="w-11 h-11 rounded-[13px] flex items-center justify-center"
+                style={{ background: stat.grad }}
+              >
+                <stat.icon className="w-[22px] h-[22px] text-white" />
               </div>
-              {stat.new > 0 && (
-                <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${stat.color} text-white`}>
-                  {stat.new} new
-                </span>
-              )}
+              {stat.new > 0 && <span className="dgs-badge dgs-badge-iris">{stat.new} new</span>}
             </div>
             <div className="mt-4">
-              <p className="text-sm text-navy-600">{stat.name}</p>
-              <p className="text-2xl font-bold text-navy-900 mt-1">{stat.total}</p>
+              <p className="text-[12.5px] text-muted2 font-medium">{stat.name}</p>
+              <p className="text-[32px] font-extrabold text-ink tracking-[-0.035em] mt-0.5">{stat.total}</p>
             </div>
-            <div className="mt-3 flex items-center text-sm text-navy-500 group-hover:text-teal-600 transition-colors">
-              <TrendingUp className="w-4 h-4 mr-1" />
-              View all
+            <div className="mt-2 flex items-center gap-1 text-[12.5px] font-semibold text-muted group-hover:text-iris-link transition-colors">
+              View all <ArrowUpRight className="w-3.5 h-3.5" />
             </div>
           </Link>
         ))}
       </div>
 
       {/* Recent Activity */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100">
-        <div className="px-6 py-4 border-b border-gray-100">
-          <div className="flex items-center gap-2">
-            <Clock className="w-5 h-5 text-navy-500" />
-            <h2 className="text-lg font-semibold text-navy-900">Recent Activity</h2>
-          </div>
+      <div className="dgs-card mt-3.5 overflow-hidden">
+        <div className="px-[22px] py-[18px] flex items-center gap-2">
+          <Clock className="w-[18px] h-[18px] text-muted" />
+          <h2 className="dgs-card-title">Recent activity</h2>
         </div>
-        <div className="divide-y divide-gray-100">
+        <div>
           {recentActivity.length === 0 ? (
-            <div className="px-6 py-12 text-center text-navy-500">
-              <CheckCircle className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-              <p>No leads yet</p>
+            <div className="px-6 py-12 text-center text-muted">
+              <CheckCircle className="w-12 h-12 mx-auto mb-3 text-[#D8D8DE]" />
+              <p className="font-semibold text-bodytext">No leads yet</p>
               <p className="text-sm mt-1">New submissions will appear here</p>
             </div>
           ) : (
@@ -258,21 +232,21 @@ export default async function AdminDashboardPage() {
               <Link
                 key={`${item.type}-${item.id}`}
                 href={getTypeHref(item.type, item.id)}
-                className="px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                className="dgs-row px-[22px] py-3.5 flex items-center justify-between"
               >
-                <div className="flex items-center gap-4">
-                  <div className={`w-2 h-2 rounded-full ${item.status === "NEW" ? "bg-teal-500" : "bg-gray-300"}`} />
+                <div className="flex items-center gap-3.5">
+                  <div className={`w-2 h-2 rounded-full ${item.status === "NEW" ? "bg-iris" : "bg-[#D8D8DE]"}`} />
                   <div>
-                    <p className="font-medium text-navy-900">{item.name}</p>
-                    <p className="text-sm text-navy-500">
+                    <p className="font-bold text-[14px] text-ink">{item.name}</p>
+                    <p className="text-[12px] text-muted">
                       {getTypeLabel(item.type)}
-                      {"propertyName" in item && item.propertyName && ` - ${item.propertyName}`}
+                      {"propertyName" in item && item.propertyName && ` · ${item.propertyName}`}
                     </p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm text-navy-500">{formatDate(item.createdAt)}</p>
-                  <p className={`text-xs font-medium ${item.status === "NEW" ? "text-teal-600" : "text-gray-500"}`}>
+                  <p className="text-[12px] text-muted">{formatDate(item.createdAt)}</p>
+                  <p className={`text-[11px] font-bold ${item.status === "NEW" ? "text-iris-link" : "text-muted"}`}>
                     {item.status}
                   </p>
                 </div>

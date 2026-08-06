@@ -55,7 +55,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       id: "contact",
       zone: "main",
       node: (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div className="dgs-card p-6">
           <h2 className="text-lg font-semibold text-navy-900 mb-4">Contact</h2>
           <div className="grid grid-cols-1 @lg:grid-cols-2 gap-4">
             {field({ icon: Phone, label: "Cell phone", value: fmtPhone(customer.cellPhone), href: customer.cellPhone ? `tel:${customer.cellPhone}` : undefined })}
@@ -70,7 +70,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       id: "service",
       zone: "main",
       node: (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div className="dgs-card p-6">
           <h2 className="text-lg font-semibold text-navy-900 mb-4">Service</h2>
           <div className="grid grid-cols-1 @lg:grid-cols-2 gap-4">
             {field({ icon: Dog, label: "Dogs", value: customer.numberOfDogs != null ? `${customer.numberOfDogs} ${customer.numberOfDogs === 1 ? "dog" : "dogs"}` : null })}
@@ -88,7 +88,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       id: "review",
       zone: "main",
       node: (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div className="dgs-card p-6">
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <h2 className="text-lg font-semibold text-navy-900 flex items-center gap-2">
               <Star className="w-4 h-4 text-amber-400" /> Review
@@ -119,7 +119,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
             id: "messages",
             zone: "main" as const,
             node: (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+              <div className="dgs-card p-6">
                 <h2 className="text-lg font-semibold text-navy-900 mb-4 flex items-center gap-2">
                   <MessageSquare className="w-4 h-4 text-gray-400" /> Messages ({messages.length})
                 </h2>
@@ -156,26 +156,28 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
 
   return (
     <div className="space-y-6 pb-20 lg:pb-0">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <Link href="/admin/customers" className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-          <ArrowLeft className="w-5 h-5 text-gray-600" />
-        </Link>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-2xl font-bold text-navy-900 truncate">{name}</h1>
-            <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${customer.active ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"}`}>
-              {customer.active ? "Active" : "Former"}
-            </span>
+      {/* Header — dark hero */}
+      <div className="dgs-hero p-[22px] sm:p-[26px]">
+        <div className="flex items-center gap-3">
+          <Link href="/admin/customers" className="p-2 rounded-[10px] bg-white/10 hover:bg-white/15 transition-colors flex-shrink-0">
+            <ArrowLeft className="w-5 h-5 text-white" />
+          </Link>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-[30px] font-extrabold text-white tracking-[-0.03em] leading-none truncate">{name}</h1>
+              <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${customer.active ? "bg-green-100 text-green-800" : "bg-white/15 text-white/80"}`}>
+                {customer.active ? "Active" : "Former"}
+              </span>
+            </div>
+            <p className="text-[#9C9CB0] text-[12.5px] mt-2">Customer since {fmtDate(customer.startDate ?? customer.firstSeenAt)}</p>
           </div>
-          <p className="text-navy-600 text-sm mt-1">Customer since {fmtDate(customer.startDate ?? customer.firstSeenAt)}</p>
-        </div>
-        <Link href={`/admin/customers/${customer.id}/map`}
-          className="inline-flex items-center gap-1.5 px-3 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors text-sm font-medium flex-shrink-0">
-          <MapPin className="w-4 h-4" /> <span className="hidden sm:inline">View on map</span>
-        </Link>
-        <div className="w-12 h-12 rounded-xl bg-teal-50 flex items-center justify-center flex-shrink-0">
-          <Dog className="w-6 h-6 text-teal-600" />
+          <Link href={`/admin/customers/${customer.id}/map`}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-[12px] text-white text-[13px] font-semibold transition-colors flex-shrink-0" style={{ background: "#8B6BFF" }}>
+            <MapPin className="w-4 h-4" /> <span className="hidden sm:inline">View on map</span>
+          </Link>
+          <div className="w-12 h-12 rounded-[13px] flex items-center justify-center flex-shrink-0" style={{ background: "linear-gradient(150deg,#8B6BFF,#6D3EF0)" }}>
+            <Dog className="w-6 h-6 text-white" />
+          </div>
         </div>
       </div>
 

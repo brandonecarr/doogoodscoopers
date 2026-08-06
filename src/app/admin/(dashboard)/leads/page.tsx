@@ -496,68 +496,62 @@ export default function LeadsPage() {
     `/admin/${lead.type === "quote" ? "quote-leads" : lead.type === "instagram" ? "instagram-leads" : "ad-leads"}/${lead.id}`;
 
   return (
-    <div className="space-y-6 pb-24 lg:pb-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-navy-900">Leads</h1>
-          <p className="text-navy-600 mt-1">{(view === "map" ? mapMeta?.totalLeads ?? total : total)} total leads</p>
-        </div>
-        <div className="flex items-center gap-2">
-          {view === "kanban" && (
-            <button
-              onClick={() => (selectMode ? exitSelect() : setSelectMode(true))}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border ${
-                selectMode ? "bg-navy-600 text-white border-navy-600" : "border-gray-200 text-navy-900 hover:bg-gray-50"
-              }`}
-            >
-              <CheckSquare className="w-4 h-4" />
-              <span className="hidden sm:inline">{selectMode ? "Done" : "Select"}</span>
-            </button>
-          )}
-          <div className="flex items-center bg-gray-100 rounded-lg p-1">
-            <button
-              onClick={() => selectView("list")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                view === "list" ? "bg-white text-navy-900 shadow-sm" : "text-gray-500 hover:text-gray-800"
-              }`}
-            >
-              <LayoutList className="w-4 h-4" />
-              <span className="hidden sm:inline">List</span>
-            </button>
-            <button
-              onClick={() => selectView("kanban")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                view === "kanban" ? "bg-white text-navy-900 shadow-sm" : "text-gray-500 hover:text-gray-800"
-              }`}
-            >
-              <LayoutGrid className="w-4 h-4" />
-              <span className="hidden sm:inline">Board</span>
-            </button>
-            <button
-              onClick={() => selectView("map")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                view === "map" ? "bg-white text-navy-900 shadow-sm" : "text-gray-500 hover:text-gray-800"
-              }`}
-            >
-              <MapIcon className="w-4 h-4" />
-              <span className="hidden sm:inline">Map</span>
-            </button>
+    <div className="space-y-3.5 pb-24 lg:pb-6">
+      {/* Header — dark hero */}
+      <div className="dgs-hero p-[22px] sm:p-[26px]">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <h1 className="text-[30px] font-extrabold text-white tracking-[-0.03em] leading-none">Leads</h1>
+            <p className="text-[12.5px] text-[#9C9CB0] mt-2">
+              Pipeline · {(view === "map" ? mapMeta?.totalLeads ?? total : total)} total lead{(view === "map" ? mapMeta?.totalLeads ?? total : total) === 1 ? "" : "s"}
+            </p>
           </div>
-          <Link
-            href="/admin/quote-leads/new"
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors text-sm font-medium"
-          >
-            <Plus className="w-4 h-4 flex-shrink-0" />
-            <span className="hidden sm:inline">Add Lead</span>
-          </Link>
+          <div className="flex items-center gap-2">
+            {view === "kanban" && (
+              <button
+                onClick={() => (selectMode ? exitSelect() : setSelectMode(true))}
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-[12px] text-[13px] font-semibold transition-colors ${
+                  selectMode ? "bg-white text-ink" : "bg-white/10 text-white hover:bg-white/15"
+                }`}
+              >
+                <CheckSquare className="w-4 h-4" />
+                <span className="hidden sm:inline">{selectMode ? "Done" : "Select"}</span>
+              </button>
+            )}
+            <div className="flex items-center bg-white/10 rounded-[12px] p-1">
+              {([
+                { v: "list" as const, icon: LayoutList, label: "List" },
+                { v: "kanban" as const, icon: LayoutGrid, label: "Board" },
+                { v: "map" as const, icon: MapIcon, label: "Map" },
+              ]).map(({ v, icon: Icon, label }) => (
+                <button
+                  key={v}
+                  onClick={() => selectView(v)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[9px] text-[13px] font-semibold transition-colors ${
+                    view === v ? "bg-white text-ink shadow-sm" : "text-white/70 hover:text-white"
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  <span className="hidden sm:inline">{label}</span>
+                </button>
+              ))}
+            </div>
+            <Link
+              href="/admin/quote-leads/new"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-[12px] text-[13px] font-bold text-white transition-colors"
+              style={{ background: "#8B6BFF" }}
+            >
+              <Plus className="w-4 h-4 flex-shrink-0" />
+              <span className="hidden sm:inline">Add lead</span>
+            </Link>
+          </div>
         </div>
       </div>
 
       <CallIntelCard />
 
       {/* Filters */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+      <div className="dgs-card p-4">
         <form onSubmit={handleSearch} className="flex flex-col sm:flex-row sm:flex-wrap gap-3">
           <div className="flex-1 min-w-[200px] relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -615,7 +609,7 @@ export default function LeadsPage() {
             <option value={30}>Last 30 days</option>
             <option value={90}>Last 90 days</option>
           </select>
-          <button type="submit" className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors text-sm">
+          <button type="submit" className="px-4 py-2 rounded-lg text-white text-sm font-semibold transition-colors" style={{ background: "#8B6BFF" }}>
             Apply
           </button>
         </form>
@@ -651,10 +645,10 @@ export default function LeadsPage() {
         </div>
       ) : view === "list" ? (
         /* ── LIST VIEW ──────────────────────────────────────────────────── */
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="dgs-card overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-100">
+              <thead className="bg-[#FAFAFC] border-b border-hairline">
                 <tr>
                   {["Name", "Contact", "Source", "Grade", "Status", "Date"].map((h) => (
                     <th key={h} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{h}</th>

@@ -62,6 +62,35 @@
   --font-body: var(--font-montserrat), system-ui, sans-serif;
   --font-display: var(--font-bebas), system-ui, sans-serif;
   --font-handwriting: 'Kalam', cursive;
+
+  /* Admin dashboard fonts */
+  --font-jakarta: var(--font-jakarta), system-ui, sans-serif;
+  --font-jetbrains: var(--font-jetbrains), monospace;
+
+  /* ===== Admin redesign palette (safe names — no Tailwind collisions) =====
+     Usable as utilities anywhere inside the admin, e.g. bg-ink, text-iris,
+     bg-surface, border-hair. Named to avoid clobbering Tailwind defaults. */
+  --color-ink: #101014;
+  --color-ink-hero: #0C0C12;
+  --color-ink-tile: #16161F;
+  --color-iris: #8B6BFF;
+  --color-iris-link: #7C5CFC;
+  --color-iris-deep: #6D3EF0;
+  --color-iris-soft: #EFE9FF;
+  --color-canvas: #EFEFF2;
+  --color-surface: #FFFFFF;
+  --color-surface2: #F4F4F6;
+  --color-hair: #E9E9EF;
+  --color-hairline: #F1F1F4;
+  --color-muted: #9A9AA5;
+  --color-muted2: #8A8A96;
+  --color-bodytext: #2C2C36;
+  --color-magenta: #F0369C;
+  --color-magenta-deep: #D6208A;
+  --color-magenta-soft: #FDECF5;
+  --color-grass: #12A150;
+  --color-grass-soft: #E7F8EE;
+  --color-gold: #F5A623;
 }
 
 /* Handwriting font utility */
@@ -629,3 +658,115 @@ body:has([class*="ti-popup"]) {
     font-size: 16px !important;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ADMIN DASHBOARD REDESIGN — scoped to .dgs-admin
+   Imported design: "Integrate Client Dashboard UI Design".
+   Plus Jakarta Sans · #EFEFF2 canvas · violet accent · 24px rounded cards.
+   Everything here is namespaced under .dgs-admin so the public marketing site
+   is untouched. Reusable component classes keep page reskins consistent.
+   ══════════════════════════════════════════════════════════════════════════ */
+.dgs-admin {
+  font-family: var(--font-jakarta), system-ui, sans-serif;
+  color: #101014;
+  background: #EFEFF2;
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: -0.006em;
+
+  /* Retint the legacy accent for the WHOLE admin in one place. The Tailwind v4
+     teal/navy utilities compile to var(--teal-*) / var(--navy-*), so overriding
+     those vars here re-skins every admin page from teal→violet without touching
+     any component file. The public marketing site (outside .dgs-admin) keeps its
+     original teal/navy. */
+  --teal-50:  #F3F1FF;
+  --teal-100: #EAE4FF;
+  --teal-200: #DAD0FF;
+  --teal-300: #C3B2FF;
+  --teal-400: #A88EFF;
+  --teal-500: #8B6BFF;
+  --teal-600: #7C5CFC;
+  --teal-700: #6D3EF0;
+  --teal-800: #5B37E8;
+  --teal-900: #4A2BC2;
+
+  /* Navy → graphite. navy-600 was a vivid blue (#008EFF) used for muted text and
+     secondary buttons; retint the whole dark end to neutral ink/slate so nothing
+     reads blue in the violet design. */
+  --navy-600: #5A5A66;
+  --navy-700: #47474F;
+  --navy-800: #26262E;
+  --navy-900: #101014;
+  --navy-950: #0B0B0F;
+}
+.dgs-admin ::selection { background: #DCD2FF; color: #3B2B7A; }
+.dgs-admin ::-webkit-scrollbar { height: 6px; width: 8px; }
+.dgs-admin ::-webkit-scrollbar-thumb { background: #DCDCE3; border-radius: 8px; }
+.dgs-mono { font-family: var(--font-jetbrains), monospace; }
+
+/* Cards & surfaces */
+.dgs-card { background: #fff; border-radius: 24px; box-shadow: 0 1px 2px rgba(16,16,20,.05); }
+.dgs-card-sm { background: #fff; border-radius: 22px; box-shadow: 0 1px 2px rgba(16,16,20,.05); }
+.dgs-tile { background: #F4F4F6; border-radius: 14px; }
+.dgs-hero {
+  background: #0C0C12; border-radius: 28px; color: #fff;
+  background-image: radial-gradient(700px 220px at 10% 0%, rgba(124,92,252,.3), transparent 70%);
+}
+.dgs-hero-tile { background: #16161F; border-radius: 20px; }
+
+/* Typography helpers */
+.dgs-title { font-size: 30px; font-weight: 800; letter-spacing: -.03em; color: #101014; line-height: 1.1; }
+.dgs-sub { font-size: 13.5px; color: #8A8A96; margin-top: 4px; }
+.dgs-card-title { font-size: 15px; font-weight: 800; color: #101014; letter-spacing: -.01em; }
+.dgs-label { font-size: 10.5px; color: #9A9AA5; }
+.dgs-num { font-weight: 800; color: #101014; letter-spacing: -.02em; }
+
+/* Buttons */
+.dgs-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  border-radius: 14px; padding: 12px 18px; font-size: 13px; font-weight: 700;
+  cursor: pointer; white-space: nowrap; border: none;
+  transition: background .16s, box-shadow .16s, transform .16s, filter .16s;
+}
+.dgs-btn-primary { background: #8B6BFF; color: #fff; }
+.dgs-btn-primary:hover { background: #6D3EF0; }
+.dgs-btn-dark { background: #101014; color: #fff; border-radius: 16px; }
+.dgs-btn-dark:hover { filter: brightness(1.35); }
+.dgs-btn-light { background: #fff; color: #2C2C36; box-shadow: 0 1px 2px rgba(16,16,20,.05); }
+.dgs-btn-light:hover { background: #FAFAFC; }
+.dgs-btn-ghost { background: #F4F4F6; color: #2C2C36; }
+.dgs-btn-ghost:hover { background: #EBEBEF; }
+
+/* Badges & pills */
+.dgs-badge { display: inline-flex; align-items: center; gap: 6px; border-radius: 9px; padding: 5px 11px; font-size: 11.5px; font-weight: 700; }
+.dgs-badge-iris { background: #EFE9FF; color: #6D3EF0; }
+.dgs-badge-grass { background: #E7F8EE; color: #12A150; }
+.dgs-badge-magenta { background: #FDECF5; color: #D6208A; }
+.dgs-badge-gold { background: #FFF3DE; color: #B8791A; }
+.dgs-badge-neutral { background: #F4F4F6; color: #5A5A66; }
+.dgs-pill {
+  display: inline-flex; align-items: center; gap: 6px; border-radius: 999px;
+  padding: 7px 13px; font-size: 12px; font-weight: 700; border: 1px solid #E9E9EF;
+  background: #fff; color: #5A5A66; cursor: pointer; white-space: nowrap;
+  transition: background .16s, color .16s, border-color .16s;
+}
+.dgs-pill:hover { background: #FAFAFC; }
+.dgs-pill-active { background: #101014; color: #fff; border-color: #101014; }
+
+/* Interactive card hover lift */
+.dgs-lift { transition: transform .16s, box-shadow .16s; }
+.dgs-lift:hover { transform: translateY(-3px); box-shadow: 0 16px 36px rgba(16,16,20,.09); }
+
+/* Avatar chips */
+.dgs-avatar { border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-weight: 800; flex: 0 0 auto; }
+
+/* Row hover for tables */
+.dgs-row { border-top: 1px solid #F1F1F4; transition: background .12s; }
+.dgs-row:hover { background: #FAFAFC; }
+
+/* Popovers */
+.dgs-pop { background: #fff; border-radius: 20px; box-shadow: 0 24px 60px rgba(16,16,20,.18); }
+
+@keyframes dgsPop { from { opacity: 0; transform: translateY(10px) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes dgsFade { from { opacity: 0; } to { opacity: 1; } }
+.dgs-anim-pop { animation: dgsPop .17s ease both; }
+.dgs-anim-fade { animation: dgsFade .2s ease both; }

@@ -62,7 +62,7 @@ export function InstagramActivity({ items, timeZone }: { items: IgActivityItem[]
       : "—";
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+    <div className="dgs-card overflow-hidden">
       <div className="px-4 py-3 border-b border-gray-100">
         <h2 className="text-sm font-semibold text-navy-900">Recent activity</h2>
       </div>

@@ -89,20 +89,20 @@ export default async function CareersPage({ searchParams }: PageProps) {
   const totalPages = Math.ceil(total / pageSize);
 
   return (
-    <div className="space-y-6 pb-20 lg:pb-0">
+    <div className="space-y-3.5 pb-20 lg:pb-0">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-end justify-between gap-3 flex-wrap px-1">
         <div>
-          <h1 className="text-2xl font-bold text-navy-900">Career Applications</h1>
-          <p className="text-navy-600 mt-1">{total} total applications</p>
+          <h1 className="dgs-title">Career Applications</h1>
+          <p className="dgs-sub">{total} total applications</p>
         </div>
-        <div className="w-12 h-12 rounded-xl bg-purple-50 flex items-center justify-center">
-          <Briefcase className="w-6 h-6 text-purple-600" />
+        <div className="w-11 h-11 rounded-[13px] flex items-center justify-center" style={{ background: "linear-gradient(150deg,#C8B9FF,#7C5CFC)" }}>
+          <Briefcase className="w-[22px] h-[22px] text-white" />
         </div>
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+      <div className="dgs-card p-4">
         <form className="flex flex-col sm:flex-row gap-4">
           {/* Search */}
           <div className="flex-1 relative">
@@ -144,7 +144,7 @@ export default async function CareersPage({ searchParams }: PageProps) {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="dgs-card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-100">

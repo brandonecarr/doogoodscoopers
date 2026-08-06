@@ -37,7 +37,7 @@ export default async function EmailAutomationsPage() {
         <div className="flex items-center gap-3">
           <Link href="/admin/email" className="p-2 hover:bg-gray-100 rounded-lg"><ArrowLeft className="w-5 h-5 text-gray-600" /></Link>
           <div>
-            <h1 className="text-2xl font-bold text-navy-900">Automations</h1>
+            <h1 className="dgs-title">Automations</h1>
             <p className="text-navy-600 text-sm mt-1">Set-and-forget email sequences that enroll new contacts automatically.</p>
           </div>
         </div>
@@ -48,7 +48,7 @@ export default async function EmailAutomationsPage() {
       </div>
 
       {rows.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
+        <div className="dgs-card p-12 text-center">
           <Zap className="w-10 h-10 text-gray-300 mx-auto mb-3" />
           <p className="text-gray-500">No automations yet.</p>
           <Link href="/admin/email/automations/new" className="text-teal-600 text-sm font-medium hover:underline mt-2 inline-block">Create a welcome or win-back drip →</Link>

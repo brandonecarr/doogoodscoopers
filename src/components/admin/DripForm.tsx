@@ -119,7 +119,7 @@ export function DripForm({ mode, campaignId, initial }: DripFormProps) {
       </div>
 
       {/* Trigger */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+      <div className="dgs-card p-6 space-y-4">
         <h2 className="text-lg font-semibold text-navy-900">1. Trigger</h2>
         <input
           value={name}
@@ -149,7 +149,7 @@ export function DripForm({ mode, campaignId, initial }: DripFormProps) {
       </div>
 
       {/* Sequence */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+      <div className="dgs-card p-6 space-y-4">
         <h2 className="text-lg font-semibold text-navy-900">2. Message sequence</h2>
         {steps.map((step, i) => (
           <div key={i} className="border border-gray-100 rounded-lg p-4 space-y-3">

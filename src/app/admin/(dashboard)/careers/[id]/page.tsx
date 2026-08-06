@@ -95,7 +95,7 @@ export default async function CareerDetailPage({ params }: PageProps) {
       id: "personal",
       zone: "main",
       node: (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div className="dgs-card p-6">
           <h2 className="text-lg font-semibold text-navy-900 mb-4">
             <User className="w-5 h-5 inline-block mr-2" />
             Personal Information
@@ -173,7 +173,7 @@ export default async function CareerDetailPage({ params }: PageProps) {
       id: "eligibility",
       zone: "main",
       node: (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div className="dgs-card p-6">
           <h2 className="text-lg font-semibold text-navy-900 mb-4">Employment Eligibility</h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="p-4 bg-gray-50 rounded-lg text-center">
@@ -208,7 +208,7 @@ export default async function CareerDetailPage({ params }: PageProps) {
       id: "work-history",
       zone: "main",
       node: (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div className="dgs-card p-6">
           <h2 className="text-lg font-semibold text-navy-900 mb-4">
             <Briefcase className="w-5 h-5 inline-block mr-2" />
             Work History
@@ -260,7 +260,7 @@ export default async function CareerDetailPage({ params }: PageProps) {
             id: "references",
             zone: "main" as const,
             node: (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+              <div className="dgs-card p-6">
                 <h2 className="text-lg font-semibold text-navy-900 mb-4">References</h2>
                 <div className="p-4 bg-gray-50 rounded-lg">
                   <p className="text-navy-900 whitespace-pre-wrap">{app.references}</p>
@@ -276,7 +276,7 @@ export default async function CareerDetailPage({ params }: PageProps) {
             id: "why-work-here",
             zone: "main" as const,
             node: (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+              <div className="dgs-card p-6">
                 <h2 className="text-lg font-semibold text-navy-900 mb-4">
                   <FileText className="w-5 h-5 inline-block mr-2" />
                   Why They Want to Work Here
@@ -305,7 +305,7 @@ export default async function CareerDetailPage({ params }: PageProps) {
       id: "timeline",
       zone: "side",
       node: (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div className="dgs-card p-6">
           <h2 className="text-lg font-semibold text-navy-900 mb-4">Timeline</h2>
           <div className="space-y-4">
             <div className="flex items-start gap-3">
@@ -337,21 +337,23 @@ export default async function CareerDetailPage({ params }: PageProps) {
 
   return (
     <div className="space-y-6 pb-20 lg:pb-0">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <Link
-          href="/admin/careers"
-          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-        >
-          <ArrowLeft className="w-5 h-5 text-gray-600" />
-        </Link>
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold text-navy-900">
-            {app.firstName} {app.lastName}
-          </h1>
-          <p className="text-navy-600 mt-1">Career Application</p>
+      {/* Header — dark hero */}
+      <div className="dgs-hero p-[22px] sm:p-[26px]">
+        <div className="flex items-center gap-4">
+          <Link
+            href="/admin/careers"
+            className="p-2 rounded-[10px] bg-white/10 hover:bg-white/15 transition-colors flex-shrink-0"
+          >
+            <ArrowLeft className="w-5 h-5 text-white" />
+          </Link>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-[30px] font-extrabold text-white tracking-[-0.03em] leading-none truncate">
+              {app.firstName} {app.lastName}
+            </h1>
+            <p className="text-[#9C9CB0] text-[12.5px] mt-2">Career Application</p>
+          </div>
+          {getStatusBadge(app.status as LeadStatus)}
         </div>
-        {getStatusBadge(app.status as LeadStatus)}
       </div>
 
       <ArrangeableBoard layoutId="career" cards={cards} />

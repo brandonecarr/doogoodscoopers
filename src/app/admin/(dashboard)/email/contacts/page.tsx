@@ -100,7 +100,7 @@ export default function EmailContactsPage() {
         <div className="flex items-center gap-3">
           <Link href="/admin/email" className="p-2 hover:bg-gray-100 rounded-lg"><ArrowLeft className="w-5 h-5 text-gray-600" /></Link>
           <div>
-            <h1 className="text-2xl font-bold text-navy-900">Contacts</h1>
+            <h1 className="dgs-title">Contacts</h1>
             <p className="text-navy-600 text-sm mt-1">{stats.subscribed} subscribed · {stats.unsubscribed} unsubscribed</p>
           </div>
         </div>
@@ -117,7 +117,7 @@ export default function EmailContactsPage() {
 
       {importMsg && <div className="bg-teal-50 border border-teal-200 rounded-lg px-4 py-2 text-sm text-teal-900">{importMsg}</div>}
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex flex-col sm:flex-row gap-3">
+      <div className="dgs-card p-4 flex flex-col sm:flex-row gap-3">
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name or email…" className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500" />
@@ -129,7 +129,7 @@ export default function EmailContactsPage() {
         </select>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="dgs-card overflow-hidden">
         {loading ? (
           <div className="flex justify-center py-16"><Loader2 className="w-7 h-7 animate-spin text-teal-600" /></div>
         ) : contacts.length === 0 ? (

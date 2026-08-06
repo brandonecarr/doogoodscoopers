@@ -196,7 +196,7 @@ export default async function QuoteLeadDetailPage({ params }: PageProps) {
       id: "contact",
       zone: "main",
       node: (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div className="dgs-card p-6">
           <h2 className="text-lg font-semibold text-navy-900 mb-4">Contact Information</h2>
           <div className="grid grid-cols-1 @lg:grid-cols-2 gap-4">
             <div className="flex items-center gap-3">
@@ -246,7 +246,7 @@ export default async function QuoteLeadDetailPage({ params }: PageProps) {
       id: "service-details",
       zone: "main",
       node: (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div className="dgs-card p-6">
           <h2 className="text-lg font-semibold text-navy-900 mb-4">Service Details</h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="p-4 bg-gray-50 rounded-lg">
@@ -285,7 +285,7 @@ export default async function QuoteLeadDetailPage({ params }: PageProps) {
             id: "dogs-info",
             zone: "main" as const,
             node: (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+              <div className="dgs-card p-6">
                 <h2 className="text-lg font-semibold text-navy-900 mb-4">
                   <Dog className="w-5 h-5 inline-block mr-2" />
                   Dogs Information
@@ -401,7 +401,7 @@ export default async function QuoteLeadDetailPage({ params }: PageProps) {
       id: "timeline",
       zone: "side",
       node: (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div className="dgs-card p-6">
           <h2 className="text-lg font-semibold text-navy-900 mb-4">Timeline</h2>
           <div className="space-y-4">
             <div className="flex items-start gap-3">
@@ -510,22 +510,24 @@ export default async function QuoteLeadDetailPage({ params }: PageProps) {
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex items-start gap-3">
-        <Link
-          href="/admin/quote-leads"
-          className="p-2 hover:bg-gray-100 rounded-lg transition-colors mt-0.5 flex-shrink-0"
-        >
-          <ArrowLeft className="w-5 h-5 text-gray-600" />
-        </Link>
-        <div className="flex-1 min-w-0">
-          <h1 className="text-2xl font-bold text-navy-900 truncate">
-            {lead.firstName} {lead.lastName || ""}
-          </h1>
-          <div className="flex items-center gap-2 mt-1 flex-wrap">
-            <span className="text-navy-600 text-sm">Quote Lead</span>
-            {getGradeBadge(lead.grade)}
-            {getStatusBadge(lead.status)}
+      {/* Header — dark hero */}
+      <div className="dgs-hero p-[22px] sm:p-[26px]">
+        <div className="flex items-start gap-3">
+          <Link
+            href="/admin/quote-leads"
+            className="p-2 rounded-[10px] bg-white/10 hover:bg-white/15 transition-colors mt-0.5 flex-shrink-0"
+          >
+            <ArrowLeft className="w-5 h-5 text-white" />
+          </Link>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-[30px] font-extrabold text-white tracking-[-0.03em] truncate leading-none">
+              {lead.firstName} {lead.lastName || ""}
+            </h1>
+            <div className="flex items-center gap-2 mt-2.5 flex-wrap">
+              <span className="text-[#9C9CB0] text-[12.5px]">Quote Lead</span>
+              {getGradeBadge(lead.grade)}
+              {getStatusBadge(lead.status)}
+            </div>
           </div>
         </div>
       </div>
