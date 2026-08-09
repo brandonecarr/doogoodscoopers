@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import "mapbox-gl/dist/mapbox-gl.css";
-import { Dog, Wand2, Eraser, X, MapPin, Loader2, Info } from "lucide-react";
+import { Dog, Wand2, Eraser, X, MapPin, Loader2, Info, ChevronDown } from "lucide-react";
 import { pawSvg, type MapCustomer } from "./CustomerInfoPanels";
 import { DAY_NAMES, DAY_SHORT, parseServiceDays, serviceDaysLabel, frequencyLabel } from "@/lib/customer-schedule";
 import { DAY_ORDER, UNASSIGNED, dayColor, plannedDay } from "@/lib/route-plan";
@@ -36,6 +36,19 @@ export function RoutePlanner({
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
+  const [collapsed, setCollapsed] = useState<Set<number>>(new Set());
+
+  function toggleCollapse(d: number) {
+    setCollapsed((prev) => {
+      const n = new Set(prev);
+      if (n.has(d)) n.delete(d); else n.add(d);
+      return n;
+    });
+  }
+  function expand(d: number) {
+    setCollapsed((prev) => (prev.has(d) ? new Set([...prev].filter((x) => x !== d)) : prev));
+  }
+  const allCollapsed = collapsed.size >= LANES.length;
 
   const byId = useMemo(() => new Map(customers.map((c) => [c.id, c])), [customers]);
 
@@ -295,25 +308,35 @@ export function RoutePlanner({
 
         {/* ── DAY LANES ───────────────────────────────────────────────────── */}
         <div className="space-y-2.5 lg:max-h-[calc(100vh-300px)] lg:overflow-y-auto lg:pr-1">
+          <div className="flex justify-end px-1">
+            <button type="button" onClick={() => setCollapsed(allCollapsed ? new Set() : new Set(LANES))}
+              className="text-[12px] font-semibold text-iris-link hover:underline">
+              {allCollapsed ? "Expand all" : "Collapse all"}
+            </button>
+          </div>
           {LANES.map((d) => {
             const arr = grouped.get(d) ?? [];
             const isOver = dragOver === d;
+            const isCollapsed = collapsed.has(d);
             return (
               <div key={d} className="dgs-card overflow-hidden"
-                onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; if (dragOver !== d) setDragOver(d); }}
+                onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; if (dragOver !== d) setDragOver(d); if (isCollapsed) expand(d); }}
                 onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOver((v) => (v === d ? null : v)); }}
                 onDrop={(e) => { e.preventDefault(); if (dragId) assign(dragId, d); setDragId(null); setDragOver(null); }}
                 style={isOver ? { boxShadow: "0 0 0 2px #8B6BFF inset" } : undefined}>
-                {/* Lane header */}
-                <div className="flex items-center gap-2 px-3.5 py-2.5 border-b border-hairline">
+                {/* Lane header — click to collapse/expand */}
+                <button type="button" onClick={() => toggleCollapse(d)}
+                  className={`w-full flex items-center gap-2 px-3.5 py-2.5 text-left ${isCollapsed ? "" : "border-b border-hairline"}`}>
+                  <ChevronDown className={`w-4 h-4 text-muted flex-shrink-0 transition-transform ${isCollapsed ? "-rotate-90" : ""}`} />
                   <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: dayColor(d) }} />
                   <span className="text-[13.5px] font-extrabold text-ink">{laneName(d)}</span>
                   <span className="ml-auto flex items-center gap-2 text-[11.5px] text-muted">
                     <span>{arr.length}</span>
                     {dogTotal(arr) > 0 && <span className="inline-flex items-center gap-0.5"><Dog className="w-3.5 h-3.5" />{dogTotal(arr)}</span>}
                   </span>
-                </div>
+                </button>
                 {/* Lane body */}
+                {!isCollapsed && (
                 <div className="p-2 space-y-1.5 min-h-[52px]">
                   {arr.length === 0 ? (
                     <div className="flex items-center justify-center h-[44px] text-[12px] text-muted">
@@ -341,6 +364,7 @@ export function RoutePlanner({
                     ))
                   )}
                 </div>
+                )}
               </div>
             );
           })}

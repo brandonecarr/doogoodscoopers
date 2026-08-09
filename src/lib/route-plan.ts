@@ -13,7 +13,7 @@ export const DAY_COLOR = [
   "#12A150", // Wed — grass
   "#F5A623", // Thu — gold
   "#3B82F6", // Fri — blue
-  "#6D3EF0", // Sat — deep iris
+  "#DC2626", // Sat — red (distinct from Fri's blue and Mon's violet)
 ];
 export const UNASSIGNED = -1;
 export const UNASSIGNED_COLOR = "#9A9AA5";
