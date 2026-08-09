@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import "mapbox-gl/dist/mapbox-gl.css";
-import { Dog, Wand2, Eraser, X, MapPin, Loader2, Info, ChevronDown } from "lucide-react";
+import { Dog, Wand2, Eraser, X, MapPin, Loader2, Info, ChevronDown, ChevronRight, Check, CalendarRange, Crosshair, RotateCcw } from "lucide-react";
 import { pawSvg, type MapCustomer } from "./CustomerInfoPanels";
 import { DAY_NAMES, DAY_SHORT, parseServiceDays, serviceDaysLabel, frequencyLabel } from "@/lib/customer-schedule";
 import { DAY_ORDER, UNASSIGNED, dayColor, plannedDay } from "@/lib/route-plan";
@@ -12,6 +12,11 @@ const LANES = [...DAY_ORDER, UNASSIGNED];
 const laneName = (d: number) => (d < 0 ? "Unassigned" : DAY_NAMES[d]);
 const laneShort = (d: number) => (d < 0 ? "Unassigned" : DAY_SHORT[d]);
 const dogTotal = (arr: MapCustomer[]) => arr.reduce((s, c) => s + (c.numberOfDogs || 0), 0);
+// City from the "City, CA 92373" line (falls back to the zip when there's no city).
+const cityLabel = (c: MapCustomer) => {
+  const parts = c.cityLine.split(",");
+  return (parts.length > 1 ? parts[0].trim() : c.zipCode) || "—";
+};
 
 export function RoutePlanner({
   customers,
@@ -37,6 +42,15 @@ export function RoutePlanner({
   const [dragOver, setDragOver] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [collapsed, setCollapsed] = useState<Set<number>>(new Set());
+  // Right-click context menu for a customer (pin or lane card).
+  const [menu, setMenu] = useState<{ x: number; y: number; customer: MapCustomer } | null>(null);
+  const [submenu, setSubmenu] = useState(false);
+
+  function openMenu(x: number, y: number, customer: MapCustomer) {
+    setSubmenu(false);
+    setMenu({ x, y, customer });
+  }
+  function closeMenu() { setMenu(null); setSubmenu(false); }
 
   function toggleCollapse(d: number) {
     setCollapsed((prev) => {
@@ -175,6 +189,13 @@ export function RoutePlanner({
             setSelected(byIdRef.current.get(c.id) || c);
             map.flyTo({ center: co, zoom: 14.8, duration: 800 });
           });
+          el.addEventListener("contextmenu", (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            const me = ev as MouseEvent;
+            setSubmenu(false);
+            setMenu({ x: me.clientX, y: me.clientY, customer: byIdRef.current.get(c.id) || c });
+          });
           const marker = new mapboxgl.Marker({ element: el, anchor: "bottom" }).setLngLat(co).addTo(map);
           markersRef.current.set(c.id, { marker, inner });
           b.extend(co);
@@ -207,6 +228,21 @@ export function RoutePlanner({
       entry.marker.getElement().style.display = visible.has(day) ? "" : "none";
     }
   }, [assignments, visible, ready, customers]);
+
+  // Dismiss the context menu on Escape, scroll, or resize.
+  useEffect(() => {
+    if (!menu) return;
+    const close = () => { setMenu(null); setSubmenu(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [menu]);
 
   const selectedDay = selected ? plannedDay(selected, assignments) : UNASSIGNED;
 
@@ -348,6 +384,7 @@ export function RoutePlanner({
                         onDragStart={(e) => { setDragId(c.id); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", c.id); }}
                         onDragEnd={() => { setDragId(null); setDragOver(null); }}
                         onClick={() => { setSelected(c); flyTo(c); }}
+                        onContextMenu={(e) => { e.preventDefault(); openMenu(e.clientX, e.clientY, c); }}
                         className={`dgs-tile px-2.5 py-2 cursor-grab active:cursor-grabbing transition-opacity ${dragId === c.id ? "opacity-40" : ""}`}>
                         <div className="flex items-center gap-2">
                           <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: dayColor(d) }} />
@@ -356,7 +393,7 @@ export function RoutePlanner({
                             <span className="inline-flex items-center gap-0.5 text-[11px] text-muted flex-shrink-0"><Dog className="w-3 h-3" />{c.numberOfDogs}</span>
                           )}
                         </div>
-                        <p className="text-[11px] text-muted truncate mt-0.5 pl-4">{c.address || c.cityLine}</p>
+                        <p className="text-[11px] text-muted truncate mt-0.5 pl-4">{cityLabel(c)}</p>
                         <p className="text-[10.5px] text-muted truncate pl-4">
                           {frequencyLabel(c.cleanupFrequency)} · real: {serviceDaysLabel(parseServiceDays(c.serviceDays))}
                         </p>
@@ -369,10 +406,61 @@ export function RoutePlanner({
             );
           })}
           <p className="text-[11px] text-muted px-1 flex items-center gap-1.5">
-            <MapPin className="w-3 h-3" /> Tap a card to find it on the map.
+            <MapPin className="w-3 h-3" /> Tap a card to find it on the map. Right-click for options.
           </p>
         </div>
       </div>
+
+      {/* Right-click context menu (map pin or lane card) */}
+      {menu && (() => {
+        const MENU_W = 240, MENU_H = 196, SUB_W = 170;
+        const vw = typeof window !== "undefined" ? window.innerWidth : 1200;
+        const vh = typeof window !== "undefined" ? window.innerHeight : 800;
+        const x = Math.max(8, Math.min(menu.x, vw - MENU_W - 8));
+        const y = Math.max(8, Math.min(menu.y, vh - MENU_H - 8));
+        const openLeft = x + MENU_W + SUB_W > vw - 8;
+        const cur = plannedDay(menu.customer, assignments);
+        const item = "w-full flex items-center gap-2 px-2.5 py-2 rounded-[10px] text-[13px] font-semibold text-bodytext hover:bg-surface2 transition-colors";
+        return (
+          <>
+            <div className="fixed inset-0 z-40" onClick={closeMenu} onContextMenu={(e) => { e.preventDefault(); closeMenu(); }} />
+            <div className="dgs-pop dgs-anim-pop fixed z-50 p-1.5" style={{ left: x, top: y, width: MENU_W }}>
+              <div className="px-2.5 py-1.5 mb-1 border-b border-hairline">
+                <p className="text-[12.5px] font-extrabold text-ink truncate">{menu.customer.name}</p>
+                <p className="text-[10.5px] text-muted truncate">{cityLabel(menu.customer)}</p>
+              </div>
+
+              {/* Change service day → submenu of days */}
+              <div className="relative" onMouseEnter={() => setSubmenu(true)} onMouseLeave={() => setSubmenu(false)}>
+                <button type="button" onClick={() => setSubmenu((v) => !v)} className={`${item} justify-between`}>
+                  <span className="flex items-center gap-2"><CalendarRange className="w-4 h-4 text-muted" /> Change service day</span>
+                  <ChevronRight className="w-3.5 h-3.5 text-muted" />
+                </button>
+                {submenu && (
+                  <div className="dgs-pop absolute top-[-6px] p-1.5 max-h-[300px] overflow-auto"
+                    style={openLeft ? { right: "100%", marginRight: 4, width: SUB_W } : { left: "100%", marginLeft: 4, width: SUB_W }}>
+                    {LANES.map((dz) => (
+                      <button key={dz} type="button" onClick={() => { assign(menu.customer.id, dz); closeMenu(); }}
+                        className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-[8px] text-[12.5px] font-semibold text-bodytext hover:bg-surface2 transition-colors">
+                        <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: dayColor(dz) }} />
+                        <span className="flex-1 text-left">{laneName(dz)}</span>
+                        {cur === dz && <Check className="w-3.5 h-3.5 text-iris-deep flex-shrink-0" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <button type="button" onClick={() => { setSelected(menu.customer); flyTo(menu.customer); closeMenu(); }} className={item}>
+                <Crosshair className="w-4 h-4 text-muted" /> Find on map
+              </button>
+              <button type="button" onClick={() => { assign(menu.customer.id, null); closeMenu(); }} className={item}>
+                <RotateCcw className="w-4 h-4 text-muted" /> Reset to real Sweep&amp;Go day
+              </button>
+            </div>
+          </>
+        );
+      })()}
     </div>
   );
 }
