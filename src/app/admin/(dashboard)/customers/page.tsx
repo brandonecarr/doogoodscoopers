@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { Search, Archive, RefreshCw, ArrowUp, ArrowDown, LayoutList, Map as MapIcon } from "lucide-react";
+import { Search, Archive, RefreshCw, ArrowUp, ArrowDown, LayoutList, Map as MapIcon, CalendarRange } from "lucide-react";
 import type { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { CustomerReviewControl } from "@/components/admin/CustomerReviewControl";
 import { CustomersMapClient } from "@/components/admin/CustomersMapClient";
+import { RoutePlannerClient } from "@/components/admin/RoutePlannerClient";
 import type { MapCustomer } from "@/components/admin/CustomerInfoPanels";
 import { geocodeAddress, resolveZips, normalizeZip } from "@/lib/geo/zipgeo";
 
@@ -45,7 +46,7 @@ type Cust = any;
 
 export default async function CustomersPage({ searchParams }: PageProps) {
   const { search, sort: sortRaw, dir: dirRaw, view: viewRaw } = await searchParams;
-  const view = viewRaw === "map" ? "map" : "list";
+  const view = viewRaw === "map" ? "map" : viewRaw === "planner" ? "planner" : "list";
   let sortKey = sortRaw;
   let dirKey = dirRaw;
   if (sortRaw?.includes(":")) { const [s, d] = sortRaw.split(":"); sortKey = s; dirKey = d; }
@@ -74,10 +75,10 @@ export default async function CustomersPage({ searchParams }: PageProps) {
 
   const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
-  // ── Map view: geocode any missing coords + build the pin data ──────────────
+  // ── Map + Planner views: geocode any missing coords + build the pin data ───
   let mapCustomers: MapCustomer[] = [];
   let uncoded = 0;
-  if (view === "map") {
+  if (view === "map" || view === "planner") {
     const missing = customers.filter((c: Cust) => c.lat == null || c.lng == null).slice(0, 60);
     // Bounded parallel geocode so first load isn't slow.
     for (let i = 0; i < missing.length; i += 8) {
@@ -114,6 +115,14 @@ export default async function CustomersPage({ searchParams }: PageProps) {
         oneTimeClient: c.oneTimeClient,
       };
     });
+  }
+
+  // Planner: current day-assignments (a read-only scratchpad in its own table,
+  // entirely separate from Sweep&Go).
+  const planAssignments: Record<string, number> = {};
+  if (view === "planner") {
+    const rows = await prisma.routePlanAssignment.findMany({ select: { customerId: true, dayOfWeek: true } });
+    for (const r of rows) planAssignments[r.customerId] = r.dayOfWeek;
   }
 
   // Link helpers that preserve current filters.
@@ -156,6 +165,7 @@ export default async function CustomersPage({ searchParams }: PageProps) {
         <div className="flex items-center bg-white rounded-[12px] p-1 border border-hair">
           {viewBtn("list", "List", LayoutList)}
           {viewBtn("map", "Map", MapIcon)}
+          {viewBtn("planner", "Planner", CalendarRange)}
         </div>
       </div>
 
@@ -201,8 +211,10 @@ export default async function CustomersPage({ searchParams }: PageProps) {
         </form>
       </div>
 
-      {/* ── MAP ─────────────────────────────────────────────────────────────── */}
-      {view === "map" ? (
+      {/* ── PLANNER / MAP / LIST ────────────────────────────────────────────── */}
+      {view === "planner" ? (
+        <RoutePlannerClient customers={mapCustomers} token={token} initialAssignments={planAssignments} />
+      ) : view === "map" ? (
         <CustomersMapClient customers={mapCustomers} token={token} uncoded={uncoded} />
       ) : (
         /* ── LIST (table) ─────────────────────────────────────────────────── */

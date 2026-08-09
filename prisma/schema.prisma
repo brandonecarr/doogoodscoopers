@@ -914,3 +914,19 @@ model EmailTemplate {
 
   @@index([createdAt])
 }
+
+/// Local route-planning scratchpad: the weekday the owner has *planned* to
+/// service a customer. Never synced to Sweep&Go (SweepandgoCustomer is a
+/// one-way read-only mirror). One row per customer. dayOfWeek: 0=Sun … 6=Sat.
+/// Loose-coupled to SweepandgoCustomer by id (no FK) — orphan rows for
+/// soft-deleted customers are harmless and simply ignored.
+model RoutePlanAssignment {
+  id         String   @id @default(cuid())
+  customerId String   @unique
+  dayOfWeek  Int
+  updatedBy  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([dayOfWeek])
+}
