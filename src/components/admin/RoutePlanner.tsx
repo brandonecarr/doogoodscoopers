@@ -2,10 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import "mapbox-gl/dist/mapbox-gl.css";
-import { Dog, Wand2, Eraser, X, MapPin, Loader2, Info, ChevronDown, ChevronRight, Check, CalendarRange, Crosshair, RotateCcw } from "lucide-react";
+import { Dog, Wand2, Eraser, X, MapPin, Loader2, Info, ChevronDown, ChevronRight, Check, CalendarRange, Crosshair, RotateCcw, Droplets } from "lucide-react";
 import { pawSvg, type MapCustomer } from "./CustomerInfoPanels";
 import { DAY_NAMES, DAY_SHORT, parseServiceDays, serviceDaysLabel, frequencyLabel } from "@/lib/customer-schedule";
-import { DAY_ORDER, UNASSIGNED, dayColor, plannedDay } from "@/lib/route-plan";
+import { DAY_ORDER, UNASSIGNED, dayColor, plannedDay, sprayInfo, SPRAY_COLOR, sprayLabel, weekParity, type SprayFreq } from "@/lib/route-plan";
 
 // Lanes / chips: Mon-first work week, weekend, then Unassigned.
 const LANES = [...DAY_ORDER, UNASSIGNED];
@@ -45,6 +45,9 @@ export function RoutePlanner({
   // Right-click context menu for a customer (pin or lane card).
   const [menu, setMenu] = useState<{ x: number; y: number; customer: MapCustomer } | null>(null);
   const [submenu, setSubmenu] = useState(false);
+  // Sanitization-spray week view: "both" shows every spray; "a"/"b" split the
+  // bi-weekly/monthly ones across alternating weeks (weekly always shows).
+  const [week, setWeek] = useState<"both" | "a" | "b">("both");
 
   function openMenu(x: number, y: number, customer: MapCustomer) {
     setSubmenu(false);
@@ -65,6 +68,24 @@ export function RoutePlanner({
   const allCollapsed = collapsed.size >= LANES.length;
 
   const byId = useMemo(() => new Map(customers.map((c) => [c.id, c])), [customers]);
+
+  // Customers with the sanitization-spray add-on → their spray cadence.
+  const sprayById = useMemo(() => {
+    const m = new Map<string, { freq: SprayFreq }>();
+    for (const c of customers) {
+      const s = sprayInfo(c.subscriptionNames, c.cleanupFrequency);
+      if (s) m.set(c.id, s);
+    }
+    return m;
+  }, [customers]);
+
+  // Whether a customer's spray card shows in the current week view.
+  function sprayShown(id: string): boolean {
+    const s = sprayById.get(id);
+    if (!s) return false;
+    if (week === "both" || s.freq === "weekly") return true;
+    return weekParity(id) === (week === "a" ? 0 : 1);
+  }
 
   // Fan out customers that share a coordinate so each stays clickable.
   const coords = useMemo(() => {
@@ -184,6 +205,11 @@ export function RoutePlanner({
           inner.style.background = dayColor(plannedDay(c, as));
           inner.innerHTML = `<img src="${pawSvg("#ffffff")}" style="width:12px;height:12px;transform:rotate(-45deg)"/>`;
           el.appendChild(inner);
+          if (sprayInfo(c.subscriptionNames, c.cleanupFrequency)) {
+            const dot = document.createElement("div");
+            dot.style.cssText = `position:absolute;top:-3px;right:-3px;width:12px;height:12px;border-radius:50%;background:${SPRAY_COLOR};border:2px solid #fff;box-sizing:border-box;z-index:1`;
+            el.appendChild(dot);
+          }
           el.addEventListener("click", (ev) => {
             ev.stopPropagation();
             setSelected(byIdRef.current.get(c.id) || c);
@@ -268,6 +294,24 @@ export function RoutePlanner({
           className="dgs-btn dgs-btn-ghost disabled:opacity-50">
           <Eraser className="w-4 h-4" /> Clear plan
         </button>
+
+        {sprayById.size > 0 && (
+          <div className="flex items-center gap-1.5">
+            <span className="inline-flex items-center gap-1 text-[11.5px] font-semibold" style={{ color: SPRAY_COLOR }}>
+              <Droplets className="w-3.5 h-3.5" /> Sprays
+            </span>
+            <div className="flex items-center bg-white rounded-[10px] p-0.5 border border-hair">
+              {([["both", "All weeks"], ["a", "Week A"], ["b", "Week B"]] as const).map(([w, label]) => (
+                <button key={w} onClick={() => setWeek(w)}
+                  className="px-2.5 py-1 rounded-[8px] text-[12px] font-semibold transition-colors"
+                  style={week === w ? { background: "#101014", color: "#fff" } : { color: "#5A5A66" }}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         <span className="text-[12px] text-muted ml-auto">{customers.length} customer{customers.length === 1 ? "" : "s"} mapped</span>
       </div>
 
@@ -354,6 +398,7 @@ export function RoutePlanner({
             const arr = grouped.get(d) ?? [];
             const isOver = dragOver === d;
             const isCollapsed = collapsed.has(d);
+            const sprayCount = arr.filter((c) => sprayShown(c.id)).length;
             return (
               <div key={d} className="dgs-card overflow-hidden"
                 onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; if (dragOver !== d) setDragOver(d); if (isCollapsed) expand(d); }}
@@ -369,6 +414,7 @@ export function RoutePlanner({
                   <span className="ml-auto flex items-center gap-2 text-[11.5px] text-muted">
                     <span>{arr.length}</span>
                     {dogTotal(arr) > 0 && <span className="inline-flex items-center gap-0.5"><Dog className="w-3.5 h-3.5" />{dogTotal(arr)}</span>}
+                    {sprayCount > 0 && <span className="inline-flex items-center gap-0.5" style={{ color: SPRAY_COLOR }}><Droplets className="w-3.5 h-3.5" />{sprayCount}</span>}
                   </span>
                 </button>
                 {/* Lane body */}
@@ -379,26 +425,46 @@ export function RoutePlanner({
                       {isOver ? "Drop here" : "—"}
                     </div>
                   ) : (
-                    arr.map((c) => (
-                      <div key={c.id} draggable
-                        onDragStart={(e) => { setDragId(c.id); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", c.id); }}
-                        onDragEnd={() => { setDragId(null); setDragOver(null); }}
-                        onClick={() => { setSelected(c); flyTo(c); }}
-                        onContextMenu={(e) => { e.preventDefault(); openMenu(e.clientX, e.clientY, c); }}
-                        className={`dgs-tile px-2.5 py-2 cursor-grab active:cursor-grabbing transition-opacity ${dragId === c.id ? "opacity-40" : ""}`}>
-                        <div className="flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: dayColor(d) }} />
-                          <p className="text-[13px] font-bold text-ink truncate flex-1">{c.name}</p>
-                          {c.numberOfDogs != null && c.numberOfDogs > 0 && (
-                            <span className="inline-flex items-center gap-0.5 text-[11px] text-muted flex-shrink-0"><Dog className="w-3 h-3" />{c.numberOfDogs}</span>
-                          )}
+                    arr.map((c) => {
+                      const spray = sprayById.get(c.id);
+                      return (
+                      <div key={c.id} className="space-y-1.5">
+                        {/* Scooping (service) card — draggable */}
+                        <div draggable
+                          onDragStart={(e) => { setDragId(c.id); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", c.id); }}
+                          onDragEnd={() => { setDragId(null); setDragOver(null); }}
+                          onClick={() => { setSelected(c); flyTo(c); }}
+                          onContextMenu={(e) => { e.preventDefault(); openMenu(e.clientX, e.clientY, c); }}
+                          className={`dgs-tile px-2.5 py-2 cursor-grab active:cursor-grabbing transition-opacity ${dragId === c.id ? "opacity-40" : ""}`}>
+                          <div className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: dayColor(d) }} />
+                            <p className="text-[13px] font-bold text-ink truncate flex-1">{c.name}</p>
+                            {c.numberOfDogs != null && c.numberOfDogs > 0 && (
+                              <span className="inline-flex items-center gap-0.5 text-[11px] text-muted flex-shrink-0"><Dog className="w-3 h-3" />{c.numberOfDogs}</span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-muted truncate mt-0.5 pl-4">{cityLabel(c)}</p>
+                          <p className="text-[10.5px] text-muted truncate pl-4">
+                            {frequencyLabel(c.cleanupFrequency)} · real: {serviceDaysLabel(parseServiceDays(c.serviceDays))}
+                          </p>
                         </div>
-                        <p className="text-[11px] text-muted truncate mt-0.5 pl-4">{cityLabel(c)}</p>
-                        <p className="text-[10.5px] text-muted truncate pl-4">
-                          {frequencyLabel(c.cleanupFrequency)} · real: {serviceDaysLabel(parseServiceDays(c.serviceDays))}
-                        </p>
+                        {/* Sanitization-spray card — follows the customer's assigned day */}
+                        {spray && sprayShown(c.id) && (
+                          <div onClick={() => { setSelected(c); flyTo(c); }}
+                            onContextMenu={(e) => { e.preventDefault(); openMenu(e.clientX, e.clientY, c); }}
+                            className="rounded-[14px] px-2.5 py-2 cursor-pointer"
+                            style={{ background: "#E7F6F4", boxShadow: `inset 3px 0 0 ${SPRAY_COLOR}` }}>
+                            <div className="flex items-center gap-2">
+                              <Droplets className="w-3.5 h-3.5 flex-shrink-0" style={{ color: SPRAY_COLOR }} />
+                              <p className="text-[12.5px] font-bold text-ink truncate flex-1">Sanitization spray</p>
+                              <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded" style={{ background: "#fff", color: SPRAY_COLOR }}>{sprayLabel(spray.freq)}</span>
+                            </div>
+                            <p className="text-[11px] text-muted truncate mt-0.5 pl-5">{c.name} · {cityLabel(c)}</p>
+                          </div>
+                        )}
                       </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
                 )}
