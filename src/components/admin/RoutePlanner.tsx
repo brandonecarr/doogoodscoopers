@@ -111,6 +111,7 @@ export function RoutePlanner({
   const coordsRef = useRef(coords); coordsRef.current = coords;
   const assignmentsRef = useRef(assignments); assignmentsRef.current = assignments;
   const byIdRef = useRef(byId); byIdRef.current = byId;
+  const selectedRef = useRef(selected); selectedRef.current = selected;
 
   // Group customers into lanes by their planned day.
   const grouped = useMemo(() => {
@@ -160,6 +161,19 @@ export function RoutePlanner({
     if (map && co) map.flyTo({ center: co, zoom: 14.8, duration: 800 });
   }
 
+  // Reframe the whole set of pins (used when a customer card is closed).
+  function fitAll(duration = 700) {
+    const map = mapRef.current;
+    if (!map || coords.size === 0) return;
+    let w = Infinity, s = Infinity, e = -Infinity, n = -Infinity;
+    for (const [lng, lat] of coords.values()) { if (lng < w) w = lng; if (lng > e) e = lng; if (lat < s) s = lat; if (lat > n) n = lat; }
+    try { map.fitBounds([[w, s], [e, n]], { padding: 70, maxZoom: 13, duration }); } catch {}
+  }
+  const fitAllRef = useRef(fitAll); fitAllRef.current = fitAll;
+
+  // Close the customer card and zoom back out.
+  function closeSelected() { setSelected(null); fitAll(700); }
+
   function toggleDay(d: number) {
     setVisible((prev) => {
       const n = new Set(prev);
@@ -186,6 +200,8 @@ export function RoutePlanner({
       });
       mapRef.current = map;
       map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "bottom-right");
+      // Clicking empty map (not a pin — pins stopPropagation) closes the card and zooms out.
+      map.on("click", () => { if (selectedRef.current) { setSelected(null); fitAllRef.current(700); } });
       map.on("error", (e: { error?: { message?: string } }) => {
         const msg = e?.error?.message || "";
         if (/access token|401|403|unauthorized/i.test(msg)) setError("Mapbox rejected the token — check NEXT_PUBLIC_MAPBOX_TOKEN.");
@@ -360,7 +376,7 @@ export function RoutePlanner({
                     {selected.numberOfDogs != null ? ` · ${selected.numberOfDogs} dog${selected.numberOfDogs === 1 ? "" : "s"}` : ""}
                   </p>
                 </div>
-                <button onClick={() => setSelected(null)} className="p-1 rounded-lg hover:bg-surface2 text-muted flex-shrink-0"><X className="w-4 h-4" /></button>
+                <button onClick={closeSelected} className="p-1 rounded-lg hover:bg-surface2 text-muted flex-shrink-0"><X className="w-4 h-4" /></button>
               </div>
               <p className="text-[10.5px] font-semibold text-muted uppercase tracking-wide mt-3 mb-1.5">Plan for</p>
               <div className="grid grid-cols-4 gap-1.5">
