@@ -29,12 +29,31 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
   const customer = await prisma.sweepandgoCustomer.findUnique({ where: { id } });
   if (!customer) notFound();
 
-  const [messages, review] = await Promise.all([
+  const name = [customer.firstName, customer.lastName].filter(Boolean).join(" ") || "Unknown";
+  const fullName = [customer.firstName, customer.lastName].filter(Boolean).join(" ").trim();
+
+  const [messages, reviewCandidates] = await Promise.all([
     prisma.leadMessage.findMany({ where: { leadType: "CUSTOMER", leadId: id }, orderBy: { createdAt: "asc" }, take: 100 }),
-    prisma.review.findFirst({ where: { sngCustomerId: id }, orderBy: { createdAt: "desc" } }),
+    // A review links to a customer explicitly (sngCustomerId) or — for reviews synced
+    // from Google, which only carry the reviewer's display name — by matching full name
+    // or email. Grab candidates and prefer a completed one that has a rating/text.
+    prisma.review.findMany({
+      where: {
+        OR: [
+          { sngCustomerId: id },
+          ...(fullName ? [{ customerName: { equals: fullName, mode: "insensitive" as const } }] : []),
+          ...(customer.email ? [{ email: { equals: customer.email, mode: "insensitive" as const } }] : []),
+        ],
+      },
+      orderBy: { reviewedAt: "desc" },
+      take: 10,
+    }),
   ]);
 
-  const name = [customer.firstName, customer.lastName].filter(Boolean).join(" ") || "Unknown";
+  const review =
+    reviewCandidates.find((r) => r.rating != null || (r.reviewText != null && r.reviewText.trim() !== "")) ??
+    reviewCandidates[0] ??
+    null;
 
   const field = ({ icon: Icon, label, value, href }: { icon: typeof Mail; label: string; value: React.ReactNode; href?: string }) => (
     <div className="flex items-start gap-3">
@@ -102,14 +121,56 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
           <p className="text-xs text-gray-400 mt-2">
             Sends a Google review-request text to this customer and marks them <strong>Request Sent</strong>. Also set automatically when a review-request drip texts them. Update the status here anytime.
           </p>
-          {review && (
-            <div className="flex items-center gap-4 text-sm mt-4 pt-4 border-t border-gray-100">
-              {review.rating ? <span className="text-amber-500">{"★".repeat(review.rating)}{"☆".repeat(5 - review.rating)}</span> : null}
+          {review && (review.rating != null || (review.reviewText != null && review.reviewText.trim() !== "")) ? (
+            <div className="mt-4 pt-4 border-t border-gray-100">
+              <div className="flex items-center gap-3 flex-wrap">
+                {review.rating != null ? (
+                  <span className="text-lg leading-none text-amber-500">
+                    {"★".repeat(review.rating)}
+                    <span className="text-gray-300">{"☆".repeat(5 - review.rating)}</span>
+                  </span>
+                ) : null}
+                <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 text-[11px] font-medium capitalize">
+                  {review.platform || "google"}
+                </span>
+                {review.reviewedAt ? (
+                  <span className="text-xs text-gray-400" suppressHydrationWarning>{fmtDate(review.reviewedAt)}</span>
+                ) : null}
+              </div>
+
+              {review.reviewText && review.reviewText.trim() !== "" ? (
+                <blockquote className="mt-3 border-l-2 border-amber-300 pl-3 text-sm italic leading-relaxed text-navy-900">
+                  “{review.reviewText}”
+                </blockquote>
+              ) : (
+                <p className="mt-3 text-sm italic text-gray-400">Left a {review.rating}★ rating with no written comment.</p>
+              )}
+
+              {review.customerName && review.customerName.trim().toLowerCase() !== name.toLowerCase() ? (
+                <p className="mt-2 text-xs text-gray-400">Posted on Google as “{review.customerName}”</p>
+              ) : null}
+
+              {review.reply && review.reply.trim() !== "" ? (
+                <div className="mt-3 ml-1 border-l-2 border-gray-200 pl-3">
+                  <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-400">Your reply</p>
+                  <p className="whitespace-pre-wrap text-sm text-gray-700">{review.reply}</p>
+                </div>
+              ) : null}
+
+              {review.reviewUrl ? (
+                <a href={review.reviewUrl} target="_blank" rel="noopener noreferrer"
+                   className="mt-3 inline-block text-xs font-semibold text-teal-600 hover:underline">
+                  View on Google →
+                </a>
+              ) : null}
+            </div>
+          ) : review ? (
+            <div className="mt-4 flex items-center gap-4 border-t border-gray-100 pt-4 text-sm">
               <span className="text-gray-500" suppressHydrationWarning>
                 {review.status === "COMPLETED" ? `Reviewed on ${fmtDate(review.reviewedAt)}` : `Requested ${fmtDate(review.requestedAt)}`}
               </span>
             </div>
-          )}
+          ) : null}
         </div>
       ),
     },

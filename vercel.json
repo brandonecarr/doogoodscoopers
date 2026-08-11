@@ -51,6 +51,10 @@
     {
       "path": "/api/v2/cron/geocode-customers",
       "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/v2/cron/sync-reviews",
+      "schedule": "0 8 * * *"
     }
   ]
 }
