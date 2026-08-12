@@ -88,9 +88,15 @@ export async function POST(request: NextRequest) {
       return await handleInbound(supabase, payload);
     }
 
-    // Any other message.* event is a delivery-status update.
+    // Any other message.* event is about a message WE sent. It's a delivery-status
+    // update, and/or the first we're hearing of an outbound message composed in the
+    // Quo app (not through the CRM) — capture that into the lead's thread so the
+    // owner's own replies show up here too.
     if (event.startsWith("message.")) {
       const status = resolveDeliveryStatus(event, payload);
+      await captureOutboundFromQuo(payload, status).catch((e) =>
+        console.error("[Quo] outbound capture failed:", e)
+      );
       if (!status) return NextResponse.json({ success: true, ignored: true, event });
       return await handleDeliveryStatus(supabase, payload, status);
     }
@@ -418,6 +424,86 @@ async function handleDeliveryStatus(
   }
 
   return NextResponse.json({ success: true, status, dripStopped });
+}
+
+/**
+ * Capture an OUTBOUND message that was sent from the Quo app (not through the CRM)
+ * so the owner's own replies land in the lead's thread. No-ops when:
+ *  - the message isn't outbound (inbound is handled by message.received), or
+ *  - we already have it (it was sent through the CRM — deduped by quoMessageId), or
+ *  - it carries no body, or its recipient doesn't match a lead.
+ * Matches the recipient by phone: the active thread on that number first, then the
+ * most recent QuoteLead, then AdLead — the same resolution used for inbound replies.
+ */
+async function captureOutboundFromQuo(payload: unknown, status: string | null) {
+  const msg = parseInboundMessage(payload);
+  if (!msg.messageId) return;
+
+  // Outbound? Trust the payload's direction; otherwise infer from the sender being
+  // our own Quo number.
+  const dir = (msg.direction || "").toLowerCase();
+  const our = normalizePhoneNumber(getQuoFromNumber());
+  const fromOurs = !!our && normalizePhoneNumber(msg.from) === our;
+  const isOutbound = /out/.test(dir) || (!/in/.test(dir) && fromOurs);
+  if (!isOutbound) return;
+
+  // Already recorded (sent through the CRM, or a duplicate event) → status update
+  // handles it; don't create a second row.
+  const existing = await prisma.leadMessage.findUnique({ where: { quoMessageId: msg.messageId } });
+  if (existing) return;
+
+  const body = (msg.body || "").trim();
+  if (!body) return; // a status ping with no content — nothing to show in the thread
+
+  const toPhone = normalizePhoneNumber(msg.to);
+  if (!toPhone) return;
+  const candidates = phoneCandidates(toPhone);
+
+  // Prefer the lead/customer we're already threading with on this number, then the
+  // most recent QuoteLead, then AdLead.
+  let match: { type: LeadSource; id: string } | null = null;
+  const thread = await prisma.leadMessage.findFirst({
+    where: { phone: { in: candidates } },
+    orderBy: { createdAt: "desc" },
+    select: { leadType: true, leadId: true },
+  });
+  if (thread) {
+    match = { type: thread.leadType, id: thread.leadId };
+  } else {
+    const quote = await prisma.quoteLead.findFirst({
+      where: { phone: { in: candidates } },
+      orderBy: { createdAt: "desc" },
+      select: { id: true },
+    });
+    if (quote) match = { type: "QUOTE_FORM", id: quote.id };
+    else {
+      const adl = await prisma.adLead.findFirst({
+        where: { phone: { in: candidates } },
+        orderBy: { createdAt: "desc" },
+        select: { id: true },
+      });
+      if (adl) match = { type: "AD_LEAD", id: adl.id };
+    }
+  }
+  if (!match) return;
+
+  try {
+    await prisma.leadMessage.create({
+      data: {
+        leadType: match.type,
+        leadId: match.id,
+        direction: "OUTBOUND",
+        body,
+        phone: toPhone,
+        provider: "quo",
+        quoMessageId: msg.messageId,
+        status: status || "SENT",
+      },
+    });
+  } catch (e) {
+    // Unique-constraint race (a concurrent event just created it) — safe to ignore.
+    console.warn("[Quo] outbound capture skipped:", (e as Error).message);
+  }
 }
 
 // ── Calls → lead/client timeline (Phase 4) ──────────────────────────────────

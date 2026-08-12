@@ -246,6 +246,8 @@ export interface QuoInboundMessage {
   mediaUrls: string[];
   conversationId?: string;
   createdAt?: string;
+  /** "incoming" | "outgoing" (Quo/OpenPhone), when the payload reports it. */
+  direction?: string;
 }
 
 /**
@@ -275,6 +277,7 @@ export function parseInboundMessage(payload: unknown): QuoInboundMessage {
     mediaUrls,
     conversationId: (obj.conversationId as string) || undefined,
     createdAt: (obj.createdAt as string) || undefined,
+    direction: (obj.direction as string) || undefined,
   };
 }
 
