@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { FileText, Search, Filter, Plus, Archive, Loader2 } from "lucide-react";
 import type { LeadStatus, QuoteLead } from "@/types/leads";
+import { PageHero, heroBtnPrimary, heroBtnSecondary, heroPrimaryStyle } from "@/components/admin/PageHero";
 
 function formatDate(date: string | Date) {
   return new Date(date).toLocaleDateString("en-US", {
@@ -124,39 +125,32 @@ export default function QuoteLeadsPage() {
   return (
     <div className="space-y-6 pb-20 lg:pb-0">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="dgs-title">
-            {showArchived ? "Archived Leads" : "Quote Leads"}
-          </h1>
-          <p className="text-navy-600 mt-1">{total} {showArchived ? "archived" : "active"} leads</p>
-        </div>
-        <div className="flex items-center gap-2">
-          {!showArchived && (
-            <Link
-              href="/admin/quote-leads/new"
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors text-sm font-medium"
-            >
-              <Plus className="w-4 h-4 flex-shrink-0" />
-              <span>Add New</span>
-            </Link>
-          )}
-          <Link
-            href={showArchived ? "/admin/quote-leads" : "/admin/quote-leads?archived=true"}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors text-sm font-medium ${
-              showArchived
-                ? "bg-teal-600 text-white hover:bg-teal-700"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-            }`}
-          >
-            <Archive className="w-4 h-4 flex-shrink-0" />
-            <span>{showArchived ? "Active" : "Archived"}</span>
-          </Link>
-          <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
-            <FileText className="w-5 h-5 text-blue-600" />
+      <PageHero
+        title={showArchived ? "Archived Leads" : "Quote Leads"}
+        subtitle={`${total} ${showArchived ? "archived" : "active"} leads`}
+        icon={
+          <div className="w-11 h-11 rounded-[13px] bg-white/10 flex items-center justify-center flex-shrink-0">
+            <FileText className="w-5 h-5 text-white" />
           </div>
-        </div>
-      </div>
+        }
+        actions={
+          <>
+            {!showArchived && (
+              <Link href="/admin/quote-leads/new" className={heroBtnPrimary} style={heroPrimaryStyle}>
+                <Plus className="w-4 h-4 flex-shrink-0" />
+                <span>Add New</span>
+              </Link>
+            )}
+            <Link
+              href={showArchived ? "/admin/quote-leads" : "/admin/quote-leads?archived=true"}
+              className={heroBtnSecondary}
+            >
+              <Archive className="w-4 h-4 flex-shrink-0" />
+              <span>{showArchived ? "Active" : "Archived"}</span>
+            </Link>
+          </>
+        }
+      />
 
       {/* Filters */}
       <div className="dgs-card p-4">

@@ -38,10 +38,13 @@ export function CampaignPauseToggle({
     <button
       onClick={toggle}
       disabled={busy}
-      // The site's standard secondary button (same as Templates / Contacts /
-      // Automations); `sm` is the compact form for the dense campaigns list.
-      className={`inline-flex items-center gap-1.5 border border-gray-200 text-navy-900 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium disabled:opacity-50 ${
-        size === "md" ? "px-4 py-2" : "px-3 py-1.5"
+      // `md` sits on the dark hero header next to Edit, so it uses the same
+      // translucent-white-on-dark treatment (dark text would be unreadable there).
+      // `sm` is the compact secondary button for the light campaigns-list cards.
+      className={`inline-flex items-center gap-1.5 rounded-lg transition-colors text-sm disabled:opacity-50 ${
+        size === "md"
+          ? "px-4 py-2 rounded-[12px] bg-white/10 text-white hover:bg-white/15 font-semibold flex-shrink-0"
+          : "px-3 py-1.5 border border-gray-200 text-navy-900 hover:bg-gray-50 font-medium"
       }`}
       title={active ? "Pause drip" : "Resume drip"}
     >

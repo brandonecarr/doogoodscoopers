@@ -3,6 +3,7 @@ import { Plus, Megaphone, Send, Clock, CheckCircle2, Zap } from "lucide-react";
 import prisma from "@/lib/prisma";
 import { CampaignPauseToggle } from "@/components/admin/CampaignPauseToggle";
 import { SendingHoursCard } from "@/components/admin/SendingHoursCard";
+import { PageHero, heroBtnPrimary, heroBtnSecondary, heroPrimaryStyle } from "@/components/admin/PageHero";
 
 export const dynamic = "force-dynamic";
 
@@ -28,34 +29,25 @@ export default async function CampaignsPage() {
 
   return (
     <div className="space-y-3.5 pb-20 lg:pb-0">
-      <div className="flex items-end justify-between gap-3 flex-wrap px-1">
-        <div>
-          <h1 className="dgs-title">Campaigns</h1>
-          <p className="dgs-sub">Bulk text a segment of your leads.</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Link
-            href="/admin/templates"
-            className="flex items-center gap-1.5 px-4 py-2 border border-gray-200 text-navy-900 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
-          >
-            Templates
-          </Link>
-          <Link
-            href="/admin/campaigns/new-drip"
-            className="flex items-center gap-1.5 px-4 py-2 border border-iris text-iris-deep rounded-lg hover:bg-iris-soft transition-colors text-sm font-medium"
-          >
-            <Zap className="w-4 h-4" />
-            New Drip
-          </Link>
-          <Link
-            href="/admin/campaigns/new"
-            className="flex items-center gap-1.5 px-4 py-2 bg-iris text-white rounded-lg hover:bg-iris-deep transition-colors text-sm font-medium"
-          >
-            <Plus className="w-4 h-4" />
-            New Blast
-          </Link>
-        </div>
-      </div>
+      <PageHero
+        title="Campaigns"
+        subtitle="Bulk text a segment of your leads."
+        actions={
+          <>
+            <Link href="/admin/templates" className={heroBtnSecondary}>
+              Templates
+            </Link>
+            <Link href="/admin/campaigns/new-drip" className={heroBtnSecondary}>
+              <Zap className="w-4 h-4" />
+              New Drip
+            </Link>
+            <Link href="/admin/campaigns/new" className={heroBtnPrimary} style={heroPrimaryStyle}>
+              <Plus className="w-4 h-4" />
+              New Blast
+            </Link>
+          </>
+        }
+      />
 
       <SendingHoursCard />
 

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Building2, Search, Filter, Archive } from "lucide-react";
 import prisma from "@/lib/prisma";
 import type { LeadStatus, CommercialLead } from "@/types/leads";
+import { PageHero, heroBtnSecondary } from "@/components/admin/PageHero";
 
 interface PageProps {
   searchParams: Promise<{ status?: string; search?: string; page?: string; archived?: string }>;
@@ -95,30 +96,21 @@ export default async function CommercialPage({ searchParams }: PageProps) {
   return (
     <div className="space-y-3.5 pb-20 lg:pb-0">
       {/* Header */}
-      <div className="flex items-end justify-between gap-3 flex-wrap px-1">
-        <div>
-          <h1 className="dgs-title">
-            {showArchived ? "Archived Inquiries" : "Commercial Inquiries"}
-          </h1>
-          <p className="dgs-sub">{total} {showArchived ? "archived" : "total"} inquiries</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Link
-            href={showArchived ? "/admin/commercial" : "/admin/commercial?archived=true"}
-            className={`flex items-center gap-2 px-4 py-2 rounded-[12px] text-sm font-semibold transition-colors ${
-              showArchived
-                ? "bg-iris text-white hover:bg-iris-deep"
-                : "bg-white text-bodytext hover:bg-surface2 border border-hair"
-            }`}
-          >
-            <Archive className="w-4 h-4" />
-            {showArchived ? "View Active" : "View Archived"}
-          </Link>
+      <PageHero
+        title={showArchived ? "Archived Inquiries" : "Commercial Inquiries"}
+        subtitle={`${total} ${showArchived ? "archived" : "total"} inquiries`}
+        icon={
           <div className="w-11 h-11 rounded-[13px] flex items-center justify-center" style={{ background: "linear-gradient(150deg,#9BE7C0,#12A150)" }}>
             <Building2 className="w-[22px] h-[22px] text-white" />
           </div>
-        </div>
-      </div>
+        }
+        actions={
+          <Link href={showArchived ? "/admin/commercial" : "/admin/commercial?archived=true"} className={heroBtnSecondary}>
+            <Archive className="w-4 h-4" />
+            {showArchived ? "View Active" : "View Archived"}
+          </Link>
+        }
+      />
 
       {/* Filters */}
       <div className="dgs-card p-4">

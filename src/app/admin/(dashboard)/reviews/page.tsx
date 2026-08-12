@@ -6,6 +6,7 @@ import {
   Star, Plus, Pencil, Trash2, Search, Filter, X, ExternalLink, Loader2,
   MessageSquareQuote, CheckCircle2, Clock, Link2, AlertTriangle, RefreshCw, Unlink,
 } from "lucide-react";
+import { PageHero, heroBtnPrimary, heroPrimaryStyle } from "@/components/admin/PageHero";
 
 const SOURCE_FIELDS: { key: string; label: string; hint?: string }[] = [
   { key: "reviews.google.url", label: "Google reviews link" },
@@ -232,19 +233,16 @@ export default function ReviewsPage() {
   return (
     <div className="space-y-3.5 pb-20 lg:pb-0">
       {/* Header */}
-      <div className="flex items-end justify-between gap-3 flex-wrap px-1">
-        <div>
-          <h1 className="dgs-title">Reviews</h1>
-          <p className="dgs-sub">Track review requests and their outcomes</p>
-        </div>
-        <button
-          onClick={() => startEdit("new")}
-          className="flex items-center gap-1.5 px-4 py-2 bg-iris text-white rounded-[12px] hover:bg-iris-deep transition-colors text-[13px] font-bold"
-        >
-          <Plus className="w-4 h-4" />
-          Add Review
-        </button>
-      </div>
+      <PageHero
+        title="Reviews"
+        subtitle="Track review requests and their outcomes"
+        actions={
+          <button onClick={() => startEdit("new")} className={heroBtnPrimary} style={heroPrimaryStyle}>
+            <Plus className="w-4 h-4" />
+            Add Review
+          </button>
+        }
+      />
 
       {/* Review sources */}
       <div className="dgs-card p-4">

@@ -4,6 +4,7 @@ import { isInstagramConfigured } from "@/lib/instagram";
 import { InstagramManager, type IgCampaign } from "@/components/admin/InstagramManager";
 import { InstagramActivity, type IgActivityItem } from "@/components/admin/InstagramActivity";
 import { loadSendWindow } from "@/lib/send-window";
+import { PageHero } from "@/components/admin/PageHero";
 
 export const dynamic = "force-dynamic";
 
@@ -36,15 +37,15 @@ export default async function InstagramPage() {
 
   return (
     <div className="space-y-6 pb-20 lg:pb-0">
-      <div>
-        <h1 className="dgs-title flex items-center gap-2">
-          <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#f58529] via-[#dd2a7b] to-[#8134af] flex items-center justify-center">
-            <Instagram className="w-4 h-4 text-white" />
-          </span>
-          Instagram Auto-DM
-        </h1>
-        <p className="text-navy-600 text-sm mt-1">When someone comments a keyword on your post or reel, we automatically DM them.</p>
-      </div>
+      <PageHero
+        title="Instagram Auto-DM"
+        subtitle="When someone comments a keyword on your post or reel, we automatically DM them."
+        icon={
+          <div className="w-11 h-11 rounded-[13px] bg-gradient-to-br from-[#f58529] via-[#dd2a7b] to-[#8134af] flex items-center justify-center">
+            <Instagram className="w-[22px] h-[22px] text-white" />
+          </div>
+        }
+      />
 
       {!configured && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">

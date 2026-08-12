@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Mail, Plus, Send, Clock, CheckCircle2, FileText, LayoutTemplate, Users, Zap } from "lucide-react";
 import prisma from "@/lib/prisma";
+import { PageHero, heroBtnPrimary, heroBtnSecondary, heroPrimaryStyle } from "@/components/admin/PageHero";
 
 export const dynamic = "force-dynamic";
 
@@ -25,30 +26,30 @@ export default async function EmailPage() {
 
   return (
     <div className="space-y-3.5 pb-20 lg:pb-0">
-      <div className="flex items-end justify-between gap-3 flex-wrap px-1">
-        <div>
-          <h1 className="dgs-title">Email</h1>
-          <p className="dgs-sub">Newsletters &amp; broadcasts to your contacts.</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Link href="/admin/email/automations" className="flex items-center gap-1.5 px-4 py-2 border border-gray-200 text-navy-900 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium">
-            <Zap className="w-4 h-4" />
-            Automations
-          </Link>
-          <Link href="/admin/email/contacts" className="flex items-center gap-1.5 px-4 py-2 border border-gray-200 text-navy-900 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium">
-            <Users className="w-4 h-4" />
-            Contacts
-          </Link>
-          <Link href="/admin/email/templates" className="flex items-center gap-1.5 px-4 py-2 border border-gray-200 text-navy-900 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium">
-            <LayoutTemplate className="w-4 h-4" />
-            Templates
-          </Link>
-          <Link href="/admin/email/new" className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors text-sm font-medium">
-            <Plus className="w-4 h-4" />
-            New Email
-          </Link>
-        </div>
-      </div>
+      <PageHero
+        title="Email"
+        subtitle="Newsletters & broadcasts to your contacts."
+        actions={
+          <>
+            <Link href="/admin/email/automations" className={heroBtnSecondary}>
+              <Zap className="w-4 h-4" />
+              Automations
+            </Link>
+            <Link href="/admin/email/contacts" className={heroBtnSecondary}>
+              <Users className="w-4 h-4" />
+              Contacts
+            </Link>
+            <Link href="/admin/email/templates" className={heroBtnSecondary}>
+              <LayoutTemplate className="w-4 h-4" />
+              Templates
+            </Link>
+            <Link href="/admin/email/new" className={heroBtnPrimary} style={heroPrimaryStyle}>
+              <Plus className="w-4 h-4" />
+              New Email
+            </Link>
+          </>
+        }
+      />
 
       {campaigns.length === 0 ? (
         <div className="dgs-card p-12 text-center">

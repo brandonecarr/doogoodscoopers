@@ -2,6 +2,7 @@ import Link from "next/link";
 import { MapPinOff, Search, Filter } from "lucide-react";
 import prisma from "@/lib/prisma";
 import type { LeadStatus, OutOfAreaLead } from "@/types/leads";
+import { PageHero } from "@/components/admin/PageHero";
 
 interface PageProps {
   searchParams: Promise<{ status?: string; search?: string; page?: string }>;
@@ -90,16 +91,15 @@ export default async function OutOfAreaPage({ searchParams }: PageProps) {
 
   return (
     <div className="space-y-6 pb-20 lg:pb-0">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="dgs-title">Out of Area Leads</h1>
-          <p className="text-navy-600 mt-1">{total} total leads</p>
-        </div>
-        <div className="w-12 h-12 rounded-xl bg-amber-50 flex items-center justify-center">
-          <MapPinOff className="w-6 h-6 text-amber-600" />
-        </div>
-      </div>
+      <PageHero
+        title="Out of Area Leads"
+        subtitle={`${total} total leads`}
+        icon={
+          <div className="w-11 h-11 rounded-[13px] bg-white/10 flex items-center justify-center">
+            <MapPinOff className="w-[22px] h-[22px] text-white" />
+          </div>
+        }
+      />
 
       {/* Filters */}
       <div className="dgs-card p-4">

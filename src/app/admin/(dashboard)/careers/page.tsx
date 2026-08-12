@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Briefcase, Search, Filter } from "lucide-react";
 import prisma from "@/lib/prisma";
 import type { LeadStatus, CareerApplication } from "@/types/leads";
+import { PageHero } from "@/components/admin/PageHero";
 
 interface PageProps {
   searchParams: Promise<{ status?: string; search?: string; page?: string }>;
@@ -90,16 +91,15 @@ export default async function CareersPage({ searchParams }: PageProps) {
 
   return (
     <div className="space-y-3.5 pb-20 lg:pb-0">
-      {/* Header */}
-      <div className="flex items-end justify-between gap-3 flex-wrap px-1">
-        <div>
-          <h1 className="dgs-title">Career Applications</h1>
-          <p className="dgs-sub">{total} total applications</p>
-        </div>
-        <div className="w-11 h-11 rounded-[13px] flex items-center justify-center" style={{ background: "linear-gradient(150deg,#C8B9FF,#7C5CFC)" }}>
-          <Briefcase className="w-[22px] h-[22px] text-white" />
-        </div>
-      </div>
+      <PageHero
+        title="Career Applications"
+        subtitle={`${total} total applications`}
+        icon={
+          <div className="w-11 h-11 rounded-[13px] bg-white/10 flex items-center justify-center">
+            <Briefcase className="w-[22px] h-[22px] text-white" />
+          </div>
+        }
+      />
 
       {/* Filters */}
       <div className="dgs-card p-4">

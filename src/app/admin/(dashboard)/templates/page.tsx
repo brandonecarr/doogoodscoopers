@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import { ArrowLeft, Plus, Pencil, Trash2, MessageSquare } from "lucide-react";
+import { Plus, Pencil, Trash2, MessageSquare } from "lucide-react";
+import { PageHero, heroBtnPrimary, heroPrimaryStyle } from "@/components/admin/PageHero";
 
 interface Template {
   id: string;
@@ -68,26 +68,19 @@ export default function TemplatesPage() {
 
   return (
     <div className="space-y-6 pb-20 lg:pb-0">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Link href="/admin/campaigns" className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-            <ArrowLeft className="w-5 h-5 text-gray-600" />
-          </Link>
-          <div>
-            <h1 className="dgs-title">Message Templates</h1>
-            <p className="text-navy-600 text-sm mt-1">Reusable texts for lead replies and campaigns.</p>
-          </div>
-        </div>
-        {editing === null && (
-          <button
-            onClick={() => startEdit("new")}
-            className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors text-sm font-medium"
-          >
-            <Plus className="w-4 h-4" />
-            New Template
-          </button>
-        )}
-      </div>
+      <PageHero
+        title="Message Templates"
+        subtitle="Reusable texts for lead replies and campaigns."
+        backHref="/admin/campaigns"
+        actions={
+          editing === null && (
+            <button onClick={() => startEdit("new")} className={heroBtnPrimary} style={heroPrimaryStyle}>
+              <Plus className="w-4 h-4" />
+              New Template
+            </button>
+          )
+        }
+      />
 
       {editing !== null && (
         <div className="dgs-card p-6 space-y-3">

@@ -7,6 +7,7 @@ import { CustomersMapClient } from "@/components/admin/CustomersMapClient";
 import { RoutePlannerClient } from "@/components/admin/RoutePlannerClient";
 import type { MapCustomer } from "@/components/admin/CustomerInfoPanels";
 import { geocodeAddress, resolveZips, normalizeZip } from "@/lib/geo/zipgeo";
+import { PageHero } from "@/components/admin/PageHero";
 
 export const dynamic = "force-dynamic";
 
@@ -149,7 +150,9 @@ export default async function CustomersPage({ searchParams }: PageProps) {
 
   const viewBtn = (v: string, label: string, Icon: typeof LayoutList) => (
     <Link href={viewHref(v)}
-      className={`flex items-center gap-1.5 px-3.5 py-2 rounded-[9px] text-[13px] font-semibold transition-colors ${view === v ? "bg-ink text-white shadow-sm" : "text-muted hover:text-ink"}`}>
+      className={view === v
+        ? "flex items-center gap-1.5 px-3 py-1.5 rounded-[9px] text-[13px] font-semibold bg-white text-ink shadow-sm"
+        : "flex items-center gap-1.5 px-3 py-1.5 rounded-[9px] text-[13px] font-semibold text-white/70 hover:text-white"}>
       <Icon className="w-4 h-4" /> <span className="hidden sm:inline">{label}</span>
     </Link>
   );
@@ -157,17 +160,17 @@ export default async function CustomersPage({ searchParams }: PageProps) {
   return (
     <div className="space-y-3.5 pb-20 lg:pb-0">
       {/* Header */}
-      <div className="flex items-end justify-between gap-3 flex-wrap px-1">
-        <div>
-          <h1 className="dgs-title">Customers</h1>
-          <p className="dgs-sub">{totalActive} active Sweep&amp;Go customers</p>
-        </div>
-        <div className="flex items-center bg-white rounded-[12px] p-1 border border-hair">
-          {viewBtn("list", "List", LayoutList)}
-          {viewBtn("map", "Map", MapIcon)}
-          {viewBtn("planner", "Planner", CalendarRange)}
-        </div>
-      </div>
+      <PageHero
+        title="Customers"
+        subtitle={`${totalActive} active Sweep&Go customers`}
+        actions={
+          <div className="flex items-center bg-white/10 rounded-[12px] p-1">
+            {viewBtn("list", "List", LayoutList)}
+            {viewBtn("map", "Map", MapIcon)}
+            {viewBtn("planner", "Planner", CalendarRange)}
+          </div>
+        }
+      />
 
       {/* Source / read-only note */}
       <div className="dgs-card p-4 flex flex-col sm:flex-row sm:items-center gap-2 sm:justify-between" style={{ background: "#F7F5FF" }}>

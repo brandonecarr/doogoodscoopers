@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Megaphone, Search, Filter } from "lucide-react";
 import prisma from "@/lib/prisma";
 import type { LeadStatus, AdLead } from "@/types/leads";
+import { PageHero } from "@/components/admin/PageHero";
 
 interface PageProps {
   searchParams: Promise<{ status?: string; search?: string; page?: string; source?: string }>;
@@ -104,16 +105,15 @@ export default async function AdLeadsPage({ searchParams }: PageProps) {
 
   return (
     <div className="space-y-6 pb-20 lg:pb-0">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="dgs-title">Ad Leads</h1>
-          <p className="text-navy-600 mt-1">{total} total leads from Meta ads</p>
-        </div>
-        <div className="w-12 h-12 rounded-xl bg-pink-50 flex items-center justify-center">
-          <Megaphone className="w-6 h-6 text-pink-600" />
-        </div>
-      </div>
+      <PageHero
+        title="Ad Leads"
+        subtitle={`${total} total leads from Meta ads`}
+        icon={
+          <div className="w-11 h-11 rounded-[13px] bg-white/10 flex items-center justify-center">
+            <Megaphone className="w-[22px] h-[22px] text-white" />
+          </div>
+        }
+      />
 
       {/* Webhook Info */}
       <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
