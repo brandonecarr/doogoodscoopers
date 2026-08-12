@@ -86,6 +86,21 @@ async function getPhone(wire: WireLeadType, id: string): Promise<string | null> 
   }
 }
 
+/**
+ * True if this phone matches an ACTIVE Sweep&Go customer in the local mirror.
+ * Used as the fallback for the drip's pre-send signup check when the live
+ * Sweep&Go lookup is unavailable.
+ */
+export async function isActiveCustomerByPhone(phone: string | null | undefined): Promise<boolean> {
+  const candidates = phoneCandidates(phone);
+  if (candidates.length === 0) return false;
+  const customer = await prisma.sweepandgoCustomer.findFirst({
+    where: { active: true, OR: [{ cellPhone: { in: candidates } }, { homePhone: { in: candidates } }] },
+    select: { id: true },
+  });
+  return !!customer;
+}
+
 /** All prospect leads (quote + adlead) that share this phone number. */
 export async function findProspectLeadsByPhone(phone: string | null | undefined): Promise<ProspectRef[]> {
   const candidates = phoneCandidates(phone);

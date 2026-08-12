@@ -7,6 +7,8 @@ import { findDripCandidates, isLeadArchived, markLeadContactedIfNew } from "@/li
 import { getLeadPersonalization } from "@/lib/personalization";
 import { loadSendWindow, clampToSendWindow, isWithinSendWindow } from "@/lib/send-window";
 import { notify } from "@/lib/notify";
+import { archiveConvertedLeads, isActiveCustomerByPhone } from "@/lib/lead-duplicates";
+import { activeClientPhones, phoneInActiveSet } from "@/lib/sweepandgo-lookup";
 
 // Drives DRIP campaigns: enrolls new matching leads and sends each recipient's
 // next step when due. Stops a recipient on reply / opt-out / archive.
@@ -87,6 +89,24 @@ export async function GET(request: NextRequest) {
           select: { id: true },
         });
         if (replied) { await stop(r.id, "lead replied"); stopped++; continue; }
+      }
+
+      // Already signed up? Ping Sweep&Go (live active-client list, cached ~60s)
+      // right before texting a prospect — never message someone who's already a
+      // customer. This closes the gap between signup and the hourly convert-sync.
+      // Falls back to the synced mirror if Sweep&Go is unreachable, so an outage
+      // never blocks sends. Skipped for CUSTOMER drips (those ARE customers).
+      if (r.leadType !== "CUSTOMER") {
+        const activeSet = await activeClientPhones();
+        const signedUp = activeSet
+          ? phoneInActiveSet(activeSet, r.phone)
+          : await isActiveCustomerByPhone(r.phone);
+        if (signedUp) {
+          await archiveConvertedLeads([r.phone]);
+          await stop(r.id, "signed up — now a Sweep&Go customer");
+          stopped++;
+          continue;
+        }
       }
 
       const step = steps[r.currentStep];
