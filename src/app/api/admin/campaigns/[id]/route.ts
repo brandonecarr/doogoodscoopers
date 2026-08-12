@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { rescheduleActiveRecipients } from "@/lib/drip-schedule";
 
 // GET → campaign detail + recipient status breakdown
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -88,7 +89,12 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         },
       }),
     ]);
-    return NextResponse.json({ success: true });
+
+    // Apply the (possibly changed) step delays to anyone already mid-sequence:
+    // reschedule their next send off their last send using the new interval.
+    const rescheduled = await rescheduleActiveRecipients(id);
+
+    return NextResponse.json({ success: true, rescheduled });
   }
 
   // Blast
