@@ -95,6 +95,14 @@ export async function GET(request: NextRequest) {
         continue;
       }
 
+      // Never ask for a review from a customer who already left one. Catches reviews
+      // marked complete by the Google sync OR by hand, even mid-sequence. Only gates
+      // review-ask steps ({{reviewLink}}) so other drips are unaffected.
+      if (r.leadType === "CUSTOMER" && step.body.includes("{{reviewLink}}")) {
+        const c = await prisma.sweepandgoCustomer.findUnique({ where: { id: r.leadId }, select: { reviewStatus: true } });
+        if (c?.reviewStatus === "REVIEW_COMPLETE") { await stop(r.id, "customer left a review"); stopped++; continue; }
+      }
+
       // Quiet hours: don't text in the middle of the night. If this send came
       // due outside the window, push it to the next window open and skip for now.
       if (!isWithinSendWindow(new Date(), sendWindow)) {

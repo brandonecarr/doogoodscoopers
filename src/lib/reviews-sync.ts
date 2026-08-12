@@ -1,9 +1,12 @@
 import prisma from "@/lib/prisma";
+import { LeadSource } from "@prisma/client";
 import { getSetting, setSetting, getAccessToken, fetchAllReviews, starToNumber } from "@/lib/google-business";
 
 export interface ReviewSyncResult {
   imported: number;
   linked: number;
+  /** Active review-drip recipients stopped because the customer left a review. */
+  stoppedInDrips: number;
   averageRating?: number;
   totalReviewCount?: number;
 }
@@ -11,7 +14,9 @@ export interface ReviewSyncResult {
 /**
  * Pull every Google review for the connected location, upsert them into `Review`,
  * and auto-link each to its `SweepandgoCustomer` by reviewer name when the match is
- * unambiguous. Shared by the manual admin route and the daily cron.
+ * unambiguous. A customer who leaves a review is marked REVIEW_COMPLETE and pulled
+ * out of any active review-request drip (so we stop asking someone who already
+ * reviewed). Shared by the manual admin route and the daily cron.
  *
  * Throws "Not connected…" if Google isn't linked yet, or a Google API error on failure.
  */
@@ -39,13 +44,17 @@ export async function syncGoogleReviews(): Promise<ReviewSyncResult> {
 
   let imported = 0;
   let linked = 0;
+  const reviewedCustomerIds = new Set<string>();
   for (const r of reviews) {
     if (!r.reviewId) continue;
     const externalId = `google:${r.reviewId}`;
 
     const nameKey = (r.reviewer?.displayName || "").trim().toLowerCase();
     const linkId = (nameKey ? byName.get(nameKey) : undefined) ?? null;
-    if (linkId) linked++;
+    if (linkId) {
+      linked++;
+      reviewedCustomerIds.add(linkId);
+    }
 
     const base = {
       customerName: r.reviewer?.displayName || "Google user",
@@ -67,9 +76,39 @@ export async function syncGoogleReviews(): Promise<ReviewSyncResult> {
     imported++;
   }
 
+  // A customer who left a review is done being asked: mark them REVIEW_COMPLETE and
+  // stop them in any active review-request drip right now (don't wait for the next tick).
+  let stoppedInDrips = 0;
+  if (reviewedCustomerIds.size > 0) {
+    const ids = [...reviewedCustomerIds];
+
+    await prisma.sweepandgoCustomer.updateMany({
+      where: { id: { in: ids }, reviewStatus: { not: "REVIEW_COMPLETE" } },
+      data: { reviewStatus: "REVIEW_COMPLETE" },
+    });
+
+    // Review drips are DRIP campaigns whose steps ask for a review ({{reviewLink}}).
+    const reviewCampaigns = await prisma.campaign.findMany({
+      where: { type: "DRIP", steps: { some: { body: { contains: "{{reviewLink}}" } } } },
+      select: { id: true },
+    });
+    if (reviewCampaigns.length > 0) {
+      const res = await prisma.campaignRecipient.updateMany({
+        where: {
+          campaignId: { in: reviewCampaigns.map((c) => c.id) },
+          leadType: LeadSource.CUSTOMER,
+          leadId: { in: ids },
+          status: "ACTIVE",
+        },
+        data: { status: "STOPPED", nextSendAt: null, error: "customer left a review" },
+      });
+      stoppedInDrips = res.count;
+    }
+  }
+
   await setSetting("google.bp.lastSyncedAt", new Date().toISOString());
   if (averageRating != null) await setSetting("google.bp.avgRating", String(averageRating));
   if (totalReviewCount != null) await setSetting("google.bp.reviewCount", String(totalReviewCount));
 
-  return { imported, linked, averageRating, totalReviewCount };
+  return { imported, linked, stoppedInDrips, averageRating, totalReviewCount };
 }
