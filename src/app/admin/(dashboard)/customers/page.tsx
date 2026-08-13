@@ -48,7 +48,7 @@ type Cust = any;
 
 export default async function CustomersPage({ searchParams }: PageProps) {
   const { search, sort: sortRaw, dir: dirRaw, view: viewRaw } = await searchParams;
-  const view = viewRaw === "map" ? "map" : viewRaw === "planner" ? "planner" : viewRaw === "dashboard" ? "dashboard" : "list";
+  const view = viewRaw === "list" ? "list" : viewRaw === "map" ? "map" : viewRaw === "planner" ? "planner" : "dashboard";
   let sortKey = sortRaw;
   let dirKey = dirRaw;
   if (sortRaw?.includes(":")) { const [s, d] = sortRaw.split(":"); sortKey = s; dirKey = d; }
@@ -134,7 +134,7 @@ export default async function CustomersPage({ searchParams }: PageProps) {
     for (const [k, v] of Object.entries(params)) if (v) p.set(k, v);
     return `/admin/customers?${p}`;
   };
-  const viewHref = (v: string) => qs({ view: v === "list" ? undefined : v, sort: sortRaw, dir: dirRaw });
+  const viewHref = (v: string) => qs({ view: v === "dashboard" ? undefined : v, sort: sortRaw, dir: dirRaw });
   const renderTh = (label: string, sortKey?: string) => {
     if (!sortKey) return <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">{label}</th>;
     const active = sort === sortKey;
@@ -166,10 +166,10 @@ export default async function CustomersPage({ searchParams }: PageProps) {
         subtitle={`${totalActive} active Sweep&Go customers`}
         actions={
           <div className="flex items-center bg-white/10 rounded-[12px] p-1">
+            {viewBtn("dashboard", "Dashboard", BarChart3)}
             {viewBtn("list", "List", LayoutList)}
             {viewBtn("map", "Map", MapIcon)}
             {viewBtn("planner", "Planner", CalendarRange)}
-            {viewBtn("dashboard", "Dashboard", BarChart3)}
           </div>
         }
       />

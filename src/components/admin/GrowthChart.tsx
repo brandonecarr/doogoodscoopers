@@ -11,6 +11,7 @@ export interface GrowthPoint {
   cancels: number;
   active: number;  // cumulative net active at month end
   quotes: number;
+  mrr: number;     // cumulative estimated monthly recurring revenue
 }
 
 interface TipEntry { name: string; value: number; color: string }

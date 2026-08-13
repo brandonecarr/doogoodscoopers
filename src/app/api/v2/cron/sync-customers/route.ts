@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { archiveConvertedLeads } from "@/lib/lead-duplicates";
+import { estimateMonthlyRevenue } from "@/lib/plan-pricing";
 
 // One-way mirror of ACTIVE Sweep&Go residential customers.
 //
@@ -137,6 +138,7 @@ export async function GET(request: NextRequest) {
           kind: "SIGNUP", occurredAt: result.startDate ?? now,
           clientName: [result.firstName, result.lastName].filter(Boolean).join(" ") || null,
           email: result.email, zipCode: result.zipCode, plan: result.subscriptionNames,
+          revenue: estimateMonthlyRevenue(result.subscriptionNames),
           source: "sync-customers", dedupeKey: `sng-signup:${result.sngId}`,
         },
         update: {},
@@ -169,6 +171,7 @@ export async function GET(request: NextRequest) {
         kind: "CANCELLATION", occurredAt: now,
         clientName: [c.firstName, c.lastName].filter(Boolean).join(" ") || null,
         email: c.email, zipCode: c.zipCode, plan: c.subscriptionNames,
+        revenue: estimateMonthlyRevenue(c.subscriptionNames),
         source: "sync-customers", dedupeKey: `sng-cancel:${c.sngId}`,
       },
       update: {},
