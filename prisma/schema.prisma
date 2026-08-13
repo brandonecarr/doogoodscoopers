@@ -699,6 +699,8 @@ model MarketingTask {
   dayHint     String? // Mon..Sun (suggested day)
   effort      String? // e.g. "15 min", "1 hr"
   rationale   String?       @db.Text // why this matters (the director's reasoning)
+  caption     String?       @db.Text // ready-to-paste social caption (post tasks)
+  studioDraftId String? // linked Content Studio carousel draft (post tasks)
   status      String        @default("TODO") // TODO | DONE
   completedAt DateTime?
   sortOrder   Int           @default(0)

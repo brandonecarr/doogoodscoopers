@@ -28,6 +28,7 @@ export default async function MarketingPage() {
   const tasks: MarketingTaskItem[] = (plan?.tasks ?? []).map((t) => ({
     id: t.id, title: t.title, detail: t.detail, channel: t.channel,
     dayHint: t.dayHint, effort: t.effort, priority: t.priority, rationale: t.rationale, status: t.status,
+    caption: t.caption, studioDraftId: t.studioDraftId,
   }));
   const done = tasks.filter((t) => t.status === "DONE").length;
   const pct = tasks.length ? Math.round((done / tasks.length) * 100) : 0;

@@ -284,6 +284,18 @@ export function StudioApp() {
     if (draftId === id) { setDraftId(null); setDraftName(""); }
   };
 
+  // Deep-link: /admin/studio?draft=<id> opens that saved design straight away —
+  // this is how the Marketing director hands a generated carousel to the editor.
+  const didAutoOpen = useRef(false);
+  useEffect(() => {
+    if (didAutoOpen.current || typeof window === "undefined") return;
+    const id = new URLSearchParams(window.location.search).get("draft");
+    if (!id) return;
+    didAutoOpen.current = true;
+    loadDraft(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const previewW = format === "square" ? 460 : 400;
   const fields = LAYOUTS[cur.layout].fields;
   const inputCls = "w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent";

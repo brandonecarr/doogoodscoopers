@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check } from "lucide-react";
+import { Check, Copy, Images, ExternalLink } from "lucide-react";
 
 export interface MarketingTaskItem {
   id: string;
@@ -14,6 +15,8 @@ export interface MarketingTaskItem {
   priority: number;
   rationale: string | null;
   status: string;
+  caption: string | null;
+  studioDraftId: string | null;
 }
 
 const CHANNEL_LABEL: Record<string, string> = {
@@ -31,6 +34,17 @@ export function MarketingTaskList({ tasks: initial }: { tasks: MarketingTaskItem
   const router = useRouter();
   const [tasks, setTasks] = useState(initial);
   const [busy, setBusy] = useState<string | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
+
+  const copyCaption = async (id: string, caption: string) => {
+    try {
+      await navigator.clipboard.writeText(caption);
+      setCopied(id);
+      setTimeout(() => setCopied((c) => (c === id ? null : c)), 1800);
+    } catch {
+      /* clipboard blocked — the caption is still visible to select manually */
+    }
+  };
 
   const toggle = async (id: string) => {
     const t = tasks.find((x) => x.id === id);
@@ -90,6 +104,42 @@ export function MarketingTaskList({ tasks: initial }: { tasks: MarketingTaskItem
 
                 {t.detail && <p className={`text-[13px] leading-relaxed mt-1.5 text-bodytext ${done ? "line-through" : ""}`}>{t.detail}</p>}
                 {t.rationale && <p className="text-[12px] text-muted mt-2 italic">Why: {t.rationale}</p>}
+
+                {(t.caption || t.studioDraftId) && (
+                  <div className="mt-3 rounded-[12px] border border-hairline bg-surface2/60 p-3">
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <Images className="w-3.5 h-3.5" style={{ color }} />
+                      <span className="text-[11px] font-bold uppercase tracking-wide" style={{ color }}>
+                        Ready-to-post draft
+                      </span>
+                    </div>
+                    {t.caption && (
+                      <p className="text-[12.5px] leading-relaxed text-bodytext whitespace-pre-wrap">{t.caption}</p>
+                    )}
+                    <div className="mt-2.5 flex items-center gap-2 flex-wrap">
+                      {t.caption && (
+                        <button
+                          onClick={() => copyCaption(t.id, t.caption!)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] text-[12px] font-semibold text-white transition-colors"
+                          style={{ background: copied === t.id ? "#16A34A" : "#101014" }}
+                        >
+                          {copied === t.id ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                          {copied === t.id ? "Copied" : "Copy caption"}
+                        </button>
+                      )}
+                      {t.studioDraftId && (
+                        <Link
+                          href={`/admin/studio?draft=${t.studioDraftId}`}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] text-[12px] font-semibold transition-colors"
+                          style={{ background: "#EFE9FF", color: "#6D3EF0" }}
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          Open carousel in Studio
+                        </Link>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
