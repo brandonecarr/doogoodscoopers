@@ -9,6 +9,7 @@ import {
   Dog,
   Star,
   Megaphone,
+  Rocket,
   Instagram,
   Sparkles,
   Mail,
@@ -32,6 +33,7 @@ const primaryNav: NavItem[] = [
   { name: "Customers", short: "Customers", href: "/admin/customers", icon: Dog },
   { name: "Reviews",   short: "Reviews",   href: "/admin/reviews",   icon: Star },
   { name: "Campaigns", short: "Campaigns", href: "/admin/campaigns", icon: Megaphone },
+  { name: "Marketing", short: "Marketing", href: "/admin/marketing", icon: Rocket },
 ];
 
 const moreNav: NavItem[] = [
