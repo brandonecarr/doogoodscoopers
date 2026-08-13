@@ -672,6 +672,30 @@ model SweepandgoCustomer {
   @@index([reviewStatus])
 }
 
+// Customer-lifecycle events powering the Customers → Dashboard growth chart.
+// SIGNUP / CANCELLATION drive the net-active curve; QUOTE is the top-of-funnel
+// (web quote submissions). Seeded retroactively from historical CSVs and kept
+// current going forward by the sync-customers cron. `dedupeKey` makes every
+// source idempotent.
+model SubscriptionEvent {
+  id         String   @id @default(cuid())
+  kind       String // SIGNUP | CANCELLATION | QUOTE
+  occurredAt DateTime
+  clientName String?
+  email      String?
+  city       String?
+  zipCode    String?
+  plan       String?
+  revenue    Float?
+  reason     String?
+  source     String // csv-subscriptions | csv-quote | mirror-active | sync-customers
+  dedupeKey  String   @unique
+  createdAt  DateTime @default(now())
+
+  @@index([kind])
+  @@index([occurredAt])
+}
+
 // =====================
 // REVIEWS
 // =====================

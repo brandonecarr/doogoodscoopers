@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { Search, Archive, RefreshCw, ArrowUp, ArrowDown, LayoutList, Map as MapIcon, CalendarRange } from "lucide-react";
+import { Search, Archive, RefreshCw, ArrowUp, ArrowDown, LayoutList, Map as MapIcon, CalendarRange, BarChart3 } from "lucide-react";
 import type { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { CustomerReviewControl } from "@/components/admin/CustomerReviewControl";
 import { CustomersMapClient } from "@/components/admin/CustomersMapClient";
 import { RoutePlannerClient } from "@/components/admin/RoutePlannerClient";
+import { CustomerGrowthDashboard } from "@/components/admin/CustomerGrowthDashboard";
 import type { MapCustomer } from "@/components/admin/CustomerInfoPanels";
 import { geocodeAddress, resolveZips, normalizeZip } from "@/lib/geo/zipgeo";
 import { PageHero } from "@/components/admin/PageHero";
@@ -47,7 +48,7 @@ type Cust = any;
 
 export default async function CustomersPage({ searchParams }: PageProps) {
   const { search, sort: sortRaw, dir: dirRaw, view: viewRaw } = await searchParams;
-  const view = viewRaw === "map" ? "map" : viewRaw === "planner" ? "planner" : "list";
+  const view = viewRaw === "map" ? "map" : viewRaw === "planner" ? "planner" : viewRaw === "dashboard" ? "dashboard" : "list";
   let sortKey = sortRaw;
   let dirKey = dirRaw;
   if (sortRaw?.includes(":")) { const [s, d] = sortRaw.split(":"); sortKey = s; dirKey = d; }
@@ -168,10 +169,12 @@ export default async function CustomersPage({ searchParams }: PageProps) {
             {viewBtn("list", "List", LayoutList)}
             {viewBtn("map", "Map", MapIcon)}
             {viewBtn("planner", "Planner", CalendarRange)}
+            {viewBtn("dashboard", "Dashboard", BarChart3)}
           </div>
         }
       />
 
+      {view !== "dashboard" && (<>
       {/* Source / read-only note */}
       <div className="dgs-card p-4 flex flex-col sm:flex-row sm:items-center gap-2 sm:justify-between" style={{ background: "#F7F5FF" }}>
         <p className="text-[13px] text-bodytext flex items-center gap-2">
@@ -213,9 +216,12 @@ export default async function CustomersPage({ searchParams }: PageProps) {
           <button type="submit" className="px-4 py-2 rounded-lg text-white text-sm font-semibold transition-colors" style={{ background: "#8B6BFF" }}>Apply</button>
         </form>
       </div>
+      </>)}
 
-      {/* ── PLANNER / MAP / LIST ────────────────────────────────────────────── */}
-      {view === "planner" ? (
+      {/* ── DASHBOARD / PLANNER / MAP / LIST ─────────────────────────────────── */}
+      {view === "dashboard" ? (
+        <CustomerGrowthDashboard />
+      ) : view === "planner" ? (
         <RoutePlannerClient customers={mapCustomers} token={token} initialAssignments={planAssignments} />
       ) : view === "map" ? (
         <CustomersMapClient customers={mapCustomers} token={token} uncoded={uncoded} />

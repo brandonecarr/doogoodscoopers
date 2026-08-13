@@ -130,6 +130,17 @@ export async function GET(request: NextRequest) {
     // upsert doesn't report create-vs-update; approximate via firstSeenAt.
     if (result.firstSeenAt.getTime() === now.getTime()) {
       created++;
+      // Record the signup on the Customers → Dashboard growth chart (idempotent).
+      await prisma.subscriptionEvent.upsert({
+        where: { dedupeKey: `sng-signup:${result.sngId}` },
+        create: {
+          kind: "SIGNUP", occurredAt: result.startDate ?? now,
+          clientName: [result.firstName, result.lastName].filter(Boolean).join(" ") || null,
+          email: result.email, zipCode: result.zipCode, plan: result.subscriptionNames,
+          source: "sync-customers", dedupeKey: `sng-signup:${result.sngId}`,
+        },
+        update: {},
+      }).catch((e) => console.error("[sync-customers] signup event failed:", e));
       // A brand-new customer means this person converted — archive their old
       // prospect lead(s) so they stop showing/behaving as an active lead.
       try {
@@ -141,10 +152,28 @@ export async function GET(request: NextRequest) {
   }
 
   // ── Archive customers that fell off the active list ─────────────────────────
+  const leavingWhere = { active: true, sngId: { notIn: seenIds } };
+  const leaving = await prisma.sweepandgoCustomer.findMany({
+    where: leavingWhere,
+    select: { sngId: true, firstName: true, lastName: true, email: true, zipCode: true, subscriptionNames: true },
+  });
   const archived = await prisma.sweepandgoCustomer.updateMany({
-    where: { active: true, sngId: { notIn: seenIds } },
+    where: leavingWhere,
     data: { active: false, removedAt: now },
   });
+  // Record each cancellation on the growth dashboard (idempotent).
+  for (const c of leaving) {
+    await prisma.subscriptionEvent.upsert({
+      where: { dedupeKey: `sng-cancel:${c.sngId}` },
+      create: {
+        kind: "CANCELLATION", occurredAt: now,
+        clientName: [c.firstName, c.lastName].filter(Boolean).join(" ") || null,
+        email: c.email, zipCode: c.zipCode, plan: c.subscriptionNames,
+        source: "sync-customers", dedupeKey: `sng-cancel:${c.sngId}`,
+      },
+      update: {},
+    }).catch((e) => console.error("[sync-customers] cancel event failed:", e));
+  }
 
   return NextResponse.json({
     success: true,
