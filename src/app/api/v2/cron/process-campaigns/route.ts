@@ -4,6 +4,8 @@ import { sendSms, isQuoConfigured } from "@/lib/quo";
 import { renderTemplate } from "@/lib/resend";
 import { optedOutKeys, optOutKey } from "@/lib/sms-optout";
 import { getLeadPersonalization } from "@/lib/personalization";
+import { archiveConvertedLeads, isActiveCustomerByPhone } from "@/lib/lead-duplicates";
+import { activeClientPhones, phoneInActiveSet } from "@/lib/sweepandgo-lookup";
 
 // Drains queued campaign recipients and sends via Quo. Runs on a cron.
 // Batch + spacing keep us well under Quo's 10 req/s limit.
@@ -61,6 +63,23 @@ export async function GET(request: NextRequest) {
       });
       skipped++;
       continue;
+    }
+
+    // Already signed up? Don't blast a prospect who's now a Sweep&Go customer.
+    // Live check (cached ~60s) with the synced mirror as fallback. Customer-type
+    // recipients are exempt.
+    if (r.leadType !== "CUSTOMER") {
+      const activeSet = await activeClientPhones();
+      const signedUp = activeSet ? phoneInActiveSet(activeSet, r.phone) : await isActiveCustomerByPhone(r.phone);
+      if (signedUp) {
+        await archiveConvertedLeads([r.phone]);
+        await prisma.campaignRecipient.update({
+          where: { id: r.id },
+          data: { status: "SKIPPED", error: "signed up — now a customer", sentAt: new Date() },
+        });
+        skipped++;
+        continue;
+      }
     }
 
     const vars = await getLeadPersonalization(r.leadType, r.leadId);

@@ -1,12 +1,13 @@
 /**
  * Live "has this prospect signed up yet?" lookup against Sweep&Go, for a quick
- * pre-send check in the drip engine.
+ * pre-send check in the drip / campaign engines.
  *
  * The customer mirror (SweepandgoCustomer) is only refreshed hourly by the
- * sync-customers cron, so a lead who signs up can still get a drip text in the
- * gap before the next sync. This pulls the LIVE active-client list from Sweep&Go
- * (the same endpoint the sync uses) and caches it for 60s, so a burst of drip
- * sends in one run shares a single pull and freshness is ~1 minute, not an hour.
+ * sync-customers cron, so a lead who signs up can still get a message in the gap
+ * before the next sync. This pulls the LIVE active-client list from Sweep&Go (the
+ * same endpoint the sync uses) and caches it for 60s, so a burst of sends in one
+ * run shares a single pull and freshness is ~1 minute, not an hour. It indexes
+ * both phone numbers (for SMS) and emails (for email campaigns).
  *
  * Returns null when Sweep&Go can't be reached (no token / network / API error /
  * timeout) so callers fall back to the local mirror instead of blocking sends.
@@ -20,9 +21,15 @@ const PAGE_TIMEOUT_MS = 5_000;
 interface SngLite {
   home_phone?: string | null;
   cell_phone?: string | null;
+  email?: string | null;
 }
 
-let cache: { at: number; phones: Set<string> } | null = null;
+interface ActiveIndex {
+  phones: Set<string>; // last-10-digit numbers
+  emails: Set<string>; // lowercased
+}
+
+let cache: { at: number; index: ActiveIndex } | null = null;
 
 /** Last 10 digits of a US number, or null if it isn't a 10-digit number. */
 function last10(raw: string | null | undefined): string | null {
@@ -31,18 +38,20 @@ function last10(raw: string | null | undefined): string | null {
   return d.length === 10 ? d : null;
 }
 
-/**
- * Set of last-10-digit phone numbers for all ACTIVE Sweep&Go clients. Cached for
- * 60s. Null when Sweep&Go is unreachable (caller should fall back to the mirror).
- */
-export async function activeClientPhones(): Promise<Set<string> | null> {
-  if (cache && Date.now() - cache.at < TTL_MS) return cache.phones;
+function normEmail(raw: string | null | undefined): string {
+  return (raw || "").trim().toLowerCase();
+}
+
+/** Pull (and cache) the active-client phone + email index. Null if unreachable. */
+async function loadIndex(): Promise<ActiveIndex | null> {
+  if (cache && Date.now() - cache.at < TTL_MS) return cache.index;
 
   const token = process.env.SWEEPANDGO_API_TOKEN || process.env.SWEEPANDGO_WEBHOOK_SECRET;
   if (!token) return null;
 
   try {
     const phones = new Set<string>();
+    const emails = new Set<string>();
     let page = 1;
     let totalPages = 1;
     do {
@@ -58,7 +67,7 @@ export async function activeClientPhones(): Promise<Set<string> | null> {
       } finally {
         clearTimeout(timer);
       }
-      if (!res.ok) return cache?.phones ?? null; // reuse a stale cache on failure, else null
+      if (!res.ok) return cache?.index ?? null; // reuse a stale cache on failure, else null
       const json = await res.json();
       const data: SngLite[] = json.data ?? [];
       for (const c of data) {
@@ -66,20 +75,38 @@ export async function activeClientPhones(): Promise<Set<string> | null> {
         if (h) phones.add(h);
         const cell = last10(c.cell_phone);
         if (cell) phones.add(cell);
+        const e = normEmail(c.email);
+        if (e) emails.add(e);
       }
       totalPages = json.paginate?.total_pages ?? page;
       page++;
     } while (page <= totalPages && page <= MAX_PAGES);
 
-    cache = { at: Date.now(), phones };
-    return phones;
+    cache = { at: Date.now(), index: { phones, emails } };
+    return cache.index;
   } catch {
-    return cache?.phones ?? null;
+    return cache?.index ?? null;
   }
+}
+
+/** Set of last-10-digit phones for active Sweep&Go clients. Null if unreachable. */
+export async function activeClientPhones(): Promise<Set<string> | null> {
+  return (await loadIndex())?.phones ?? null;
+}
+
+/** Set of lowercased emails for active Sweep&Go clients. Null if unreachable. */
+export async function activeClientEmails(): Promise<Set<string> | null> {
+  return (await loadIndex())?.emails ?? null;
 }
 
 /** True if `phone` belongs to an active Sweep&Go client in the given set. */
 export function phoneInActiveSet(phones: Set<string>, phone: string | null | undefined): boolean {
   const t = last10(phone);
   return !!t && phones.has(t);
+}
+
+/** True if `email` belongs to an active Sweep&Go client in the given set. */
+export function emailInActiveSet(emails: Set<string>, email: string | null | undefined): boolean {
+  const e = normEmail(email);
+  return !!e && emails.has(e);
 }

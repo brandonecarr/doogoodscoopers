@@ -101,6 +101,18 @@ export async function isActiveCustomerByPhone(phone: string | null | undefined):
   return !!customer;
 }
 
+/** True if this email matches an ACTIVE Sweep&Go customer in the local mirror.
+ *  Fallback for the email campaigns' pre-send signup check. */
+export async function isActiveCustomerByEmail(email: string | null | undefined): Promise<boolean> {
+  const e = (email || "").trim().toLowerCase();
+  if (!e) return false;
+  const customer = await prisma.sweepandgoCustomer.findFirst({
+    where: { active: true, email: { equals: e, mode: "insensitive" } },
+    select: { id: true },
+  });
+  return !!customer;
+}
+
 /** All prospect leads (quote + adlead) that share this phone number. */
 export async function findProspectLeadsByPhone(phone: string | null | undefined): Promise<ProspectRef[]> {
   const candidates = phoneCandidates(phone);

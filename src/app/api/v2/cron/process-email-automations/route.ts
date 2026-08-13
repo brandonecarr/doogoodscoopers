@@ -3,6 +3,12 @@ import prisma from "@/lib/prisma";
 import { sendCampaignBatch, isEmailConfigured } from "@/lib/email-send";
 import { unsubscribedSet, normalizeEmail } from "@/lib/email-unsubscribe";
 import { findAutomationCandidates } from "@/lib/email-automation";
+import { isActiveCustomerByEmail } from "@/lib/lead-duplicates";
+import { activeClientEmails, emailInActiveSet } from "@/lib/sweepandgo-lookup";
+
+// Contact types that are PROSPECTS — subject to the "already signed up?" check.
+// customer / former_customer / subscriber are intentionally targeted and exempt.
+const PROSPECT_EMAIL_TYPES = new Set(["quote", "ad", "outofarea", "commercial", "career"]);
 
 // Drives email automations: enrolls new matching contacts and sends each
 // recipient's next step when due. Stops on unsubscribe.
@@ -56,6 +62,17 @@ export async function GET(request: NextRequest) {
         await prisma.emailAutomationRecipient.update({ where: { id: r.id }, data: { status: "STOPPED", error: "unsubscribed", nextSendAt: null } });
         stopped++;
         continue;
+      }
+      // Already signed up? Stop nurturing a prospect who's now a Sweep&Go customer.
+      // Only prospect contact types — never suppress customer/subscriber automations.
+      if (PROSPECT_EMAIL_TYPES.has(r.contactType)) {
+        const emails = await activeClientEmails();
+        const signedUp = emails ? emailInActiveSet(emails, r.email) : await isActiveCustomerByEmail(r.email);
+        if (signedUp) {
+          await prisma.emailAutomationRecipient.update({ where: { id: r.id }, data: { status: "STOPPED", error: "signed up — now a customer", nextSendAt: null } });
+          stopped++;
+          continue;
+        }
       }
       const step = steps[r.currentStep];
       if (!step) { await prisma.emailAutomationRecipient.update({ where: { id: r.id }, data: { status: "COMPLETED", nextSendAt: null } }); continue; }

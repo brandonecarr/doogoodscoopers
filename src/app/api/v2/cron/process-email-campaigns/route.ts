@@ -2,8 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { sendCampaignBatch, isEmailConfigured } from "@/lib/email-send";
 import { unsubscribedSet, normalizeEmail } from "@/lib/email-unsubscribe";
+import { activeClientEmails, emailInActiveSet } from "@/lib/sweepandgo-lookup";
 
 // Drains queued email campaigns and sends via Resend in batches. Runs on a cron.
+
+// Contact types that are PROSPECTS — subject to the "already signed up?" check.
+// customer / contact are intentionally targeted (e.g. newsletters) and exempt.
+const PROSPECT_EMAIL_TYPES = new Set(["quote", "ad", "outofarea", "commercial", "career"]);
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -38,12 +43,29 @@ export async function GET(request: NextRequest) {
   const unsub = await unsubscribedSet();
   let sent = 0, failed = 0, skipped = 0;
 
+  // Active Sweep&Go clients (by email) so a prospect broadcast never reaches
+  // someone who already signed up. Live list first; fall back to the synced mirror
+  // if Sweep&Go is unreachable so the broadcast still respects conversions.
+  let activeEmails = await activeClientEmails();
+  if (!activeEmails) {
+    const rows = await prisma.sweepandgoCustomer.findMany({ where: { active: true, email: { not: null } }, select: { email: true } });
+    activeEmails = new Set(rows.map((r) => (r.email || "").trim().toLowerCase()).filter(Boolean));
+  }
+
   for (let i = 0; i < pending.length; i += BATCH) {
     const slice = pending.slice(i, i + BATCH);
-    const toSend = slice.filter((r) => !unsub.has(normalizeEmail(r.email)));
-    for (const s of slice.filter((r) => unsub.has(normalizeEmail(r.email)))) {
-      await prisma.emailRecipient.update({ where: { id: s.id }, data: { status: "SKIPPED", error: "unsubscribed", sentAt: new Date() } });
-      skipped++;
+    const toSend: typeof slice = [];
+    for (const r of slice) {
+      if (unsub.has(normalizeEmail(r.email))) {
+        await prisma.emailRecipient.update({ where: { id: r.id }, data: { status: "SKIPPED", error: "unsubscribed", sentAt: new Date() } });
+        skipped++;
+      } else if (r.contactType && PROSPECT_EMAIL_TYPES.has(r.contactType) && emailInActiveSet(activeEmails, r.email)) {
+        // Prospect who already signed up — don't send them a prospect broadcast.
+        await prisma.emailRecipient.update({ where: { id: r.id }, data: { status: "SKIPPED", error: "signed up — now a customer", sentAt: new Date() } });
+        skipped++;
+      } else {
+        toSend.push(r);
+      }
     }
     if (toSend.length === 0) continue;
 
