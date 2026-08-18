@@ -99,7 +99,19 @@ export async function getAccessToken(): Promise<string> {
       grant_type: "refresh_token",
     }),
   });
-  if (!res.ok) throw new Error(`Refresh failed: ${res.status} ${await res.text().catch(() => "")}`);
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    // Google revokes/expires refresh tokens (esp. while the OAuth consent screen
+    // is in "Testing" mode — those expire after 7 days). When that happens the
+    // stored token is dead, so clear the connection and ask for a reconnect
+    // rather than surfacing a raw 400 on every sync.
+    if (/invalid_grant/i.test(text)) {
+      await setSetting("google.oauth.refreshToken", "");
+      await setSetting("google.bp.connectedEmail", "");
+      throw new Error("Your Google Business Profile connection has expired. Reconnect it on the Reviews page to resume syncing.");
+    }
+    throw new Error(`Refresh failed: ${res.status} ${text}`);
+  }
   const json = await res.json();
   return json.access_token as string;
 }
