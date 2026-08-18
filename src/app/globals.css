@@ -770,3 +770,14 @@ body:has([class*="ti-popup"]) {
 @keyframes dgsFade { from { opacity: 0; } to { opacity: 1; } }
 .dgs-anim-pop { animation: dgsPop .17s ease both; }
 .dgs-anim-fade { animation: dgsFade .2s ease both; }
+
+/* ── Print-to-PDF: the community contract document ──────────────────────────
+   On screen the contract is hidden; when printing we hide the admin chrome and
+   reveal only the contract subtree so "Save as PDF" yields a clean document. */
+.dgs-print-only { display: none; }
+@media print {
+  body * { visibility: hidden !important; }
+  .dgs-print-only, .dgs-print-only * { visibility: visible !important; }
+  .dgs-print-only { display: block !important; position: absolute; left: 0; top: 0; width: 100%; }
+  @page { size: letter; margin: 0.9in; }
+}

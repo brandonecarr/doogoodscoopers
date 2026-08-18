@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Copy, Check, Info } from "lucide-react";
+import { Copy, Check, Info, FileDown } from "lucide-react";
+import { ContractDocument, type ContractData } from "@/components/admin/CommunityContractDocument";
 
 // Community / HOA quote calculator. The price is BUILT from serviceable area ×
 // frequency × a loaded hourly rate (with a per-visit floor), then PRESENTED as a
@@ -22,6 +23,18 @@ type Fields = {
   stationMonthly: string;
   stationInstall: string;
   initialCleanup: string;
+  // Contract details (for the PDF)
+  clientLegalName: string;
+  propertyAddress: string;
+  clientContact: string;
+  clientEmail: string;
+  effectiveDate: string;
+  termMonths: string;
+  netDays: string;
+  lateFeePct: string;
+  governingState: string;
+  providerAddress: string;
+  providerEmail: string;
 };
 
 const DEFAULTS: Fields = {
@@ -39,7 +52,21 @@ const DEFAULTS: Fields = {
   stationMonthly: "50",
   stationInstall: "125",
   initialCleanup: "0",
+  clientLegalName: "",
+  propertyAddress: "",
+  clientContact: "",
+  clientEmail: "",
+  effectiveDate: "",
+  termMonths: "12",
+  netDays: "15",
+  lateFeePct: "1.5",
+  governingState: "California",
+  providerAddress: "",
+  providerEmail: "",
 };
+
+const PROVIDER_ENTITY = "DooGoodScoopers";
+const PROVIDER_PHONE = "(909) 366-3744";
 
 const num = (s: string) => {
   const n = parseFloat(s);
@@ -149,7 +176,37 @@ export function CommunityQuoteCalculator() {
     } catch { /* still selectable on screen */ }
   };
 
+  const contractData: ContractData = useMemo(() => ({
+    providerEntity: PROVIDER_ENTITY,
+    providerAddress: f.providerAddress,
+    providerPhone: PROVIDER_PHONE,
+    providerEmail: f.providerEmail,
+    clientLegalName: f.clientLegalName || f.property,
+    propertyAddress: f.propertyAddress,
+    clientContact: f.clientContact,
+    clientEmail: f.clientEmail,
+    effectiveDate: f.effectiveDate,
+    termMonths: f.termMonths,
+    netDays: f.netDays,
+    lateFeePct: f.lateFeePct,
+    governingState: f.governingState,
+    acres: f.acres,
+    units: f.units,
+    freq: c.freq,
+    visitsMo: c.visitsMo.toFixed(1),
+    stations: c.stations,
+    monthlyTotal: money0(c.monthlyTotal),
+    perUnitMo: money2(c.perUnitMo),
+    oneTime: money0(c.oneTime),
+    hasOneTime: c.oneTime > 0,
+  }), [f, c]);
+
+  const exportPdf = () => {
+    if (typeof window !== "undefined") window.print();
+  };
+
   return (
+    <>
     <div className="grid grid-cols-1 lg:grid-cols-[1fr_minmax(340px,420px)] gap-3.5">
       {/* ── Inputs ─────────────────────────────────────────────── */}
       <div className="space-y-3.5">
@@ -206,6 +263,48 @@ export function CommunityQuoteCalculator() {
             <Num label="Initial deep cleanup (one-time)" value={f.initialCleanup} onChange={(v) => set("initialCleanup", v)} prefix="$" hint="For neglected grounds — charge separately." />
           </div>
         </div>
+
+        <details className="dgs-card p-4" open>
+          <summary className="text-[13px] font-bold text-ink cursor-pointer select-none">Contract details <span className="font-medium text-muted">(for the PDF agreement)</span></summary>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+            <label className="block sm:col-span-2">
+              <span className="block text-[12px] font-semibold text-bodytext mb-1">Client legal name (HOA / association)</span>
+              <input value={f.clientLegalName} onChange={(e) => set("clientLegalName", e.target.value)} placeholder={f.property || "e.g. Riverside Condominiums HOA"} className={inputCls} />
+            </label>
+            <label className="block sm:col-span-2">
+              <span className="block text-[12px] font-semibold text-bodytext mb-1">Property address</span>
+              <input value={f.propertyAddress} onChange={(e) => set("propertyAddress", e.target.value)} placeholder="123 Main St, Fontana, CA 92335" className={inputCls} />
+            </label>
+            <label className="block">
+              <span className="block text-[12px] font-semibold text-bodytext mb-1">Client contact name</span>
+              <input value={f.clientContact} onChange={(e) => set("clientContact", e.target.value)} placeholder="Property manager / board contact" className={inputCls} />
+            </label>
+            <label className="block">
+              <span className="block text-[12px] font-semibold text-bodytext mb-1">Client email</span>
+              <input value={f.clientEmail} onChange={(e) => set("clientEmail", e.target.value)} placeholder="manager@example.com" className={inputCls} />
+            </label>
+            <label className="block">
+              <span className="block text-[12px] font-semibold text-bodytext mb-1">Effective date</span>
+              <input type="date" value={f.effectiveDate} onChange={(e) => set("effectiveDate", e.target.value)} className={inputCls} />
+            </label>
+            <Num label="Initial term (months)" value={f.termMonths} onChange={(v) => set("termMonths", v)} suffix="months" />
+            <Num label="Payment due (net days)" value={f.netDays} onChange={(v) => set("netDays", v)} suffix="days" />
+            <Num label="Late fee" value={f.lateFeePct} onChange={(v) => set("lateFeePct", v)} suffix="%/mo" step="0.1" />
+            <label className="block">
+              <span className="block text-[12px] font-semibold text-bodytext mb-1">Governing state</span>
+              <input value={f.governingState} onChange={(e) => set("governingState", e.target.value)} placeholder="California" className={inputCls} />
+            </label>
+            <label className="block">
+              <span className="block text-[12px] font-semibold text-bodytext mb-1">Provider email (for notices)</span>
+              <input value={f.providerEmail} onChange={(e) => set("providerEmail", e.target.value)} placeholder="hello@doogoodscoopers.com" className={inputCls} />
+            </label>
+            <label className="block sm:col-span-2">
+              <span className="block text-[12px] font-semibold text-bodytext mb-1">Provider mailing address</span>
+              <input value={f.providerAddress} onChange={(e) => set("providerAddress", e.target.value)} placeholder="DooGoodScoopers business address" className={inputCls} />
+            </label>
+          </div>
+          <p className="text-[11px] text-muted mt-3">Blank fields print as a fill-in line. Have counsel review before use.</p>
+        </details>
       </div>
 
       {/* ── Results ────────────────────────────────────────────── */}
@@ -276,21 +375,39 @@ export function CommunityQuoteCalculator() {
 
         {/* Copy-ready proposal */}
         <div className="dgs-card p-4">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-between mb-2 gap-2">
             <h3 className="text-[13px] font-bold text-ink">Proposal</h3>
-            <button
-              onClick={copy}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] text-[12px] font-semibold text-white transition-colors"
-              style={{ background: copied ? "#16A34A" : "#101014" }}
-            >
-              {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-              {copied ? "Copied" : "Copy"}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={exportPdf}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] text-[12px] font-semibold text-white transition-colors"
+                style={{ background: "#6D3EF0" }}
+                title="Opens your browser's print dialog — choose 'Save as PDF'"
+              >
+                <FileDown className="w-3.5 h-3.5" />
+                Export PDF
+              </button>
+              <button
+                onClick={copy}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] text-[12px] font-semibold text-white transition-colors"
+                style={{ background: copied ? "#16A34A" : "#101014" }}
+              >
+                {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                {copied ? "Copied" : "Copy"}
+              </button>
+            </div>
           </div>
           <pre className="text-[11.5px] leading-relaxed text-bodytext whitespace-pre-wrap font-sans bg-surface2/60 rounded-lg p-3 max-h-[320px] overflow-auto">{proposal}</pre>
+          <p className="text-[11px] text-muted mt-2">
+            <b>Copy</b> grabs the short proposal above. <b>Export PDF</b> generates the full service agreement — fill in the Contract details for a signature-ready document.
+          </p>
         </div>
       </div>
     </div>
+
+    {/* Print-only legal agreement — hidden on screen, revealed by the print stylesheet */}
+    <ContractDocument d={contractData} />
+    </>
   );
 }
 
