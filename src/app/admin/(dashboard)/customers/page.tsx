@@ -191,7 +191,9 @@ export default async function CustomersPage({ searchParams }: PageProps) {
       {/* Search + sort */}
       <div className="dgs-card p-4">
         <form className="flex flex-col sm:flex-row gap-3">
-          {view !== "list" && <input type="hidden" name="view" value={view} />}
+          {/* Preserve the current tab on search — the default view is "dashboard",
+              so a list/map/planner search must carry view=<current> or it snaps back. */}
+          <input type="hidden" name="view" value={view} />
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input type="text" name="search" defaultValue={search}
