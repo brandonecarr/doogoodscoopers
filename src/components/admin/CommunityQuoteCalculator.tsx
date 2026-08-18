@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Copy, Check, Info, FileDown } from "lucide-react";
-import { ContractDocument, type ContractData } from "@/components/admin/CommunityContractDocument";
+import { Copy, Check, Info, FileDown, Loader2 } from "lucide-react";
+import type { ContractData } from "@/components/admin/CommunityContractDocument";
 
 // Community / HOA quote calculator. The price is BUILT from serviceable area ×
 // frequency × a loaded hourly rate (with a per-visit floor), then PRESENTED as a
@@ -201,12 +201,20 @@ export function CommunityQuoteCalculator() {
     hasOneTime: c.oneTime > 0,
   }), [f, c]);
 
-  const exportPdf = () => {
-    if (typeof window !== "undefined") window.print();
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const exportPdf = async () => {
+    setPdfBusy(true);
+    try {
+      const { downloadContractPdf } = await import("@/components/admin/CommunityContractDocument");
+      await downloadContractPdf(contractData);
+    } catch {
+      /* generation failed — leave the UI unchanged */
+    } finally {
+      setPdfBusy(false);
+    }
   };
 
   return (
-    <>
     <div className="grid grid-cols-1 lg:grid-cols-[1fr_minmax(340px,420px)] gap-3.5">
       {/* ── Inputs ─────────────────────────────────────────────── */}
       <div className="space-y-3.5">
@@ -380,12 +388,13 @@ export function CommunityQuoteCalculator() {
             <div className="flex items-center gap-2">
               <button
                 onClick={exportPdf}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] text-[12px] font-semibold text-white transition-colors"
+                disabled={pdfBusy}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] text-[12px] font-semibold text-white transition-colors disabled:opacity-60"
                 style={{ background: "#6D3EF0" }}
-                title="Opens your browser's print dialog — choose 'Save as PDF'"
+                title="Download the full service agreement as a PDF"
               >
-                <FileDown className="w-3.5 h-3.5" />
-                Export PDF
+                {pdfBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileDown className="w-3.5 h-3.5" />}
+                {pdfBusy ? "Generating…" : "Export PDF"}
               </button>
               <button
                 onClick={copy}
@@ -399,15 +408,11 @@ export function CommunityQuoteCalculator() {
           </div>
           <pre className="text-[11.5px] leading-relaxed text-bodytext whitespace-pre-wrap font-sans bg-surface2/60 rounded-lg p-3 max-h-[320px] overflow-auto">{proposal}</pre>
           <p className="text-[11px] text-muted mt-2">
-            <b>Copy</b> grabs the short proposal above. <b>Export PDF</b> generates the full service agreement — fill in the Contract details for a signature-ready document.
+            <b>Copy</b> grabs the short proposal above. <b>Export PDF</b> downloads the full service agreement — fill in the Contract details for a signature-ready document.
           </p>
         </div>
       </div>
     </div>
-
-    {/* Print-only legal agreement — hidden on screen, revealed by the print stylesheet */}
-    <ContractDocument d={contractData} />
-    </>
   );
 }
 
