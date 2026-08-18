@@ -44,9 +44,19 @@ export interface SendSmsOptions {
   statusCallback?: string;
 }
 
+const QUO_TIMEOUT_MS = 20_000; // fail fast so one hung request can't stall a whole cron run
+const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 /**
- * Low-level Quo API fetch. Returns { ok, status, data } and never throws on
- * non-2xx — callers decide how to handle failures.
+ * Low-level Quo API fetch. Returns { ok, status, data } and never throws — callers
+ * decide how to handle failures.
+ *
+ * Resilience: every request has a hard timeout. Idempotent GETs retry a few times
+ * with backoff on transient failures (timeouts, network errors, 429/5xx incl. the
+ * 504 gateway timeouts Quo occasionally returns). Non-GET requests (i.e. sending a
+ * message) are NEVER auto-retried — a 504 can mean the message actually went
+ * through, so a retry could double-send. Those fail safe and the caller reports it.
  */
 export async function quoFetch(
   path: string,
@@ -55,23 +65,47 @@ export async function quoFetch(
   if (!apiKey) {
     return { ok: false, status: 0, data: { error: "Quo not configured" } };
   }
-  const res = await fetch(`${QUO_BASE_URL}${path}`, {
-    method: init.method ?? "GET",
-    headers: {
-      Authorization: apiKey,
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: init.body != null ? JSON.stringify(init.body) : undefined,
-    cache: "no-store",
-  });
-  let data: unknown = null;
-  try {
-    data = await res.json();
-  } catch {
-    data = null;
+  const method = init.method ?? "GET";
+  const maxAttempts = method === "GET" ? 3 : 1;
+
+  let lastError = "network error";
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), QUO_TIMEOUT_MS);
+    try {
+      const res = await fetch(`${QUO_BASE_URL}${path}`, {
+        method,
+        headers: {
+          Authorization: apiKey,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: init.body != null ? JSON.stringify(init.body) : undefined,
+        cache: "no-store",
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+
+      // Retry idempotent GETs on a transient status; otherwise return the response.
+      if (maxAttempts > 1 && RETRYABLE_STATUS.has(res.status) && attempt < maxAttempts) {
+        lastError = `Quo API error (${res.status})`;
+        await sleep(300 * 2 ** (attempt - 1));
+        continue;
+      }
+
+      let data: unknown = null;
+      try { data = await res.json(); } catch { data = null; }
+      return { ok: res.ok, status: res.status, data };
+    } catch (e) {
+      clearTimeout(timer);
+      lastError = e instanceof Error ? e.message : "network error";
+      if (attempt < maxAttempts) {
+        await sleep(300 * 2 ** (attempt - 1));
+        continue;
+      }
+    }
   }
-  return { ok: res.ok, status: res.status, data };
+  return { ok: false, status: 0, data: { error: lastError } };
 }
 
 /** Pull an id/status out of Quo's response whether or not it wraps in `data`. */
