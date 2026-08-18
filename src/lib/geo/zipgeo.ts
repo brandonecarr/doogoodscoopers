@@ -101,6 +101,43 @@ export async function geocodeAddress(address: string | null | undefined, zip: st
   return zipPoint;
 }
 
+export interface ReverseHit { address: string; city: string | null; zip: string | null; place: string }
+
+/**
+ * Reverse geocode a dropped pin (lat/lng → nearest street address). Used by the
+ * canvasser tool so a rep sees the house address for a pin they just dropped.
+ * Returns null if Mapbox isn't configured or nothing resolves.
+ */
+export async function reverseGeocode(lat: number, lng: number): Promise<ReverseHit | null> {
+  const token = mapboxToken();
+  if (!token || !Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  const url =
+    `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json` +
+    `?country=US&types=address&limit=1&access_token=${encodeURIComponent(token)}`;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      features?: {
+        place_name?: string;
+        text?: string;
+        address?: string;
+        context?: { id: string; text: string }[];
+      }[];
+    };
+    const f = data.features?.[0];
+    if (!f) return null;
+    // House number + street from `address` (number) + `text` (street name).
+    const street = [f.address, f.text].filter(Boolean).join(" ").trim();
+    const ctx = f.context || [];
+    const city = ctx.find((c) => c.id.startsWith("place"))?.text || null;
+    const zip = ctx.find((c) => c.id.startsWith("postcode"))?.text || null;
+    return { address: street || f.place_name?.split(",")[0] || "", city, zip, place: f.place_name || "" };
+  } catch {
+    return null;
+  }
+}
+
 // Small concurrency cap so a batch of new zips doesn't hammer Mapbox at once.
 async function mapLimited<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
   const out: R[] = new Array(items.length);

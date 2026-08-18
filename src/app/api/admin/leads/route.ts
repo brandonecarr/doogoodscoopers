@@ -6,7 +6,7 @@ import type { LeadStatus } from "@/types/leads";
 
 export interface CombinedLead {
   id: string;
-  type: "quote" | "ad" | "instagram";
+  type: "quote" | "ad" | "instagram" | "canvasser";
   name: string;
   phone: string | null;
   email: string | null;
@@ -47,6 +47,11 @@ const INSTA_SELECT = {
   convertedQuoteLeadId: true,
 } as const;
 
+const CANV_SELECT = {
+  id: true, firstName: true, lastName: true, phone: true, email: true,
+  zipCode: true, status: true, grade: true, canvasserName: true, createdAt: true, followupDate: true, archived: true,
+} as const;
+
 // Priority sort: A first … F, then ungraded. Then newest within the same grade.
 const GRADE_RANK: Record<string, number> = { A: 0, B: 1, C: 2, D: 3, F: 4 };
 const gradeRank = (g: string | null) => (g ? GRADE_RANK[g] ?? 5 : 9);
@@ -72,6 +77,7 @@ export async function GET(request: NextRequest) {
     const includeQuote = !sourceFilter || sourceFilter === "all" || sourceFilter === "quote";
     const includeAd = !sourceFilter || sourceFilter === "all" || sourceFilter === "ad";
     const includeInsta = !sourceFilter || sourceFilter === "all" || sourceFilter === "instagram";
+    const includeCanv = !sourceFilter || sourceFilter === "all" || sourceFilter === "canvasser";
     const cutoff = days > 0 ? new Date(Date.now() - days * 86_400_000) : null;
 
     // ── Shared where-builders ────────────────────────────────────────────────
@@ -119,6 +125,21 @@ export async function GET(request: NextRequest) {
       }
       return w;
     };
+    const canvWhere = (s?: LeadStatus): Record<string, unknown> => {
+      const w: Record<string, unknown> = { archived: false };
+      if (s) w.status = s;
+      if (cutoff) w.createdAt = { gte: cutoff };
+      if (search) {
+        w.OR = [
+          { firstName: { contains: search, mode: "insensitive" } },
+          { lastName: { contains: search, mode: "insensitive" } },
+          { email: { contains: search, mode: "insensitive" } },
+          { phone: { contains: search, mode: "insensitive" } },
+          { zipCode: { contains: search, mode: "insensitive" } },
+        ];
+      }
+      return w;
+    };
 
     // Per-table order matches the JS comparator so merge+slice stays correct.
     const orderBy: Prisma.QuoteLeadOrderByWithRelationInput[] = sortBy === "grade"
@@ -126,6 +147,7 @@ export async function GET(request: NextRequest) {
       : [{ createdAt: "desc" }];
     const adOrderBy = orderBy as unknown as Prisma.AdLeadOrderByWithRelationInput[];
     const instaOrderBy = orderBy as unknown as Prisma.InstagramLeadOrderByWithRelationInput[];
+    const canvOrderBy = orderBy as unknown as Prisma.CanvasserLeadOrderByWithRelationInput[];
     const cmp = (x: CombinedLead, y: CombinedLead) => {
       if (sortBy === "grade") {
         const g = gradeRank(x.grade) - gradeRank(y.grade);
@@ -159,16 +181,26 @@ export async function GET(request: NextRequest) {
       createdAt: l.createdAt.toISOString(), followupDate: l.followupDate?.toISOString() || null,
       archived: l.archived,
     });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const toCanv = (l: any): CombinedLead => ({
+      id: l.id, type: "canvasser",
+      name: `${l.firstName || ""} ${l.lastName || ""}`.trim() || "Canvasser lead",
+      phone: l.phone, email: l.email, zipCode: l.zipCode, status: l.status as LeadStatus,
+      grade: l.grade, source: l.canvasserName ? `Canvasser (${l.canvasserName})` : "Canvasser",
+      createdAt: l.createdAt.toISOString(), followupDate: l.followupDate?.toISOString() || null,
+      archived: l.archived,
+    });
 
     // Top `take` leads for one status (by the active sort), merged across tables, offset by `skip`.
     const fetchStatusPage = async (s: LeadStatus, skip: number, take: number): Promise<CombinedLead[]> => {
       const limit = skip + take;
-      const [q, a, ig] = await Promise.all([
+      const [q, a, ig, cv] = await Promise.all([
         includeQuote ? prisma.quoteLead.findMany({ where: quoteWhere(s), orderBy, take: limit, select: QUOTE_SELECT }) : Promise.resolve([]),
         includeAd ? prisma.adLead.findMany({ where: adWhere(s), orderBy: adOrderBy, take: limit, select: AD_SELECT }) : Promise.resolve([]),
         includeInsta ? prisma.instagramLead.findMany({ where: instaWhere(s), orderBy: instaOrderBy, take: limit, select: INSTA_SELECT }) : Promise.resolve([]),
+        includeCanv ? prisma.canvasserLead.findMany({ where: canvWhere(s), orderBy: canvOrderBy, take: limit, select: CANV_SELECT }) : Promise.resolve([]),
       ]);
-      const merged = [...q.map(toQuote), ...a.map(toAd), ...ig.map(toInsta)].sort(cmp);
+      const merged = [...q.map(toQuote), ...a.map(toAd), ...ig.map(toInsta), ...cv.map(toCanv)].sort(cmp);
       return merged.slice(skip, skip + take);
     };
 
@@ -186,16 +218,18 @@ export async function GET(request: NextRequest) {
       }
 
       // Counts per status (one grouped query per table).
-      const [quoteCounts, adCounts, instaCounts] = await Promise.all([
+      const [quoteCounts, adCounts, instaCounts, canvCounts] = await Promise.all([
         includeQuote ? prisma.quoteLead.groupBy({ by: ["status"], where: quoteWhere(), _count: { _all: true } }) : Promise.resolve([]),
         includeAd ? prisma.adLead.groupBy({ by: ["status"], where: adWhere(), _count: { _all: true } }) : Promise.resolve([]),
         includeInsta ? prisma.instagramLead.groupBy({ by: ["status"], where: instaWhere(), _count: { _all: true } }) : Promise.resolve([]),
+        includeCanv ? prisma.canvasserLead.groupBy({ by: ["status"], where: canvWhere(), _count: { _all: true } }) : Promise.resolve([]),
       ]);
       const counts: Record<string, number> = {};
       for (const s of ALL_STATUSES) counts[s] = 0;
       for (const r of quoteCounts) counts[r.status] = (counts[r.status] || 0) + (r._count?._all || 0);
       for (const r of adCounts) counts[r.status] = (counts[r.status] || 0) + (r._count?._all || 0);
       for (const r of instaCounts) counts[r.status] = (counts[r.status] || 0) + (r._count?._all || 0);
+      for (const r of canvCounts) counts[r.status] = (counts[r.status] || 0) + (r._count?._all || 0);
 
       const pages = await Promise.all(statuses.map((s) => fetchStatusPage(s, 0, PER_COLUMN)));
       const leads = pages.flat();
@@ -206,14 +240,16 @@ export async function GET(request: NextRequest) {
 
     // ── List view: combined + in-memory pagination ───────────────────────────
     const combined: CombinedLead[] = [];
-    const [quoteLeads, adLeads, instaLeads] = await Promise.all([
+    const [quoteLeads, adLeads, instaLeads, canvLeads] = await Promise.all([
       includeQuote ? prisma.quoteLead.findMany({ where: quoteWhere(statusFilter), orderBy, select: QUOTE_SELECT }) : Promise.resolve([]),
       includeAd ? prisma.adLead.findMany({ where: adWhere(statusFilter), orderBy: adOrderBy, select: AD_SELECT }) : Promise.resolve([]),
       includeInsta ? prisma.instagramLead.findMany({ where: instaWhere(statusFilter), orderBy: instaOrderBy, select: INSTA_SELECT }) : Promise.resolve([]),
+      includeCanv ? prisma.canvasserLead.findMany({ where: canvWhere(statusFilter), orderBy: canvOrderBy, select: CANV_SELECT }) : Promise.resolve([]),
     ]);
     for (const l of quoteLeads) combined.push(toQuote(l));
     for (const l of adLeads) combined.push(toAd(l));
     for (const l of instaLeads) combined.push(toInsta(l));
+    for (const l of canvLeads) combined.push(toCanv(l));
     combined.sort(cmp);
 
     const total = combined.length;

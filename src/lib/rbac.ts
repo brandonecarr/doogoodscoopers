@@ -179,6 +179,11 @@ const rolePermissions: Record<UserRole, Permission[]> = {
     "referrals:read", "referrals:write",
     "gift_certificates:read",
   ],
+  CANVASSER: [
+    // Door-to-door canvasser: can only create/see their OWN leads (scoping
+    // enforced in the API by canvasserId, not just by permission).
+    "leads:read", "leads:write",
+  ],
 };
 
 // Check if a role has a specific permission
@@ -226,6 +231,11 @@ export function canAccessClientPortal(role: UserRole): boolean {
   return role === "CLIENT" || role === "OWNER";
 }
 
+// Check if role can access the canvasser portal
+export function canAccessCanvasserPortal(role: UserRole): boolean {
+  return role === "CANVASSER" || role === "OWNER" || role === "MANAGER";
+}
+
 // Role hierarchy for comparison (higher number = more permissions)
 const roleHierarchy: Record<UserRole, number> = {
   OWNER: 100,
@@ -234,6 +244,7 @@ const roleHierarchy: Record<UserRole, number> = {
   CREW_LEAD: 50,
   ACCOUNTANT: 40,
   FIELD_TECH: 30,
+  CANVASSER: 20,
   CLIENT: 10,
 };
 
@@ -251,6 +262,7 @@ export function getRoleDisplayName(role: UserRole): string {
     CREW_LEAD: "Crew Lead",
     FIELD_TECH: "Field Technician",
     ACCOUNTANT: "Accountant",
+    CANVASSER: "Canvasser",
     CLIENT: "Client",
   };
   return names[role] ?? role;
@@ -265,6 +277,7 @@ export function getRoleColor(role: UserRole): string {
     CREW_LEAD: "text-orange-600 bg-orange-100",
     FIELD_TECH: "text-green-600 bg-green-100",
     ACCOUNTANT: "text-gray-600 bg-gray-100",
+    CANVASSER: "text-amber-600 bg-amber-100",
     CLIENT: "text-navy-600 bg-navy-100",
   };
   return colors[role] ?? "text-gray-600 bg-gray-100";

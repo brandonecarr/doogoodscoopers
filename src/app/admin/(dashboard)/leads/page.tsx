@@ -16,6 +16,7 @@ import {
   FileText,
   Megaphone,
   Instagram,
+  MapPin,
   ChevronLeft,
   ChevronRight,
   CheckCircle2,
@@ -41,7 +42,7 @@ interface MapMeta { configured: boolean; totalLeads: number; mappedLeads: number
 
 interface CombinedLead {
   id: string;
-  type: "quote" | "ad" | "instagram";
+  type: "quote" | "ad" | "instagram" | "canvasser";
   name: string;
   phone: string | null;
   email: string | null;
@@ -56,10 +57,17 @@ interface CombinedLead {
 
 // Source badge styling/icon/label by lead type.
 const typeBadgeClass = (t: CombinedLead["type"]) =>
-  t === "quote" ? "bg-blue-100 text-blue-800" : t === "instagram" ? "bg-purple-100 text-purple-800" : "bg-pink-100 text-pink-800";
+  t === "quote" ? "bg-blue-100 text-blue-800"
+  : t === "instagram" ? "bg-purple-100 text-purple-800"
+  : t === "canvasser" ? "bg-amber-100 text-amber-800"
+  : "bg-pink-100 text-pink-800";
 const TypeIcon = ({ type }: { type: CombinedLead["type"] }) =>
-  type === "quote" ? <FileText className="w-3 h-3" /> : type === "instagram" ? <Instagram className="w-3 h-3" /> : <Megaphone className="w-3 h-3" />;
-const typeShortLabel = (t: CombinedLead["type"]) => (t === "quote" ? "Quote" : t === "instagram" ? "Instagram" : "Ad");
+  type === "quote" ? <FileText className="w-3 h-3" />
+  : type === "instagram" ? <Instagram className="w-3 h-3" />
+  : type === "canvasser" ? <MapPin className="w-3 h-3" />
+  : <Megaphone className="w-3 h-3" />;
+const typeShortLabel = (t: CombinedLead["type"]) =>
+  t === "quote" ? "Quote" : t === "instagram" ? "Instagram" : t === "canvasser" ? "Canvasser" : "Ad";
 
 type ColorKey =
   | "teal" | "blue" | "orange" | "gray" | "purple"
@@ -395,7 +403,7 @@ export default function LeadsPage() {
     if (col?.statusMapping && col.statusMapping !== lead.status) {
       const prevStatus = lead.status;
       const newStatus = col.statusMapping;
-      const leadType = lead.type === "quote" ? "quote" : lead.type === "instagram" ? "instagram" : "adlead";
+      const leadType = lead.type === "quote" ? "quote" : lead.type === "instagram" ? "instagram" : lead.type === "canvasser" ? "canvasser" : "adlead";
       await fetch("/api/admin/update-lead", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -493,7 +501,7 @@ export default function LeadsPage() {
   }, {});
 
   const detailHref = (lead: CombinedLead) =>
-    `/admin/${lead.type === "quote" ? "quote-leads" : lead.type === "instagram" ? "instagram-leads" : "ad-leads"}/${lead.id}`;
+    `/admin/${lead.type === "quote" ? "quote-leads" : lead.type === "instagram" ? "instagram-leads" : lead.type === "canvasser" ? "canvasser-leads" : "ad-leads"}/${lead.id}`;
 
   return (
     <div className="space-y-3.5 pb-24 lg:pb-6">
@@ -589,6 +597,7 @@ export default function LeadsPage() {
             <option value="quote">Quote Form</option>
             <option value="ad">Meta Ads</option>
             <option value="instagram">Instagram</option>
+            <option value="canvasser">Canvasser</option>
           </select>
           <select
             value={sortBy}

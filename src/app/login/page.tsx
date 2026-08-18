@@ -73,6 +73,9 @@ function LoginForm() {
           case "FIELD_TECH":
             redirectTo = "/app/field";
             break;
+          case "CANVASSER":
+            redirectTo = "/app/canvasser";
+            break;
           case "CLIENT":
             redirectTo = "/app/client";
             break;

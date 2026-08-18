@@ -13,6 +13,7 @@ const leadTypeMap: Record<string, LeadSource> = {
   career: "CAREERS",
   commercial: "COMMERCIAL",
   adlead: "AD_LEAD",
+  canvasser: "CANVASSER",
 };
 
 type Contact = { phone: string | null; firstName: string | null; lastName: string | null };
@@ -38,6 +39,10 @@ async function getLeadContact(mapped: LeadSource, leadId: string): Promise<Conta
     case "AD_LEAD": {
       const l = await prisma.adLead.findUnique({ where: { id: leadId } });
       return l ? { phone: l.phone, firstName: l.firstName || l.fullName, lastName: l.lastName } : null;
+    }
+    case "CANVASSER": {
+      const l = await prisma.canvasserLead.findUnique({ where: { id: leadId } });
+      return l ? { phone: l.phone, firstName: l.firstName, lastName: l.lastName } : null;
     }
   }
   return null;

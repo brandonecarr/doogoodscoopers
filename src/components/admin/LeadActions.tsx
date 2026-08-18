@@ -6,7 +6,7 @@ import { Archive, ArchiveRestore, Trash2 } from "lucide-react";
 
 interface LeadActionsProps {
   leadId: string;
-  leadType: "quote" | "outofarea" | "career" | "commercial" | "adlead";
+  leadType: "quote" | "outofarea" | "career" | "commercial" | "adlead" | "canvasser";
   isArchived: boolean;
 }
 
@@ -17,6 +17,7 @@ const LIST_PATH: Record<LeadActionsProps["leadType"], string> = {
   outofarea: "/admin/out-of-area",
   commercial: "/admin/commercial",
   career: "/admin/careers",
+  canvasser: "/admin/leads",
 };
 
 export function LeadActions({ leadId, leadType, isArchived }: LeadActionsProps) {

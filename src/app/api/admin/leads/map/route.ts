@@ -9,7 +9,7 @@ export const maxDuration = 60; // first load may geocode a batch of new zips
 
 interface MapLead {
   id: string;
-  type: "quote" | "ad" | "instagram";
+  type: "quote" | "ad" | "instagram" | "canvasser";
   name: string;
   status: LeadStatus;
   grade: string | null;
@@ -42,6 +42,7 @@ export async function GET(request: NextRequest) {
     const includeQuote = !source || source === "all" || source === "quote";
     const includeAd = !source || source === "all" || source === "ad";
     const includeInsta = !source || source === "all" || source === "instagram";
+    const includeCanv = !source || source === "all" || source === "canvasser";
     const cutoff = days > 0 ? new Date(Date.now() - days * 86_400_000) : null;
 
     const base = (extraSearch: Record<string, unknown>[]): Record<string, unknown> => {
@@ -71,8 +72,15 @@ export async function GET(request: NextRequest) {
       { email: { contains: search ?? "", mode: "insensitive" } },
       { phone: { contains: search ?? "", mode: "insensitive" } },
     ]);
+    const canvWhere = base([
+      { firstName: { contains: search ?? "", mode: "insensitive" } },
+      { lastName: { contains: search ?? "", mode: "insensitive" } },
+      { email: { contains: search ?? "", mode: "insensitive" } },
+      { phone: { contains: search ?? "", mode: "insensitive" } },
+      { zipCode: { contains: search ?? "", mode: "insensitive" } },
+    ]);
 
-    const [quotes, ads, instas] = await Promise.all([
+    const [quotes, ads, instas, canvs] = await Promise.all([
       includeQuote
         ? prisma.quoteLead.findMany({ where: quoteWhere, select: { id: true, firstName: true, lastName: true, zipCode: true, status: true, grade: true, createdAt: true } })
         : Promise.resolve([]),
@@ -82,6 +90,9 @@ export async function GET(request: NextRequest) {
       includeInsta
         ? prisma.instagramLead.findMany({ where: instaWhere, select: { id: true, username: true, firstName: true, lastName: true, zipCode: true, status: true, grade: true, createdAt: true } })
         : Promise.resolve([]),
+      includeCanv
+        ? prisma.canvasserLead.findMany({ where: canvWhere, select: { id: true, firstName: true, lastName: true, zipCode: true, status: true, grade: true, createdAt: true } })
+        : Promise.resolve([]),
     ]);
 
     // Flatten to a common shape with a normalized zip.
@@ -89,6 +100,7 @@ export async function GET(request: NextRequest) {
       ...quotes.map((l) => ({ id: l.id, type: "quote" as const, name: `${l.firstName} ${l.lastName || ""}`.trim(), status: l.status as LeadStatus, grade: l.grade, createdAt: l.createdAt.toISOString(), zip: normalizeZip(l.zipCode) })),
       ...ads.map((l) => ({ id: l.id, type: "ad" as const, name: l.fullName || `${l.firstName || ""} ${l.lastName || ""}`.trim() || "Unknown", status: l.status as LeadStatus, grade: l.grade, createdAt: l.createdAt.toISOString(), zip: normalizeZip(l.zipCode) })),
       ...instas.map((l) => ({ id: l.id, type: "instagram" as const, name: l.username ? `@${l.username}` : `${l.firstName || ""} ${l.lastName || ""}`.trim() || "Instagram user", status: l.status as LeadStatus, grade: l.grade, createdAt: l.createdAt.toISOString(), zip: normalizeZip(l.zipCode) })),
+      ...canvs.map((l) => ({ id: l.id, type: "canvasser" as const, name: `${l.firstName || ""} ${l.lastName || ""}`.trim() || "Canvasser lead", status: l.status as LeadStatus, grade: l.grade, createdAt: l.createdAt.toISOString(), zip: normalizeZip(l.zipCode) })),
     ];
 
     const withZip = all.filter((l) => l.zip !== null);

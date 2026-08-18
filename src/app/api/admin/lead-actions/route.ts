@@ -3,7 +3,7 @@ import { getSession } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import type { LeadSource } from "@prisma/client";
 
-type LeadTypeKey = "quote" | "outofarea" | "career" | "commercial" | "adlead";
+type LeadTypeKey = "quote" | "outofarea" | "career" | "commercial" | "adlead" | "canvasser";
 
 interface LeadActionData {
   leadId: string;
@@ -17,6 +17,7 @@ const leadTypeMap: Record<LeadTypeKey, LeadSource> = {
   career: "CAREERS",
   commercial: "COMMERCIAL",
   adlead: "AD_LEAD",
+  canvasser: "CANVASSER",
 };
 
 /** Set `archived` on whichever lead table this type lives in. */
@@ -27,6 +28,7 @@ async function setArchived(leadType: LeadTypeKey, id: string, archived: boolean)
     case "outofarea":  return prisma.outOfAreaLead.update({ where: { id }, data: { archived } });
     case "commercial": return prisma.commercialLead.update({ where: { id }, data: { archived } });
     case "career":     return prisma.careerApplication.update({ where: { id }, data: { archived } });
+    case "canvasser":  return prisma.canvasserLead.update({ where: { id }, data: { archived } });
   }
 }
 
@@ -38,6 +40,7 @@ async function deleteLead(leadType: LeadTypeKey, id: string) {
     case "outofarea":  return prisma.outOfAreaLead.delete({ where: { id } });
     case "commercial": return prisma.commercialLead.delete({ where: { id } });
     case "career":     return prisma.careerApplication.delete({ where: { id } });
+    case "canvasser":  return prisma.canvasserLead.delete({ where: { id } });
   }
 }
 

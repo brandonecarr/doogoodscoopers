@@ -12,6 +12,7 @@ const ROLE_HOME: Record<string, string> = {
   CREW_LEAD: "/app/field",
   FIELD_TECH: "/app/field",
   ACCOUNTANT: "/app/office",
+  CANVASSER: "/app/canvasser",
   CLIENT: "/app/client",
 };
 

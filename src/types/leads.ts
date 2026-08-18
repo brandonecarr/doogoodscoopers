@@ -11,7 +11,7 @@ export type LeadStatus =
   | "PHONE_REVIEW";
 
 // Lead source to track where leads come from
-export type LeadSource = "QUOTE_FORM" | "OUT_OF_AREA" | "CAREERS" | "COMMERCIAL" | "AD_LEAD";
+export type LeadSource = "QUOTE_FORM" | "OUT_OF_AREA" | "CAREERS" | "COMMERCIAL" | "AD_LEAD" | "CANVASSER";
 
 // Base interface for common fields
 interface BaseModel {
@@ -82,6 +82,23 @@ export interface CommercialLead extends BaseModel {
   state: string;
   zipCode: string;
   inquiry: string | null;
+}
+
+// Canvasser Lead model (door-to-door field rep marked a home as a lead)
+export interface CanvasserLead extends BaseModel {
+  firstName: string | null;
+  lastName: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  city: string | null;
+  zipCode: string | null;
+  canvasserId: string;
+  canvasserName: string;
+  visitId: string | null;
+  followupDate: Date | null;
+  grade: string | null;
+  archived: boolean;
 }
 
 // Ad Lead model (Meta/Facebook ads via Privyr)

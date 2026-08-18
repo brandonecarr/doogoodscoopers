@@ -7,12 +7,18 @@ import type { LeadStatus } from "@/types/leads";
 // Bulk actions from the leads board: archive, move status, or set grade on many
 // quote/ad leads at once. Reuses the same fields as the single-lead actions.
 
+type BulkLeadType = "quote" | "ad" | "instagram" | "canvasser";
+
 interface BulkBody {
   action: "archive" | "status" | "grade";
-  leads: { type: "quote" | "ad"; id: string }[];
+  leads: { type: BulkLeadType; id: string }[];
   status?: LeadStatus;
   grade?: string | null;
 }
+
+const SOURCE_FOR: Record<BulkLeadType, "QUOTE_FORM" | "AD_LEAD" | "INSTAGRAM" | "CANVASSER"> = {
+  quote: "QUOTE_FORM", ad: "AD_LEAD", instagram: "INSTAGRAM", canvasser: "CANVASSER",
+};
 
 const VALID_STATUSES = ["NEW", "CONTACTED", "NO_ANSWER", "NOT_INTERESTED", "WAITING_FOR_SIGNUP", "CONVERTED"];
 const VALID_GRADES = ["A", "B", "C", "D", "F"];
@@ -29,7 +35,8 @@ export async function POST(request: Request) {
     }
 
     // Build the update payload + activity label for the chosen action.
-    let data: Prisma.QuoteLeadUpdateManyMutationInput & Prisma.AdLeadUpdateManyMutationInput;
+    // Fields used (archived/status/grade) are common to every lead table.
+    let data: Prisma.QuoteLeadUpdateManyMutationInput & Prisma.AdLeadUpdateManyMutationInput & Prisma.CanvasserLeadUpdateManyMutationInput;
     let logAction: string;
     let details: Prisma.InputJsonValue;
     if (action === "archive") {
@@ -54,18 +61,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid action" }, { status: 400 });
     }
 
-    const quoteIds = leads.filter((l) => l.type === "quote").map((l) => l.id);
-    const adIds = leads.filter((l) => l.type === "ad").map((l) => l.id);
+    const idsOf = (t: BulkLeadType) => leads.filter((l) => l.type === t).map((l) => l.id);
+    const quoteIds = idsOf("quote");
+    const adIds = idsOf("ad");
+    const instaIds = idsOf("instagram");
+    const canvIds = idsOf("canvasser");
 
     const ops = [];
     if (quoteIds.length) ops.push(prisma.quoteLead.updateMany({ where: { id: { in: quoteIds } }, data }));
     if (adIds.length) ops.push(prisma.adLead.updateMany({ where: { id: { in: adIds } }, data }));
+    if (instaIds.length) ops.push(prisma.instagramLead.updateMany({ where: { id: { in: instaIds } }, data }));
+    if (canvIds.length) ops.push(prisma.canvasserLead.updateMany({ where: { id: { in: canvIds } }, data }));
     await Promise.all(ops);
 
     // One activity-log row per lead, mirroring single-lead actions.
     const logs: Prisma.ActivityLogCreateManyInput[] = leads.map((l) => ({
       action: logAction,
-      leadType: l.type === "quote" ? "QUOTE_FORM" : "AD_LEAD",
+      leadType: SOURCE_FOR[l.type] ?? "QUOTE_FORM",
       leadId: l.id,
       details,
       adminEmail: session.email,

@@ -29,6 +29,7 @@ enum LeadSource {
   AD_LEAD          // Meta/Facebook ads via Privyr
   CUSTOMER         // Active Sweep&Go customer (for review-request / customer drips)
   INSTAGRAM        // Instagram comment → auto-DM commenter
+  CANVASSER        // Door-to-door canvasser marked a home as a lead
 }
 
 // =====================
@@ -85,6 +86,80 @@ model QuoteLead {
   @@index([zipCode])
   @@index([followupDate])
   @@index([instagramLeadId])
+}
+
+// =====================
+// CANVASSER — field door-to-door
+// =====================
+// Every knocked door / dropped pin. Most never become leads; this is the map's
+// memory. Owned by an individual canvasser (Supabase users.id). Never written
+// by Sweep&Go. `clientKey` is a client-generated UUID for offline-safe upserts.
+model CanvassVisit {
+  id              String   @id @default(cuid())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  canvasserId     String   // Supabase users.id of the rep who dropped the pin
+  canvasserName   String   @default("")
+  orgId           String   // Supabase org_id, carried from the session
+
+  lat             Float
+  lng             Float
+  address         String?
+  city            String?
+  zipCode         String?
+
+  status          String   @default("NOT_HOME") // NOT_HOME | NOT_INTERESTED | CALLBACK | INTERESTED | LEAD | DO_NOT_KNOCK
+  notes           String?  @db.Text
+
+  canvasserLeadId String?  // set when this visit is marked as a lead
+  clientKey       String   @unique // offline idempotency key
+
+  @@index([canvasserId])
+  @@index([status])
+  @@index([zipCode])
+  @@index([createdAt])
+}
+
+// The subset of visits marked as a lead — a first-class pipeline lead. Shares
+// the common lead block so it flows into the /admin unified pipeline. Excluded
+// from the existing Meta-ad drip campaigns (its own source, never cross-merged).
+model CanvasserLead {
+  id              String     @id @default(cuid())
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  // Status tracking (shared lead block)
+  status          LeadStatus @default(NEW)
+  archived        Boolean    @default(false)
+  notes           String?    @db.Text
+  followupDate    DateTime?
+  grade           String?
+
+  // Contact info (all optional — a door knock may yield only a name)
+  firstName       String?
+  lastName        String?
+  email           String?
+  phone           String?
+
+  // Address
+  address         String?
+  city            String?
+  zipCode         String?
+
+  // Canvasser attribution + origin
+  canvasserId     String
+  canvasserName   String     @default("")
+  orgId           String
+  visitId         String?    // the CanvassVisit this lead came from
+  clientKey       String     @unique // offline idempotency key
+
+  @@index([status])
+  @@index([archived])
+  @@index([createdAt])
+  @@index([zipCode])
+  @@index([followupDate])
+  @@index([canvasserId])
 }
 
 // =====================

@@ -20,7 +20,7 @@ interface Template {
 
 interface LeadMessagesProps {
   leadId: string;
-  leadType: "quote" | "outofarea" | "career" | "commercial" | "adlead";
+  leadType: "quote" | "outofarea" | "career" | "commercial" | "adlead" | "canvasser";
   phone: string | null;
   initialMessages: LeadMessage[];
   optedOut?: boolean;

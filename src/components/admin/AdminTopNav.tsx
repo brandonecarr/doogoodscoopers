@@ -54,7 +54,8 @@ function navMatches(pathname: string, href: string): boolean {
       pathname.startsWith("/admin/leads") ||
       pathname.startsWith("/admin/quote-leads") ||
       pathname.startsWith("/admin/ad-leads") ||
-      pathname.startsWith("/admin/instagram-leads")
+      pathname.startsWith("/admin/instagram-leads") ||
+      pathname.startsWith("/admin/canvasser-leads")
     );
   }
   if (href === "/admin") return pathname === "/admin";
