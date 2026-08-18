@@ -111,6 +111,54 @@ model Canvasser {
   @@index([active])
 }
 
+// =====================
+// FUNNELS — no-code lead funnels (Heyflow-style)
+// =====================
+// A funnel is stored as one JSON blob (steps/blocks/branching/theme/variants),
+// mirroring StudioDraft. Rendered publicly at /f/<slug>; built in /admin/funnels.
+model Funnel {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  name      String
+  status    String   @default("draft") // draft | published
+  data      Json // { theme, settings, variants: { A:{steps[]}, B?:{steps[]} }, split }
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+}
+
+// One visitor run through a funnel (for per-step analytics + attribution).
+model FunnelSession {
+  id          String    @id @default(cuid())
+  funnelId    String
+  slug        String
+  variant     String    @default("A")
+  attribution Json? // { fbp, fbc, fbclid, utm..., ig, ip, ua }
+  leadId      String? // the QuoteLead / OutOfAreaLead created on completion
+  leadType    String? // "quote" | "outofarea"
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  @@index([funnelId])
+  @@index([startedAt])
+}
+
+// A single step-level event (view / answer / next / submit / handoff / abandon).
+model FunnelEvent {
+  id        String   @id @default(cuid())
+  sessionId String
+  funnelId  String
+  variant   String   @default("A")
+  step      String
+  type      String
+  payload   Json?
+  createdAt DateTime @default(now())
+
+  @@index([funnelId, createdAt])
+  @@index([sessionId])
+}
+
 // Every knocked door / dropped pin. Most never become leads; this is the map's
 // memory. Owned by an individual canvasser (Supabase users.id). Never written
 // by Sweep&Go. `clientKey` is a client-generated UUID for offline-safe upserts.
