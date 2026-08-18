@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { PageHero } from "@/components/admin/PageHero";
 import { CanvassersOverviewMap, type OverviewPin } from "@/components/admin/CanvassersOverviewMap";
+import { CanvasserTeamManager } from "@/components/admin/CanvasserTeamManager";
 
 export const dynamic = "force-dynamic";
 
@@ -73,10 +74,13 @@ export default async function CanvassersOverviewPage() {
         }
       />
 
+      {/* Account management — add/invite canvassers, resend, deactivate */}
+      <CanvasserTeamManager />
+
       {rows.length === 0 ? (
         <div className="dgs-card p-8 text-center">
           <Footprints className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-          <p className="text-[13.5px] text-muted">No canvassing activity yet. Add a canvasser in the field portal (Staff → role Canvasser) and their dropped pins will appear here.</p>
+          <p className="text-[13.5px] text-muted">No canvassing activity yet. Add a canvasser above — once they set their password and start dropping pins, their activity shows up here.</p>
         </div>
       ) : (
         <>

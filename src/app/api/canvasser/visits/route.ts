@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getAuthUser } from "@/lib/auth-supabase";
-import { canAccessCanvasserPortal } from "@/lib/rbac";
+import { getCanvasserSession } from "@/lib/canvasser-auth";
 import { reverseGeocode, normalizeZip } from "@/lib/geo/zipgeo";
 
 // Canvasser map pins. Every handler is gated to a canvasser session and scoped
@@ -12,17 +11,11 @@ import { reverseGeocode, normalizeZip } from "@/lib/geo/zipgeo";
 export const dynamic = "force-dynamic";
 export const maxDuration = 30; // POST reverse-geocodes on first drop
 
-function nameOf(u: { firstName: string | null; lastName: string | null }): string {
-  return [u.firstName, u.lastName].filter(Boolean).join(" ").trim();
-}
-
 const STATUSES = new Set(["NOT_HOME", "NOT_INTERESTED", "CALLBACK", "INTERESTED", "LEAD", "DO_NOT_KNOCK"]);
 
 export async function GET() {
-  const user = await getAuthUser();
-  if (!user || !canAccessCanvasserPortal(user.role)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const user = await getCanvasserSession();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const visits = await prisma.canvassVisit.findMany({
     where: { canvasserId: user.id },
     orderBy: { createdAt: "desc" },
@@ -32,10 +25,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const user = await getAuthUser();
-  if (!user || !canAccessCanvasserPortal(user.role)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const user = await getCanvasserSession();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await request.json().catch(() => ({}));
   const { clientKey, lat, lng } = body as { clientKey?: string; lat?: number; lng?: number };
@@ -68,11 +59,10 @@ export async function POST(request: Request) {
     }
   }
 
-  const canvasserName = nameOf(user);
   const visit = await prisma.canvassVisit.upsert({
     where: { clientKey },
     create: {
-      clientKey, canvasserId: user.id, canvasserName, orgId: user.orgId,
+      clientKey, canvasserId: user.id, canvasserName: user.name, orgId: "",
       lat, lng, address, city, zipCode, status, notes,
     },
     update: {

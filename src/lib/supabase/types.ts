@@ -13,7 +13,6 @@ export type UserRole =
   | "CREW_LEAD"
   | "FIELD_TECH"
   | "ACCOUNTANT"
-  | "CANVASSER"
   | "CLIENT";
 
 export type ClientStatus = "ACTIVE" | "PAUSED" | "CANCELED" | "DELINQUENT";

@@ -91,6 +91,26 @@ model QuoteLead {
 // =====================
 // CANVASSER — field door-to-door
 // =====================
+// Isolated canvasser login accounts — created/managed from /admin, completely
+// separate from the /app office/field/client Supabase staff system. Password is
+// set by the rep via an emailed invite link (Brevo).
+model Canvasser {
+  id              String    @id @default(cuid())
+  email           String    @unique
+  name            String
+  passwordHash    String? // null until they accept the invite
+  active          Boolean   @default(true)
+  inviteTokenHash String?   @unique // sha256 of the emailed invite token
+  inviteExpires   DateTime?
+  invitedAt       DateTime?
+  lastLoginAt     DateTime?
+  createdBy       String? // admin email who created them
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([active])
+}
+
 // Every knocked door / dropped pin. Most never become leads; this is the map's
 // memory. Owned by an individual canvasser (Supabase users.id). Never written
 // by Sweep&Go. `clientKey` is a client-generated UUID for offline-safe upserts.

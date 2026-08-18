@@ -4,13 +4,11 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Map as MapIcon, ListChecks, LogOut, Wifi, WifiOff, CloudUpload } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
-import type { AuthUser } from "@/lib/auth-supabase";
 import { startOutbox, getQueueCount, processOutbox } from "@/lib/pwa/canvasser-outbox";
 
 // Canvasser portal shell: top bar (rep name, connection + queued-writes status,
 // sign out) and a two-tab nav (Map / My Leads). Boots the offline outbox.
-export function CanvasserChrome({ user, children }: { user: AuthUser; children: React.ReactNode }) {
+export function CanvasserChrome({ user, children }: { user: { name: string; email: string }; children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [online, setOnline] = useState(true);
@@ -39,12 +37,12 @@ export function CanvasserChrome({ user, children }: { user: AuthUser; children: 
 
   const logout = async () => {
     setLoggingOut(true);
-    await createClient().auth.signOut();
-    router.push("/login");
+    await fetch("/api/canvasser/auth/logout", { method: "POST" }).catch(() => {});
+    router.push("/canvasser/login");
     router.refresh();
   };
 
-  const name = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email;
+  const name = user.name || user.email;
   const tabs = [
     { href: "/app/canvasser", label: "Map", icon: MapIcon },
     { href: "/app/canvasser/my-leads", label: "My Leads", icon: ListChecks },

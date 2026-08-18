@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { requireCanvasserAccess } from "@/lib/auth-supabase";
+import { redirect } from "next/navigation";
+import { getCanvasserSession } from "@/lib/canvasser-auth";
 import { CanvasserChrome } from "@/components/portals/canvasser/CanvasserChrome";
 
 export const metadata: Metadata = {
@@ -7,6 +8,7 @@ export const metadata: Metadata = {
 };
 
 export default async function CanvasserLayout({ children }: { children: React.ReactNode }) {
-  const user = await requireCanvasserAccess();
-  return <CanvasserChrome user={user}>{children}</CanvasserChrome>;
+  const session = await getCanvasserSession();
+  if (!session) redirect("/canvasser/login");
+  return <CanvasserChrome user={{ name: session.name, email: session.email }}>{children}</CanvasserChrome>;
 }

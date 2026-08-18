@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getAuthUser } from "@/lib/auth-supabase";
-import { canAccessCanvasserPortal } from "@/lib/rbac";
+import { getCanvasserSession } from "@/lib/canvasser-auth";
 import { syncContactToQuo } from "@/lib/quo";
 import { normalizeZip } from "@/lib/geo/zipgeo";
 
@@ -12,15 +11,9 @@ import { normalizeZip } from "@/lib/geo/zipgeo";
 
 export const dynamic = "force-dynamic";
 
-function nameOf(u: { firstName: string | null; lastName: string | null }): string {
-  return [u.firstName, u.lastName].filter(Boolean).join(" ").trim();
-}
-
 export async function GET() {
-  const user = await getAuthUser();
-  if (!user || !canAccessCanvasserPortal(user.role)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const user = await getCanvasserSession();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const leads = await prisma.canvasserLead.findMany({
     where: { canvasserId: user.id },
     orderBy: { createdAt: "desc" },
@@ -30,10 +23,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const user = await getAuthUser();
-  if (!user || !canAccessCanvasserPortal(user.role)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const user = await getCanvasserSession();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await request.json().catch(() => ({}));
   const { clientKey, visitClientKey } = body as { clientKey?: string; visitClientKey?: string };
@@ -58,11 +49,10 @@ export async function POST(request: Request) {
     notes: str(body.notes),
   };
 
-  const canvasserName = nameOf(user);
   const lead = await prisma.canvasserLead.upsert({
     where: { clientKey },
     create: {
-      clientKey, canvasserId: user.id, canvasserName, orgId: user.orgId,
+      clientKey, canvasserId: user.id, canvasserName: user.name, orgId: "",
       visitId: str(body.visitId), ...data,
     },
     update: { ...data },

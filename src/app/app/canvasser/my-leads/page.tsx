@@ -1,4 +1,5 @@
-import { requireCanvasserAccess } from "@/lib/auth-supabase";
+import { redirect } from "next/navigation";
+import { getCanvasserSession } from "@/lib/canvasser-auth";
 import prisma from "@/lib/prisma";
 import { MapPin } from "lucide-react";
 
@@ -10,9 +11,10 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 export default async function MyLeadsPage() {
-  const user = await requireCanvasserAccess();
+  const session = await getCanvasserSession();
+  if (!session) redirect("/canvasser/login");
   const leads = await prisma.canvasserLead.findMany({
-    where: { canvasserId: user.id },
+    where: { canvasserId: session.id },
     orderBy: { createdAt: "desc" },
     take: 500,
   });

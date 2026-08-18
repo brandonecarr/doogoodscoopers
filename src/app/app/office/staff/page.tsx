@@ -53,7 +53,6 @@ const STAFF_ROLES: UserRole[] = [
   "CREW_LEAD",
   "FIELD_TECH",
   "ACCOUNTANT",
-  "CANVASSER",
 ];
 
 const VEHICLE_TYPES = ["Truck", "Van", "SUV", "Car", "Other"];

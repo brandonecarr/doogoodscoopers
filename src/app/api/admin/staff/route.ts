@@ -31,7 +31,6 @@ const STAFF_ROLES: UserRole[] = [
   "CREW_LEAD",
   "FIELD_TECH",
   "ACCOUNTANT",
-  "CANVASSER",
 ];
 
 interface StaffProfile {

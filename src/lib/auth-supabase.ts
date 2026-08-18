@@ -7,7 +7,6 @@ import {
   canAccessOfficePortal,
   canAccessFieldPortal,
   canAccessClientPortal,
-  canAccessCanvasserPortal,
   type Permission,
 } from "@/lib/rbac";
 
@@ -160,17 +159,6 @@ export async function requireClientAccess(): Promise<AuthUser> {
   return user;
 }
 
-// Require canvasser portal access
-export async function requireCanvasserAccess(): Promise<AuthUser> {
-  const user = await requireAuth("/login");
-
-  if (!canAccessCanvasserPortal(user.role)) {
-    redirect(getDefaultRedirectForRole(user.role));
-  }
-
-  return user;
-}
-
 // Get the default redirect URL for a role
 export function getDefaultRedirectForRole(role: UserRole): string {
   switch (role) {
@@ -182,8 +170,6 @@ export function getDefaultRedirectForRole(role: UserRole): string {
     case "CREW_LEAD":
     case "FIELD_TECH":
       return "/app/field";
-    case "CANVASSER":
-      return "/app/canvasser";
     case "CLIENT":
       return "/app/client";
     default:
