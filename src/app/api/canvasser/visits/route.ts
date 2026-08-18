@@ -46,11 +46,14 @@ export async function POST(request: Request) {
   const status = typeof body.status === "string" && STATUSES.has(body.status) ? body.status : "NOT_HOME";
   const notes = typeof body.notes === "string" ? body.notes : null;
 
-  // Fill the street address from the pin unless the client already resolved it.
+  // Fill the street address from the pin. `regeocode` (sent when a pin is moved)
+  // forces a fresh lookup that overwrites the old address; otherwise we only
+  // geocode when nothing is set yet, so a manually-edited address is preserved.
+  const regeocode = body.regeocode === true;
   let address: string | null = typeof body.address === "string" ? body.address : null;
   let city: string | null = typeof body.city === "string" ? body.city : null;
   let zipCode: string | null = normalizeZip(body.zipCode) ?? (typeof body.zipCode === "string" ? body.zipCode : null);
-  if (!address && !existing?.address) {
+  if (regeocode || (!address && !existing?.address)) {
     const hit = await reverseGeocode(lat, lng);
     if (hit) {
       address = hit.address || null;
@@ -75,4 +78,17 @@ export async function POST(request: Request) {
   });
 
   return NextResponse.json({ visit });
+}
+
+// Remove a pin. Scoped to the owner and idempotent (deleting a pin that never
+// synced is a harmless no-op), so it's safe to replay from the offline queue.
+export async function DELETE(request: Request) {
+  const user = await getCanvasserSession();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { clientKey } = await request.json().catch(() => ({}));
+  if (!clientKey || typeof clientKey !== "string") {
+    return NextResponse.json({ error: "clientKey is required" }, { status: 400 });
+  }
+  await prisma.canvassVisit.deleteMany({ where: { clientKey, canvasserId: user.id } });
+  return NextResponse.json({ ok: true });
 }

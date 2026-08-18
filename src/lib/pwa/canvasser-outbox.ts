@@ -16,12 +16,13 @@ const DB_VERSION = 1;
 const STORE = "outbox";
 const MAX_RETRIES = 6;
 
-export type OutboxKind = "visit" | "lead";
+export type OutboxKind = "visit" | "lead" | "visit-delete";
 
 export interface OutboxItem {
   id: string; // = payload.clientKey
   kind: OutboxKind;
   url: string;
+  method: "POST" | "DELETE";
   payload: Record<string, unknown>;
   status: "pending" | "sending" | "failed";
   retryCount: number;
@@ -31,6 +32,12 @@ export interface OutboxItem {
 const URL_FOR: Record<OutboxKind, string> = {
   visit: "/api/canvasser/visits",
   lead: "/api/canvasser/leads",
+  "visit-delete": "/api/canvasser/visits",
+};
+const METHOD_FOR: Record<OutboxKind, "POST" | "DELETE"> = {
+  visit: "POST",
+  lead: "POST",
+  "visit-delete": "DELETE",
 };
 
 let dbInstance: IDBPDatabase | null = null;
@@ -57,10 +64,14 @@ export async function enqueue(kind: OutboxKind, payload: Record<string, unknown>
   const clientKey = payload.clientKey as string | undefined;
   if (!clientKey) throw new Error("payload.clientKey is required");
   const db = await getDB();
+  // Keying the store by clientKey means a delete replaces any still-pending
+  // create/update for the same pin — so removing a pin that never synced simply
+  // cancels it, and the server delete is idempotent either way.
   const item: OutboxItem = {
     id: clientKey,
     kind,
     url: URL_FOR[kind],
+    method: METHOD_FOR[kind],
     payload,
     status: "pending",
     retryCount: 0,
@@ -94,7 +105,7 @@ export async function processOutbox(): Promise<void> {
       await db.put(STORE, item);
       try {
         const res = await fetch(item.url, {
-          method: "POST",
+          method: item.method,
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(item.payload),
         });

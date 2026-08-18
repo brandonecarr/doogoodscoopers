@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import "mapbox-gl/dist/mapbox-gl.css";
-import { Crosshair, X, UserPlus, Loader2, Download, Check as CheckIcon } from "lucide-react";
+import { Crosshair, X, UserPlus, Loader2, Download, Check as CheckIcon, Trash2, Move } from "lucide-react";
 import { enqueue } from "@/lib/pwa/canvasser-outbox";
 
 // Offline base map: we render Mapbox as RASTER tiles (a style with no glyph or
@@ -101,6 +101,25 @@ export function CanvasserMap({ token }: { token: string | undefined }) {
     });
   }, [upsertLocal]);
 
+  // Latest visits, readable from marker drag callbacks without stale closures.
+  const visitsRef = useRef<VisitRow[]>([]);
+  useEffect(() => { visitsRef.current = visits; }, [visits]);
+
+  // Move a pin (drag): update the position and re-grab the address for the new spot.
+  const moveVisit = useCallback((clientKey: string, lat: number, lng: number) => {
+    const v = visitsRef.current.find((x) => x.clientKey === clientKey);
+    if (!v) return;
+    upsertLocal({ ...v, lat, lng, address: null, city: null, zipCode: null, pending: true });
+    void enqueue("visit", { clientKey, lat, lng, status: v.status, notes: v.notes, regeocode: true });
+  }, [upsertLocal]);
+
+  // Remove a pin. Enqueuing the delete under the same clientKey also cancels any
+  // still-pending create, so an accidental pin that never synced just disappears.
+  const removeVisit = useCallback((clientKey: string) => {
+    setVisits((prev) => prev.filter((x) => x.clientKey !== clientKey));
+    void enqueue("visit-delete", { clientKey });
+  }, []);
+
   // Load existing pins.
   useEffect(() => {
     let cancelled = false;
@@ -183,7 +202,8 @@ export function CanvasserMap({ token }: { token: string | undefined }) {
           el.style.cssText = "cursor:pointer";
           el.innerHTML = `<div style="width:20px;height:20px;border-radius:50% 50% 50% 2px;transform:rotate(45deg);border:2px solid #fff;box-shadow:0 2px 5px rgba(0,0,0,.35);background:${colorFor(v.status)}"></div>`;
           el.addEventListener("click", (ev) => { ev.stopPropagation(); setSelected(v.clientKey); });
-          const marker = new mapboxgl!.Marker({ element: el, anchor: "bottom" }).setLngLat([v.lng, v.lat]).addTo(map);
+          const marker = new mapboxgl!.Marker({ element: el, anchor: "bottom", draggable: true }).setLngLat([v.lng, v.lat]).addTo(map);
+          marker.on("dragend", () => { const ll = marker.getLngLat(); moveVisit(v.clientKey, ll.lat, ll.lng); });
           markersRef.current.set(v.clientKey, marker);
         }
       }
@@ -192,7 +212,7 @@ export function CanvasserMap({ token }: { token: string | undefined }) {
         if (!seen.has(key)) { marker.remove(); markersRef.current.delete(key); }
       }
     })();
-  }, [visits, ready]);
+  }, [visits, ready, moveVisit]);
 
   const locate = () => {
     if (!navigator.geolocation || !mapRef.current) return;
@@ -265,6 +285,17 @@ export function CanvasserMap({ token }: { token: string | undefined }) {
     setSelected(null);
   };
 
+  const removePin = () => {
+    if (!cur) return;
+    const warn = cur.canvasserLeadId
+      ? "Remove this pin? It's marked as a lead — the lead stays in your list, but the map pin will be deleted."
+      : "Remove this pin? This can't be undone.";
+    if (typeof window !== "undefined" && !window.confirm(warn)) return;
+    removeVisit(cur.clientKey);
+    setSelected(null);
+    setLeadForm(null);
+  };
+
   return (
     <div className="relative w-full" style={{ height: "calc(100vh - 116px)", minHeight: 460 }}>
       <div ref={containerRef} className="w-full h-full rounded-2xl overflow-hidden bg-gray-200" />
@@ -308,15 +339,21 @@ export function CanvasserMap({ token }: { token: string | undefined }) {
       {/* Detail sheet */}
       {cur && (
         <div className="absolute left-0 right-0 bottom-0 z-20 bg-white rounded-t-2xl shadow-[0_-8px_30px_rgba(0,0,0,.18)] p-4 max-h-[70%] overflow-auto">
-          <div className="flex items-start justify-between gap-3 mb-2">
-            <div className="min-w-0">
-              <p className="text-[14px] font-bold text-gray-900 truncate">
-                {cur.address || (cur.pending ? "Locating address…" : "Dropped pin")}
-              </p>
+          <div className="flex items-start justify-between gap-3 mb-1">
+            <div className="min-w-0 flex-1">
+              {/* Editable address — re-mounts (via key) when a fresh geocode arrives */}
+              <input
+                key={`${cur.clientKey}|${cur.address ?? ""}`}
+                defaultValue={cur.address ?? ""}
+                onBlur={(e) => { const val = e.target.value.trim(); if (val !== (cur.address ?? "")) saveVisit({ ...cur, address: val || null }); }}
+                placeholder={cur.pending ? "Locating address…" : "Add an address"}
+                className="w-full text-[14px] font-bold text-gray-900 bg-transparent border-b border-transparent focus:border-violet-300 focus:outline-none py-0.5"
+              />
               <p className="text-[12px] text-gray-500">{[cur.city, cur.zipCode].filter(Boolean).join(", ") || `${cur.lat.toFixed(5)}, ${cur.lng.toFixed(5)}`}</p>
             </div>
-            <button onClick={() => { setSelected(null); setLeadForm(null); }} className="p-1.5 rounded-lg hover:bg-gray-100"><X className="w-4 h-4 text-gray-500" /></button>
+            <button onClick={() => { setSelected(null); setLeadForm(null); }} className="p-1.5 rounded-lg hover:bg-gray-100 flex-shrink-0"><X className="w-4 h-4 text-gray-500" /></button>
           </div>
+          <p className="text-[11px] text-gray-400 flex items-center gap-1 mb-2.5"><Move className="w-3 h-3" /> Drag the pin on the map to move it. Tap the address to edit it.</p>
 
           {/* Status chips */}
           <div className="flex flex-wrap gap-1.5 mb-3">
@@ -365,6 +402,14 @@ export function CanvasserMap({ token }: { token: string | undefined }) {
               <UserPlus className="w-4 h-4" /> Mark as lead
             </button>
           )}
+
+          {/* Remove pin */}
+          <button
+            onClick={removePin}
+            className="mt-2 w-full inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-[12.5px] font-semibold text-rose-600 hover:bg-rose-50 transition-colors"
+          >
+            <Trash2 className="w-3.5 h-3.5" /> Remove pin
+          </button>
         </div>
       )}
     </div>
