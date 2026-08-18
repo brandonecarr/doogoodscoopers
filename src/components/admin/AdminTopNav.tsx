@@ -15,6 +15,7 @@ import {
   Mail,
   Building2,
   Calculator,
+  Footprints,
   MapPinOff,
   Briefcase,
   ChevronDown,
@@ -43,6 +44,7 @@ const moreNav: NavItem[] = [
   { name: "Email",                short: "Email",      href: "/admin/email",       icon: Mail },
   { name: "Commercial Inquiries", short: "Commercial", href: "/admin/commercial",  icon: Building2 },
   { name: "Community Quote",      short: "Quote Calc", href: "/admin/community-quote", icon: Calculator },
+  { name: "Canvassers",           short: "Canvassers", href: "/admin/canvassers",   icon: Footprints },
   { name: "Out of Area",          short: "Out of Area", href: "/admin/out-of-area", icon: MapPinOff },
   { name: "Career Applications",  short: "Careers",    href: "/admin/careers",     icon: Briefcase },
 ];

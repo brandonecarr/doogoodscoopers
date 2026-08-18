@@ -2,8 +2,42 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import "mapbox-gl/dist/mapbox-gl.css";
-import { Crosshair, X, UserPlus, Loader2 } from "lucide-react";
+import { Crosshair, X, UserPlus, Loader2, Download, Check as CheckIcon } from "lucide-react";
 import { enqueue } from "@/lib/pwa/canvasser-outbox";
+
+// Offline base map: we render Mapbox as RASTER tiles (a style with no glyph or
+// sprite dependencies) so every tile is a plain cacheable image. The service
+// worker cache-firsts api.mapbox.com, and "Download this area" bulk-fetches the
+// visible tiles into the same cache so the backdrop renders with no signal.
+const TILE_CACHE = "dgs-canvasser-v1";
+const rasterStyle = (token: string) => ({
+  version: 8 as const,
+  sources: {
+    mb: {
+      type: "raster" as const,
+      tiles: [`https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=${token}`],
+      tileSize: 256,
+      attribution: "© Mapbox © OpenStreetMap",
+    },
+  },
+  layers: [{ id: "mb", type: "raster" as const, source: "mb" }],
+});
+const tileUrl = (token: string, z: number, x: number, y: number) =>
+  `https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/${z}/${x}/${y}@2x?access_token=${token}`;
+function tileXY(lng: number, lat: number, z: number) {
+  const n = 2 ** z;
+  const x = Math.floor(((lng + 180) / 360) * n);
+  const latRad = (lat * Math.PI) / 180;
+  const y = Math.floor(((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * n);
+  const clamp = (v: number) => Math.max(0, Math.min(n - 1, v));
+  return { x: clamp(x), y: clamp(y) };
+}
+async function runLimited(urls: string[], limit: number, fn: (u: string) => Promise<void>) {
+  let i = 0;
+  await Promise.all(Array.from({ length: Math.min(limit, urls.length) }, async () => {
+    while (i < urls.length) await fn(urls[i++]);
+  }));
+}
 
 // Interactive canvasser map: drop a pin on a home, set a disposition + notes, and
 // optionally mark it a lead. All writes go through the offline outbox.
@@ -99,7 +133,7 @@ export function CanvasserMap({ token }: { token: string | undefined }) {
       mapboxgl.accessToken = token;
       const map = new mapboxgl.Map({
         container: containerRef.current,
-        style: "mapbox://styles/mapbox/streets-v12",
+        style: rasterStyle(token),
         center: IE_CENTER,
         zoom: 12,
       });
@@ -168,6 +202,52 @@ export function CanvasserMap({ token }: { token: string | undefined }) {
     );
   };
 
+  // "Download this area for offline" — bulk-fetch the visible tiles (current zoom
+  // plus two deeper levels) into the SW's cache so the base map renders offline.
+  const [dl, setDl] = useState<{ active: boolean; done: number; total: number }>({ active: false, done: 0, total: 0 });
+  const [toast, setToast] = useState("");
+  const downloadArea = async () => {
+    const map = mapRef.current;
+    if (!map || !token || dl.active || typeof caches === "undefined") return;
+    const b = map.getBounds();
+    const z0 = Math.round(map.getZoom());
+    const zooms = [z0, z0 + 1, z0 + 2].filter((z) => z >= 1 && z <= 19);
+    const urls: string[] = [];
+    for (const z of zooms) {
+      const nw = tileXY(b.getWest(), b.getNorth(), z);
+      const se = tileXY(b.getEast(), b.getSouth(), z);
+      for (let x = Math.min(nw.x, se.x); x <= Math.max(nw.x, se.x); x++)
+        for (let y = Math.min(nw.y, se.y); y <= Math.max(nw.y, se.y); y++)
+          urls.push(tileUrl(token, z, x, y));
+    }
+    if (urls.length > 1500) {
+      setToast("Zoom in a little — that area's too big to save at once.");
+      setTimeout(() => setToast(""), 2600);
+      return;
+    }
+    setDl({ active: true, done: 0, total: urls.length });
+    try {
+      const cache = await caches.open(TILE_CACHE);
+      let done = 0;
+      await runLimited(urls, 8, async (u) => {
+        try {
+          if (!(await cache.match(u))) {
+            const res = await fetch(u);
+            if (res.ok) await cache.put(u, res.clone());
+          }
+        } catch { /* skip a failed tile */ }
+        done += 1;
+        setDl((d) => ({ ...d, done }));
+      });
+      setToast(`Saved ${urls.length} tiles for offline ✓`);
+    } catch {
+      setToast("Couldn't save this area.");
+    } finally {
+      setDl({ active: false, done: 0, total: 0 });
+      setTimeout(() => setToast(""), 2600);
+    }
+  };
+
   const cur = visits.find((v) => v.clientKey === selected) || null;
 
   const markLead = async () => {
@@ -195,17 +275,35 @@ export function CanvasserMap({ token }: { token: string | undefined }) {
         </div>
       )}
 
-      {/* Locate me */}
-      <button
-        onClick={locate}
-        className="absolute left-3 bottom-3 z-10 inline-flex items-center gap-2 px-3.5 py-2.5 rounded-full bg-white shadow-lg text-[13px] font-bold text-gray-800 active:scale-95"
-      >
-        <Crosshair className="w-4 h-4 text-blue-600" /> Locate me
-      </button>
+      {/* Locate me + Save offline */}
+      <div className="absolute left-3 bottom-3 z-10 flex items-center gap-2">
+        <button
+          onClick={locate}
+          className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-full bg-white shadow-lg text-[13px] font-bold text-gray-800 active:scale-95"
+        >
+          <Crosshair className="w-4 h-4 text-blue-600" /> Locate me
+        </button>
+        <button
+          onClick={downloadArea}
+          disabled={dl.active}
+          title="Save this area's map so it works with no signal"
+          className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-full bg-white shadow-lg text-[13px] font-bold text-gray-800 active:scale-95 disabled:opacity-70"
+        >
+          {dl.active
+            ? <><Loader2 className="w-4 h-4 animate-spin text-amber-600" /> {dl.total ? Math.round((dl.done / dl.total) * 100) : 0}%</>
+            : <><Download className="w-4 h-4 text-amber-600" /> Save offline</>}
+        </button>
+      </div>
 
       <p className="absolute left-3 top-3 z-10 text-[11px] font-medium text-gray-700 bg-white/90 rounded-full px-2.5 py-1 shadow">
         Tap the map to drop a pin
       </p>
+
+      {toast && (
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 inline-flex items-center gap-1.5 bg-gray-900 text-white text-[12px] font-semibold rounded-full px-3 py-1.5 shadow-lg">
+          <CheckIcon className="w-3.5 h-3.5 text-emerald-400" /> {toast}
+        </div>
+      )}
 
       {/* Detail sheet */}
       {cur && (
