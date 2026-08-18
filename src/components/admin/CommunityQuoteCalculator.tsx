@@ -1,0 +1,304 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { Copy, Check, Info } from "lucide-react";
+
+// Community / HOA quote calculator. The price is BUILT from serviceable area ×
+// frequency × a loaded hourly rate (with a per-visit floor), then PRESENTED as a
+// per-unit figure — the number an HOA board actually budgets against.
+
+type Fields = {
+  property: string;
+  units: string;
+  acres: string;
+  minutesPerAcre: string;
+  driveMinutes: string;
+  loadedRate: string;
+  visitMinimum: string;
+  freqPerWeek: string;
+  dogPct: string;
+  dogsPerHome: string;
+  stations: string;
+  stationMonthly: string;
+  stationInstall: string;
+  initialCleanup: string;
+};
+
+const DEFAULTS: Fields = {
+  property: "",
+  units: "120",
+  acres: "2",
+  minutesPerAcre: "45",
+  driveMinutes: "20",
+  loadedRate: "65",
+  visitMinimum: "45",
+  freqPerWeek: "2",
+  dogPct: "30",
+  dogsPerHome: "1.2",
+  stations: "0",
+  stationMonthly: "50",
+  stationInstall: "125",
+  initialCleanup: "0",
+};
+
+const num = (s: string) => {
+  const n = parseFloat(s);
+  return isFinite(n) && n > 0 ? n : 0;
+};
+const money0 = (n: number) =>
+  isFinite(n) ? n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }) : "—";
+const money2 = (n: number) =>
+  isFinite(n) ? n.toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—";
+
+const inputCls =
+  "w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-violet-400 focus:border-transparent bg-white text-ink";
+
+function Num({
+  label, value, onChange, prefix, suffix, hint, step = "1",
+}: {
+  label: string; value: string; onChange: (v: string) => void;
+  prefix?: string; suffix?: string; hint?: string; step?: string;
+}) {
+  return (
+    <label className="block">
+      <span className="block text-[12px] font-semibold text-bodytext mb-1">{label}</span>
+      <div className="relative">
+        {prefix && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[13px] text-muted">{prefix}</span>}
+        <input
+          type="number" inputMode="decimal" step={step} min="0" value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className={`${inputCls} ${prefix ? "pl-7" : ""} ${suffix ? "pr-12" : ""}`}
+        />
+        {suffix && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[12px] text-muted">{suffix}</span>}
+      </div>
+      {hint && <span className="block text-[11px] text-muted mt-1">{hint}</span>}
+    </label>
+  );
+}
+
+export function CommunityQuoteCalculator() {
+  const [f, setF] = useState<Fields>(DEFAULTS);
+  const set = (k: keyof Fields, v: string) => setF((p) => ({ ...p, [k]: v }));
+  const [copied, setCopied] = useState(false);
+
+  const c = useMemo(() => {
+    const units = num(f.units);
+    const acres = num(f.acres);
+    const onSiteMin = acres * num(f.minutesPerAcre);
+    const laborMin = onSiteMin + num(f.driveMinutes);
+    const laborCost = (laborMin / 60) * num(f.loadedRate);
+    const perVisit = Math.max(laborCost, num(f.visitMinimum));
+    const belowFloor = laborCost > 0 && laborCost < num(f.visitMinimum);
+    const freq = num(f.freqPerWeek);
+    const visitsMo = freq * 4.33;
+    const monthlyCommon = perVisit * visitsMo;
+    const stations = num(f.stations);
+    const monthlyStations = stations * num(f.stationMonthly);
+    const monthlyTotal = monthlyCommon + monthlyStations;
+    const perUnitMo = units > 0 ? monthlyTotal / units : NaN;
+    const perUnitYr = perUnitMo * 12;
+    const installTotal = stations * num(f.stationInstall);
+    const oneTime = num(f.initialCleanup) + installTotal;
+    const estDogs = Math.round(units * (num(f.dogPct) / 100) * num(f.dogsPerHome));
+
+    const tiers = [1, 2, 3].map((fq) => {
+      const mTotal = perVisit * fq * 4.33 + monthlyStations;
+      return { fq, mTotal, perUnit: units > 0 ? mTotal / units : NaN };
+    });
+
+    return {
+      units, acres, onSiteMin, perVisit, belowFloor, freq, visitsMo,
+      monthlyCommon, stations, monthlyStations, monthlyTotal,
+      perUnitMo, perUnitYr, installTotal, oneTime, estDogs, tiers,
+    };
+  }, [f]);
+
+  const proposal = useMemo(() => {
+    const name = f.property.trim() || "Your Community";
+    const L: string[] = [];
+    L.push(`${name} — Dog Waste Removal Proposal`);
+    L.push("");
+    L.push(`Service: Common-area pet-waste removal${c.stations > 0 ? " + pet-station servicing" : ""}`);
+    L.push(`Frequency: ${c.freq}× per week (${c.visitsMo.toFixed(1)} visits/month)`);
+    L.push(`Serviceable area: ${c.acres} acre${c.acres === 1 ? "" : "s"} · ${c.units} units`);
+    L.push("");
+    L.push(`MONTHLY INVESTMENT: ${money0(c.monthlyTotal)}`);
+    L.push(`  • Common-area service: ${money0(c.monthlyCommon)}`);
+    if (c.stations > 0) L.push(`  • Pet-station service (${c.stations}): ${money0(c.monthlyStations)}`);
+    if (isFinite(c.perUnitMo)) {
+      L.push("");
+      L.push(`That's just ${money2(c.perUnitMo)} per home each month — about ${money0(c.perUnitYr)} per home per year —`);
+      L.push(`to keep every shared space clean, safe, and odor-free for residents, kids, and pets.`);
+    }
+    if (c.oneTime > 0) {
+      L.push("");
+      L.push(`ONE-TIME START-UP: ${money0(c.oneTime)}`);
+      if (num(f.initialCleanup) > 0) L.push(`  • Initial deep cleanup: ${money0(num(f.initialCleanup))}`);
+      if (c.installTotal > 0) L.push(`  • Station installation (${c.stations}): ${money0(c.installTotal)}`);
+    }
+    L.push("");
+    L.push(`Includes all labor, bags, waste disposal, and full liability insurance.`);
+    return L.join("\n");
+  }, [f, c]);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(proposal);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch { /* still selectable on screen */ }
+  };
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-[1fr_minmax(340px,420px)] gap-3.5">
+      {/* ── Inputs ─────────────────────────────────────────────── */}
+      <div className="space-y-3.5">
+        <div className="dgs-card p-4">
+          <h3 className="text-[13px] font-bold text-ink mb-3">Community</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label className="block sm:col-span-2">
+              <span className="block text-[12px] font-semibold text-bodytext mb-1">Community / property name</span>
+              <input value={f.property} onChange={(e) => set("property", e.target.value)} placeholder="e.g. Riverside Condominiums" className={inputCls} />
+            </label>
+            <Num label="Number of units / homes" value={f.units} onChange={(v) => set("units", v)} suffix="units" />
+            <Num label="Serviceable common area" value={f.acres} onChange={(v) => set("acres", v)} suffix="acres" step="0.1" hint="Only the areas dogs use — measure from satellite." />
+          </div>
+        </div>
+
+        <div className="dgs-card p-4">
+          <h3 className="text-[13px] font-bold text-ink mb-3">Service &amp; pricing</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label className="block">
+              <span className="block text-[12px] font-semibold text-bodytext mb-1">Visit frequency</span>
+              <select value={f.freqPerWeek} onChange={(e) => set("freqPerWeek", e.target.value)} className={inputCls}>
+                <option value="1">1× per week</option>
+                <option value="2">2× per week</option>
+                <option value="3">3× per week</option>
+                <option value="5">5× per week</option>
+                <option value="7">Daily (7×)</option>
+              </select>
+            </label>
+            <Num label="Your loaded hourly rate" value={f.loadedRate} onChange={(v) => set("loadedRate", v)} prefix="$" suffix="/hr" hint="All-in: wages, fuel, disposal, insurance, profit." />
+            <Num label="Sweep time per acre" value={f.minutesPerAcre} onChange={(v) => set("minutesPerAcre", v)} suffix="min" hint="Raise it for heavy dog traffic / dense landscaping." />
+            <Num label="Drive time (round trip)" value={f.driveMinutes} onChange={(v) => set("driveMinutes", v)} suffix="min" />
+            <Num label="Per-visit minimum" value={f.visitMinimum} onChange={(v) => set("visitMinimum", v)} prefix="$" hint="Price floor — you drive out regardless." />
+          </div>
+        </div>
+
+        <div className="dgs-card p-4">
+          <h3 className="text-[13px] font-bold text-ink mb-1">Dog load <span className="font-medium text-muted">(optional — helps you judge sweep time)</span></h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
+            <Num label="Homes with a dog" value={f.dogPct} onChange={(v) => set("dogPct", v)} suffix="%" />
+            <Num label="Avg dogs per dog-home" value={f.dogsPerHome} onChange={(v) => set("dogsPerHome", v)} step="0.1" />
+          </div>
+          <p className="text-[12px] text-bodytext mt-2 flex items-center gap-1.5">
+            <Info className="w-3.5 h-3.5 text-violet-500" />
+            Estimated dogs in the community: <b className="text-ink">{c.estDogs.toLocaleString()}</b>
+          </p>
+        </div>
+
+        <div className="dgs-card p-4">
+          <h3 className="text-[13px] font-bold text-ink mb-3">Add-ons &amp; start-up</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Num label="Pet-waste stations serviced" value={f.stations} onChange={(v) => set("stations", v)} suffix="stations" />
+            <Num label="Per station / month" value={f.stationMonthly} onChange={(v) => set("stationMonthly", v)} prefix="$" hint="Restock bags + empty bin." />
+            <Num label="Station install (one-time, each)" value={f.stationInstall} onChange={(v) => set("stationInstall", v)} prefix="$" />
+            <Num label="Initial deep cleanup (one-time)" value={f.initialCleanup} onChange={(v) => set("initialCleanup", v)} prefix="$" hint="For neglected grounds — charge separately." />
+          </div>
+        </div>
+      </div>
+
+      {/* ── Results ────────────────────────────────────────────── */}
+      <div className="space-y-3.5 lg:sticky lg:top-[92px] self-start">
+        <div className="dgs-hero p-[22px]">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[#C8B9FF]">Monthly total</p>
+              <p className="text-[30px] font-extrabold text-white tracking-[-0.02em] leading-tight mt-1">{money0(c.monthlyTotal)}</p>
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[#C8B9FF]">Per unit / month</p>
+              <p className="text-[30px] font-extrabold text-white tracking-[-0.02em] leading-tight mt-1">{money2(c.perUnitMo)}</p>
+            </div>
+          </div>
+          <p className="text-[12px] text-[#C9C9D6] mt-3">
+            {c.freq}×/week · {c.visitsMo.toFixed(1)} visits/mo · {money0(c.perVisit)}/visit · {money0(c.perUnitYr)}/unit/yr
+          </p>
+        </div>
+
+        <div className="dgs-card p-4">
+          <h3 className="text-[13px] font-bold text-ink mb-3">Breakdown</h3>
+          <dl className="space-y-2 text-[13px]">
+            <Row k={`Common-area service (${c.visitsMo.toFixed(1)} visits)`} v={money0(c.monthlyCommon)} />
+            {c.stations > 0 && <Row k={`Pet-station service (${c.stations})`} v={money0(c.monthlyStations)} />}
+            <div className="border-t border-hairline my-1" />
+            <Row k="Monthly total" v={money0(c.monthlyTotal)} bold />
+            <Row k="Per unit / month" v={money2(c.perUnitMo)} accent />
+            <Row k="Per unit / year" v={money0(c.perUnitYr)} />
+            {c.oneTime > 0 && (
+              <>
+                <div className="border-t border-hairline my-1" />
+                <Row k="One-time start-up" v={money0(c.oneTime)} bold />
+                {num(f.initialCleanup) > 0 && <Row k="— Initial cleanup" v={money0(num(f.initialCleanup))} sub />}
+                {c.installTotal > 0 && <Row k={`— Station install (${c.stations})`} v={money0(c.installTotal)} sub />}
+              </>
+            )}
+          </dl>
+          {c.belowFloor && (
+            <p className="text-[11.5px] text-[#8A6D00] bg-[#FEF6E7] rounded-lg px-2.5 py-1.5 mt-3">
+              Labor for this visit is under your ${num(f.visitMinimum)} minimum — the floor is being applied.
+            </p>
+          )}
+        </div>
+
+        {/* Frequency comparison — give the board a tier to self-select */}
+        <div className="dgs-card p-4">
+          <h3 className="text-[13px] font-bold text-ink mb-2">Frequency options</h3>
+          <table className="w-full text-[13px]">
+            <thead>
+              <tr className="text-muted text-[11px] uppercase tracking-wide">
+                <th className="text-left font-semibold pb-1">Plan</th>
+                <th className="text-right font-semibold pb-1">Monthly</th>
+                <th className="text-right font-semibold pb-1">Per unit</th>
+              </tr>
+            </thead>
+            <tbody>
+              {c.tiers.map((t) => (
+                <tr key={t.fq} className={t.fq === c.freq ? "font-bold text-ink" : "text-bodytext"}>
+                  <td className="py-1">{t.fq}×/week{t.fq === c.freq ? " ←" : ""}</td>
+                  <td className="py-1 text-right">{money0(t.mTotal)}</td>
+                  <td className="py-1 text-right">{money2(t.perUnit)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Copy-ready proposal */}
+        <div className="dgs-card p-4">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-[13px] font-bold text-ink">Proposal</h3>
+            <button
+              onClick={copy}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] text-[12px] font-semibold text-white transition-colors"
+              style={{ background: copied ? "#16A34A" : "#101014" }}
+            >
+              {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+              {copied ? "Copied" : "Copy"}
+            </button>
+          </div>
+          <pre className="text-[11.5px] leading-relaxed text-bodytext whitespace-pre-wrap font-sans bg-surface2/60 rounded-lg p-3 max-h-[320px] overflow-auto">{proposal}</pre>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Row({ k, v, bold, accent, sub }: { k: string; v: string; bold?: boolean; accent?: boolean; sub?: boolean }) {
+  return (
+    <div className="flex items-center justify-between">
+      <dt className={`${sub ? "text-muted text-[12px]" : "text-bodytext"}`}>{k}</dt>
+      <dd className={`tabular-nums ${accent ? "text-[15px] font-extrabold text-[#6D3EF0]" : bold ? "font-bold text-ink" : sub ? "text-muted text-[12px]" : "text-ink"}`}>{v}</dd>
+    </div>
+  );
+}
