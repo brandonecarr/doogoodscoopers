@@ -41,11 +41,16 @@ export function FunnelBuilder({ initial }: { initial: { id: string; name: string
   const dragStep = useRef<number | null>(null);
   const dragBlock = useRef<number | null>(null);
 
-  const steps = data.variants.A.steps;
+  const [av, setAv] = useState<"A" | "B">("A");
+  const steps = (av === "B" ? data.variants.B?.steps : data.variants.A.steps) || [];
   const sel = steps.find((s) => s.id === selId) || steps[0];
 
   const setSteps = (next: Step[]) =>
-    setData((d) => ({ ...d, variants: { ...d.variants, A: { ...d.variants.A, steps: next } } }));
+    setData((d) => ({ ...d, variants: { ...d.variants, [av]: { steps: next } } }));
+
+  const switchVariant = (v: "A" | "B") => { setAv(v); const s = (v === "B" ? data.variants.B?.steps : data.variants.A.steps) || []; setSelId(s[0]?.id ?? ""); };
+  const createB = () => { setData((d) => ({ ...d, variants: { ...d.variants, B: JSON.parse(JSON.stringify(d.variants.A)) }, split: d.split || 50 })); setAv("B"); };
+  const deleteB = () => { if (!confirm("Delete variant B? Its edits are lost.")) return; setData((d) => ({ ...d, variants: { A: d.variants.A }, split: 0 })); setAv("A"); setSelId(data.variants.A.steps[0]?.id ?? ""); };
   const patchStep = (id: string, patch: Partial<Step>) =>
     setSteps(steps.map((s) => (s.id === id ? { ...s, ...patch } : s)));
   const patchBlock = (stepId: string, blockId: string, patch: Partial<Block>) =>
@@ -108,6 +113,25 @@ export function FunnelBuilder({ initial }: { initial: { id: string; name: string
           <Rocket className="w-4 h-4" /> {status === "published" ? "Unpublish" : "Publish"}
         </button>
         {msg && <span className="text-[12px] text-gray-500">{msg}</span>}
+      </div>
+
+      {/* A/B variants */}
+      <div className="dgs-card p-2.5 flex flex-wrap items-center gap-2">
+        <span className="text-[12px] font-bold text-ink uppercase tracking-wide mr-1">Variant</span>
+        <button onClick={() => switchVariant("A")} className="px-3 py-1.5 rounded-lg text-[12.5px] font-bold" style={av === "A" ? { background: "#6D3EF0", color: "#fff" } : { background: "#F4F4F6", color: "#5A5A66" }}>A</button>
+        {data.variants.B ? (
+          <>
+            <button onClick={() => switchVariant("B")} className="px-3 py-1.5 rounded-lg text-[12.5px] font-bold" style={av === "B" ? { background: "#6D3EF0", color: "#fff" } : { background: "#F4F4F6", color: "#5A5A66" }}>B</button>
+            <div className="flex items-center gap-1.5 text-[12px] text-gray-500 ml-1">
+              Split
+              <input type="number" min={0} max={100} value={data.split ?? 50} onChange={(e) => setData((d) => ({ ...d, split: Math.max(0, Math.min(100, parseInt(e.target.value) || 0)) }))} className="w-16 px-2 py-1 border border-gray-200 rounded-lg" />
+              % to B
+            </div>
+            <button onClick={deleteB} className="text-[12px] text-rose-500 font-semibold ml-auto">Delete B</button>
+          </>
+        ) : (
+          <button onClick={createB} className="px-3 py-1.5 rounded-lg text-[12.5px] font-semibold text-violet-600 border border-violet-200">+ Add B variant (A/B test)</button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr_360px] gap-3.5">
@@ -192,7 +216,7 @@ export function FunnelBuilder({ initial }: { initial: { id: string; name: string
             <div className="text-[11px] font-bold text-gray-400 uppercase tracking-wide px-2 py-1">Live preview</div>
             <div className="rounded-xl overflow-hidden border border-gray-100" style={{ height: 560 }}>
               <div className="scale-[0.72] origin-top-left" style={{ width: "139%", height: "139%" }}>
-                <FunnelRunner key={JSON.stringify(previewData).length + selId} funnelId={initial.id} slug={slug} data={previewData} preview />
+                <FunnelRunner key={`${av}-${JSON.stringify(previewData).length}-${selId}`} funnelId={initial.id} slug={slug} data={previewData} preview forceVariant={av} />
               </div>
             </div>
           </div>

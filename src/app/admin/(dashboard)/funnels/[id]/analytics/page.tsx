@@ -28,7 +28,7 @@ export default async function FunnelAnalyticsPage({ params, searchParams }: Page
   const data = funnel.data as unknown as FunnelData;
   const steps = data.variants.A.steps;
 
-  const [sessions, completed, leadGroups, stepRows, specialRows] = await Promise.all([
+  const [sessions, completed, leadGroups, stepRows, specialRows, variantStats] = await Promise.all([
     prisma.funnelSession.count({ where: { funnelId: id, startedAt: { gte: cutoff } } }),
     prisma.funnelSession.count({ where: { funnelId: id, startedAt: { gte: cutoff }, completedAt: { not: null } } }),
     prisma.funnelSession.groupBy({ by: ["leadType"], where: { funnelId: id, startedAt: { gte: cutoff }, leadType: { not: null } }, _count: { _all: true } }),
@@ -40,6 +40,11 @@ export default async function FunnelAnalyticsPage({ params, searchParams }: Page
       SELECT type, COUNT(DISTINCT "sessionId")::int AS sessions
       FROM "FunnelEvent" WHERE "funnelId" = ${id} AND type IN ('handoff','outofarea') AND "createdAt" >= ${cutoff}
       GROUP BY type`,
+    prisma.$queryRaw<{ variant: string; sessions: number; completed: number; leads: number }[]>`
+      SELECT variant, COUNT(*)::int AS sessions, COUNT("completedAt")::int AS completed,
+        COUNT(CASE WHEN "leadType" = 'quote' THEN 1 END)::int AS leads
+      FROM "FunnelSession" WHERE "funnelId" = ${id} AND "startedAt" >= ${cutoff}
+      GROUP BY variant ORDER BY variant`,
   ]);
 
   const stepMap = new Map(stepRows.map((r) => [r.step, r.sessions]));
@@ -80,6 +85,37 @@ export default async function FunnelAnalyticsPage({ params, searchParams }: Page
         {tile("Out of area", fmtInt(ooaLeads))}
         {tile("Booking clicks", fmtInt(handoffs), `${pct(handoffs, completed)}% of completed`)}
       </div>
+
+      {(data.variants.B || variantStats.length > 1) && (
+        <div className="dgs-card p-4">
+          <h2 className="text-[13px] font-bold text-ink mb-3">A/B test — variant comparison{data.split ? ` (${100 - data.split}% A · ${data.split}% B)` : ""}</h2>
+          <table className="w-full text-[13px]">
+            <thead>
+              <tr className="text-muted text-[11px] uppercase tracking-wide">
+                <th className="text-left font-semibold pb-1">Variant</th>
+                <th className="text-right font-semibold pb-1">Sessions</th>
+                <th className="text-right font-semibold pb-1">Completed</th>
+                <th className="text-right font-semibold pb-1">Conv. rate</th>
+                <th className="text-right font-semibold pb-1">Quote leads</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(["A", "B"] as const).filter((v) => data.variants[v]).map((v) => {
+                const row = variantStats.find((r) => r.variant === v) || { sessions: 0, completed: 0, leads: 0 };
+                return (
+                  <tr key={v} className="text-bodytext">
+                    <td className="py-1 font-bold text-ink">{v}</td>
+                    <td className="py-1 text-right tabular-nums">{fmtInt(row.sessions)}</td>
+                    <td className="py-1 text-right tabular-nums">{fmtInt(row.completed)}</td>
+                    <td className="py-1 text-right tabular-nums font-semibold" style={{ color: "#6D3EF0" }}>{pct(row.completed, row.sessions)}%</td>
+                    <td className="py-1 text-right tabular-nums">{fmtInt(row.leads)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       <div className="dgs-card p-4">
         <h2 className="text-[13px] font-bold text-ink mb-3">Step-by-step drop-off</h2>

@@ -18,13 +18,26 @@ const cookie = (n: string) =>
   typeof document === "undefined" ? undefined
     : document.cookie.split("; ").find((c) => c.startsWith(n + "="))?.split("=")[1];
 
+// Sticky A/B assignment: reuse the cookie choice, else roll on the split % and
+// persist it so the visitor always sees the same variant.
+function pickVariant(slug: string, data: FunnelData): "A" | "B" {
+  if (typeof document === "undefined") return "A";
+  if (!data.variants.B || !data.split || data.split <= 0) return "A";
+  const key = `fnl_${slug}_v`;
+  const existing = cookie(key);
+  if (existing === "A" || existing === "B") return existing;
+  const v = Math.random() * 100 < data.split ? "B" : "A";
+  document.cookie = `${key}=${v}; path=/; max-age=${60 * 60 * 24 * 30}`;
+  return v;
+}
+
 export function FunnelRunner({
-  funnelId, slug, data, variant = "A", preview = false,
-}: { funnelId: string; slug: string; data: FunnelData; variant?: "A" | "B"; preview?: boolean }) {
-  const steps = useMemo(
-    () => (variant === "B" && data.variants.B ? data.variants.B.steps : data.variants.A.steps),
-    [data, variant],
-  );
+  funnelId, slug, data, preview = false, forceVariant,
+}: { funnelId: string; slug: string; data: FunnelData; preview?: boolean; forceVariant?: "A" | "B" }) {
+  const stepsFor = (v: "A" | "B") => (v === "B" && data.variants.B ? data.variants.B.steps : data.variants.A.steps);
+  const [variant, setVariant] = useState<"A" | "B">(forceVariant ?? "A");
+  const [resolved, setResolved] = useState<boolean>(!!forceVariant || preview);
+  const steps = useMemo(() => stepsFor(variant), [data, variant]);
   const primary = data.theme?.primary || "#6D3EF0";
   const bg = data.theme?.bg || "#0E2A47";
   const bookingUrl = data.settings?.bookingUrl || DEFAULT_BOOKING_URL;
@@ -58,6 +71,8 @@ export function FunnelRunner({
   // Start session + capture attribution.
   useEffect(() => {
     if (preview) return;
+    const v = pickVariant(slug, data);
+    setVariant(v); setCurrentId(stepsFor(v)[0]?.id ?? ""); setResolved(true);
     eventIdRef.current = (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : `ev_${Date.now()}${Math.random().toString(36).slice(2)}`;
     const p = new URLSearchParams(window.location.search);
     attrRef.current = {
@@ -74,7 +89,7 @@ export function FunnelRunner({
     if (p.get("ig")) setAnswers((a) => ({ ...a, igTracking: p.get("ig")! }));
     fetch("/api/v2/funnel/session", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ funnelId, slug, variant, attribution: attrRef.current }),
+      body: JSON.stringify({ funnelId, slug, variant: v, attribution: attrRef.current }),
     }).then((r) => r.json()).then((d) => setSessionId(d.sessionId)).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -301,6 +316,7 @@ export function FunnelRunner({
     }
   };
 
+  if (!resolved) return <div className="min-h-screen" style={{ background: bg }} />;
   if (!cur) return null;
   const progress = steps.length > 1 ? Math.round(((idx(cur.id) + 1) / steps.length) * 100) : 100;
 
