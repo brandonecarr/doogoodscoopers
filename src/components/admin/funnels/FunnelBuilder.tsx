@@ -271,7 +271,7 @@ export function FunnelBuilder({ initial }: { initial: { id: string; name: string
             <div className="text-[11px] font-bold text-gray-400 uppercase tracking-wide px-2 py-1">Live preview</div>
             <div className="rounded-xl overflow-hidden border border-gray-100" style={{ height: 560 }}>
               <div className="scale-[0.72] origin-top-left" style={{ width: "139%", height: "139%" }}>
-                <FunnelRunner key={`${av}-${JSON.stringify(previewData).length}-${selId}`} funnelId={initial.id} slug={slug} data={previewData} preview forceVariant={av} />
+                <FunnelRunner key={`${av}-${JSON.stringify(previewData).length}`} funnelId={initial.id} slug={slug} data={previewData} preview forceVariant={av} previewStepId={selId} />
               </div>
             </div>
           </div>

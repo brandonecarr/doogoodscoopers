@@ -32,8 +32,8 @@ function pickVariant(slug: string, data: FunnelData): "A" | "B" {
 }
 
 export function FunnelRunner({
-  funnelId, slug, data, preview = false, forceVariant,
-}: { funnelId: string; slug: string; data: FunnelData; preview?: boolean; forceVariant?: "A" | "B" }) {
+  funnelId, slug, data, preview = false, forceVariant, previewStepId,
+}: { funnelId: string; slug: string; data: FunnelData; preview?: boolean; forceVariant?: "A" | "B"; previewStepId?: string }) {
   const stepsFor = (v: "A" | "B") => (v === "B" && data.variants.B ? data.variants.B.steps : data.variants.A.steps);
   const [variant, setVariant] = useState<"A" | "B">(forceVariant ?? "A");
   const [resolved, setResolved] = useState<boolean>(!!forceVariant || preview);
@@ -63,7 +63,7 @@ export function FunnelRunner({
   };
 
   const idx = (id: string) => steps.findIndex((s) => s.id === id);
-  const [currentId, setCurrentId] = useState(steps[0]?.id ?? "");
+  const [currentId, setCurrentId] = useState((preview && previewStepId) || steps[0]?.id || "");
   const [history, setHistory] = useState<string[]>([]);
   const [answers, setAnswers] = useState<FunnelAnswers>({});
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -116,6 +116,12 @@ export function FunnelRunner({
 
   // Log a view whenever the step changes.
   useEffect(() => { if (sessionId && cur) logEvent("view", cur.id); /* eslint-disable-next-line */ }, [sessionId, currentId]);
+
+  // In the builder preview, follow the step the editor selects.
+  useEffect(() => {
+    if (preview && previewStepId) { setCurrentId(previewStepId); setHistory([]); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [previewStepId, preview]);
 
   // Abandon on unload (best-effort).
   useEffect(() => {
@@ -235,10 +241,10 @@ export function FunnelRunner({
     } finally { setSubmitting(false); }
   };
 
-  const btn = (label: string, onClick: () => void, disabled = false, busy = false) => (
+  const btn = (label: string, onClick: () => void, disabled = false, busy = false, extra?: React.CSSProperties) => (
     <button onClick={onClick} disabled={disabled || busy}
       className="w-full inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl text-[15px] font-bold text-white transition-transform active:scale-[.99] disabled:opacity-60"
-      style={{ background: primary }}>
+      style={{ background: primary, ...extra }}>
       {busy && <Loader2 className="w-4 h-4 animate-spin" />} {label}
     </button>
   );
@@ -285,14 +291,14 @@ export function FunnelRunner({
         return (
           <div key={b.id} className="text-center">
             {stars(b.rating ?? 5, "w-5 h-5")}
-            {b.ratingCount && <p className="text-[13px] text-gray-500 mt-1.5">{b.ratingCount}</p>}
+            {b.ratingCount && <p style={textStyle(b)} className="text-[13px] text-gray-500 mt-1.5">{b.ratingCount}</p>}
           </div>
         );
       case "testimonial":
         return (
           <figure key={b.id} className="rounded-2xl border border-gray-100 bg-gray-50/70 p-5 text-center">
             {b.rating ? <div className="mb-2">{stars(b.rating)}</div> : null}
-            <blockquote className="text-[15px] leading-relaxed text-gray-700">“{b.quote || ""}”</blockquote>
+            <blockquote style={textStyle(b)} className="text-[15px] leading-relaxed text-gray-700">“{b.quote || ""}”</blockquote>
             <figcaption className="mt-3 flex items-center justify-center gap-2.5">
               {b.avatarUrl && (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -309,7 +315,7 @@ export function FunnelRunner({
         return (
           <div key={b.id} className="flex flex-wrap justify-center gap-2">
             {(b.items || []).map((it, i) => (
-              <span key={i} className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-[12px] font-semibold text-gray-600">
+              <span key={i} style={textStyle(b)} className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-[12px] font-semibold text-gray-600">
                 {it.icon && <span>{it.icon}</span>}{it.label}
               </span>
             ))}
@@ -340,7 +346,7 @@ export function FunnelRunner({
                   className="w-full text-left px-4 py-3.5 rounded-xl border-2 transition-colors flex items-center justify-between"
                   style={active ? { borderColor: primary, background: `${primary}0F` } : { borderColor: "#E5E7EB" }}>
                   <span>
-                    <span className="block text-[15px] font-semibold text-gray-900">{o.label}</span>
+                    <span style={textStyle(b)} className="block text-[15px] font-semibold text-gray-900">{o.label}</span>
                     {o.sublabel && <span className="block text-[13px] text-gray-500">{o.sublabel}</span>}
                   </span>
                   {active && <Check className="w-5 h-5" style={{ color: primary }} />}
@@ -384,7 +390,8 @@ export function FunnelRunner({
         );
       case "cta": {
         const label = b.label || "Continue";
-        if (b.ctaKind === "submit") return <div key={b.id}>{btn(label, submitFunnel, false, submitting)}</div>;
+        const ctaStyle = textStyle(b);
+        if (b.ctaKind === "submit") return <div key={b.id}>{btn(label, submitFunnel, false, submitting, ctaStyle)}</div>;
         if (b.ctaKind === "booking" || b.ctaKind === "link") {
           let href = b.ctaKind === "booking" ? bookingUrl : (b.href || "#");
           // Prefill the ZIP into the Sweep&Go onboarding (it accepts ?zip_code=).
@@ -394,10 +401,10 @@ export function FunnelRunner({
           return (
             <a key={b.id} href={href} target="_blank" rel="noopener noreferrer" onClick={() => logEvent("handoff", cur.id, { href })}
               className="w-full inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl text-[15px] font-bold text-white transition-transform active:scale-[.99]"
-              style={{ background: primary }}>{label}</a>
+              style={{ background: primary, ...ctaStyle }}>{label}</a>
           );
         }
-        return <div key={b.id}>{btn(label, () => advance())}</div>;
+        return <div key={b.id}>{btn(label, () => advance(), false, false, ctaStyle)}</div>;
       }
       case "html":
         return <div key={b.id} dangerouslySetInnerHTML={{ __html: b.html || b.text || "" }} />;
