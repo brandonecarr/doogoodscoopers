@@ -101,7 +101,7 @@ export function FunnelRunner({
       zipCode: answers.zipCode, numberOfDogs: answers.numberOfDogs, frequency: answers.frequency,
       ...(answers.lastCleaned ? { lastCleaned: answers.lastCleaned } : {}),
     });
-    fetch(`/api/v2/get-pricing?${qs}`).then((r) => r.json())
+    fetch(`/api/v2/funnel/pricing?${qs}`).then((r) => r.json())
       .then((d) => setPrice(d?.pricing ?? null)).catch(() => setPrice(null)).finally(() => setPriceLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentId]);
