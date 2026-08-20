@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Split, ExternalLink, Pencil } from "lucide-react";
+import { Split, ExternalLink, Pencil, BarChart3 } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { PageHero } from "@/components/admin/PageHero";
@@ -51,6 +51,7 @@ export default async function FunnelsPage() {
                 {f.status === "published" && (
                   <a href={`/f/${f.slug}`} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500" title="View live"><ExternalLink className="w-4 h-4" /></a>
                 )}
+                <Link href={`/admin/funnels/${f.id}/analytics`} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500" title="Analytics"><BarChart3 className="w-4 h-4" /></Link>
                 <Link href={`/admin/funnels/${f.id}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12.5px] font-semibold text-white" style={{ background: "#6D3EF0" }}><Pencil className="w-3.5 h-3.5" /> Edit</Link>
               </div>
             ))}
