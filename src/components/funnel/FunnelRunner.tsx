@@ -10,8 +10,8 @@ import { DEFAULT_BOOKING_URL } from "@/lib/funnel/types";
 // so the builder's live preview and this public page stay identical.
 
 interface Pricing {
-  amount?: number; interval?: string; initialFee?: number | null;
-  zipType?: string | null; priceNotConfigured?: boolean;
+  perVisit?: number | null; monthly?: number | null; initialFee?: number | null;
+  oneTime?: boolean; zipType?: string | null; priceNotConfigured?: boolean;
 }
 
 const cookie = (n: string) =>
@@ -242,14 +242,15 @@ export function FunnelRunner({
           <div key={b.id} className="rounded-2xl border-2 p-5 text-center" style={{ borderColor: `${primary}33`, background: `${primary}08` }}>
             {priceLoading ? (
               <Loader2 className="w-6 h-6 animate-spin mx-auto" style={{ color: primary }} />
-            ) : price?.priceNotConfigured || !price ? (
+            ) : price?.priceNotConfigured || !price || price.perVisit == null ? (
               <p className="text-[15px] font-semibold text-gray-700">We&apos;ll build you a custom quote — enter your details and we&apos;ll reach out.</p>
             ) : (
               <>
                 <p className="text-[13px] font-semibold uppercase tracking-wide text-gray-500">Your estimate</p>
                 <p className="text-[34px] font-extrabold text-gray-900 mt-1">
-                  {money(price.amount)}<span className="text-[15px] font-semibold text-gray-500"> / {price.interval || "month"}</span>
+                  {money(price.perVisit)}<span className="text-[15px] font-semibold text-gray-500">{price.oneTime ? " one-time" : " / visit"}</span>
                 </p>
+                {!price.oneTime && price.monthly ? <p className="text-[14px] text-gray-600 mt-1">≈ {money(price.monthly)}/month</p> : null}
                 {price.initialFee ? <p className="text-[13px] text-gray-500 mt-1">+ {money(price.initialFee)} one-time initial cleaning</p> : null}
               </>
             )}

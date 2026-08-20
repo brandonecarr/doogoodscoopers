@@ -15,6 +15,13 @@ const normInterval = (raw?: string): string => {
   return raw || "month";
 };
 
+// Visits per month by funnel frequency — used to derive a per-visit price from
+// Sweep&Go's monthly amount ($99/mo weekly ÷ 4.33 ≈ $22.86/visit).
+const VPM: Record<string, number> = {
+  once_a_week: 4.33, two_times_a_week: 8.67, bi_weekly: 2.17, once_a_month: 1, one_time: 1,
+};
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const zip = (url.searchParams.get("zipCode") || "").trim();
@@ -28,13 +35,19 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "zipCode and frequency are required" }, { status: 400 });
   }
 
+  const vpm = VPM[frequency] ?? 4.33;
+  const oneTime = frequency === "one_time";
+
   const sng = await sngPrice({ zip, frequency, dogs, lastCleaned, cfOverride, includeRaw: debug });
-  if (sng && !sng.priceNotConfigured) {
+  if (sng && !sng.priceNotConfigured && sng.amount != null) {
+    const isMonthly = normInterval(sng.interval) === "month";
+    const monthly = isMonthly ? sng.amount : round2(sng.amount * vpm);
+    const perVisit = oneTime ? sng.amount : isMonthly ? round2(sng.amount / vpm) : sng.amount;
     return NextResponse.json({
       success: true, source: "sweepandgo",
       pricing: {
-        amount: sng.amount, interval: normInterval(sng.interval),
-        initialFee: sng.initialFee ?? null, zipType: sng.zipType ?? null, priceNotConfigured: false,
+        perVisit, monthly: oneTime ? null : monthly, initialFee: sng.initialFee ?? null,
+        oneTime, zipType: sng.zipType ?? null, priceNotConfigured: false,
       },
       ...(debug ? { raw: sng.raw } : {}),
     });
@@ -50,8 +63,9 @@ export async function GET(request: Request) {
       return NextResponse.json({
         success: true, source: "fallback",
         pricing: {
-          amount: pr.recurringPrice ?? pr.basePrice ?? null, interval: "visit",
-          initialFee: pr.initialCleanupFee || null, zipType: null,
+          perVisit: pr.recurringPrice ?? pr.basePrice ?? null,
+          monthly: oneTime ? null : (pr.monthlyPrice ?? null),
+          initialFee: pr.initialCleanupFee || null, oneTime, zipType: null,
           priceNotConfigured: !!pr.priceNotConfigured,
         },
         ...(debug ? { sngRaw: sng?.raw ?? null } : {}),
