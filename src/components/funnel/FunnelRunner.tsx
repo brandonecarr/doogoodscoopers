@@ -138,25 +138,28 @@ export function FunnelRunner({
     const zip = (answers.zipCode || "").trim();
     if (!/^\d{5}$/.test(zip)) { setZipError("Please enter a valid 5-digit ZIP code."); return; }
     setZipLoading(true); setZipError("");
-    try {
-      const res = await fetch("/api/v2/check-zip", {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ zipCode: zip }),
-      });
-      const d = await res.json().catch(() => null);
-      // Only branch on a DEFINITIVE answer. Any error / bad shape → let them retry,
-      // never silently fall through to the "out of area" path.
-      if (!res.ok || !d || typeof d.inServiceArea !== "boolean") {
-        setZipError("We couldn't check that ZIP just now. Please try again.");
-        return;
-      }
-      const next: FunnelAnswers = { ...answers, zipCode: zip, inServiceArea: String(d.inServiceArea), pricingZone: d.pricingZone || "" };
-      setAnswers(next);
-      logEvent("answer", cur.id, { zip, inServiceArea: d.inServiceArea });
-      if (!d.inServiceArea) logEvent("outofarea", cur.id, { zip });
-      advance(next);
-    } catch {
-      setZipError("We couldn't check that ZIP just now. Please try again.");
-    } finally { setZipLoading(false); }
+    // Auto-retry transient failures (cold starts etc.) so a blip never blocks a
+    // real visitor. Only a definitive 200 + inServiceArea:boolean counts.
+    let d: { inServiceArea: boolean; pricingZone?: string } | null = null;
+    for (let attempt = 0; attempt < 3 && !d; attempt++) {
+      if (attempt > 0) await new Promise((r) => setTimeout(r, 500 * attempt));
+      try {
+        const res = await fetch("/api/v2/check-zip", {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ zipCode: zip }),
+        });
+        if (res.ok) {
+          const j = await res.json().catch(() => null);
+          if (j && typeof j.inServiceArea === "boolean") d = j;
+        }
+      } catch { /* retry */ }
+    }
+    setZipLoading(false);
+    if (!d) { setZipError("We couldn't check that ZIP just now. Please try again."); return; }
+    const next: FunnelAnswers = { ...answers, zipCode: zip, inServiceArea: String(d.inServiceArea), pricingZone: d.pricingZone || "" };
+    setAnswers(next);
+    logEvent("answer", cur.id, { zip, inServiceArea: d.inServiceArea });
+    if (!d.inServiceArea) logEvent("outofarea", cur.id, { zip });
+    advance(next);
   };
 
   const selectChoice = (field: string, value: string) => {
