@@ -400,27 +400,54 @@ export function FunnelRunner({
   if (!cur) return null;
   const progress = steps.length > 1 ? Math.round(((idx(cur.id) + 1) / steps.length) * 100) : 100;
 
+  const L = cur.layout || {};
+  const full = L.mode === "full";
+  const pageBg = L.background || bg;
+  const hasBgImage = !!L.backgroundImage;
+  const overlay = L.overlayOpacity != null ? Math.max(0, Math.min(100, L.overlayOpacity)) / 100 : 0;
+  const stepCardBg = L.cardBg || cardBg;
+  const maxW = L.maxWidth || 448;
+  const showProgress = !L.hideProgress && steps.length > 1;
+
+  const backLink = history.length > 0 && (
+    <button onClick={goBack} className="inline-flex items-center gap-1 text-[13px] mb-3 opacity-60 hover:opacity-100" style={{ color: full ? "inherit" : "#9CA3AF" }}>
+      <ArrowLeft className="w-4 h-4" /> Back
+    </button>
+  );
+  const logo = data.theme?.logoUrl && (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={data.theme.logoUrl} alt="" className={`h-8 mb-4${full ? " mx-auto" : ""}`} />
+  );
+  const blocks = <div className="dgs-funnel-blocks space-y-4">{cur.blocks.map((b) => <div key={b.id} style={blockCss(b)}>{renderBlock(b)}</div>)}</div>;
+
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: bg, fontFamily: fontStack }}>
+    <div className="relative min-h-screen flex flex-col" style={{ background: pageBg, fontFamily: fontStack, color: L.textColor }}>
       {fontHref && <link rel="stylesheet" href={fontHref} />}
       {customCss && <style dangerouslySetInnerHTML={{ __html: customCss }} />}
-      <div className="flex-1 flex items-start sm:items-center justify-center p-4 sm:p-6">
-        <div className="dgs-funnel-card w-full max-w-md rounded-2xl shadow-xl overflow-hidden" style={{ background: cardBg }}>
-          {/* Progress */}
-          <div className="h-1.5 bg-gray-100"><div className="h-full transition-all" style={{ width: `${progress}%`, background: primary }} /></div>
-          <div className="p-5 sm:p-7">
-            {history.length > 0 && (
-              <button onClick={goBack} className="inline-flex items-center gap-1 text-[13px] text-gray-400 hover:text-gray-600 mb-3">
-                <ArrowLeft className="w-4 h-4" /> Back
-              </button>
-            )}
-            {data.theme?.logoUrl && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={data.theme.logoUrl} alt="" className="h-8 mb-4" />
-            )}
-            <div className="dgs-funnel-blocks space-y-4">{cur.blocks.map((b) => <div key={b.id} style={blockCss(b)}>{renderBlock(b)}</div>)}</div>
+      {hasBgImage && (
+        <>
+          <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url("${L.backgroundImage}")` }} />
+          {overlay > 0 && <div className="absolute inset-0 bg-black" style={{ opacity: overlay }} />}
+        </>
+      )}
+      <div className={`relative flex-1 flex ${L.vAlign === "top" ? "items-start" : "items-start sm:items-center"} justify-center p-4 sm:p-6`}>
+        {full ? (
+          <div className="dgs-funnel-card w-full" style={{ maxWidth: maxW }}>
+            {showProgress && <div className="h-1.5 rounded-full mb-4" style={{ background: "rgba(255,255,255,.2)" }}><div className="h-full rounded-full transition-all" style={{ width: `${progress}%`, background: primary }} /></div>}
+            {backLink}
+            {logo}
+            {blocks}
           </div>
-        </div>
+        ) : (
+          <div className="dgs-funnel-card w-full rounded-2xl shadow-xl overflow-hidden" style={{ background: stepCardBg, maxWidth: maxW }}>
+            {showProgress && <div className="h-1.5 bg-gray-100"><div className="h-full transition-all" style={{ width: `${progress}%`, background: primary }} /></div>}
+            <div className="p-5 sm:p-7">
+              {backLink}
+              {logo}
+              {blocks}
+            </div>
+          </div>
+        )}
       </div>
       <p className="text-center text-[11px] text-white/50 pb-4 flex items-center justify-center gap-1">
         <MapPin className="w-3 h-3" /> DooGoodScoopers · Inland Empire

@@ -90,11 +90,34 @@ export interface BranchRule {
   goto: GotoTarget;
 }
 
+/** Per-screen layout & background (Heyflow-style screen controls). */
+export interface StepLayout {
+  /** "card" = the default centered card; "full" = full-bleed, no card chrome. */
+  mode?: "card" | "full";
+  /** Page background for this step (color, gradient, or overrides the theme bg). */
+  background?: string;
+  /** A cover background image URL for this step (hero screens). */
+  backgroundImage?: string;
+  /** 0–100 dark overlay over the background image, for text legibility. */
+  overlayOpacity?: number;
+  /** Vertical placement of the content. */
+  vAlign?: "top" | "center";
+  /** Content max width in px (default ~448). */
+  maxWidth?: number;
+  /** Card surface override for this step (card mode). */
+  cardBg?: string;
+  /** Default text color for this step (useful full-bleed on a dark hero). */
+  textColor?: string;
+  /** Hide the progress bar on this step. */
+  hideProgress?: boolean;
+}
+
 export interface Step {
   id: string;
   name: string;
   blocks: Block[];
   logic?: BranchRule[]; // first matching rule wins; else next step in order
+  layout?: StepLayout;
 }
 
 export interface FunnelTheme {

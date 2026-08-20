@@ -3,9 +3,9 @@
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  GripVertical, Plus, Trash2, Save, Eye, EyeOff, ExternalLink, Loader2, Rocket, Palette,
+  GripVertical, Plus, Trash2, Save, Eye, EyeOff, ExternalLink, Loader2, Rocket, Palette, Layout,
 } from "lucide-react";
-import type { FunnelData, Step, Block, BlockType, BlockStyle, ContactField } from "@/lib/funnel/types";
+import type { FunnelData, Step, StepLayout, Block, BlockType, BlockStyle, ContactField } from "@/lib/funnel/types";
 import { FunnelRunner } from "@/components/funnel/FunnelRunner";
 
 function reorder<T>(arr: T[], from: number, to: number): T[] {
@@ -179,6 +179,8 @@ export function FunnelBuilder({ initial }: { initial: { id: string; name: string
                 <label className="block text-[11px] font-semibold text-gray-500 mb-1">Step name</label>
                 <input value={sel.name} onChange={(e) => patchStep(sel.id, { name: e.target.value })} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg" />
               </div>
+
+              <LayoutPanel step={sel} onChange={(layout) => patchStep(sel.id, { layout })} />
 
               <div className="dgs-card p-4">
                 <div className="flex items-center justify-between mb-2">
@@ -378,6 +380,75 @@ function BlockEditor({ block, onChange }: { block: Block; onChange: (patch: Part
     default:
       return null;
   }
+}
+
+function LayoutPanel({ step, onChange }: { step: Step; onChange: (layout: StepLayout) => void }) {
+  const L = step.layout || {};
+  const set = (patch: Partial<StepLayout>) => onChange({ ...L, ...patch });
+  const num = (v: string) => (v === "" ? undefined : Math.max(0, parseInt(v) || 0));
+  const cell = "text-[10.5px] font-semibold text-gray-400 uppercase tracking-wide";
+  const ipt = "w-full mt-1 px-2 py-1 text-[12px] border border-gray-200 rounded-md";
+  const seg = (active: boolean) => active ? { background: "#EFE9FF", color: "#6D3EF0", borderColor: "#6D3EF0" } : { color: "#6B7280", borderColor: "#E5E7EB" };
+  const full = L.mode === "full";
+  return (
+    <div className="dgs-card p-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <Layout className="w-3.5 h-3.5 text-gray-400" />
+        <span className="text-[12px] font-bold text-ink uppercase tracking-wide">Screen layout</span>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div className={cell}>Container
+          <div className="flex gap-1 mt-1">
+            <button type="button" onClick={() => set({ mode: "card" })} className="flex-1 py-1.5 rounded-md border text-[11px] font-bold" style={seg(!full)}>Card</button>
+            <button type="button" onClick={() => set({ mode: "full" })} className="flex-1 py-1.5 rounded-md border text-[11px] font-bold" style={seg(full)}>Full-bleed</button>
+          </div>
+        </div>
+        <div className={cell}>Vertical
+          <div className="flex gap-1 mt-1">
+            <button type="button" onClick={() => set({ vAlign: "center" })} className="flex-1 py-1.5 rounded-md border text-[11px] font-bold" style={seg(L.vAlign !== "top")}>Center</button>
+            <button type="button" onClick={() => set({ vAlign: "top" })} className="flex-1 py-1.5 rounded-md border text-[11px] font-bold" style={seg(L.vAlign === "top")}>Top</button>
+          </div>
+        </div>
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        <label className={cell}>Background
+          <div className="flex items-center gap-1 mt-1">
+            <input type="color" value={/^#/.test(L.background || "") ? L.background : "#0E2A47"} onChange={(e) => set({ background: e.target.value })} className="h-7 w-8 rounded border border-gray-200 p-0" />
+            {L.background && <button type="button" onClick={() => set({ background: undefined })} className="text-[10px] text-gray-400">clear</button>}
+          </div>
+        </label>
+        {!full && (
+          <label className={cell}>Card color
+            <div className="flex items-center gap-1 mt-1">
+              <input type="color" value={L.cardBg || "#ffffff"} onChange={(e) => set({ cardBg: e.target.value })} className="h-7 w-8 rounded border border-gray-200 p-0" />
+              {L.cardBg && <button type="button" onClick={() => set({ cardBg: undefined })} className="text-[10px] text-gray-400">clear</button>}
+            </div>
+          </label>
+        )}
+        <label className={cell}>Text color
+          <div className="flex items-center gap-1 mt-1">
+            <input type="color" value={L.textColor || "#0E2A47"} onChange={(e) => set({ textColor: e.target.value })} className="h-7 w-8 rounded border border-gray-200 p-0" />
+            {L.textColor && <button type="button" onClick={() => set({ textColor: undefined })} className="text-[10px] text-gray-400">clear</button>}
+          </div>
+        </label>
+        <label className={cell}>Max width px
+          <input type="number" min={0} value={L.maxWidth ?? ""} onChange={(e) => set({ maxWidth: num(e.target.value) })} placeholder="448" className={ipt} />
+        </label>
+      </div>
+      <label className={cell}>Background image URL (hero)
+        <input value={L.backgroundImage || ""} onChange={(e) => set({ backgroundImage: e.target.value || undefined })} placeholder="https://…/photo.jpg" className={ipt} />
+      </label>
+      {L.backgroundImage && (
+        <label className={cell}>Darken image {L.overlayOpacity ?? 0}%
+          <input type="range" min={0} max={90} value={L.overlayOpacity ?? 0} onChange={(e) => set({ overlayOpacity: parseInt(e.target.value) })} className="w-full mt-1 accent-violet-600" />
+        </label>
+      )}
+      <label className="flex items-center gap-2 text-[12px] text-gray-600">
+        <input type="checkbox" checked={!!L.hideProgress} onChange={(e) => set({ hideProgress: e.target.checked || undefined })} className="accent-violet-600" />
+        Hide the progress bar on this step
+      </label>
+    </div>
+  );
 }
 
 function StylePanel({ style, onChange }: { style?: BlockStyle; onChange: (patch: Partial<Block>) => void }) {
