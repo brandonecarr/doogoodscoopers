@@ -25,6 +25,12 @@ const BLOCK_TYPES: { type: BlockType; label: string }[] = [
   { type: "priceEstimate", label: "Price estimate" },
   { type: "contactForm", label: "Contact form" },
   { type: "cta", label: "Button / CTA" },
+  { type: "video", label: "Video" },
+  { type: "testimonial", label: "Testimonial" },
+  { type: "rating", label: "Star rating" },
+  { type: "trustBadges", label: "Trust badges" },
+  { type: "divider", label: "Divider" },
+  { type: "spacer", label: "Spacer" },
   { type: "html", label: "Custom HTML" },
 ];
 const CONTACT_FIELDS: ContactField[] = ["firstName", "lastName", "email", "phone", "address"];
@@ -76,6 +82,11 @@ export function FunnelBuilder({ initial }: { initial: { id: string; name: string
     if (type === "text") base.text = "Some text";
     if (type === "zipCheck") base.label = "Check my area";
     if (type === "html") base.html = '<div style="padding:8px;text-align:center">Your custom HTML</div>';
+    if (type === "video") base.videoUrl = "";
+    if (type === "testimonial") { base.quote = "They show up every week and my yard has never looked better."; base.authorName = "Happy customer"; base.authorMeta = "Fontana, CA"; base.rating = 5; }
+    if (type === "rating") { base.rating = 5; base.ratingCount = "Loved by Inland Empire dog owners"; }
+    if (type === "trustBadges") base.items = [{ icon: "🛡️", label: "Licensed & insured" }, { icon: "📍", label: "Locally owned" }, { icon: "↩️", label: "Cancel anytime" }];
+    if (type === "spacer") base.size = 16;
     patchStep(sel.id, { blocks: [...sel.blocks, base] });
   };
 
@@ -254,7 +265,65 @@ function BlockEditor({ block, onChange }: { block: Block; onChange: (patch: Part
     case "text":
       return <textarea rows={2} value={block.text || ""} onChange={(e) => onChange({ text: e.target.value })} className={`${input} resize-none`} />;
     case "image":
-      return <input value={block.imageUrl || ""} onChange={(e) => onChange({ imageUrl: e.target.value })} placeholder="Image URL" className={input} />;
+      return (
+        <div className="space-y-1.5">
+          <input value={block.imageUrl || ""} onChange={(e) => onChange({ imageUrl: e.target.value })} placeholder="Image URL" className={input} />
+          <input value={block.alt || ""} onChange={(e) => onChange({ alt: e.target.value })} placeholder="Alt text (accessibility)" className={input} />
+        </div>
+      );
+    case "video":
+      return (
+        <div className="space-y-1">
+          <input value={block.videoUrl || ""} onChange={(e) => onChange({ videoUrl: e.target.value })} placeholder="YouTube / Vimeo / .mp4 URL" className={input} />
+          <p className="text-[11px] text-gray-400">Paste a YouTube or Vimeo link, or a direct video file URL.</p>
+        </div>
+      );
+    case "rating":
+      return (
+        <div className="flex gap-2">
+          <label className="text-[11px] text-gray-500 w-20">Stars
+            <input type="number" min={0} max={5} step={0.5} value={block.rating ?? 5} onChange={(e) => onChange({ rating: Math.max(0, Math.min(5, parseFloat(e.target.value) || 0)) })} className={input} />
+          </label>
+          <label className="text-[11px] text-gray-500 flex-1">Caption
+            <input value={block.ratingCount || ""} onChange={(e) => onChange({ ratingCount: e.target.value })} placeholder="200+ happy dog owners" className={input} />
+          </label>
+        </div>
+      );
+    case "testimonial":
+      return (
+        <div className="space-y-1.5">
+          <textarea rows={2} value={block.quote || ""} onChange={(e) => onChange({ quote: e.target.value })} placeholder="Quote" className={`${input} resize-none`} />
+          <div className="flex gap-1.5">
+            <input value={block.authorName || ""} onChange={(e) => onChange({ authorName: e.target.value })} placeholder="Name" className={input} />
+            <input value={block.authorMeta || ""} onChange={(e) => onChange({ authorMeta: e.target.value })} placeholder="City / detail" className={input} />
+          </div>
+          <div className="flex gap-1.5">
+            <input value={block.avatarUrl || ""} onChange={(e) => onChange({ avatarUrl: e.target.value })} placeholder="Avatar URL (optional)" className={input} />
+            <input type="number" min={0} max={5} step={0.5} value={block.rating ?? 5} onChange={(e) => onChange({ rating: Math.max(0, Math.min(5, parseFloat(e.target.value) || 0)) })} placeholder="Stars" className={`${input} w-20`} />
+          </div>
+        </div>
+      );
+    case "trustBadges":
+      return (
+        <div className="space-y-1.5">
+          {(block.items || []).map((it, i) => (
+            <div key={i} className="flex gap-1">
+              <input value={it.icon || ""} onChange={(e) => onChange({ items: (block.items || []).map((x, j) => j === i ? { ...x, icon: e.target.value } : x) })} placeholder="🛡️" className={`${input} w-14 text-center`} />
+              <input value={it.label} onChange={(e) => onChange({ items: (block.items || []).map((x, j) => j === i ? { ...x, label: e.target.value } : x) })} placeholder="Licensed & insured" className={input} />
+              <button onClick={() => onChange({ items: (block.items || []).filter((_, j) => j !== i) })} className="text-gray-300 hover:text-rose-500 px-1"><Trash2 className="w-3.5 h-3.5" /></button>
+            </div>
+          ))}
+          <button onClick={() => onChange({ items: [...(block.items || []), { icon: "", label: "" }] })} className="text-[12px] text-violet-600 font-semibold">+ Add badge</button>
+        </div>
+      );
+    case "spacer":
+      return (
+        <label className="text-[11px] text-gray-500 block">Height (px)
+          <input type="number" min={0} value={block.size ?? 16} onChange={(e) => onChange({ size: Math.max(0, parseInt(e.target.value) || 0) })} className={input} />
+        </label>
+      );
+    case "divider":
+      return <p className="text-[12px] text-gray-400">A thin horizontal line. Style its color/spacing below.</p>;
     case "zipCheck":
       return <input value={block.label || ""} onChange={(e) => onChange({ label: e.target.value })} placeholder="Button label" className={input} />;
     case "priceEstimate":

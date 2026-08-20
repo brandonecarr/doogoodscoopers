@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Loader2, ArrowLeft, Check, MapPin } from "lucide-react";
+import { Loader2, ArrowLeft, Check, MapPin, Star } from "lucide-react";
 import type { FunnelData, Step, Block, FunnelAnswers, BranchRule } from "@/lib/funnel/types";
 import { DEFAULT_BOOKING_URL } from "@/lib/funnel/types";
 
@@ -236,6 +236,22 @@ export function FunnelRunner({
     </button>
   );
 
+  const stars = (n: number, size = "w-4 h-4") => (
+    <div className="flex items-center justify-center gap-0.5">
+      {[1, 2, 3, 4, 5].map((i) => (
+        // eslint-disable-next-line react/jsx-key
+        <Star className={size} style={{ color: "#FFB400" }} fill={i <= Math.round(n || 0) ? "#FFB400" : "none"} key={i} />
+      ))}
+    </div>
+  );
+  const toEmbed = (url: string): { src: string; isFile: boolean } => {
+    const yt = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([\w-]{11})/);
+    if (yt) return { src: `https://www.youtube.com/embed/${yt[1]}`, isFile: false };
+    const vim = url.match(/vimeo\.com\/(?:video\/)?(\d+)/);
+    if (vim) return { src: `https://player.vimeo.com/video/${vim[1]}`, isFile: false };
+    return { src: url, isFile: /\.(mp4|webm|ogg)(\?|$)/i.test(url) };
+  };
+
   const renderBlock = (b: Block) => {
     switch (b.type) {
       case "heading":
@@ -244,7 +260,56 @@ export function FunnelRunner({
         return <p key={b.id} className="text-[15px] text-gray-600 leading-relaxed">{b.text}</p>;
       case "image":
         // eslint-disable-next-line @next/next/no-img-element
-        return b.imageUrl ? <img key={b.id} src={b.imageUrl} alt="" className="w-full rounded-xl" /> : null;
+        return b.imageUrl ? <img key={b.id} src={b.imageUrl} alt={b.alt || ""} className="w-full rounded-xl" /> : null;
+      case "video": {
+        if (!b.videoUrl) return null;
+        const { src, isFile } = toEmbed(b.videoUrl);
+        return (
+          <div key={b.id} className="relative w-full overflow-hidden rounded-xl bg-black" style={{ aspectRatio: "16 / 9" }}>
+            {isFile
+              ? <video src={src} controls playsInline className="absolute inset-0 w-full h-full" />
+              : <iframe src={src} title="video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="absolute inset-0 w-full h-full" />}
+          </div>
+        );
+      }
+      case "rating":
+        return (
+          <div key={b.id} className="text-center">
+            {stars(b.rating ?? 5, "w-5 h-5")}
+            {b.ratingCount && <p className="text-[13px] text-gray-500 mt-1.5">{b.ratingCount}</p>}
+          </div>
+        );
+      case "testimonial":
+        return (
+          <figure key={b.id} className="rounded-2xl border border-gray-100 bg-gray-50/70 p-5 text-center">
+            {b.rating ? <div className="mb-2">{stars(b.rating)}</div> : null}
+            <blockquote className="text-[15px] leading-relaxed text-gray-700">“{b.quote || ""}”</blockquote>
+            <figcaption className="mt-3 flex items-center justify-center gap-2.5">
+              {b.avatarUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={b.avatarUrl} alt="" className="w-9 h-9 rounded-full object-cover" />
+              )}
+              <span className="text-left">
+                {b.authorName && <span className="block text-[13px] font-bold text-gray-900">{b.authorName}</span>}
+                {b.authorMeta && <span className="block text-[12px] text-gray-500">{b.authorMeta}</span>}
+              </span>
+            </figcaption>
+          </figure>
+        );
+      case "trustBadges":
+        return (
+          <div key={b.id} className="flex flex-wrap justify-center gap-2">
+            {(b.items || []).map((it, i) => (
+              <span key={i} className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-[12px] font-semibold text-gray-600">
+                {it.icon && <span>{it.icon}</span>}{it.label}
+              </span>
+            ))}
+          </div>
+        );
+      case "divider":
+        return <hr key={b.id} className="border-0 border-t border-gray-200" />;
+      case "spacer":
+        return <div key={b.id} style={{ height: b.size ?? 16 }} />;
       case "zipCheck":
         return (
           <div key={b.id} className="space-y-2">

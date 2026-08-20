@@ -10,12 +10,25 @@ export type BlockType =
   | "priceEstimate"
   | "contactForm"
   | "cta"
-  | "html"; // raw HTML escape hatch (owner-authored)
+  | "html" // raw HTML escape hatch (owner-authored)
+  // Design blocks (the no-code design library)
+  | "video"
+  | "testimonial"
+  | "rating"
+  | "trustBadges"
+  | "divider"
+  | "spacer";
 
 export interface ChoiceOption {
   value: string;
   label: string;
   sublabel?: string;
+}
+
+/** One badge in a trust-badges row. */
+export interface BadgeItem {
+  icon?: string; // an emoji or short glyph
+  label: string;
 }
 
 export type ContactField = "firstName" | "lastName" | "email" | "phone" | "address";
@@ -27,6 +40,20 @@ export interface Block {
   text?: string;
   // image
   imageUrl?: string;
+  alt?: string;
+  // video — a YouTube/Vimeo watch/share URL, or a direct .mp4
+  videoUrl?: string;
+  // testimonial / rating
+  quote?: string;
+  authorName?: string;
+  authorMeta?: string; // e.g. "Fontana, CA" or "Weekly customer"
+  avatarUrl?: string;
+  rating?: number; // 0–5 (supports .5)
+  ratingCount?: string; // e.g. "200+ happy dog owners"
+  // trustBadges
+  items?: BadgeItem[];
+  // spacer — vertical space in px
+  size?: number;
   // choice — writes its selected value to `field` in the answers
   field?: string; // e.g. "numberOfDogs" | "frequency"
   options?: ChoiceOption[];
