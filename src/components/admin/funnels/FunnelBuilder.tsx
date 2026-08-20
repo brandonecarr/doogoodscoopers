@@ -403,22 +403,29 @@ function BlockEditor({ block, onChange }: { block: Block; onChange: (patch: Part
   }
 }
 
-/** A color control with an explicit "None (transparent)" state — native
- *  color inputs can't be transparent, so we clear the value instead. */
+/** A color control with an explicit "None (transparent)" state — native color
+ *  inputs can't be transparent, so we clear the value instead. Touching the
+ *  swatch always turns a color ON (clears None); the None button always clears
+ *  to transparent. The two states are mutually exclusive and never both active. */
 function ColorField({ label, value, def, onChange }: { label: string; value?: string; def: string; onChange: (v?: string) => void }) {
   const isColor = /^#/.test(value || "");
   const none = !value;
   return (
-    <label className="text-[10.5px] font-semibold text-gray-400 uppercase tracking-wide block">{label}
+    <div className="text-[10.5px] font-semibold text-gray-400 uppercase tracking-wide">
+      {label}
       <div className="flex items-center gap-1 mt-1">
-        <input type="color" value={isColor ? value : def} onChange={(e) => onChange(e.target.value)} className="h-7 w-8 rounded border border-gray-200 p-0 shrink-0" />
-        <button type="button" onClick={() => onChange(none ? def : undefined)} title="No fill (transparent)"
+        <input type="color" value={isColor ? value : def}
+          onClick={() => { if (none) onChange(def); }}   // opening the picker turns a color on
+          onChange={(e) => onChange(e.target.value)}
+          title="Pick a color"
+          className={`h-7 w-8 rounded border border-gray-200 p-0 shrink-0 cursor-pointer ${none ? "opacity-40" : ""}`} />
+        <button type="button" onClick={() => onChange(undefined)} title="No fill (transparent)"
           className="h-7 px-1.5 rounded border text-[10px] font-bold leading-none shrink-0"
           style={none ? { borderColor: "#6D3EF0", color: "#6D3EF0", background: "#EFE9FF" } : { borderColor: "#E5E7EB", color: "#9CA3AF", background: "#fff" }}>
           None
         </button>
       </div>
-    </label>
+    </div>
   );
 }
 
