@@ -100,7 +100,10 @@ export async function sngPrice(opts: {
       signal: controller.signal,
     });
     clearTimeout(timer);
-    if (!res.ok) return opts.includeRaw ? { priceNotConfigured: true, raw: { status: res.status, url } } : null;
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      return opts.includeRaw ? { priceNotConfigured: true, raw: { status: res.status, url, body } } : null;
+    }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const d: any = await res.json().catch(() => null);
     if (!d) return null;
