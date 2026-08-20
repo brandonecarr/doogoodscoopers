@@ -2,9 +2,18 @@ import { NextResponse } from "next/server";
 import { sngPrice } from "@/lib/sweepandgo-zip";
 
 // Funnel pricing. Sweep&Go's real onboarding price is the source of truth; falls
-// back to the local get-pricing if SNG can't be reached / has no price.
+// back to the local get-pricing if SNG can't be reached / has no price. Both are
+// normalized to { amount, interval, initialFee } for the renderer.
 export const dynamic = "force-dynamic";
 export const maxDuration = 20;
+
+const normInterval = (raw?: string): string => {
+  const s = (raw || "").toLowerCase();
+  if (s.includes("month")) return "month";
+  if (s.includes("week")) return "week";
+  if (s.includes("visit") || s.includes("cleanup") || s.includes("clean_up")) return "visit";
+  return raw || "month";
+};
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -21,7 +30,14 @@ export async function GET(request: Request) {
 
   const sng = await sngPrice({ zip, frequency, dogs, lastCleaned, cfOverride, includeRaw: debug });
   if (sng && !sng.priceNotConfigured) {
-    return NextResponse.json({ success: true, source: "sweepandgo", pricing: sng, ...(debug ? { raw: sng.raw } : {}) });
+    return NextResponse.json({
+      success: true, source: "sweepandgo",
+      pricing: {
+        amount: sng.amount, interval: normInterval(sng.interval),
+        initialFee: sng.initialFee ?? null, zipType: sng.zipType ?? null, priceNotConfigured: false,
+      },
+      ...(debug ? { raw: sng.raw } : {}),
+    });
   }
 
   // Fallback → the existing Supabase-backed pricing.
@@ -30,7 +46,16 @@ export async function GET(request: Request) {
     const res = await fetch(`${url.origin}/api/v2/get-pricing?${qs.toString()}`);
     const d = await res.json().catch(() => null);
     if (res.ok && d?.pricing) {
-      return NextResponse.json({ success: true, source: "fallback", pricing: d.pricing, ...(debug ? { sngRaw: sng?.raw ?? null } : {}) });
+      const pr = d.pricing;
+      return NextResponse.json({
+        success: true, source: "fallback",
+        pricing: {
+          amount: pr.recurringPrice ?? pr.basePrice ?? null, interval: "visit",
+          initialFee: pr.initialCleanupFee || null, zipType: null,
+          priceNotConfigured: !!pr.priceNotConfigured,
+        },
+        ...(debug ? { sngRaw: sng?.raw ?? null } : {}),
+      });
     }
   } catch { /* fall through */ }
 

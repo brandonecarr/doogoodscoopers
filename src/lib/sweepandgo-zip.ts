@@ -54,10 +54,10 @@ export async function sngCheckZip(zip: string, includeRaw = false): Promise<SngZ
 // ── Pricing (Sweep&Go's real onboarding price) ───────────────────────────────
 
 export interface SngPriceResult {
-  recurringPrice?: number;
-  monthlyPrice?: number;
-  initialCleanupFee?: number;
-  billingInterval?: string;
+  amount?: number; // price.value
+  interval?: string; // raw SNG billing_interval, e.g. "monthly"
+  initialFee?: number; // parsed from custom_price text
+  zipType?: string; // pricing_zip_code_type (regular | premium)
   priceNotConfigured: boolean;
   raw?: unknown;
 }
@@ -88,8 +88,10 @@ export async function sngPrice(opts: {
     zip_code: opts.zip,
     clean_up_frequency: cf,
     number_of_dogs: String(opts.dogs || "1"),
+    // Required by SNG. Defaults to the "it's been a while" bracket; the funnel
+    // can collect this later for a more exact initial-cleanup fee.
+    last_time_yard_was_thoroughly_cleaned: opts.lastCleaned || "over_a_month",
   });
-  if (opts.lastCleaned) p.set("last_time_yard_was_thoroughly_cleaned", opts.lastCleaned);
   const url = `${SNG_BASE}/client_on_boarding/price_registration_form?${p.toString()}`;
   try {
     const controller = new AbortController();
@@ -108,14 +110,17 @@ export async function sngPrice(opts: {
     const d: any = await res.json().catch(() => null);
     if (!d) return null;
     const node = d.data ?? d;
-    // Field names parsed defensively across likely shapes; refined via ?debug=1.
-    const recurringPrice = num(node?.recurring_price ?? node?.price_per_visit ?? node?.per_visit_price ?? node?.price ?? node?.amount ?? node?.subscription_price);
-    const monthlyPrice = num(node?.monthly_price ?? node?.monthly ?? node?.price_per_month);
-    const initialCleanupFee = num(node?.initial_cleanup_price ?? node?.initial_cleanup_fee ?? node?.initial_cleanup ?? node?.one_time_price ?? node?.first_time_price);
+    // SNG shape: { price: { value, billing_interval }, custom_price: { short_description: "$49 Initial Cleaning Fee:" }, pricing_zip_code_type }
+    const amount = num(node?.price?.value ?? node?.price?.amount);
+    const interval = node?.price?.billing_interval || node?.show_price_options?.default_billing_interval || undefined;
+    let initialFee: number | undefined;
+    const cpText = [node?.custom_price?.short_description, node?.custom_price?.long_description].filter(Boolean).join(" ");
+    const m = cpText.match(/\$\s?([\d,]+(?:\.\d+)?)/);
+    if (m) initialFee = num(m[1].replace(/,/g, ""));
     return {
-      recurringPrice, monthlyPrice, initialCleanupFee,
-      billingInterval: "per_visit",
-      priceNotConfigured: recurringPrice == null,
+      amount, interval, initialFee,
+      zipType: node?.pricing_zip_code_type,
+      priceNotConfigured: amount == null,
       ...(opts.includeRaw ? { raw: d } : {}),
     };
   } catch {

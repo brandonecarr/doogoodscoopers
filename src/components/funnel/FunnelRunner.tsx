@@ -10,8 +10,8 @@ import { DEFAULT_BOOKING_URL } from "@/lib/funnel/types";
 // so the builder's live preview and this public page stay identical.
 
 interface Pricing {
-  recurringPrice?: number; monthlyPrice?: number; initialCleanupFee?: number;
-  billingInterval?: string; priceNotConfigured?: boolean;
+  amount?: number; interval?: string; initialFee?: number | null;
+  zipType?: string | null; priceNotConfigured?: boolean;
 }
 
 const cookie = (n: string) =>
@@ -248,10 +248,9 @@ export function FunnelRunner({
               <>
                 <p className="text-[13px] font-semibold uppercase tracking-wide text-gray-500">Your estimate</p>
                 <p className="text-[34px] font-extrabold text-gray-900 mt-1">
-                  {money(price.recurringPrice)}<span className="text-[15px] font-semibold text-gray-500">{price.billingInterval === "per_visit" ? " / visit" : ""}</span>
+                  {money(price.amount)}<span className="text-[15px] font-semibold text-gray-500"> / {price.interval || "month"}</span>
                 </p>
-                {price.monthlyPrice ? <p className="text-[14px] text-gray-600 mt-1">about {money(price.monthlyPrice)}/month</p> : null}
-                {price.initialCleanupFee ? <p className="text-[13px] text-gray-500 mt-1">+ {money(price.initialCleanupFee)} one-time initial cleanup</p> : null}
+                {price.initialFee ? <p className="text-[13px] text-gray-500 mt-1">+ {money(price.initialFee)} one-time initial cleaning</p> : null}
               </>
             )}
           </div>
