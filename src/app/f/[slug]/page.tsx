@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import prisma from "@/lib/prisma";
 import type { FunnelData } from "@/lib/funnel/types";
 import { FunnelRunner } from "@/components/funnel/FunnelRunner";
+import { MetaPixel } from "@/components/funnel/MetaPixel";
 
 export const dynamic = "force-dynamic";
 
@@ -24,5 +25,10 @@ export default async function FunnelPage({ params }: { params: Promise<{ slug: s
   if (!f) notFound();
   const data = f.data as unknown as FunnelData;
   if (!data?.variants?.A?.steps?.length) notFound();
-  return <FunnelRunner funnelId={f.id} slug={f.slug} data={data} />;
+  return (
+    <>
+      <MetaPixel pixelId={process.env.NEXT_PUBLIC_META_PIXEL_ID} />
+      <FunnelRunner funnelId={f.id} slug={f.slug} data={data} />
+    </>
+  );
 }

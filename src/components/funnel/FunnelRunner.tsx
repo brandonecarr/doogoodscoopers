@@ -41,6 +41,7 @@ export function FunnelRunner({
   const [formError, setFormError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const attrRef = useRef<Record<string, unknown>>({});
+  const eventIdRef = useRef<string>("");
   const completedRef = useRef(false);
 
   const cur = steps.find((s) => s.id === currentId) || steps[0];
@@ -57,6 +58,7 @@ export function FunnelRunner({
   // Start session + capture attribution.
   useEffect(() => {
     if (preview) return;
+    eventIdRef.current = (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : `ev_${Date.now()}${Math.random().toString(36).slice(2)}`;
     const p = new URLSearchParams(window.location.search);
     attrRef.current = {
       ig: p.get("ig") || undefined,
@@ -177,13 +179,21 @@ export function FunnelRunner({
     if (preview) { completedRef.current = true; advance(); return; }
     setSubmitting(true);
     try {
+      const value = price?.monthly ?? price?.perVisit ?? undefined;
       const res = await fetch("/api/v2/funnel/submit", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId, funnelId, variant, step: cur.id, answers }),
+        body: JSON.stringify({
+          sessionId, funnelId, variant, step: cur.id, answers,
+          eventId: eventIdRef.current, attribution: attrRef.current, value,
+          pageUrl: window.location.href,
+        }),
       });
       const d = await res.json().catch(() => ({}));
       if (!res.ok) { setFormError(d.error || "Something went wrong. Please try again."); return; }
       completedRef.current = true;
+      // Browser-side Lead (dedupes with the server CAPI event by eventID).
+      const fbq = (window as unknown as { fbq?: (...a: unknown[]) => void }).fbq;
+      if (fbq) fbq("track", "Lead", { value, currency: "USD" }, { eventID: eventIdRef.current });
       advance();
     } catch {
       setFormError("Something went wrong. Please try again.");

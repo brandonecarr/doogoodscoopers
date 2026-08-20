@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { captureQuoteLead, captureOutOfAreaLead } from "@/lib/lead-capture";
+import { sendLeadEvent, isMetaCapiConfigured } from "@/lib/meta-capi";
 
 // Public: a funnel's final submit. Creates a QuoteLead (in-area) or an
 // OutOfAreaLead (out-of-area) via the shared lead-capture lib, ties it to the
@@ -51,6 +52,22 @@ export async function POST(request: Request) {
         variant: b.variant === "B" ? "B" : "A", step: String(b.step || "submit"),
         type: "submit", payload: { leadType },
       },
+    }).catch(() => {});
+  }
+
+  // Server-side Meta CAPI Lead (dedupes with the browser pixel via eventId).
+  if (isMetaCapiConfigured() && b.eventId) {
+    const attr = (b.attribution && typeof b.attribution === "object" ? b.attribution : {}) as Record<string, string>;
+    let fbc = attr.fbc || null;
+    if (!fbc && attr.fbclid) fbc = `fb.1.${Date.now()}.${attr.fbclid}`;
+    const clientIp = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || null;
+    await sendLeadEvent({
+      eventId: String(b.eventId),
+      eventSourceUrl: b.pageUrl ? String(b.pageUrl) : undefined,
+      email: a.email, phone: a.phone, firstName: a.firstName, lastName: a.lastName,
+      zip: a.zipCode, city: a.city, fbp: attr.fbp || null, fbc,
+      clientIp, userAgent: request.headers.get("user-agent"),
+      value: typeof b.value === "number" ? b.value : undefined, currency: "USD",
     }).catch(() => {});
   }
 
