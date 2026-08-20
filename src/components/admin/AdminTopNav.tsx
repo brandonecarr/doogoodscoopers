@@ -16,6 +16,7 @@ import {
   Building2,
   Calculator,
   Footprints,
+  Split,
   MapPinOff,
   Briefcase,
   ChevronDown,
@@ -41,6 +42,7 @@ const primaryNav: NavItem[] = [
 const moreNav: NavItem[] = [
   { name: "Instagram Auto-DM",    short: "Instagram",  href: "/admin/instagram",   icon: Instagram },
   { name: "Content Studio",       short: "Studio",     href: "/admin/studio",      icon: Sparkles },
+  { name: "Funnels",              short: "Funnels",    href: "/admin/funnels",     icon: Split },
   { name: "Email",                short: "Email",      href: "/admin/email",       icon: Mail },
   { name: "Commercial Inquiries", short: "Commercial", href: "/admin/commercial",  icon: Building2 },
   { name: "Community Quote",      short: "Quote Calc", href: "/admin/community-quote", icon: Calculator },
