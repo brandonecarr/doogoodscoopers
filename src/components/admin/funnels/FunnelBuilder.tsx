@@ -403,6 +403,25 @@ function BlockEditor({ block, onChange }: { block: Block; onChange: (patch: Part
   }
 }
 
+/** A color control with an explicit "None (transparent)" state — native
+ *  color inputs can't be transparent, so we clear the value instead. */
+function ColorField({ label, value, def, onChange }: { label: string; value?: string; def: string; onChange: (v?: string) => void }) {
+  const isColor = /^#/.test(value || "");
+  const none = !value;
+  return (
+    <label className="text-[10.5px] font-semibold text-gray-400 uppercase tracking-wide block">{label}
+      <div className="flex items-center gap-1 mt-1">
+        <input type="color" value={isColor ? value : def} onChange={(e) => onChange(e.target.value)} className="h-7 w-8 rounded border border-gray-200 p-0 shrink-0" />
+        <button type="button" onClick={() => onChange(none ? def : undefined)} title="No fill (transparent)"
+          className="h-7 px-1.5 rounded border text-[10px] font-bold leading-none shrink-0"
+          style={none ? { borderColor: "#6D3EF0", color: "#6D3EF0", background: "#EFE9FF" } : { borderColor: "#E5E7EB", color: "#9CA3AF", background: "#fff" }}>
+          None
+        </button>
+      </div>
+    </label>
+  );
+}
+
 function LayoutPanel({ step, onChange }: { step: Step; onChange: (layout: StepLayout) => void }) {
   const L = step.layout || {};
   const set = (patch: Partial<StepLayout>) => onChange({ ...L, ...patch });
@@ -432,26 +451,9 @@ function LayoutPanel({ step, onChange }: { step: Step; onChange: (layout: StepLa
         </div>
       </div>
       <div className="grid grid-cols-3 gap-2">
-        <label className={cell}>Background
-          <div className="flex items-center gap-1 mt-1">
-            <input type="color" value={/^#/.test(L.background || "") ? L.background : "#0E2A47"} onChange={(e) => set({ background: e.target.value })} className="h-7 w-8 rounded border border-gray-200 p-0" />
-            {L.background && <button type="button" onClick={() => set({ background: undefined })} className="text-[10px] text-gray-400">clear</button>}
-          </div>
-        </label>
-        {!full && (
-          <label className={cell}>Card color
-            <div className="flex items-center gap-1 mt-1">
-              <input type="color" value={L.cardBg || "#ffffff"} onChange={(e) => set({ cardBg: e.target.value })} className="h-7 w-8 rounded border border-gray-200 p-0" />
-              {L.cardBg && <button type="button" onClick={() => set({ cardBg: undefined })} className="text-[10px] text-gray-400">clear</button>}
-            </div>
-          </label>
-        )}
-        <label className={cell}>Text color
-          <div className="flex items-center gap-1 mt-1">
-            <input type="color" value={L.textColor || "#0E2A47"} onChange={(e) => set({ textColor: e.target.value })} className="h-7 w-8 rounded border border-gray-200 p-0" />
-            {L.textColor && <button type="button" onClick={() => set({ textColor: undefined })} className="text-[10px] text-gray-400">clear</button>}
-          </div>
-        </label>
+        <ColorField label="Background" value={L.background} def="#0E2A47" onChange={(v) => set({ background: v })} />
+        {!full && <ColorField label="Card color" value={L.cardBg} def="#ffffff" onChange={(v) => set({ cardBg: v })} />}
+        <ColorField label="Text color" value={L.textColor} def="#0E2A47" onChange={(v) => set({ textColor: v })} />
         <label className={cell}>Max width px
           <input type="number" min={0} value={L.maxWidth ?? ""} onChange={(e) => set({ maxWidth: num(e.target.value) })} placeholder="448" className={ipt} />
         </label>
@@ -504,18 +506,8 @@ function StylePanel({ style, onChange }: { style?: BlockStyle; onChange: (patch:
             {[400, 500, 600, 700, 800].map((w) => <option key={w} value={w}>{w}</option>)}
           </select>
         </label>
-        <label className={cell}>Text color
-          <div className="flex items-center gap-1 mt-1">
-            <input type="color" value={s.color || "#0E2A47"} onChange={(e) => set({ color: e.target.value })} className="h-7 w-8 rounded border border-gray-200 p-0" />
-            {s.color && <button type="button" onClick={() => set({ color: undefined })} className="text-[10px] text-gray-400">clear</button>}
-          </div>
-        </label>
-        <label className={cell}>Background
-          <div className="flex items-center gap-1 mt-1">
-            <input type="color" value={s.background || "#ffffff"} onChange={(e) => set({ background: e.target.value })} className="h-7 w-8 rounded border border-gray-200 p-0" />
-            {s.background && <button type="button" onClick={() => set({ background: undefined })} className="text-[10px] text-gray-400">clear</button>}
-          </div>
-        </label>
+        <ColorField label="Text color" value={s.color} def="#0E2A47" onChange={(v) => set({ color: v })} />
+        <ColorField label="Background" value={s.background} def="#ffffff" onChange={(v) => set({ background: v })} />
         <label className={cell}>Radius px
           <input type="number" min={0} value={s.radius ?? ""} onChange={(e) => set({ radius: num(e.target.value) })} placeholder="—" className={ipt} />
         </label>
