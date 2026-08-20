@@ -79,7 +79,7 @@ const num = (v: any): number | undefined => {
 };
 
 export async function sngPrice(opts: {
-  zip: string; frequency: string; dogs: string; lastCleaned?: string; cfOverride?: string; includeRaw?: boolean;
+  zip: string; frequency: string; dogs: string; lastCleaned?: string; cfOverride?: string; includeRaw?: boolean; isOneTime?: boolean;
 }): Promise<SngPriceResult | null> {
   const token = sngToken();
   if (!token || !/^\d{5}$/.test(opts.zip)) return null;
@@ -110,15 +110,22 @@ export async function sngPrice(opts: {
     const d: any = await res.json().catch(() => null);
     if (!d) return null;
     const node = d.data ?? d;
-    // SNG shape: { price: { value, billing_interval }, custom_price: { short_description: "$49 Initial Cleaning Fee:" }, pricing_zip_code_type }
+    // The first $ in custom_price: for recurring it's the "$49 Initial Cleaning
+    // Fee"; for one-time it's the actual price ("$99* For Your One-Time Cleanup").
+    const cpText = [node?.custom_price?.short_description, node?.custom_price?.long_description].filter(Boolean).join(" ");
+    const cpMatch = cpText.match(/\$\s?([\d,]+(?:\.\d+)?)/);
+    const cpDollar = cpMatch ? num(cpMatch[1].replace(/,/g, "")) : undefined;
+
+    if (opts.isOneTime) {
+      // One-time: SNG returns no `price` object; the price is in custom_price.
+      const amount = num(node?.price?.value) ?? cpDollar;
+      return { amount, interval: "one_time", initialFee: undefined, zipType: node?.pricing_zip_code_type, priceNotConfigured: amount == null, ...(opts.includeRaw ? { raw: d } : {}) };
+    }
+    // Recurring: monthly price + a one-time initial cleaning fee.
     const amount = num(node?.price?.value ?? node?.price?.amount);
     const interval = node?.price?.billing_interval || node?.show_price_options?.default_billing_interval || undefined;
-    let initialFee: number | undefined;
-    const cpText = [node?.custom_price?.short_description, node?.custom_price?.long_description].filter(Boolean).join(" ");
-    const m = cpText.match(/\$\s?([\d,]+(?:\.\d+)?)/);
-    if (m) initialFee = num(m[1].replace(/,/g, ""));
     return {
-      amount, interval, initialFee,
+      amount, interval, initialFee: cpDollar,
       zipType: node?.pricing_zip_code_type,
       priceNotConfigured: amount == null,
       ...(opts.includeRaw ? { raw: d } : {}),

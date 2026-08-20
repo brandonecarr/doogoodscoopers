@@ -15,10 +15,15 @@ const normInterval = (raw?: string): string => {
   return raw || "month";
 };
 
-// Visits per month by funnel frequency — used to derive a per-visit price from
-// Sweep&Go's monthly amount ($99/mo weekly ÷ 4.33 ≈ $22.86/visit).
+// Visits per month by funnel frequency, on Sweep&Go's 4.33-weeks/month basis, so
+// per-visit matches theirs exactly ($168/mo ÷ 8.66 = $19.40/visit).
+const WEEKS_PER_MONTH = 4.33;
 const VPM: Record<string, number> = {
-  once_a_week: 4.33, two_times_a_week: 8.67, bi_weekly: 2.17, once_a_month: 1, one_time: 1,
+  once_a_week: WEEKS_PER_MONTH,
+  two_times_a_week: WEEKS_PER_MONTH * 2,
+  bi_weekly: WEEKS_PER_MONTH / 2,
+  once_a_month: 1,
+  one_time: 1,
 };
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -38,7 +43,7 @@ export async function GET(request: Request) {
   const vpm = VPM[frequency] ?? 4.33;
   const oneTime = frequency === "one_time";
 
-  const sng = await sngPrice({ zip, frequency, dogs, lastCleaned, cfOverride, includeRaw: debug });
+  const sng = await sngPrice({ zip, frequency, dogs, lastCleaned, cfOverride, includeRaw: debug, isOneTime: oneTime });
   if (sng && !sng.priceNotConfigured && sng.amount != null) {
     const isMonthly = normInterval(sng.interval) === "month";
     const monthly = isMonthly ? sng.amount : round2(sng.amount * vpm);
