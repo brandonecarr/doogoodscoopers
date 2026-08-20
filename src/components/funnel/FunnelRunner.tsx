@@ -54,6 +54,13 @@ export function FunnelRunner({
       background: s.background, padding: s.padding, borderRadius: s.radius, marginTop: s.marginTop,
     };
   };
+  // Text-only style props applied directly on a text element (heading/text), so
+  // they override that element's own Tailwind color/size/weight classes — the
+  // wrapper's inherited styles alone can't beat a class on the child.
+  const textStyle = (b: Block): React.CSSProperties => {
+    const s = b.style; if (!s) return {};
+    return { color: s.color, fontSize: s.fontSize, fontWeight: s.fontWeight, textAlign: s.align };
+  };
 
   const idx = (id: string) => steps.findIndex((s) => s.id === id);
   const [currentId, setCurrentId] = useState(steps[0]?.id ?? "");
@@ -255,9 +262,11 @@ export function FunnelRunner({
   const renderBlock = (b: Block) => {
     switch (b.type) {
       case "heading":
-        return <h1 key={b.id} className="text-[24px] sm:text-[28px] font-extrabold text-gray-900 tracking-[-0.02em] leading-tight">{b.text}</h1>;
+        // Inline style on the element itself so it beats the Tailwind color/size
+        // classes; each prop falls back to the class default when unset.
+        return <h1 key={b.id} style={textStyle(b)} className="text-[24px] sm:text-[28px] font-extrabold text-gray-900 tracking-[-0.02em] leading-tight">{b.text}</h1>;
       case "text":
-        return <p key={b.id} className="text-[15px] text-gray-600 leading-relaxed">{b.text}</p>;
+        return <p key={b.id} style={textStyle(b)} className="text-[15px] text-gray-600 leading-relaxed">{b.text}</p>;
       case "image":
         // eslint-disable-next-line @next/next/no-img-element
         return b.imageUrl ? <img key={b.id} src={b.imageUrl} alt={b.alt || ""} className="w-full rounded-xl" /> : null;
