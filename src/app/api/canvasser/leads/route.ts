@@ -38,6 +38,18 @@ export async function POST(request: Request) {
   }
 
   const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
+
+  // Carry the at-the-door AI notes over from the originating pin (client may
+  // also pass them directly; the pin is the authoritative source).
+  let aiNotes = str(body.aiNotes);
+  if (visitClientKey && typeof visitClientKey === "string") {
+    const srcVisit = await prisma.canvassVisit.findFirst({
+      where: { clientKey: visitClientKey, canvasserId: user.id },
+      select: { aiNotes: true },
+    });
+    if (srcVisit?.aiNotes) aiNotes = srcVisit.aiNotes;
+  }
+
   const data = {
     firstName: str(body.firstName),
     lastName: str(body.lastName),
@@ -47,6 +59,7 @@ export async function POST(request: Request) {
     city: str(body.city),
     zipCode: normalizeZip(body.zipCode) ?? str(body.zipCode),
     notes: str(body.notes),
+    aiNotes,
   };
 
   const lead = await prisma.canvasserLead.upsert({

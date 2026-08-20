@@ -179,6 +179,7 @@ model CanvassVisit {
 
   status          String   @default("NOT_HOME") // NOT_HOME | NOT_INTERESTED | CALLBACK | INTERESTED | LEAD | DO_NOT_KNOCK
   notes           String?  @db.Text
+  aiNotes         String?  @db.Text // AI-summarized notes from an at-the-door "Listen" session (audio never stored)
 
   canvasserLeadId String?  // set when this visit is marked as a lead
   clientKey       String   @unique // offline idempotency key
@@ -201,6 +202,7 @@ model CanvasserLead {
   status          LeadStatus @default(NEW)
   archived        Boolean    @default(false)
   notes           String?    @db.Text
+  aiNotes         String?    @db.Text // carried over from the canvass pin's at-the-door AI notes
   followupDate    DateTime?
   grade           String?
 

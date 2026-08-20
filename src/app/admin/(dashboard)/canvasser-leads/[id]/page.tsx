@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, MapPin, Mail, Phone, Calendar, User } from "lucide-react";
+import { ArrowLeft, MapPin, Mail, Phone, Calendar, User, Sparkles } from "lucide-react";
 import prisma from "@/lib/prisma";
 import StatusUpdateForm from "@/components/admin/StatusUpdateForm";
 import { LeadUpdates } from "@/components/admin/LeadUpdates";
@@ -68,6 +68,16 @@ export default async function CanvasserLeadDetailPage({ params }: PageProps) {
               <Field icon={<Calendar className="w-5 h-5 text-gray-600" />} label="Added" value={formatDate(lead.createdAt)} />
             </div>
           </div>
+
+          {lead.aiNotes && (
+            <div className="dgs-card p-6">
+              <h2 className="text-lg font-semibold text-navy-900 mb-3 flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-violet-500" /> AI notes from the door
+              </h2>
+              <p className="text-[13.5px] text-gray-700 whitespace-pre-wrap leading-relaxed">{lead.aiNotes}</p>
+              <p className="text-[11px] text-gray-400 mt-3">Captured at the door with the homeowner&apos;s consent. Audio was not recorded.</p>
+            </div>
+          )}
 
           <LeadMessages
             leadId={lead.id}

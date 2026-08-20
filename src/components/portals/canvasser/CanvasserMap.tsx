@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import "mapbox-gl/dist/mapbox-gl.css";
-import { Crosshair, X, UserPlus, Loader2, Download, Check as CheckIcon, Trash2, Move } from "lucide-react";
+import { Crosshair, X, UserPlus, Loader2, Download, Check as CheckIcon, Trash2, Move, Sparkles } from "lucide-react";
 import { enqueue } from "@/lib/pwa/canvasser-outbox";
+import { DoorListen } from "@/components/portals/canvasser/DoorListen";
 
 // Offline base map: we render Mapbox as RASTER tiles (a style with no glyph or
 // sprite dependencies) so every tile is a plain cacheable image. The service
@@ -51,6 +52,7 @@ export interface VisitRow {
   zipCode: string | null;
   status: string;
   notes: string | null;
+  aiNotes: string | null;
   canvasserLeadId: string | null;
   pending?: boolean;
 }
@@ -165,7 +167,7 @@ export function CanvasserMap({ token }: { token: string | undefined }) {
         const clientKey = uuid();
         const row: VisitRow = {
           clientKey, lat: e.lngLat.lat, lng: e.lngLat.lng,
-          address: null, city: null, zipCode: null, status: "NOT_HOME", notes: null, canvasserLeadId: null, pending: true,
+          address: null, city: null, zipCode: null, status: "NOT_HOME", notes: null, aiNotes: null, canvasserLeadId: null, pending: true,
         };
         saveVisit(row);
         setSelected(clientKey);
@@ -277,7 +279,7 @@ export function CanvasserMap({ token }: { token: string | undefined }) {
     await enqueue("lead", {
       clientKey: leadKey, visitClientKey: cur.clientKey,
       firstName: leadForm.firstName, lastName: leadForm.lastName, phone: leadForm.phone, email: leadForm.email,
-      address: cur.address, city: cur.city, zipCode: cur.zipCode, notes: cur.notes,
+      address: cur.address, city: cur.city, zipCode: cur.zipCode, notes: cur.notes, aiNotes: cur.aiNotes,
     });
     saveVisit({ ...cur, status: "LEAD", canvasserLeadId: "pending" });
     setSavingLead(false);
@@ -377,6 +379,21 @@ export function CanvasserMap({ token }: { token: string | undefined }) {
             rows={2}
             className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-amber-400 focus:border-transparent resize-none"
           />
+
+          {/* At-the-door AI note-taker */}
+          <DoorListen
+            key={cur.clientKey}
+            clientKey={cur.clientKey}
+            onNotes={(aiNotes) => upsertLocal({ ...cur, aiNotes })}
+          />
+
+          {/* AI notes captured for this home */}
+          {cur.aiNotes && (
+            <div className="mt-3 rounded-xl border border-violet-100 bg-violet-50/60 p-3">
+              <p className="text-[11px] font-bold text-violet-700 uppercase tracking-wide flex items-center gap-1.5 mb-1"><Sparkles className="w-3.5 h-3.5" /> AI notes</p>
+              <p className="text-[12.5px] text-gray-700 whitespace-pre-wrap leading-relaxed">{cur.aiNotes}</p>
+            </div>
+          )}
 
           {/* Mark as lead */}
           {cur.canvasserLeadId ? (
