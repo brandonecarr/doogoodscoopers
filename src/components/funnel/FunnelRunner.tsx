@@ -40,7 +40,20 @@ export function FunnelRunner({
   const steps = useMemo(() => stepsFor(variant), [data, variant]);
   const primary = data.theme?.primary || "#6D3EF0";
   const bg = data.theme?.bg || "#0E2A47";
+  const cardBg = data.theme?.cardBg || "#ffffff";
   const bookingUrl = data.settings?.bookingUrl || DEFAULT_BOOKING_URL;
+  const fontFamily = data.theme?.fontFamily;
+  const fontStack = fontFamily ? `'${fontFamily}', system-ui, -apple-system, sans-serif` : undefined;
+  const fontHref = data.theme?.fontUrl
+    || (fontFamily ? `https://fonts.googleapis.com/css2?family=${encodeURIComponent(fontFamily).replace(/%20/g, "+")}:wght@400;500;600;700;800&display=swap` : null);
+  const customCss = data.settings?.customCss;
+  const blockCss = (b: Block): React.CSSProperties => {
+    const s = b.style; if (!s) return {};
+    return {
+      color: s.color, fontSize: s.fontSize, fontWeight: s.fontWeight, textAlign: s.align,
+      background: s.background, padding: s.padding, borderRadius: s.radius, marginTop: s.marginTop,
+    };
+  };
 
   const idx = (id: string) => steps.findIndex((s) => s.id === id);
   const [currentId, setCurrentId] = useState(steps[0]?.id ?? "");
@@ -312,6 +325,8 @@ export function FunnelRunner({
         }
         return <div key={b.id}>{btn(label, () => advance())}</div>;
       }
+      case "html":
+        return <div key={b.id} dangerouslySetInnerHTML={{ __html: b.html || b.text || "" }} />;
       default: return null;
     }
   };
@@ -321,9 +336,11 @@ export function FunnelRunner({
   const progress = steps.length > 1 ? Math.round(((idx(cur.id) + 1) / steps.length) * 100) : 100;
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: bg }}>
+    <div className="min-h-screen flex flex-col" style={{ background: bg, fontFamily: fontStack }}>
+      {fontHref && <link rel="stylesheet" href={fontHref} />}
+      {customCss && <style dangerouslySetInnerHTML={{ __html: customCss }} />}
       <div className="flex-1 flex items-start sm:items-center justify-center p-4 sm:p-6">
-        <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden">
+        <div className="dgs-funnel-card w-full max-w-md rounded-2xl shadow-xl overflow-hidden" style={{ background: cardBg }}>
           {/* Progress */}
           <div className="h-1.5 bg-gray-100"><div className="h-full transition-all" style={{ width: `${progress}%`, background: primary }} /></div>
           <div className="p-5 sm:p-7">
@@ -336,7 +353,7 @@ export function FunnelRunner({
               // eslint-disable-next-line @next/next/no-img-element
               <img src={data.theme.logoUrl} alt="" className="h-8 mb-4" />
             )}
-            <div className="space-y-4">{cur.blocks.map(renderBlock)}</div>
+            <div className="dgs-funnel-blocks space-y-4">{cur.blocks.map((b) => <div key={b.id} style={blockCss(b)}>{renderBlock(b)}</div>)}</div>
           </div>
         </div>
       </div>

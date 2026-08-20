@@ -25,6 +25,7 @@ const BLOCK_TYPES: { type: BlockType; label: string }[] = [
   { type: "priceEstimate", label: "Price estimate" },
   { type: "contactForm", label: "Contact form" },
   { type: "cta", label: "Button / CTA" },
+  { type: "html", label: "Custom HTML" },
 ];
 const CONTACT_FIELDS: ContactField[] = ["firstName", "lastName", "email", "phone", "address"];
 
@@ -74,6 +75,7 @@ export function FunnelBuilder({ initial }: { initial: { id: string; name: string
     if (type === "heading") base.text = "Heading";
     if (type === "text") base.text = "Some text";
     if (type === "zipCheck") base.label = "Check my area";
+    if (type === "html") base.html = '<div style="padding:8px;text-align:center">Your custom HTML</div>';
     patchStep(sel.id, { blocks: [...sel.blocks, base] });
   };
 
@@ -197,15 +199,33 @@ export function FunnelBuilder({ initial }: { initial: { id: string; name: string
             </>
           )}
 
-          {/* Theme + settings */}
-          <div className="dgs-card p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Brand & design */}
+          <div className="dgs-card p-4 space-y-3">
+            <h3 className="text-[12px] font-bold text-ink uppercase tracking-wide">Brand &amp; design</h3>
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { key: "primary" as const, label: "Accent", def: "#6D3EF0" },
+                { key: "bg" as const, label: "Page bg", def: "#0E2A47" },
+                { key: "cardBg" as const, label: "Card bg", def: "#ffffff" },
+              ].map((c) => (
+                <label key={c.key} className="block">
+                  <span className="block text-[11px] font-semibold text-gray-500 mb-1">{c.label}</span>
+                  <input type="color" value={data.theme?.[c.key] || c.def} onChange={(e) => setData((d) => ({ ...d, theme: { ...d.theme, [c.key]: e.target.value } }))} className="h-9 w-full rounded-lg border border-gray-200" />
+                </label>
+              ))}
+            </div>
             <label className="block">
-              <span className="block text-[11px] font-semibold text-gray-500 mb-1">Accent color</span>
-              <input type="color" value={data.theme?.primary || "#6D3EF0"} onChange={(e) => setData((d) => ({ ...d, theme: { ...d.theme, primary: e.target.value } }))} className="h-9 w-full rounded-lg border border-gray-200" />
+              <span className="block text-[11px] font-semibold text-gray-500 mb-1">Font (Google Fonts family, e.g. Poppins)</span>
+              <input value={data.theme?.fontFamily || ""} onChange={(e) => setData((d) => ({ ...d, theme: { ...d.theme, fontFamily: e.target.value } }))} placeholder="Inter" className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg" />
             </label>
-            <label className="block sm:col-span-2">
+            <label className="block">
               <span className="block text-[11px] font-semibold text-gray-500 mb-1">Booking handoff URL (Sweep&amp;Go)</span>
               <input value={data.settings?.bookingUrl || ""} onChange={(e) => setData((d) => ({ ...d, settings: { ...d.settings, bookingUrl: e.target.value } }))} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg" />
+            </label>
+            <label className="block">
+              <span className="block text-[11px] font-semibold text-gray-500 mb-1">Custom CSS (the escape hatch)</span>
+              <textarea rows={5} value={data.settings?.customCss || ""} onChange={(e) => setData((d) => ({ ...d, settings: { ...d.settings, customCss: e.target.value } }))} placeholder=".dgs-funnel-card { border-radius: 24px; }" className="w-full px-3 py-2 text-[12px] font-mono border border-gray-200 rounded-lg" />
+              <span className="block text-[11px] text-gray-400 mt-1">Target <code>.dgs-funnel-card</code> / <code>.dgs-funnel-blocks</code>. For full custom markup, add a <b>Custom HTML</b> block.</span>
             </label>
           </div>
         </div>
@@ -238,6 +258,8 @@ function BlockEditor({ block, onChange }: { block: Block; onChange: (patch: Part
       return <input value={block.label || ""} onChange={(e) => onChange({ label: e.target.value })} placeholder="Button label" className={input} />;
     case "priceEstimate":
       return <p className="text-[12px] text-gray-400">Shows the live Sweep&amp;Go estimate from the ZIP + answers.</p>;
+    case "html":
+      return <textarea rows={5} value={block.html || ""} onChange={(e) => onChange({ html: e.target.value })} placeholder="<div>Your HTML…</div>" className={`${input} font-mono text-[12px]`} />;
     case "contactForm":
       return (
         <div className="flex flex-wrap gap-2">

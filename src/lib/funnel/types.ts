@@ -9,7 +9,8 @@ export type BlockType =
   | "choice"
   | "priceEstimate"
   | "contactForm"
-  | "cta";
+  | "cta"
+  | "html"; // raw HTML escape hatch (owner-authored)
 
 export interface ChoiceOption {
   value: string;
@@ -35,6 +36,22 @@ export interface Block {
   ctaKind?: "next" | "submit" | "booking" | "link";
   href?: string;
   label?: string;
+  // html block — raw markup
+  html?: string;
+  // per-block style overrides (Heyflow-style; applied inline on the block)
+  style?: BlockStyle;
+}
+
+/** A small, high-impact subset of per-block styling. Extended over time. */
+export interface BlockStyle {
+  color?: string;
+  fontSize?: number; // px
+  fontWeight?: number;
+  align?: "left" | "center" | "right";
+  background?: string;
+  padding?: number; // px
+  radius?: number; // px
+  marginTop?: number; // px
 }
 
 export type GotoTarget = string; // a step id, or "@finish"
@@ -55,8 +72,14 @@ export interface Step {
 
 export interface FunnelTheme {
   primary?: string; // button / accent color
-  bg?: string;
+  bg?: string; // page background behind the card
+  cardBg?: string; // the card surface
+  text?: string; // body text color
   logoUrl?: string;
+  /** Google Font family name (e.g. "Poppins"); loaded on the page. */
+  fontFamily?: string;
+  /** Optional explicit stylesheet URL (custom-hosted font); overrides fontFamily loading. */
+  fontUrl?: string;
 }
 
 export interface FunnelSettings {
@@ -64,6 +87,10 @@ export interface FunnelSettings {
   bookingUrl?: string;
   /** Headline shown on the browser tab / share card. */
   metaTitle?: string;
+  /** Owner-authored custom CSS injected into the funnel (the escape hatch). */
+  customCss?: string;
+  /** Full-screen (no card) layout — the escape hatch for hand-designed pages. */
+  fullBleed?: boolean;
 }
 
 export interface FunnelVariant {
