@@ -6,6 +6,7 @@ import {
   GripVertical, Plus, Trash2, Save, Eye, EyeOff, ExternalLink, Loader2, Rocket, Palette, Layout,
 } from "lucide-react";
 import type { FunnelData, Step, StepLayout, Block, BlockType, BlockStyle, ContactField } from "@/lib/funnel/types";
+import { SECTION_TEMPLATES } from "@/lib/funnel/templates";
 import { FunnelRunner } from "@/components/funnel/FunnelRunner";
 
 function reorder<T>(arr: T[], from: number, to: number): T[] {
@@ -71,6 +72,14 @@ export function FunnelBuilder({ initial }: { initial: { id: string; name: string
     if (steps.length <= 1) return;
     const next = steps.filter((s) => s.id !== id);
     setSteps(next); if (selId === id) setSelId(next[0].id);
+  };
+  const addTemplate = (key: string) => {
+    const tpl = SECTION_TEMPLATES.find((t) => t.key === key);
+    if (!tpl) return;
+    const s = tpl.make();
+    const at = steps.findIndex((x) => x.id === selId);
+    const next = at < 0 ? [...steps, s] : [...steps.slice(0, at + 1), s, ...steps.slice(at + 1)];
+    setSteps(next); setSelId(s.id);
   };
   const addBlock = (type: BlockType) => {
     if (!sel) return;
@@ -169,6 +178,18 @@ export function FunnelBuilder({ initial }: { initial: { id: string; name: string
               </div>
             ))}
           </div>
+          <select onChange={(e) => { if (e.target.value) { addTemplate(e.target.value); e.target.value = ""; } }} defaultValue=""
+            className="w-full mt-2 text-[12px] border border-violet-200 text-violet-700 font-semibold rounded-lg px-2 py-1.5 bg-violet-50/40">
+            <option value="">+ Add screen from template…</option>
+            {["Opening", "Questions", "Persuasion", "Convert"].map((g) => (
+              <optgroup key={g} label={g}>
+                {SECTION_TEMPLATES.filter((t) => t.group === g).map((t) => (
+                  <option key={t.key} value={t.key}>{t.label}</option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+          <p className="text-[10.5px] text-gray-400 mt-1 px-1">Inserts a ready-made screen after the selected step — then restyle it.</p>
         </div>
 
         {/* Step editor */}
