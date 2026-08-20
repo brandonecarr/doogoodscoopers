@@ -10,6 +10,7 @@ import {
   Star,
   Megaphone,
   Rocket,
+  Bot,
   Instagram,
   Sparkles,
   Mail,
@@ -37,6 +38,7 @@ const primaryNav: NavItem[] = [
   { name: "Reviews",   short: "Reviews",   href: "/admin/reviews",   icon: Star },
   { name: "Campaigns", short: "Campaigns", href: "/admin/campaigns", icon: Megaphone },
   { name: "Marketing", short: "Marketing", href: "/admin/marketing", icon: Rocket },
+  { name: "Ask DGS",   short: "Ask DGS",   href: "/admin/ask",       icon: Bot },
 ];
 
 const moreNav: NavItem[] = [
