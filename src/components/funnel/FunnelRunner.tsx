@@ -142,14 +142,20 @@ export function FunnelRunner({
       const res = await fetch("/api/v2/check-zip", {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ zipCode: zip }),
       });
-      const d = await res.json().catch(() => ({}));
-      const next: FunnelAnswers = { ...answers, zipCode: zip, inServiceArea: String(!!d.inServiceArea), pricingZone: d.pricingZone || "" };
+      const d = await res.json().catch(() => null);
+      // Only branch on a DEFINITIVE answer. Any error / bad shape → let them retry,
+      // never silently fall through to the "out of area" path.
+      if (!res.ok || !d || typeof d.inServiceArea !== "boolean") {
+        setZipError("We couldn't check that ZIP just now. Please try again.");
+        return;
+      }
+      const next: FunnelAnswers = { ...answers, zipCode: zip, inServiceArea: String(d.inServiceArea), pricingZone: d.pricingZone || "" };
       setAnswers(next);
-      logEvent("answer", cur.id, { zip, inServiceArea: !!d.inServiceArea });
+      logEvent("answer", cur.id, { zip, inServiceArea: d.inServiceArea });
       if (!d.inServiceArea) logEvent("outofarea", cur.id, { zip });
       advance(next);
     } catch {
-      setZipError("Couldn't check that ZIP right now. Please try again.");
+      setZipError("We couldn't check that ZIP just now. Please try again.");
     } finally { setZipLoading(false); }
   };
 
