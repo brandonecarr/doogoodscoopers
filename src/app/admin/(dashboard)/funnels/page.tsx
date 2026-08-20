@@ -5,6 +5,7 @@ import { getSession } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { PageHero } from "@/components/admin/PageHero";
 import { NewFunnelButton } from "@/components/admin/funnels/NewFunnelButton";
+import { DeleteFunnelButton } from "@/components/admin/funnels/DeleteFunnelButton";
 
 export const dynamic = "force-dynamic";
 
@@ -53,6 +54,7 @@ export default async function FunnelsPage() {
                 )}
                 <Link href={`/admin/funnels/${f.id}/analytics`} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500" title="Analytics"><BarChart3 className="w-4 h-4" /></Link>
                 <Link href={`/admin/funnels/${f.id}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12.5px] font-semibold text-white" style={{ background: "#6D3EF0" }}><Pencil className="w-3.5 h-3.5" /> Edit</Link>
+                <DeleteFunnelButton id={f.id} name={f.name} />
               </div>
             ))}
           </div>

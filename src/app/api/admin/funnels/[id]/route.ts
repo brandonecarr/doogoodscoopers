@@ -18,6 +18,13 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
-  await prisma.funnel.delete({ where: { id } }).catch(() => {});
-  return NextResponse.json({ ok: true });
+  try {
+    // Clear the funnel's analytics rows (plain funnelId columns, no FK), then the funnel.
+    await prisma.funnelEvent.deleteMany({ where: { funnelId: id } });
+    await prisma.funnelSession.deleteMany({ where: { funnelId: id } });
+    await prisma.funnel.delete({ where: { id } });
+    return NextResponse.json({ ok: true });
+  } catch {
+    return NextResponse.json({ error: "Couldn't delete the funnel." }, { status: 500 });
+  }
 }
