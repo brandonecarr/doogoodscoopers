@@ -34,6 +34,23 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const { id } = await params;
   const body = await request.json();
 
+  // Approve a blast that's awaiting approval → queue it for the send cron.
+  if (body.approve === true) {
+    const c = await prisma.campaign.findUnique({ where: { id } });
+    if (!c || c.type !== "BLAST") return NextResponse.json({ error: "Not a blast" }, { status: 400 });
+    if (c.status !== "PENDING_APPROVAL") return NextResponse.json({ error: "This blast isn't awaiting approval." }, { status: 409 });
+    const campaign = await prisma.campaign.update({ where: { id }, data: { status: "QUEUED" } });
+    return NextResponse.json({ success: true, campaign });
+  }
+
+  // Reject a pending blast → send it back to draft (nothing goes out).
+  if (body.reject === true) {
+    const c = await prisma.campaign.findUnique({ where: { id } });
+    if (!c || c.type !== "BLAST") return NextResponse.json({ error: "Not a blast" }, { status: 400 });
+    const campaign = await prisma.campaign.update({ where: { id }, data: { status: "DRAFT" } });
+    return NextResponse.json({ success: true, campaign });
+  }
+
   // Activate a draft: go live now. Reset createdAt so trigger-based auto-enroll
   // starts from activation time (not draft-creation) and doesn't backfill.
   if (body.activate === true) {

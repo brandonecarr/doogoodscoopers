@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Plus, Megaphone, Send, Clock, CheckCircle2, Zap } from "lucide-react";
 import prisma from "@/lib/prisma";
 import { CampaignPauseToggle } from "@/components/admin/CampaignPauseToggle";
+import { BlastApproval } from "@/components/admin/BlastApproval";
 import { SendingHoursCard } from "@/components/admin/SendingHoursCard";
 import { PageHero, heroBtnPrimary, heroBtnSecondary, heroPrimaryStyle } from "@/components/admin/PageHero";
 
@@ -19,9 +20,14 @@ function formatDate(date: Date) {
 
 const statusStyles: Record<string, string> = {
   DRAFT: "bg-gray-100 text-gray-700",
+  PENDING_APPROVAL: "bg-orange-100 text-orange-800",
   QUEUED: "bg-amber-100 text-amber-800",
   SENDING: "bg-blue-100 text-blue-800",
   SENT: "bg-green-100 text-green-800",
+};
+
+const statusLabels: Record<string, string> = {
+  PENDING_APPROVAL: "Awaiting approval",
 };
 
 export default async function CampaignsPage() {
@@ -109,11 +115,18 @@ export default async function CampaignsPage() {
                   ) : (
                     <>
                       <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${statusStyles[c.status] || "bg-gray-100 text-gray-700"}`}>
-                        {c.status}
+                        {statusLabels[c.status] || c.status}
                       </span>
-                      <p className="text-xs text-gray-500">
-                        {c.sentCount}/{c.totalRecipients} sent{c.failedCount ? ` · ${c.failedCount} failed` : ""}
-                      </p>
+                      {c.status === "PENDING_APPROVAL" ? (
+                        <>
+                          <p className="text-xs text-gray-500">Will send to {c.totalRecipients} recipient{c.totalRecipients === 1 ? "" : "s"}</p>
+                          <BlastApproval campaignId={c.id} recipientCount={c.totalRecipients} />
+                        </>
+                      ) : (
+                        <p className="text-xs text-gray-500">
+                          {c.sentCount}/{c.totalRecipients} sent{c.failedCount ? ` · ${c.failedCount} failed` : ""}
+                        </p>
+                      )}
                     </>
                   )}
                   <p className="text-xs text-gray-400" suppressHydrationWarning>{formatDate(c.createdAt)}</p>

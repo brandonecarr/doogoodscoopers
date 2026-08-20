@@ -286,9 +286,9 @@ export default function NewCampaignPage() {
           className="flex items-center gap-2 px-5 py-2.5 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
         >
           <Send className="w-4 h-4" />
-          {sending ? "Queuing…" : `Send to ${selected.length}`}
+          {sending ? "Preparing…" : `Review — ${selected.length} recipient${selected.length === 1 ? "" : "s"}`}
         </button>
-        <p className="text-xs text-gray-400">Messages send in the background (a few per second). You can leave this page.</p>
+        <p className="text-xs text-gray-400">Nothing sends yet. You&apos;ll get a final <strong>Approve &amp; send</strong> step on the campaigns page — messages only go out after you approve.</p>
       </div>
     </div>
   );

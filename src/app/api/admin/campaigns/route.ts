@@ -78,7 +78,11 @@ export async function POST(request: Request) {
       name: b.name.trim(),
       body: b.body.trim(),
       type: "BLAST",
-      status: "QUEUED",
+      // Approval gate: a blast is built and its audience resolved, but it waits
+      // for the owner's explicit approval before the cron sends anything. The
+      // process-campaigns cron only drains QUEUED/SENDING, so PENDING_APPROVAL
+      // is inert until the owner approves it.
+      status: "PENDING_APPROVAL",
       audienceFilter: (b.audienceFilter ?? undefined) as object | undefined,
       adminEmail: session.email,
       totalRecipients: b.recipients.length,
