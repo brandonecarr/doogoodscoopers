@@ -3,9 +3,9 @@
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  GripVertical, Plus, Trash2, Save, Eye, EyeOff, ExternalLink, Loader2, Rocket,
+  GripVertical, Plus, Trash2, Save, Eye, EyeOff, ExternalLink, Loader2, Rocket, Palette,
 } from "lucide-react";
-import type { FunnelData, Step, Block, BlockType, ContactField } from "@/lib/funnel/types";
+import type { FunnelData, Step, Block, BlockType, BlockStyle, ContactField } from "@/lib/funnel/types";
 import { FunnelRunner } from "@/components/funnel/FunnelRunner";
 
 function reorder<T>(arr: T[], from: number, to: number): T[] {
@@ -190,6 +190,7 @@ export function FunnelBuilder({ initial }: { initial: { id: string; name: string
                         <button onClick={() => patchStep(sel.id, { blocks: sel.blocks.filter((x) => x.id !== b.id) })} className="text-gray-300 hover:text-rose-500"><Trash2 className="w-3.5 h-3.5" /></button>
                       </div>
                       <BlockEditor block={b} onChange={(patch) => patchBlock(sel.id, b.id, patch)} />
+                      <StylePanel style={b.style} onChange={(patch) => patchBlock(sel.id, b.id, patch)} />
                     </div>
                   ))}
                 </div>
@@ -308,6 +309,69 @@ function BlockEditor({ block, onChange }: { block: Block; onChange: (patch: Part
     default:
       return null;
   }
+}
+
+function StylePanel({ style, onChange }: { style?: BlockStyle; onChange: (patch: Partial<Block>) => void }) {
+  const s = style || {};
+  const set = (patch: Partial<BlockStyle>) => onChange({ style: { ...s, ...patch } });
+  const num = (v: string) => (v === "" ? undefined : Math.max(0, parseInt(v) || 0));
+  const has = Object.values(s).some((v) => v !== undefined && v !== "");
+  const cell = "text-[10.5px] font-semibold text-gray-400 uppercase tracking-wide";
+  const ipt = "w-full mt-1 px-2 py-1 text-[12px] border border-gray-200 rounded-md";
+  return (
+    <details className="mt-2">
+      <summary className="cursor-pointer select-none list-none flex items-center gap-1 text-[11px] font-semibold text-gray-400 hover:text-violet-600">
+        <Palette className="w-3 h-3" /> Style{has && <span className="ml-1 w-1.5 h-1.5 rounded-full bg-violet-500 inline-block" />}
+      </summary>
+      <div className="mt-2 grid grid-cols-3 gap-2">
+        <label className={cell}>Align
+          <div className="flex gap-1 mt-1">
+            {(["left", "center", "right"] as const).map((a) => (
+              <button key={a} type="button" onClick={() => set({ align: s.align === a ? undefined : a })}
+                className="flex-1 py-1 rounded-md border text-[11px] font-bold" style={s.align === a ? { background: "#EFE9FF", color: "#6D3EF0", borderColor: "#6D3EF0" } : { color: "#9CA3AF", borderColor: "#E5E7EB" }}>
+                {a[0].toUpperCase()}
+              </button>
+            ))}
+          </div>
+        </label>
+        <label className={cell}>Size px
+          <input type="number" min={0} value={s.fontSize ?? ""} onChange={(e) => set({ fontSize: num(e.target.value) })} placeholder="—" className={ipt} />
+        </label>
+        <label className={cell}>Weight
+          <select value={s.fontWeight ?? ""} onChange={(e) => set({ fontWeight: e.target.value === "" ? undefined : parseInt(e.target.value) })} className={ipt}>
+            <option value="">—</option>
+            {[400, 500, 600, 700, 800].map((w) => <option key={w} value={w}>{w}</option>)}
+          </select>
+        </label>
+        <label className={cell}>Text color
+          <div className="flex items-center gap-1 mt-1">
+            <input type="color" value={s.color || "#0E2A47"} onChange={(e) => set({ color: e.target.value })} className="h-7 w-8 rounded border border-gray-200 p-0" />
+            {s.color && <button type="button" onClick={() => set({ color: undefined })} className="text-[10px] text-gray-400">clear</button>}
+          </div>
+        </label>
+        <label className={cell}>Background
+          <div className="flex items-center gap-1 mt-1">
+            <input type="color" value={s.background || "#ffffff"} onChange={(e) => set({ background: e.target.value })} className="h-7 w-8 rounded border border-gray-200 p-0" />
+            {s.background && <button type="button" onClick={() => set({ background: undefined })} className="text-[10px] text-gray-400">clear</button>}
+          </div>
+        </label>
+        <label className={cell}>Radius px
+          <input type="number" min={0} value={s.radius ?? ""} onChange={(e) => set({ radius: num(e.target.value) })} placeholder="—" className={ipt} />
+        </label>
+        <label className={cell}>Padding px
+          <input type="number" min={0} value={s.padding ?? ""} onChange={(e) => set({ padding: num(e.target.value) })} placeholder="—" className={ipt} />
+        </label>
+        <label className={cell}>Space above
+          <input type="number" min={0} value={s.marginTop ?? ""} onChange={(e) => set({ marginTop: num(e.target.value) })} placeholder="—" className={ipt} />
+        </label>
+        {has && (
+          <div className="flex items-end">
+            <button type="button" onClick={() => onChange({ style: undefined })} className="text-[10.5px] text-rose-400 font-semibold">Reset all</button>
+          </div>
+        )}
+      </div>
+    </details>
+  );
 }
 
 function BranchEditor({ step, steps, onChange }: { step: Step; steps: Step[]; onChange: (logic: Step["logic"]) => void }) {
