@@ -144,7 +144,7 @@ export function FunnelRunner({
     for (let attempt = 0; attempt < 3 && !d; attempt++) {
       if (attempt > 0) await new Promise((r) => setTimeout(r, 500 * attempt));
       try {
-        const res = await fetch("/api/v2/check-zip", {
+        const res = await fetch("/api/v2/funnel/check-zip", {
           method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ zipCode: zip }),
         });
         if (res.ok) {
@@ -274,7 +274,11 @@ export function FunnelRunner({
         const label = b.label || "Continue";
         if (b.ctaKind === "submit") return <div key={b.id}>{btn(label, submitFunnel, false, submitting)}</div>;
         if (b.ctaKind === "booking" || b.ctaKind === "link") {
-          const href = b.ctaKind === "booking" ? bookingUrl : (b.href || "#");
+          let href = b.ctaKind === "booking" ? bookingUrl : (b.href || "#");
+          // Prefill the ZIP into the Sweep&Go onboarding (it accepts ?zip_code=).
+          if (b.ctaKind === "booking" && answers.zipCode) {
+            try { const u = new URL(bookingUrl); u.searchParams.set("zip_code", answers.zipCode); href = u.toString(); } catch { /* keep base */ }
+          }
           return (
             <a key={b.id} href={href} target="_blank" rel="noopener noreferrer" onClick={() => logEvent("handoff", cur.id, { href })}
               className="w-full inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl text-[15px] font-bold text-white transition-transform active:scale-[.99]"
