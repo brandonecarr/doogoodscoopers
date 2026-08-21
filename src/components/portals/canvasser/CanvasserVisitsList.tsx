@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Search, ArrowDownUp, MapPin, Sparkles, X } from "lucide-react";
+import Link from "next/link";
+import { Search, ArrowDownUp, MapPin, Sparkles, X, ChevronRight } from "lucide-react";
 
 export interface VisitItem {
   id: string;
@@ -103,10 +104,13 @@ export function CanvasserVisitsList({ visits }: { visits: VisitItem[] }) {
           const m = meta(v.status);
           const loc = [v.city, v.zipCode].filter(Boolean).join(", ");
           return (
-            <div key={v.id} className="bg-white rounded-2xl p-3.5 border border-gray-100">
+            <Link key={v.id} href={`/app/canvasser/pin/${v.id}`} className="block bg-white rounded-2xl p-3.5 border border-gray-100 active:bg-gray-50">
               <div className="flex items-start justify-between gap-2">
                 <p className="text-[14px] font-bold text-gray-900 min-w-0 flex-1 truncate">{v.address || `${v.lat.toFixed(5)}, ${v.lng.toFixed(5)}`}</p>
-                <span className="text-[10.5px] font-bold rounded-full px-2 py-0.5 flex-shrink-0" style={{ color: "#fff", background: m.color }}>{m.label}</span>
+                <span className="inline-flex items-center gap-1 flex-shrink-0">
+                  <span className="text-[10.5px] font-bold rounded-full px-2 py-0.5" style={{ color: "#fff", background: m.color }}>{m.label}</span>
+                  <ChevronRight className="w-4 h-4 text-gray-300" />
+                </span>
               </div>
               {loc && <p className="text-[12px] text-gray-500 mt-0.5">{loc}</p>}
               {v.notes && <p className="text-[12.5px] text-gray-700 mt-1.5 whitespace-pre-wrap line-clamp-3">{v.notes}</p>}
@@ -117,7 +121,7 @@ export function CanvasserVisitsList({ visits }: { visits: VisitItem[] }) {
                 </div>
               )}
               <p className="text-[11px] text-gray-400 mt-1.5">{when(v.createdAt)}</p>
-            </div>
+            </Link>
           );
         })
       )}

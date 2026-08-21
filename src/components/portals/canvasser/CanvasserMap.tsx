@@ -167,6 +167,20 @@ export function CanvasserMap({ token }: { token: string | undefined }) {
     });
   }, [territories, ready]);
 
+  // Deep-link from a pin detail page (?pin=<clientKey>): select + fly to it once.
+  const didPinParamRef = useRef(false);
+  useEffect(() => {
+    if (didPinParamRef.current || !ready) return;
+    const pk = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("pin") : null;
+    if (!pk) { didPinParamRef.current = true; return; }
+    const v = visits.find((x) => x.clientKey === pk);
+    if (v) {
+      didPinParamRef.current = true;
+      setSelected(pk);
+      mapRef.current?.flyTo?.({ center: [v.lng, v.lat], zoom: 17 });
+    }
+  }, [ready, visits]);
+
   // Reconcile server responses coming back from the outbox.
   useEffect(() => {
     const onSynced = (e: Event) => {

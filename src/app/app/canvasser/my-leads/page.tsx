@@ -1,7 +1,8 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCanvasserSession } from "@/lib/canvasser-auth";
 import prisma from "@/lib/prisma";
-import { MapPin } from "lucide-react";
+import { MapPin, ChevronRight } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -32,17 +33,20 @@ export default async function MyLeadsPage() {
         leads.map((l) => {
           const name = [l.firstName, l.lastName].filter(Boolean).join(" ") || "Unnamed";
           return (
-            <div key={l.id} className="bg-white rounded-2xl p-3.5 border border-gray-100">
+            <Link key={l.id} href={`/app/canvasser/lead/${l.id}`} className="block bg-white rounded-2xl p-3.5 border border-gray-100 active:bg-gray-50">
               <div className="flex items-start justify-between gap-2">
                 <p className="text-[14px] font-bold text-gray-900">{name}</p>
-                <span className="text-[10.5px] font-semibold text-violet-700 bg-violet-100 rounded-full px-2 py-0.5">{STATUS_LABEL[l.status] ?? l.status}</span>
+                <span className="inline-flex items-center gap-1">
+                  <span className="text-[10.5px] font-semibold text-violet-700 bg-violet-100 rounded-full px-2 py-0.5">{STATUS_LABEL[l.status] ?? l.status}</span>
+                  <ChevronRight className="w-4 h-4 text-gray-300" />
+                </span>
               </div>
               {(l.address || l.city || l.zipCode) && (
                 <p className="text-[12.5px] text-gray-600 mt-0.5">{[l.address, l.city, l.zipCode].filter(Boolean).join(", ")}</p>
               )}
               {l.phone && <p className="text-[12.5px] text-gray-500 mt-0.5">{l.phone}</p>}
-              {l.notes && <p className="text-[12px] text-gray-500 mt-1.5 italic">{l.notes}</p>}
-            </div>
+              {l.notes && <p className="text-[12px] text-gray-500 mt-1.5 italic line-clamp-2">{l.notes}</p>}
+            </Link>
           );
         })
       )}
