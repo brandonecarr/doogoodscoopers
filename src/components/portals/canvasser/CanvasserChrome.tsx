@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Map as MapIcon, ListChecks, List as ListIcon, LogOut, Wifi, WifiOff, CloudUpload } from "lucide-react";
+import { Map as MapIcon, ListChecks, List as ListIcon, Bot, LogOut, Wifi, WifiOff, CloudUpload } from "lucide-react";
 import { startOutbox, getQueueCount, processOutbox } from "@/lib/pwa/canvasser-outbox";
 
 // Canvasser portal shell: top bar (rep name, connection + queued-writes status,
@@ -47,6 +47,7 @@ export function CanvasserChrome({ user, children }: { user: { name: string; emai
     { href: "/app/canvasser", label: "Map", icon: MapIcon },
     { href: "/app/canvasser/list", label: "List", icon: ListIcon },
     { href: "/app/canvasser/my-leads", label: "My Leads", icon: ListChecks },
+    { href: "/app/canvasser/ask", label: "Coach", icon: Bot },
   ];
   const active = (href: string) => (href === "/app/canvasser" ? pathname === href : pathname.startsWith(href));
 
@@ -75,7 +76,7 @@ export function CanvasserChrome({ user, children }: { user: { name: string; emai
 
       <main className="flex-1 p-3">{children}</main>
 
-      <nav className="sticky bottom-0 z-30 bg-white border-t border-gray-200 grid grid-cols-3">
+      <nav className="sticky bottom-0 z-30 bg-white border-t border-gray-200 grid grid-cols-4">
         {tabs.map((t) => {
           const Icon = t.icon;
           const on = active(t.href);
