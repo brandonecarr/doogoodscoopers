@@ -7,6 +7,7 @@ import { brevoSend, isBrevoConfigured, parseAddr } from "@/lib/brevo-email";
 
 const FROM = "DooGoodScoopers <service@doogoodscoopers.com>";
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://doogoodscoopers.vercel.app";
+const OWNER_EMAIL = process.env.ALERT_EMAIL || process.env.OWNER_EMAIL || "brandonecarr@gmail.com";
 
 const STATUS_LABEL: Record<string, string> = {
   NOT_HOME: "Not home", CALLBACK: "Call back", INTERESTED: "Interested",
@@ -55,12 +56,39 @@ function digestHtml(name: string, s: {
   </div>`;
 }
 
-export async function runCanvasserDaily(now = new Date()): Promise<{ sent: number; skipped: number }> {
+interface TeamRow { name: string; doors: number; leads: number; followups: number }
+
+function teamHtml(rows: TeamRow[], dateLabel: string): string {
+  const sorted = [...rows].sort((a, b) => b.doors - a.doors);
+  const tot = rows.reduce((a, r) => ({ doors: a.doors + r.doors, leads: a.leads + r.leads, followups: a.followups + r.followups }), { doors: 0, leads: 0, followups: 0 });
+  const tr = (r: TeamRow, bold = false) => `<tr style="${bold ? "font-weight:800;background:#F9FAFB" : ""}">
+    <td style="padding:9px 10px;border-top:1px solid #EAECF0;font-size:13.5px;color:#101828">${r.name}</td>
+    <td style="padding:9px 10px;border-top:1px solid #EAECF0;font-size:13.5px;color:#101828;text-align:right">${r.doors}</td>
+    <td style="padding:9px 10px;border-top:1px solid #EAECF0;font-size:13.5px;color:#16A34A;text-align:right">${r.leads}</td>
+    <td style="padding:9px 10px;border-top:1px solid #EAECF0;font-size:13.5px;color:#B54708;text-align:right">${r.followups}</td></tr>`;
+  return `<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:560px;margin:0 auto;padding:8px">
+    <div style="font-size:18px;font-weight:800;color:#101828">Team canvassing recap</div>
+    <div style="font-size:13px;color:#667085;margin:2px 0 16px">${dateLabel} · ${rows.length} rep${rows.length === 1 ? "" : "s"} out today</div>
+    <table style="width:100%;border-collapse:collapse;border:1px solid #EAECF0;border-radius:12px;overflow:hidden">
+      <thead><tr style="background:#F2F4F7">
+        <th style="padding:8px 10px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#667085">Canvasser</th>
+        <th style="padding:8px 10px;text-align:right;font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#667085">Doors</th>
+        <th style="padding:8px 10px;text-align:right;font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#667085">Leads</th>
+        <th style="padding:8px 10px;text-align:right;font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#667085">Follow-ups</th>
+      </tr></thead>
+      <tbody>${sorted.map((r) => tr(r)).join("")}${tr({ name: "Team total", doors: tot.doors, leads: tot.leads, followups: tot.followups }, true)}</tbody>
+    </table>
+    <a href="${APP_URL}/admin/canvassers" style="display:inline-block;margin-top:14px;font-size:13px;font-weight:700;color:#6D3EF0;text-decoration:none">Open the canvassers dashboard →</a>
+  </div>`;
+}
+
+export async function runCanvasserDaily(now = new Date()): Promise<{ sent: number; skipped: number; teamEmailed: boolean }> {
   const today = ptDayStart(now);
   const dateLabel = new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", weekday: "long", month: "short", day: "numeric" }).format(now);
 
   const canvassers = await prisma.canvasser.findMany({ where: { active: true, passwordHash: { not: null } } });
   let sent = 0, skipped = 0;
+  const teamRows: TeamRow[] = [];
 
   for (const c of canvassers) {
     const scope = { canvasserId: c.id };
@@ -78,6 +106,7 @@ export async function runCanvasserDaily(now = new Date()): Promise<{ sent: numbe
     const byDispoToday: Record<string, number> = {};
     for (const d of dispoToday) byDispoToday[d.status] = d._count._all;
     const followups = (byDispoToday.INTERESTED ?? 0) + (byDispoToday.CALLBACK ?? 0);
+    teamRows.push({ name: c.name || c.email, doors: doorsToday, leads: leadsToday, followups });
 
     if (!isBrevoConfigured()) { skipped++; continue; }
     const res = await brevoSend({
@@ -91,5 +120,19 @@ export async function runCanvasserDaily(now = new Date()): Promise<{ sent: numbe
     else sent++;
   }
 
-  return { sent, skipped };
+  // Owner rollup: one email with every rep who worked today.
+  let teamEmailed = false;
+  if (teamRows.length && isBrevoConfigured()) {
+    const res = await brevoSend({
+      from: parseAddr(FROM),
+      to: [parseAddr(OWNER_EMAIL)],
+      subject: `Team canvassing recap — ${dateLabel}`,
+      html: teamHtml(teamRows, dateLabel),
+      tags: ["canvasser-daily-team"],
+    });
+    if (res.error) console.error("[canvasser-daily/team]", res.error);
+    else teamEmailed = true;
+  }
+
+  return { sent, skipped, teamEmailed };
 }
