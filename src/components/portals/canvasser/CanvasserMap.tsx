@@ -73,6 +73,16 @@ const uuid = () =>
     ? crypto.randomUUID()
     : `ck_${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
 
+// Ray-casting point-in-polygon on a [lng,lat] ring.
+function pointInRing(lng: number, lat: number, ring: [number, number][]): boolean {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i], [xj, yj] = ring[j];
+    if ((yi > lat) !== (yj > lat) && lng < ((xj - xi) * (lat - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
 export function CanvasserMap({ token }: { token: string | undefined }) {
   const containerRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -107,6 +117,8 @@ export function CanvasserMap({ token }: { token: string | undefined }) {
   // Latest visits, readable from marker drag callbacks without stale closures.
   const visitsRef = useRef<VisitRow[]>([]);
   useEffect(() => { visitsRef.current = visits; }, [visits]);
+  const territoriesRef = useRef<typeof territories>([]);
+  useEffect(() => { territoriesRef.current = territories; }, [territories]);
 
   // Move a pin (drag): update the position and re-grab the address for the new spot.
   const moveVisit = useCallback((clientKey: string, lat: number, lng: number) => {
@@ -196,6 +208,13 @@ export function CanvasserMap({ token }: { token: string | undefined }) {
 
       // Tap to drop a pin.
       map.on("click", (e: { lngLat: { lng: number; lat: number } }) => {
+        // Restrict drops to the rep's assigned territory (if any are assigned).
+        const terrs = territoriesRef.current.filter((t) => Array.isArray(t.polygon) && t.polygon.length >= 3);
+        if (terrs.length && !terrs.some((t) => pointInRing(e.lngLat.lng, e.lngLat.lat, t.polygon))) {
+          setToast("That's outside your assigned area — no pin dropped.");
+          setTimeout(() => setToast(""), 2600);
+          return;
+        }
         const clientKey = uuid();
         const row: VisitRow = {
           clientKey, lat: e.lngLat.lat, lng: e.lngLat.lng,

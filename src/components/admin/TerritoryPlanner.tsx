@@ -40,6 +40,13 @@ export function TerritoryPlanner({ token, canvassers, initial }: { token: string
   const containerRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mapRef = useRef<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const mapboxRef = useRef<any>(null);
+  const editingRef = useRef<string | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const vtxMarkersRef = useRef<any[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const midMarkersRef = useRef<any[]>([]);
   const [ready, setReady] = useState(false);
 
   const [territories, setTerritories] = useState<Territory[]>(initial);
@@ -58,6 +65,12 @@ export function TerritoryPlanner({ token, canvassers, initial }: { token: string
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState("");
 
+  // Editing an existing territory's shape (draggable vertex handles).
+  const [editing, setEditing] = useState<Territory | null>(null);
+  const [editRing, setEditRing] = useState<[number, number][]>([]);
+  const [editBusy, setEditBusy] = useState(false);
+  useEffect(() => { editingRef.current = editing?.id ?? null; }, [editing]);
+
   const refetch = useCallback(async () => {
     const res = await fetch("/api/admin/territories");
     if (res.ok) setTerritories(((await res.json()).territories ?? []) as Territory[]);
@@ -70,6 +83,7 @@ export function TerritoryPlanner({ token, canvassers, initial }: { token: string
     (async () => {
       const mapboxgl = (await import("mapbox-gl")).default;
       if (cancelled || !containerRef.current || mapRef.current) return;
+      mapboxRef.current = mapboxgl;
       mapboxgl.accessToken = token;
       const map = new mapboxgl.Map({
         container: containerRef.current,
@@ -92,6 +106,7 @@ export function TerritoryPlanner({ token, canvassers, initial }: { token: string
       });
 
       map.on("click", (e: { lngLat: { lng: number; lat: number }; point: { x: number; y: number } }) => {
+        if (editingRef.current) return; // clicks are for the vertex handles while editing
         if (modeRef.current === "drawing") {
           setDraft((d) => [...d, [e.lngLat.lng, e.lngLat.lat]]);
           return;
@@ -116,11 +131,15 @@ export function TerritoryPlanner({ token, canvassers, initial }: { token: string
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready || !map.getSource("saved")) return;
-    const feats = territories.map((t) => ({
-      type: "Feature" as const,
-      properties: { id: t.id, color: t.color, label: `${t.name} · ${t.homeCount} homes`, pending: false },
-      geometry: { type: "Polygon" as const, coordinates: [[...t.polygon, t.polygon[0]]] },
-    }));
+    const feats = territories.map((t) => {
+      const beingEdited = editing?.id === t.id;
+      const ring = beingEdited ? editRing : t.polygon;
+      return {
+        type: "Feature" as const,
+        properties: { id: t.id, color: t.color, label: beingEdited ? `Editing ${t.name}` : `${t.name} · ${t.homeCount} homes`, pending: beingEdited },
+        geometry: { type: "Polygon" as const, coordinates: [[...ring, ring[0]]] },
+      };
+    });
     if (pending) {
       feats.push({
         type: "Feature",
@@ -129,7 +148,58 @@ export function TerritoryPlanner({ token, canvassers, initial }: { token: string
       });
     }
     map.getSource("saved").setData({ type: "FeatureCollection", features: feats });
-  }, [territories, pending, count, form.color, ready]);
+  }, [territories, pending, count, form.color, ready, editing, editRing]);
+
+  // ── Editing handles: draggable vertices + midpoint "insert" dots ─────────
+  const clearHandles = useCallback(() => {
+    vtxMarkersRef.current.forEach((m) => m.remove());
+    midMarkersRef.current.forEach((m) => m.remove());
+    vtxMarkersRef.current = [];
+    midMarkersRef.current = [];
+  }, []);
+
+  const liveRingToSource = useCallback(() => {
+    const map = mapRef.current;
+    if (!map || !editingRef.current || !map.getSource("saved")) return;
+    const ring = vtxMarkersRef.current.map((m) => { const ll = m.getLngLat(); return [ll.lng, ll.lat] as [number, number]; });
+    const feats = territories.map((t) => {
+      const isEd = t.id === editingRef.current;
+      const r = isEd ? ring : t.polygon;
+      return { type: "Feature" as const, properties: { id: t.id, color: t.color, label: isEd ? "Editing…" : `${t.name} · ${t.homeCount} homes`, pending: isEd }, geometry: { type: "Polygon" as const, coordinates: [[...r, r[0]]] } };
+    });
+    map.getSource("saved").setData({ type: "FeatureCollection", features: feats });
+  }, [territories]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    const mapboxgl = mapboxRef.current;
+    if (!map || !mapboxgl || !ready) return;
+    clearHandles();
+    if (!editing || editRing.length === 0) return;
+
+    editRing.forEach((pt, i) => {
+      const el = document.createElement("div");
+      el.style.cssText = "width:15px;height:15px;border-radius:50%;background:#fff;border:3px solid #6D3EF0;box-shadow:0 1px 4px rgba(0,0,0,.4);cursor:grab;";
+      const m = new mapboxgl.Marker({ element: el, draggable: true }).setLngLat(pt).addTo(map);
+      m.on("drag", () => liveRingToSource());
+      m.on("dragend", () => { const ll = m.getLngLat(); setEditRing((r) => r.map((p, idx) => (idx === i ? [ll.lng, ll.lat] : p))); });
+      el.addEventListener("dblclick", (ev) => { ev.stopPropagation(); setEditRing((r) => (r.length > 3 ? r.filter((_, idx) => idx !== i) : r)); });
+      vtxMarkersRef.current.push(m);
+    });
+    // Midpoint insert dots
+    editRing.forEach((pt, i) => {
+      const next = editRing[(i + 1) % editRing.length];
+      const mid: [number, number] = [(pt[0] + next[0]) / 2, (pt[1] + next[1]) / 2];
+      const el = document.createElement("div");
+      el.style.cssText = "width:11px;height:11px;border-radius:50%;background:rgba(255,255,255,.75);border:2px solid #8B6BFF;cursor:copy;";
+      el.title = "Add a point";
+      const m = new mapboxgl.Marker({ element: el }).setLngLat(mid).addTo(map);
+      el.addEventListener("click", (ev) => { ev.stopPropagation(); setEditRing((r) => [...r.slice(0, i + 1), mid, ...r.slice(i + 1)]); });
+      midMarkersRef.current.push(m);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing, editRing, ready]);
+  useEffect(() => () => clearHandles(), [clearHandles]);
 
   // ── Sync the in-progress draft line + vertices ──────────────────────────
   useEffect(() => {
@@ -212,6 +282,34 @@ export function TerritoryPlanner({ token, canvassers, initial }: { token: string
     if (res.ok) { setSelectedId(null); await refetch(); }
   };
 
+  const startEdit = (t: Territory) => {
+    setPending(null); setCount(null); setMode("idle"); setError("");
+    setSelectedId(t.id);
+    setEditing(t);
+    setEditRing(t.polygon.map((p) => [p[0], p[1]] as [number, number]));
+    mapRef.current?.flyTo({ center: centroid(t.polygon), zoom: 15 });
+  };
+  const cancelEdit = () => { setEditing(null); setEditRing([]); clearHandles(); };
+  const saveEdit = async () => {
+    if (!editing) return;
+    if (editRing.length < 3) { setError("A territory needs at least 3 points."); return; }
+    setEditBusy(true); setError("");
+    try {
+      let homeCount = editing.homeCount;
+      const cr = await fetch("/api/admin/territories/count", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ polygon: editRing }) });
+      const cd = await cr.json().catch(() => ({}));
+      if (cr.ok && typeof cd.count === "number") homeCount = cd.count;
+      const res = await fetch("/api/admin/territories", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: editing.id, name: editing.name, polygon: editRing, homeCount, color: editing.color, assignedCanvasserId: editing.assignedCanvasserId }),
+      });
+      if (!res.ok) { const d = await res.json().catch(() => ({})); setError(d.error || "Couldn't save the shape."); return; }
+      setEditing(null); setEditRing([]); clearHandles();
+      await refetch();
+    } catch { setError("Something went wrong saving the shape."); }
+    finally { setEditBusy(false); }
+  };
+
   const selected = territories.find((t) => t.id === selectedId) || null;
   const totalHomes = territories.reduce((s, t) => s + t.homeCount, 0);
 
@@ -224,10 +322,21 @@ export function TerritoryPlanner({ token, canvassers, initial }: { token: string
 
         {/* Draw controls */}
         <div className="absolute top-3 left-3 z-10 flex flex-col gap-2">
-          {mode === "idle" && !pending && (
+          {mode === "idle" && !pending && !editing && (
             <button onClick={startDrawing} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-[12.5px] font-bold text-white shadow-lg" style={{ background: "#6D3EF0" }}>
               <Pencil className="w-4 h-4" /> Draw a territory
             </button>
+          )}
+          {editing && (
+            <div className="bg-white rounded-lg shadow-lg p-2 w-56">
+              <p className="text-[11.5px] text-gray-500 px-1 mb-1.5">Drag a dot to reshape · tap a faint dot to add a point · double-tap a dot to remove it.</p>
+              <div className="flex gap-1.5">
+                <button onClick={saveEdit} disabled={editBusy} className="flex-1 inline-flex items-center justify-center gap-1 px-2 py-1.5 rounded-md text-[12px] font-bold text-white disabled:opacity-60" style={{ background: "#16A34A" }}>
+                  {editBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />} Save shape
+                </button>
+                <button onClick={cancelEdit} disabled={editBusy} className="px-2.5 py-1.5 rounded-md text-[12px] font-semibold text-gray-600 border border-gray-200">Cancel</button>
+              </div>
+            </div>
           )}
           {mode === "drawing" && (
             <div className="bg-white rounded-lg shadow-lg p-2 flex flex-col gap-1.5 w-52">
@@ -283,7 +392,7 @@ export function TerritoryPlanner({ token, canvassers, initial }: { token: string
         )}
 
         {/* Selected territory */}
-        {selected && !pending && (
+        {selected && !pending && !editing && (
           <div className="dgs-card p-4 space-y-2.5">
             <div className="flex items-start justify-between gap-2">
               <div>
@@ -299,7 +408,23 @@ export function TerritoryPlanner({ token, canvassers, initial }: { token: string
                 {canvassers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
+            <button onClick={() => startEdit(selected)} className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-[12.5px] font-bold text-white" style={{ background: "#6D3EF0" }}><Pencil className="w-3.5 h-3.5" /> Edit shape</button>
             <button onClick={() => remove(selected)} className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-[12px] font-semibold text-rose-600 hover:bg-rose-50"><Trash2 className="w-3.5 h-3.5" /> Delete territory</button>
+          </div>
+        )}
+
+        {/* Editing shape */}
+        {editing && (
+          <div className="dgs-card p-4 space-y-2">
+            <h3 className="text-[13px] font-bold text-navy-900 flex items-center gap-1.5"><Pencil className="w-4 h-4 text-violet-500" /> Editing {editing.name}</h3>
+            <p className="text-[12px] text-gray-500">Reshape on the map, then <b>Save shape</b> — the home count re-counts automatically. {editRing.length} points.</p>
+            {error && <p className="text-[12px] text-rose-600">{error}</p>}
+            <div className="flex gap-2">
+              <button onClick={saveEdit} disabled={editBusy} className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-[12.5px] font-bold text-white disabled:opacity-60" style={{ background: "#16A34A" }}>
+                {editBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Save shape
+              </button>
+              <button onClick={cancelEdit} disabled={editBusy} className="px-3 py-2 rounded-lg text-[12.5px] font-semibold text-gray-600 border border-gray-200">Cancel</button>
+            </div>
           </div>
         )}
 
