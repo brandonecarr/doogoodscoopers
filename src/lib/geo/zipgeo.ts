@@ -10,6 +10,10 @@ import prisma from "@/lib/prisma";
 
 export interface ZipPoint { lat: number; lng: number; place: string }
 
+/** A geocode result that also says whether it landed on the real address
+ *  (`precise: true`, address-grade) or only on the ZIP centroid (`precise: false`). */
+export interface GeoResult extends ZipPoint { precise: boolean; accuracy?: string }
+
 // Server-side geocoding works fine with a public (pk.) token, so a single
 // NEXT_PUBLIC_MAPBOX_TOKEN covers both the map and this lookup. A dedicated
 // server token (MAPBOX_TOKEN) takes precedence if set.
@@ -60,12 +64,17 @@ function haversineKm(aLat: number, aLng: number, bLat: number, bLng: number): nu
 const MAX_ADDRESS_KM = 25;
 
 /**
- * Geocode a full street address (for the customer map pin). Biases the search
- * toward the customer's zip and rejects any result that lands implausibly far
- * from the zip centroid, falling back to the centroid itself. Returns null only
- * when nothing at all resolves or Mapbox isn't configured.
+ * Geocode a full street address to the actual home. Biases the search toward the
+ * customer's zip and rejects any result that lands implausibly far from the zip
+ * centroid. Returns a {@link GeoResult}: `precise: true` when it resolved to a
+ * real address (rooftop/parcel/point/interpolated), or `precise: false` when it
+ * could only fall back to the zip centroid. Returns null only when nothing at all
+ * resolves or Mapbox isn't configured.
+ *
+ * Callers that must never plot a wrong pin (the customer map overlay) should use
+ * only results where `precise === true`.
  */
-export async function geocodeAddress(address: string | null | undefined, zip: string | null | undefined): Promise<ZipPoint | null> {
+export async function geocodeAddress(address: string | null | undefined, zip: string | null | undefined): Promise<GeoResult | null> {
   const token = mapboxToken();
   if (!token) return null;
   const zip5 = normalizeZip(zip);
@@ -83,13 +92,16 @@ export async function geocodeAddress(address: string | null | undefined, zip: st
     try {
       const res = await fetch(url);
       if (res.ok) {
-        const data = (await res.json()) as { features?: { center?: [number, number]; place_name?: string }[] };
+        const data = (await res.json()) as {
+          features?: { center?: [number, number]; place_name?: string; place_type?: string[]; properties?: { accuracy?: string } }[];
+        };
         const f = data.features?.[0];
-        if (f?.center && f.center.length >= 2) {
+        // Require an actual ADDRESS-level match (not a postcode/place centroid).
+        if (f?.center && f.center.length >= 2 && (f.place_type || []).includes("address")) {
           const [lng, lat] = f.center;
           // Accept only if it's plausibly within the zip's area.
           if (!zipPoint || haversineKm(zipPoint.lat, zipPoint.lng, lat, lng) <= MAX_ADDRESS_KM) {
-            return { lat, lng, place: f.place_name || "" };
+            return { lat, lng, place: f.place_name || "", precise: true, accuracy: f.properties?.accuracy };
           }
           // else: wrong-city match — fall through to the zip centroid below.
         }
@@ -97,8 +109,8 @@ export async function geocodeAddress(address: string | null | undefined, zip: st
     } catch { /* fall through to zip centroid */ }
   }
 
-  // Fallback: zip centroid (correct city, if not the exact street).
-  return zipPoint;
+  // Fallback: zip centroid (correct city, but NOT the exact home) — not precise.
+  return zipPoint ? { ...zipPoint, precise: false } : null;
 }
 
 export interface ReverseHit { address: string; city: string | null; zip: string | null; place: string }

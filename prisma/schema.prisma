@@ -802,6 +802,8 @@ model SweepandgoCustomer {
   zipCode           String?
   lat               Float? // geocoded from address for the customer map view
   lng               Float?
+  geoPrecise        Boolean? // true = lat/lng is an exact address match; false = only the ZIP centroid; null = not yet evaluated
+  geoAccuracy       String?  // Mapbox address accuracy (rooftop/parcel/point/interpolated) when precise
   homePhone         String?
   cellPhone         String?
   subscriptionNames String? // comma-joined, e.g. "2d-1xW,Sanitize w/ Regular Service"

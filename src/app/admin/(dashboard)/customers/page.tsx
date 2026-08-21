@@ -87,7 +87,7 @@ export default async function CustomersPage({ searchParams }: PageProps) {
       const chunk = missing.slice(i, i + 8);
       await Promise.all(chunk.map(async (c: Cust) => {
         const p = await geocodeAddress(c.address, c.zipCode);
-        if (p) { c.lat = p.lat; c.lng = p.lng; await prisma.sweepandgoCustomer.update({ where: { id: c.id }, data: { lat: p.lat, lng: p.lng } }).catch(() => {}); }
+        if (p) { c.lat = p.lat; c.lng = p.lng; await prisma.sweepandgoCustomer.update({ where: { id: c.id }, data: { lat: p.lat, lng: p.lng, geoPrecise: p.precise, geoAccuracy: p.accuracy ?? null } }).catch(() => {}); }
       }));
     }
     const zips = [...new Set(customers.map((c: Cust) => normalizeZip(c.zipCode)).filter(Boolean) as string[])];

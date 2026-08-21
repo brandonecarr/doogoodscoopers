@@ -2,7 +2,20 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import "mapbox-gl/dist/mapbox-gl.css";
-import { Pencil, Check, X, Trash2, Loader2, Home, Users2, MapPinned, Undo2 } from "lucide-react";
+import { Pencil, Check, X, Trash2, Loader2, Home, Users2, MapPinned, Undo2, PawPrint } from "lucide-react";
+
+// Dog-paw icon (a cyan coin + white paw) added to the map so current-customer
+// pins read instantly and differently from anything else.
+const PAW_SVG =
+  `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">` +
+  `<circle cx="24" cy="24" r="21" fill="#0EA5E9" stroke="#ffffff" stroke-width="3"/>` +
+  `<ellipse cx="24" cy="31" rx="8.5" ry="6.5" fill="#ffffff"/>` +
+  `<circle cx="14.5" cy="23" r="3.6" fill="#ffffff"/>` +
+  `<circle cx="20" cy="17.5" r="3.6" fill="#ffffff"/>` +
+  `<circle cx="28" cy="17.5" r="3.6" fill="#ffffff"/>` +
+  `<circle cx="33.5" cy="23" r="3.6" fill="#ffffff"/>` +
+  `</svg>`;
+const PAW_URL = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(PAW_SVG)}`;
 
 export interface Territory {
   id: string;
@@ -49,6 +62,13 @@ export function TerritoryPlanner({ token, canvassers, initial }: { token: string
   const midMarkersRef = useRef<any[]>([]);
   const [ready, setReady] = useState(false);
 
+  // Current-customer overlay (dog-paw pins).
+  const [showCustomers, setShowCustomers] = useState(false);
+  const [customers, setCustomers] = useState<{ lat: number; lng: number; name: string; address: string }[]>([]);
+  const [custLoaded, setCustLoaded] = useState(false);
+  const [custLoading, setCustLoading] = useState(false);
+  const [hiddenCount, setHiddenCount] = useState(0);
+
   const [territories, setTerritories] = useState<Territory[]>(initial);
   const [mode, setMode] = useState<"idle" | "drawing">("idle");
   const modeRef = useRef(mode);
@@ -76,6 +96,30 @@ export function TerritoryPlanner({ token, canvassers, initial }: { token: string
     if (res.ok) setTerritories(((await res.json()).territories ?? []) as Territory[]);
   }, []);
 
+  const toggleCustomers = () => {
+    const next = !showCustomers;
+    setShowCustomers(next);
+    if (next && !custLoaded && !custLoading) {
+      setCustLoading(true);
+      fetch("/api/admin/customers/points")
+        .then((r) => r.json())
+        .then((d) => { setCustomers(d.points || []); setHiddenCount(d.hiddenCount || 0); setCustLoaded(true); })
+        .catch(() => {})
+        .finally(() => setCustLoading(false));
+    }
+  };
+
+  // Push customer points to the map + toggle the paw layer's visibility.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready || !map.getSource?.("customers")) return;
+    map.getSource("customers").setData({
+      type: "FeatureCollection",
+      features: customers.map((c) => ({ type: "Feature", properties: { name: c.name, address: c.address }, geometry: { type: "Point", coordinates: [c.lng, c.lat] } })),
+    });
+    if (map.getLayer("customers-paw")) map.setLayoutProperty("customers-paw", "visibility", showCustomers ? "visible" : "none");
+  }, [customers, showCustomers, ready]);
+
   // ── Map init (satellite so rooftops are visible) ────────────────────────
   useEffect(() => {
     if (!token || !containerRef.current) return;
@@ -99,10 +143,37 @@ export function TerritoryPlanner({ token, canvassers, initial }: { token: string
         map.addLayer({ id: "saved-fill", type: "fill", source: "saved", paint: { "fill-color": ["get", "color"], "fill-opacity": ["case", ["get", "pending"], 0.35, 0.22] } });
         map.addLayer({ id: "saved-line", type: "line", source: "saved", paint: { "line-color": ["get", "color"], "line-width": 2.5 } });
         map.addLayer({ id: "saved-label", type: "symbol", source: "saved", layout: { "text-field": ["get", "label"], "text-size": 13, "text-font": ["DIN Pro Bold", "Arial Unicode MS Bold"] }, paint: { "text-color": "#fff", "text-halo-color": "rgba(0,0,0,.6)", "text-halo-width": 1.4 } });
+        // Current-customer overlay (hidden until toggled). A symbol layer — NOT
+        // HTML markers — so the paws never intercept the click-to-draw tool.
+        map.addSource("customers", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+        map.addLayer({ id: "customers-paw", type: "symbol", source: "customers", layout: { "icon-image": "dog-paw", "icon-size": 0.45, "icon-allow-overlap": false, "visibility": "none" } });
+
         map.addSource("draftline", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
         map.addLayer({ id: "draft-line", type: "line", source: "draftline", filter: ["==", "$type", "LineString"], paint: { "line-color": "#F9FAFB", "line-width": 2, "line-dasharray": [2, 1] } });
         map.addLayer({ id: "draft-pts", type: "circle", source: "draftline", filter: ["==", "$type", "Point"], paint: { "circle-radius": 5, "circle-color": "#6D3EF0", "circle-stroke-color": "#fff", "circle-stroke-width": 2 } });
         setReady(true);
+      });
+
+      // Provide the paw icon on demand (no missing-image warning).
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (map as any).on("styleimagemissing", (e: any) => {
+        if (e.id !== "dog-paw" || map.hasImage("dog-paw")) return;
+        const img = new Image(48, 48);
+        img.onload = () => { if (!map.hasImage("dog-paw")) map.addImage("dog-paw", img); };
+        img.src = PAW_URL;
+      });
+
+      // Tap a customer paw → a small name/address popup (not while drawing).
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (map as any).on("click", "customers-paw", (e: any) => {
+        if (modeRef.current === "drawing" || editingRef.current) return;
+        const p = e.features?.[0]?.properties;
+        if (!p) return;
+        const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] || c));
+        new mapboxRef.current.Popup({ closeButton: true, offset: 12 })
+          .setLngLat(e.lngLat)
+          .setHTML(`<div style="font:700 12.5px system-ui;color:#0f172a">${esc(p.name || "Customer")}</div>${p.address ? `<div style="font:12px system-ui;color:#64748b;margin-top:2px">${esc(p.address)}</div>` : ""}`)
+          .addTo(map);
       });
 
       map.on("click", (e: { lngLat: { lng: number; lat: number }; point: { x: number; y: number } }) => {
@@ -322,6 +393,17 @@ export function TerritoryPlanner({ token, canvassers, initial }: { token: string
 
         {/* Draw controls */}
         <div className="absolute top-3 left-3 z-10 flex flex-col gap-2">
+          {/* Customer overlay toggle (always available) */}
+          <button onClick={toggleCustomers} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-[12.5px] font-bold shadow-lg" style={showCustomers ? { background: "#0EA5E9", color: "#fff" } : { background: "#fff", color: "#334155" }}>
+            {custLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <PawPrint className="w-4 h-4" />}
+            {showCustomers ? "Hide customers" : "Show customers"}
+          </button>
+          {showCustomers && (
+            <div className="bg-white/95 rounded-lg shadow px-2.5 py-1.5 text-[11px] text-gray-600 w-fit max-w-[13rem]">
+              <span className="inline-flex items-center gap-1 font-semibold"><PawPrint className="w-3 h-3 text-sky-500" /> = current customer</span>
+              {hiddenCount > 0 && <div className="text-gray-400 mt-0.5">{hiddenCount} still locating — hidden until precise</div>}
+            </div>
+          )}
           {mode === "idle" && !pending && !editing && (
             <button onClick={startDrawing} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-[12.5px] font-bold text-white shadow-lg" style={{ background: "#6D3EF0" }}>
               <Pencil className="w-4 h-4" /> Draw a territory
