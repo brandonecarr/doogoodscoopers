@@ -82,6 +82,7 @@ export function CanvasserMap({ token }: { token: string | undefined }) {
   const [visits, setVisits] = useState<VisitRow[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const [territories, setTerritories] = useState<{ id: string; name: string; polygon: [number, number][]; homeCount: number; color: string }[]>([]);
   const [leadForm, setLeadForm] = useState<{ firstName: string; lastName: string; phone: string; email: string } | null>(null);
   const [savingLead, setSavingLead] = useState(false);
 
@@ -132,6 +133,28 @@ export function CanvasserMap({ token }: { token: string | undefined }) {
     return () => { cancelled = true; };
   }, []);
 
+  // My assigned territories (drawn as an overlay).
+  useEffect(() => {
+    fetch("/api/canvasser/territories")
+      .then((r) => r.json())
+      .then((d) => setTerritories(d.territories ?? []))
+      .catch(() => {});
+  }, []);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready || !map.getSource || !map.getSource("myterr")) return;
+    map.getSource("myterr").setData({
+      type: "FeatureCollection",
+      features: territories
+        .filter((t) => Array.isArray(t.polygon) && t.polygon.length >= 3)
+        .map((t) => ({
+          type: "Feature",
+          properties: { color: t.color || "#6D3EF0", label: `${t.name} · ${t.homeCount} homes` },
+          geometry: { type: "Polygon", coordinates: [[...t.polygon, t.polygon[0]]] },
+        })),
+    });
+  }, [territories, ready]);
+
   // Reconcile server responses coming back from the outbox.
   useEffect(() => {
     const onSynced = (e: Event) => {
@@ -160,7 +183,16 @@ export function CanvasserMap({ token }: { token: string | undefined }) {
       });
       mapRef.current = map;
       map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-right");
-      map.on("load", () => { if (!cancelled) { map.resize(); setReady(true); } });
+      map.on("load", () => {
+        if (cancelled) return;
+        // Assigned-territory overlay (below the pins).
+        map.addSource("myterr", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+        map.addLayer({ id: "myterr-fill", type: "fill", source: "myterr", paint: { "fill-color": ["get", "color"], "fill-opacity": 0.14 } });
+        map.addLayer({ id: "myterr-line", type: "line", source: "myterr", paint: { "line-color": ["get", "color"], "line-width": 2.5 } });
+        map.addLayer({ id: "myterr-label", type: "symbol", source: "myterr", layout: { "text-field": ["get", "label"], "text-size": 12 }, paint: { "text-color": "#111827", "text-halo-color": "#fff", "text-halo-width": 1.5 } });
+        map.resize();
+        setReady(true);
+      });
 
       // Tap to drop a pin.
       map.on("click", (e: { lngLat: { lng: number; lat: number } }) => {

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
-import { Footprints } from "lucide-react";
+import Link from "next/link";
+import { Footprints, MapPinned } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { PageHero } from "@/components/admin/PageHero";
@@ -71,6 +72,11 @@ export default async function CanvassersOverviewPage() {
           <div className="w-11 h-11 rounded-[13px] flex items-center justify-center" style={{ background: "linear-gradient(150deg,#FCD34D,#D97706)" }}>
             <Footprints className="w-[22px] h-[22px] text-white" />
           </div>
+        }
+        actions={
+          <Link href="/admin/canvassers/territories" className="inline-flex items-center gap-1.5 px-4 py-2 rounded-[12px] text-[13px] font-bold text-white transition-colors hover:brightness-110" style={{ background: "#8B6BFF" }}>
+            <MapPinned className="w-4 h-4" /> Territories
+          </Link>
         }
       />
 
