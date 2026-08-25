@@ -354,13 +354,54 @@ export async function consolidateProspects(
  * survivor. Returns the survivor ref (or null if there are none). Used both at
  * lead-creation time (prevent duplicates) and by the manual merge button.
  */
-export async function consolidateByPhone(phone: string | null | undefined): Promise<ProspectRef | null> {
+export async function consolidateByPhone(
+  phone: string | null | undefined
+): Promise<(ProspectRef & { isReturning: boolean }) | null> {
   const refs = await findProspectLeadsByPhone(phone);
   const survivor = pickSurvivor(refs);
   if (!survivor) return null;
   const sources = refs.filter((r) => !(r.type === survivor.type && r.id === survivor.id));
   if (sources.length) await consolidateProspects(survivor, sources);
-  return survivor;
+  // "Returning" = this phone already had a lead before the fresh one that
+  // triggered this call (refs includes the just-created lead), so more than one
+  // record means the person re-contacted us.
+  return { ...survivor, isReturning: refs.length > 1 };
+}
+
+/**
+ * A known lead just re-contacted us (re-submitted a form). Consolidation
+ * backdates createdAt to first contact, so on its own the lead would stay buried
+ * at the bottom of the (createdAt-sorted) lists. Bump `lastActivityAt` to now so
+ * it floats to the top, and drop a visible note on the profile so the team can
+ * see the re-engagement. Both writes are best-effort — never block lead capture.
+ */
+export async function recordReengagement(
+  survivor: ProspectRef,
+  opts?: { message?: string }
+): Promise<void> {
+  const now = new Date();
+  try {
+    if (survivor.type === "quote") {
+      await prisma.quoteLead.update({ where: { id: survivor.id }, data: { lastActivityAt: now } });
+    } else {
+      await prisma.adLead.update({ where: { id: survivor.id }, data: { lastActivityAt: now } });
+    }
+  } catch (e) {
+    console.error("[reengagement] bump failed:", e);
+  }
+  try {
+    await prisma.leadUpdate.create({
+      data: {
+        leadType: sourceEnum[survivor.type],
+        leadId: survivor.id,
+        message: opts?.message ?? "🔁 Returning lead — submitted a form again.",
+        communicationType: "other",
+        adminEmail: "system",
+      },
+    });
+  } catch (e) {
+    console.error("[reengagement] note failed:", e);
+  }
 }
 
 /**

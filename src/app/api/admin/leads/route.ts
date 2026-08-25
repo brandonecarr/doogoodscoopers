@@ -15,6 +15,7 @@ export interface CombinedLead {
   grade: string | null;
   source: string;
   createdAt: string;
+  activityAt: string; // lastActivityAt ?? createdAt — drives the default sort so returning leads surface
   followupDate: string | null;
   archived: boolean;
 }
@@ -33,12 +34,12 @@ const PER_COLUMN = 25;
 
 const QUOTE_SELECT = {
   id: true, firstName: true, lastName: true, phone: true, email: true,
-  zipCode: true, status: true, grade: true, createdAt: true, followupDate: true, archived: true,
+  zipCode: true, status: true, grade: true, createdAt: true, lastActivityAt: true, followupDate: true, archived: true,
 } as const;
 
 const AD_SELECT = {
   id: true, firstName: true, lastName: true, fullName: true, phone: true, email: true,
-  zipCode: true, status: true, grade: true, adSource: true, createdAt: true, followupDate: true, archived: true,
+  zipCode: true, status: true, grade: true, adSource: true, createdAt: true, lastActivityAt: true, followupDate: true, archived: true,
 } as const;
 
 const INSTA_SELECT = {
@@ -142,18 +143,25 @@ export async function GET(request: NextRequest) {
     };
 
     // Per-table order matches the JS comparator so merge+slice stays correct.
-    const orderBy: Prisma.QuoteLeadOrderByWithRelationInput[] = sortBy === "grade"
+    // Quote/Ad carry lastActivityAt (a returning lead re-submitting bumps it), so
+    // they sort by it; Instagram/Canvasser have no such column → fall back to
+    // createdAt (equivalent, since they never re-consolidate).
+    const activeOrder: Prisma.QuoteLeadOrderByWithRelationInput[] = sortBy === "grade"
+      ? [{ grade: { sort: "asc", nulls: "last" } }, { lastActivityAt: { sort: "desc", nulls: "last" } }, { createdAt: "desc" }]
+      : [{ lastActivityAt: { sort: "desc", nulls: "last" } }, { createdAt: "desc" }];
+    const createdOrder: Prisma.InstagramLeadOrderByWithRelationInput[] = sortBy === "grade"
       ? [{ grade: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }]
       : [{ createdAt: "desc" }];
-    const adOrderBy = orderBy as unknown as Prisma.AdLeadOrderByWithRelationInput[];
-    const instaOrderBy = orderBy as unknown as Prisma.InstagramLeadOrderByWithRelationInput[];
-    const canvOrderBy = orderBy as unknown as Prisma.CanvasserLeadOrderByWithRelationInput[];
+    const orderBy = activeOrder;
+    const adOrderBy = activeOrder as unknown as Prisma.AdLeadOrderByWithRelationInput[];
+    const instaOrderBy = createdOrder;
+    const canvOrderBy = createdOrder as unknown as Prisma.CanvasserLeadOrderByWithRelationInput[];
     const cmp = (x: CombinedLead, y: CombinedLead) => {
       if (sortBy === "grade") {
         const g = gradeRank(x.grade) - gradeRank(y.grade);
         if (g !== 0) return g;
       }
-      return new Date(y.createdAt).getTime() - new Date(x.createdAt).getTime();
+      return new Date(y.activityAt).getTime() - new Date(x.activityAt).getTime();
     };
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -161,6 +169,7 @@ export async function GET(request: NextRequest) {
       id: l.id, type: "quote", name: `${l.firstName} ${l.lastName || ""}`.trim(),
       phone: l.phone, email: l.email, zipCode: l.zipCode, status: l.status as LeadStatus,
       grade: l.grade, source: "Quote Form", createdAt: l.createdAt.toISOString(),
+      activityAt: (l.lastActivityAt ?? l.createdAt).toISOString(),
       followupDate: l.followupDate?.toISOString() || null, archived: l.archived,
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -169,7 +178,9 @@ export async function GET(request: NextRequest) {
       name: l.fullName || `${l.firstName || ""} ${l.lastName || ""}`.trim() || "Unknown",
       phone: l.phone, email: l.email, zipCode: l.zipCode, status: l.status as LeadStatus,
       grade: l.grade, source: l.adSource ? `Meta (${l.adSource})` : "Meta",
-      createdAt: l.createdAt.toISOString(), followupDate: l.followupDate?.toISOString() || null,
+      createdAt: l.createdAt.toISOString(),
+      activityAt: (l.lastActivityAt ?? l.createdAt).toISOString(),
+      followupDate: l.followupDate?.toISOString() || null,
       archived: l.archived,
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -178,7 +189,9 @@ export async function GET(request: NextRequest) {
       name: l.username ? `@${l.username}` : `${l.firstName || ""} ${l.lastName || ""}`.trim() || "Instagram user",
       phone: l.phone, email: l.email, zipCode: l.zipCode, status: l.status as LeadStatus,
       grade: l.grade, source: l.convertedQuoteLeadId ? "Instagram (converted)" : "Instagram",
-      createdAt: l.createdAt.toISOString(), followupDate: l.followupDate?.toISOString() || null,
+      createdAt: l.createdAt.toISOString(),
+      activityAt: l.createdAt.toISOString(),
+      followupDate: l.followupDate?.toISOString() || null,
       archived: l.archived,
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -187,7 +200,9 @@ export async function GET(request: NextRequest) {
       name: `${l.firstName || ""} ${l.lastName || ""}`.trim() || "Canvasser lead",
       phone: l.phone, email: l.email, zipCode: l.zipCode, status: l.status as LeadStatus,
       grade: l.grade, source: l.canvasserName ? `Canvasser (${l.canvasserName})` : "Canvasser",
-      createdAt: l.createdAt.toISOString(), followupDate: l.followupDate?.toISOString() || null,
+      createdAt: l.createdAt.toISOString(),
+      activityAt: l.createdAt.toISOString(),
+      followupDate: l.followupDate?.toISOString() || null,
       archived: l.archived,
     });
 

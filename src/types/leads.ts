@@ -99,6 +99,7 @@ export interface CanvasserLead extends BaseModel {
   followupDate: Date | null;
   grade: string | null;
   archived: boolean;
+  lastActivityAt: Date | null;
 }
 
 // Ad Lead model (Meta/Facebook ads via Privyr)
@@ -122,4 +123,5 @@ export interface AdLead extends BaseModel {
   followupDate: Date | null;
   grade: string | null;
   archived: boolean;
+  lastActivityAt: Date | null;
 }

@@ -36,7 +36,9 @@ async function getAdLeads(status?: string, search?: string, source?: string, pag
   const [leads, total] = await Promise.all([
     prisma.adLead.findMany({
       where,
-      orderBy: { createdAt: "desc" },
+      // Sort by last activity so a returning lead (re-submitted form) floats to
+      // the top, even though dedup backdates its createdAt to first contact.
+      orderBy: [{ lastActivityAt: { sort: "desc", nulls: "last" } }, { createdAt: "desc" }],
       skip,
       take: pageSize,
     }),
@@ -54,6 +56,13 @@ function formatDate(date: Date) {
     hour: "numeric",
     minute: "2-digit",
   });
+}
+
+// A returning lead: last activity is meaningfully after first contact (they
+// re-submitted a form), so dedup backdated createdAt but lastActivityAt is fresh.
+function isReturning(lead: AdLead) {
+  if (!lead.lastActivityAt) return false;
+  return new Date(lead.lastActivityAt).getTime() - new Date(lead.createdAt).getTime() > 60_000;
 }
 
 const statusLabels: Record<LeadStatus, string> = {
@@ -208,8 +217,16 @@ export default async function AdLeadsPage({ searchParams }: PageProps) {
                     className="table-row hover:bg-gray-50 transition-colors cursor-pointer"
                   >
                     <td className="px-6 py-4">
-                      <div className="font-medium text-navy-900">
+                      <div className="font-medium text-navy-900 flex items-center gap-2">
                         {getDisplayName(lead)}
+                        {isReturning(lead) && (
+                          <span
+                            title={`Re-submitted a form ${formatDate(lead.lastActivityAt as Date)}`}
+                            className="px-2 py-0.5 text-xs font-semibold rounded-full bg-amber-100 text-amber-800"
+                          >
+                            🔁 Returning
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4">

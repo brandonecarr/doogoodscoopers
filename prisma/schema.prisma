@@ -80,12 +80,18 @@ model QuoteLead {
   sourceChannel   String?     // e.g. "instagram"
   instagramLeadId String?     // links back to the InstagramLead that converted
 
+  // Last time this lead did something (created, or re-submitted a form). Lists
+  // sort by this so a re-engaged lead floats to the top even though dedup
+  // backdates createdAt to the earliest contact.
+  lastActivityAt  DateTime?   @default(now())
+
   @@index([status])
   @@index([archived])
   @@index([createdAt])
   @@index([zipCode])
   @@index([followupDate])
   @@index([instagramLeadId])
+  @@index([lastActivityAt])
 }
 
 // =====================
@@ -424,12 +430,18 @@ model AdLead {
   // Raw webhook payload for debugging
   rawPayload      Json?
 
+  // Last time this lead did something (created, or re-submitted a form). Lists
+  // sort by this so a re-engaged lead floats to the top even though dedup
+  // backdates createdAt to the earliest contact.
+  lastActivityAt  DateTime?   @default(now())
+
   @@index([status])
   @@index([archived])
   @@index([createdAt])
   @@index([adSource])
   @@index([privyrLeadId])
   @@index([followupDate])
+  @@index([lastActivityAt])
 }
 
 // =====================

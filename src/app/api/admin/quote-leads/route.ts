@@ -40,7 +40,9 @@ export async function GET(request: NextRequest) {
     const [leads, total] = await Promise.all([
       prisma.quoteLead.findMany({
         where,
-        orderBy: { createdAt: "desc" },
+        // Last activity first: a returning lead (re-submitted / resumed funnel)
+        // floats to the top even though dedup backdates createdAt.
+        orderBy: [{ lastActivityAt: { sort: "desc", nulls: "last" } }, { createdAt: "desc" }],
         skip,
         take: pageSize,
       }),

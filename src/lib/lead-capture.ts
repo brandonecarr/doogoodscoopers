@@ -1,6 +1,6 @@
 import prisma from "@/lib/prisma";
 import { syncContactToQuo } from "@/lib/quo";
-import { findProspectLeadsByPhone, consolidateByPhone } from "@/lib/lead-duplicates";
+import { findProspectLeadsByPhone, consolidateByPhone, recordReengagement } from "@/lib/lead-duplicates";
 
 // Shared lead-capture logic, factored out of /api/save-quote-lead so the public
 // quote form AND the funnel platform create leads identically (one person = one
@@ -45,6 +45,8 @@ export async function captureQuoteLead(data: QuoteLeadInput): Promise<string> {
     gateCode: data.gateCode ?? undefined,
     lastStep: data.lastStep ?? "Funnel",
     dogsInfo: data.dogsInfo ? JSON.parse(JSON.stringify(data.dogsInfo)) : undefined,
+    // Every quote capture (new or resumed) is fresh activity → float to top.
+    lastActivityAt: new Date(),
   };
 
   let leadId: string;
@@ -61,7 +63,14 @@ export async function captureQuoteLead(data: QuoteLeadInput): Promise<string> {
   if (prospects.length > (existingQuote ? 1 : 0)) {
     try {
       const survivor = await consolidateByPhone(data.phone);
-      if (survivor) leadId = survivor.id;
+      if (survivor) {
+        leadId = survivor.id;
+        // A known contact came back through the quote funnel — log a visible note
+        // (lastActivityAt is already fresh from the capture above).
+        if (survivor.isReturning) {
+          await recordReengagement(survivor, { message: "🔁 Returning lead — came back through the quote funnel." });
+        }
+      }
     } catch (e) {
       console.error("[lead-capture] consolidation failed:", e);
     }

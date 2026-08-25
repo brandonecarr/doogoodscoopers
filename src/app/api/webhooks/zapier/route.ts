@@ -3,7 +3,7 @@ import prisma from "@/lib/prisma";
 import { syncContactToQuo } from "@/lib/quo";
 import { Prisma } from "@prisma/client";
 import { sendAdminPush } from "@/lib/web-push";
-import { consolidateByPhone } from "@/lib/lead-duplicates";
+import { consolidateByPhone, recordReengagement } from "@/lib/lead-duplicates";
 
 // Zapier Webhook endpoint to receive leads from Facebook Lead Ads
 //
@@ -145,11 +145,20 @@ export async function POST(request: NextRequest) {
     // back to the ad lead we just created if there's nothing to merge.
     let finalType: "quote" | "adlead" = "adlead";
     let finalId = lead.id;
+    let isReturning = false;
     try {
       const survivor = await consolidateByPhone(phone);
       if (survivor) {
         finalType = survivor.type;
         finalId = survivor.id;
+        // A known contact re-submitted the ad form — surface it (bump to top of
+        // the lists) and log a visible note on their profile.
+        if (survivor.isReturning) {
+          isReturning = true;
+          await recordReengagement(survivor, {
+            message: `🔁 Returning lead — re-submitted the ad form${campaignName ? ` (${campaignName})` : ""}.`,
+          });
+        }
       }
     } catch (e) {
       console.error("[Zapier Webhook] consolidation failed:", e);
@@ -169,7 +178,11 @@ export async function POST(request: NextRequest) {
     // Fire-and-forget push notification — don't let push failure block the response
     const merged = finalType === "quote";
     sendAdminPush({
-      title: merged ? "📣 Ad Lead matched an existing quote" : "📣 New Ad Lead",
+      title: isReturning
+        ? "🔁 Returning lead re-submitted"
+        : merged
+          ? "📣 Ad Lead matched an existing quote"
+          : "📣 New Ad Lead",
       body: `${fullName || phone || email || "Unknown"} — ${campaignName || "Meta Ad"}`,
       url: `/admin/${finalType === "quote" ? "quote-leads" : "ad-leads"}/${finalId}`,
       tag: `ad-lead-${finalId}`,
