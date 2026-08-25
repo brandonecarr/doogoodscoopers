@@ -63,11 +63,14 @@ async function linkOrCreateLead(psid: string): Promise<{ id: string; phone: stri
     }
   }
 
-  // No match → this person messaged the Page cold. Capture them (nothing lost),
-  // but don't auto-greet: their message may not fit a canned reply.
+  // No match. Only capture a cold messager as a lead when we could identify them
+  // (we have a name) — never create a nameless "Unknown" lead. In development mode
+  // Meta blocks reading non-tester names, so unidentifiable inbound is skipped
+  // until the app is live/approved.
+  if (!name) return null;
   try {
     const created = await prisma.adLead.create({
-      data: { adSource: "messenger", messengerPsid: psid, firstName: profile?.firstName ?? null, lastName: profile?.lastName ?? null, fullName: name ?? null, status: "NEW" },
+      data: { adSource: "messenger", messengerPsid: psid, firstName: profile?.firstName ?? null, lastName: profile?.lastName ?? null, fullName: name, status: "NEW" },
       select: { id: true, phone: true },
     });
     return { id: created.id, phone: created.phone, matched: false };
