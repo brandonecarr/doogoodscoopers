@@ -30,11 +30,12 @@ export async function GET(request: NextRequest) {
   return new NextResponse("Forbidden", { status: 403 });
 }
 
-/** Resolve a PSID to an AdLead: already-linked, else match a recent unlinked
- *  lead by name, else create a fresh lead from the Messenger thread. */
-async function linkOrCreateLead(psid: string): Promise<{ id: string; phone: string | null } | null> {
-  const existing = await prisma.adLead.findUnique({ where: { messengerPsid: psid }, select: { id: true, phone: true } });
-  if (existing) return existing;
+/** Resolve a PSID to an AdLead. `matched` = it was an existing ad/form lead (a
+ *  real funnel lead); `false` = a cold messager we just captured. We only
+ *  auto-greet matched leads. */
+async function linkOrCreateLead(psid: string): Promise<{ id: string; phone: string | null; matched: boolean } | null> {
+  const existing = await prisma.adLead.findUnique({ where: { messengerPsid: psid }, select: { id: true, phone: true, adSource: true } });
+  if (existing) return { id: existing.id, phone: existing.phone, matched: existing.adSource !== "messenger" };
 
   const profile = await getMessengerProfile(psid);
   const name = profile?.name;
@@ -54,22 +55,25 @@ async function linkOrCreateLead(psid: string): Promise<{ id: string; phone: stri
     if (match) {
       try {
         await prisma.adLead.update({ where: { id: match.id }, data: { messengerPsid: psid } });
-        return { id: match.id, phone: match.phone };
+        return { id: match.id, phone: match.phone, matched: true }; // a real form/ad lead
       } catch {
-        return prisma.adLead.findUnique({ where: { messengerPsid: psid }, select: { id: true, phone: true } });
+        const held = await prisma.adLead.findUnique({ where: { messengerPsid: psid }, select: { id: true, phone: true, adSource: true } });
+        return held ? { id: held.id, phone: held.phone, matched: held.adSource !== "messenger" } : null;
       }
     }
   }
 
-  // No match → this person messaged the Page cold; capture them as a lead.
+  // No match → this person messaged the Page cold. Capture them (nothing lost),
+  // but don't auto-greet: their message may not fit a canned reply.
   try {
     const created = await prisma.adLead.create({
       data: { adSource: "messenger", messengerPsid: psid, firstName: profile?.firstName ?? null, lastName: profile?.lastName ?? null, fullName: name ?? null, status: "NEW" },
       select: { id: true, phone: true },
     });
-    return created;
+    return { id: created.id, phone: created.phone, matched: false };
   } catch {
-    return prisma.adLead.findUnique({ where: { messengerPsid: psid }, select: { id: true, phone: true } });
+    const held = await prisma.adLead.findUnique({ where: { messengerPsid: psid }, select: { id: true, phone: true, adSource: true } });
+    return held ? { id: held.id, phone: held.phone, matched: held.adSource !== "messenger" } : null;
   }
 }
 
@@ -130,8 +134,9 @@ export async function POST(request: NextRequest) {
           // conversation starts, then it stays silent so humans/drips take over.
           // Off by default unless enabled; the atomic greetedAt guard means it
           // can never fire twice for the same person, even on rapid messages.
+          // Only greet real ad/form leads — not cold random messagers.
           const autoReplyOn = (await getSetting("messenger.autoReplyEnabled")) === "true";
-          if (autoReplyOn && isMessengerConfigured()) {
+          if (autoReplyOn && lead.matched && isMessengerConfigured()) {
             const won = await prisma.adLead.updateMany({
               where: { id: lead.id, messengerGreetedAt: null },
               data: { messengerGreetedAt: new Date() },

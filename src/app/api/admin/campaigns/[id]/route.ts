@@ -95,6 +95,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
           name: b.name.trim(),
           body: steps[0].body.trim(),
           stopOnReply: b.stopOnReply !== false,
+          ...(b.channel ? { channel: b.channel === "messenger" ? "messenger" : "sms" } : {}),
           audienceFilter: { leadTypes: b.leadTypes },
           steps: {
             create: steps.map((s: { body: string; delayMinutes?: number }, i: number) => ({

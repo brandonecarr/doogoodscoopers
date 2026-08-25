@@ -25,7 +25,7 @@ export default async function EditCampaignPage({ params }: { params: Promise<{ i
       <DripForm
         mode="edit"
         campaignId={campaign.id}
-        initial={{ name: campaign.name, leadTypes, stopOnReply: campaign.stopOnReply, steps }}
+        initial={{ name: campaign.name, leadTypes, stopOnReply: campaign.stopOnReply, steps, channel: campaign.channel }}
       />
     );
   }

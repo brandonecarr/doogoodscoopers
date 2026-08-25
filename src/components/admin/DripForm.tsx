@@ -41,7 +41,7 @@ function toggle(arr: string[], v: string): string[] {
 interface DripFormProps {
   mode: "create" | "edit";
   campaignId?: string;
-  initial?: { name: string; leadTypes: string[]; stopOnReply: boolean; steps: DripStep[] };
+  initial?: { name: string; leadTypes: string[]; stopOnReply: boolean; steps: DripStep[]; channel?: string };
 }
 
 export function DripForm({ mode, campaignId, initial }: DripFormProps) {
@@ -49,6 +49,7 @@ export function DripForm({ mode, campaignId, initial }: DripFormProps) {
   const [name, setName] = useState(initial?.name ?? "");
   const [leadTypes, setLeadTypes] = useState<string[]>(initial?.leadTypes ?? ["quote"]);
   const [stopOnReply, setStopOnReply] = useState(initial?.stopOnReply ?? true);
+  const [channel, setChannel] = useState<string>(initial?.channel ?? "sms");
   const [steps, setSteps] = useState<DripStep[]>(initial?.steps ?? [{ body: "", delayValue: 0, delayUnit: "days" }]);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [saving, setSaving] = useState<null | "draft" | "launch">(null);
@@ -82,6 +83,7 @@ export function DripForm({ mode, campaignId, initial }: DripFormProps) {
         name: name.trim(),
         leadTypes,
         stopOnReply,
+        channel,
         steps: steps
           .filter((s) => s.body.trim())
           .map((s) => ({ body: s.body.trim(), delayMinutes: Math.max(0, Math.round(s.delayValue * UNIT_MINUTES[s.delayUnit])) })),
@@ -146,6 +148,24 @@ export function DripForm({ mode, campaignId, initial }: DripFormProps) {
           <input type="checkbox" checked={stopOnReply} onChange={(e) => setStopOnReply(e.target.checked)} className="rounded border-gray-300 text-teal-600 focus:ring-teal-500" />
           Stop the sequence for a lead once they reply
         </label>
+
+        {/* Send channel */}
+        <div>
+          <p className="text-sm font-medium text-navy-900 mb-1.5">Send over</p>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setChannel("sms")} className="flex-1 px-3 py-2 rounded-lg text-[13px] font-semibold border transition-colors"
+              style={channel === "sms" ? { background: "#EFE9FF", color: "#6D3EF0", borderColor: "#6D3EF0" } : { color: "#6B7280", borderColor: "#E5E7EB" }}>
+              💬 Text (SMS)
+            </button>
+            <button type="button" onClick={() => setChannel("messenger")} className="flex-1 px-3 py-2 rounded-lg text-[13px] font-semibold border transition-colors"
+              style={channel === "messenger" ? { background: "#E7F1FF", color: "#0084FF", borderColor: "#0084FF" } : { color: "#6B7280", borderColor: "#E5E7EB" }}>
+              🔵 Facebook Messenger
+            </button>
+          </div>
+          {channel === "messenger" && (
+            <p className="text-[12px] text-gray-500 mt-1.5">Sends into each lead&apos;s Messenger thread (Meta-lead threads only), with automatic <b>SMS/email fallback</b> when there&apos;s no Messenger thread or the reply window has closed. Requires the Messenger connection to be live.</p>
+          )}
+        </div>
       </div>
 
       {/* Sequence */}

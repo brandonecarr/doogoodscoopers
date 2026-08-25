@@ -23,6 +23,7 @@ interface CreateBody {
   leadTypes?: string[];
   steps?: Array<{ body: string; delayMinutes?: number }>;
   stopOnReply?: boolean;
+  channel?: string;
   draft?: boolean;
 }
 
@@ -54,6 +55,7 @@ export async function POST(request: Request) {
         status: isDraft ? "DRAFT" : "ACTIVE",
         active: !isDraft,
         stopOnReply: b.stopOnReply !== false,
+        channel: b.channel === "messenger" ? "messenger" : "sms",
         audienceFilter: { leadTypes: b.leadTypes || [] },
         adminEmail: session.email,
         totalRecipients: 0,
