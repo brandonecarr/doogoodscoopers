@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import prisma from "@/lib/prisma";
-import { verifyMetaSignature, messengerVerifyToken, getMessengerProfile, sendMessengerMessage, isMessengerConfigured } from "@/lib/messenger";
+import { verifyMessengerSignature, hasMessengerSecret, messengerVerifyToken, getMessengerProfile, sendMessengerMessage, isMessengerConfigured } from "@/lib/messenger";
 import { notify } from "@/lib/notify";
+import { setSetting } from "@/lib/google-business";
 
 // Facebook Messenger webhook.
 //  GET  → verification handshake (paste this URL into Messenger API Settings).
@@ -74,9 +75,13 @@ async function linkOrCreateLead(psid: string): Promise<{ id: string; phone: stri
 
 export async function POST(request: NextRequest) {
   const raw = await request.text();
-  if (process.env.META_APP_SECRET && !verifyMetaSignature(raw, request.headers.get("x-hub-signature-256"))) {
-    return new NextResponse("Invalid signature", { status: 401 });
-  }
+  const sigOk = !hasMessengerSecret() || verifyMessengerSignature(raw, request.headers.get("x-hub-signature-256"));
+  // Diagnostic breadcrumb (readable via AppSetting) to confirm delivery + signature.
+  let obj = "?";
+  try { obj = JSON.parse(raw)?.object ?? "?"; } catch { /* ignore */ }
+  await setSetting("messenger.lastHit", `${new Date().toISOString()} sig=${sigOk ? "ok" : "FAIL"} object=${obj} len=${raw.length}`).catch(() => {});
+
+  if (!sigOk) return new NextResponse("Invalid signature", { status: 401 });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let body: any;
   try { body = JSON.parse(raw); } catch { return NextResponse.json({ ok: true }); }

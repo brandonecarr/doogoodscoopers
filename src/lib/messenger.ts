@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { verifyMetaSignature } from "@/lib/instagram";
 
 // Facebook Messenger (Page) send + helpers. Unlike Instagram (graph.instagram.com),
@@ -14,6 +15,24 @@ export function messengerVerifyToken(): string | undefined {
   return process.env.MESSENGER_VERIFY_TOKEN || process.env.IG_VERIFY_TOKEN || undefined;
 }
 export { verifyMetaSignature };
+
+// Facebook Messenger webhooks are signed with the FACEBOOK App Secret, which for
+// this app differs from the Instagram app secret (META_APP_SECRET). Accept either
+// so we don't reject genuine events regardless of which secret is configured.
+export function verifyMessengerSignature(raw: string, sig: string | null): boolean {
+  if (!sig) return false;
+  const secrets = [process.env.FB_APP_SECRET, process.env.META_APP_SECRET].filter(Boolean) as string[];
+  for (const secret of secrets) {
+    const expected = "sha256=" + crypto.createHmac("sha256", secret).update(raw, "utf8").digest("hex");
+    try {
+      if (sig.length === expected.length && crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return true;
+    } catch { /* length mismatch → next secret */ }
+  }
+  return false;
+}
+export function hasMessengerSecret(): boolean {
+  return !!(process.env.FB_APP_SECRET || process.env.META_APP_SECRET);
+}
 
 /** Send a Messenger message to a user PSID within the Page's messaging window. */
 export async function sendMessengerMessage(
