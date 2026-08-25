@@ -416,6 +416,7 @@ model AdLead {
   // a Facebook Messenger thread; lastInboundAt tracks the 24h/7d send window.
   messengerPsid          String?    @unique
   messengerLastInboundAt DateTime?
+  messengerGreetedAt     DateTime?  // set once we auto-greet, so we never greet twice
 
   // Store any additional custom fields as JSON
   customFields    Json?

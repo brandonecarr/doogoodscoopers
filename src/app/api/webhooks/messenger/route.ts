@@ -2,7 +2,7 @@ import { NextRequest, NextResponse, after } from "next/server";
 import prisma from "@/lib/prisma";
 import { verifyMessengerSignature, hasMessengerSecret, messengerVerifyToken, getMessengerProfile, sendMessengerMessage, isMessengerConfigured } from "@/lib/messenger";
 import { notify } from "@/lib/notify";
-import { setSetting } from "@/lib/google-business";
+import { setSetting, getSetting } from "@/lib/google-business";
 
 // Facebook Messenger webhook.
 //  GET  → verification handshake (paste this URL into Messenger API Settings).
@@ -126,15 +126,18 @@ export async function POST(request: NextRequest) {
             }
           }
 
-          // One-time auto-reply: instant response to a new Page conversation.
-          // Fires once per thread (no prior outbound), satisfies pages_messaging,
-          // and never repeats — so it doesn't fight stop-on-reply.
-          if (isMessengerConfigured()) {
-            const priorOut = await prisma.leadMessage.count({
-              where: { leadType: "AD_LEAD", leadId: lead.id, provider: "messenger", direction: "OUTBOUND" },
+          // One-time auto-greeting: a single instant reply the FIRST time a
+          // conversation starts, then it stays silent so humans/drips take over.
+          // Off by default unless enabled; the atomic greetedAt guard means it
+          // can never fire twice for the same person, even on rapid messages.
+          const autoReplyOn = (await getSetting("messenger.autoReplyEnabled")) === "true";
+          if (autoReplyOn && isMessengerConfigured()) {
+            const won = await prisma.adLead.updateMany({
+              where: { id: lead.id, messengerGreetedAt: null },
+              data: { messengerGreetedAt: new Date() },
             });
-            if (priorOut === 0) {
-              const greeting = (await prisma.appSetting.findUnique({ where: { key: "messenger.autoReply" } }))?.value || DEFAULT_AUTOREPLY;
+            if (won.count === 1) {
+              const greeting = (await getSetting("messenger.autoReply")) || DEFAULT_AUTOREPLY;
               const m = await sendMessengerMessage({ psid, text: greeting });
               if (m.ok) {
                 await prisma.leadMessage.create({
