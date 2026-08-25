@@ -412,6 +412,11 @@ model AdLead {
   // Privyr specific fields
   privyrLeadId    String?     @unique  // Privyr's internal lead ID
 
+  // Messenger link (for the Messenger-first drip). Set when we match this lead to
+  // a Facebook Messenger thread; lastInboundAt tracks the 24h/7d send window.
+  messengerPsid          String?    @unique
+  messengerLastInboundAt DateTime?
+
   // Store any additional custom fields as JSON
   customFields    Json?
 
@@ -712,6 +717,7 @@ model Campaign {
   status          String   @default("DRAFT") // BLAST: DRAFT|QUEUED|SENDING|SENT
   active          Boolean  @default(true) // DRIP: pause/resume enrollment + sends
   stopOnReply     Boolean  @default(true) // DRIP: halt a lead's sequence once they reply
+  channel         String   @default("sms") // DRIP send channel: sms | messenger (messenger-first, SMS/email fallback)
   audienceFilter  Json?    // BLAST: segment criteria. DRIP: trigger { leadTypes: [...] }
   adminEmail      String
 
