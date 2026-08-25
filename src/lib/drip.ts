@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma";
 import { optedOutKeys, optOutKey } from "@/lib/sms-optout";
+import { loadSendWindow, clampToSendWindow } from "@/lib/send-window";
 import { LeadStatus, type LeadSource } from "@prisma/client";
 
 /**
@@ -124,4 +125,85 @@ export async function isLeadArchived(leadType: LeadSource, leadId: string): Prom
   else if (leadType === "OUT_OF_AREA") row = await prisma.outOfAreaLead.findUnique({ where: { id: leadId }, ...sel });
   else if (leadType === "COMMERCIAL") row = await prisma.commercialLead.findUnique({ where: { id: leadId }, ...sel });
   return row?.archived ?? false;
+}
+
+const MINUTE_MS = 60 * 1000;
+
+/**
+ * Enroll a lead into every active "returning lead" drip campaign the instant
+ * they re-engage. These campaigns carry `"returning"` in their trigger
+ * `leadTypes` and get their OWN message sequence (different from a cold lead).
+ *
+ * Why this can't ride the normal auto-enroll: consolidation backdates a
+ * returning lead's `createdAt` to first contact, so `findDripCandidates`
+ * (which keys on `createdAt > campaign.createdAt`) never sees them. So we enroll
+ * here, at the moment of re-engagement (called from `recordReengagement`).
+ *
+ * Fresh enroll if not already a recipient; if they previously COMPLETED/STOPPED
+ * the sequence, restart it (they came back again). If they're mid-sequence
+ * (ACTIVE), leave them be. Best-effort — never throws into lead capture.
+ * Returns how many campaigns the lead was (re-)enrolled into.
+ */
+export async function enrollReturningLead(leadType: LeadSource, leadId: string): Promise<number> {
+  if (leadType !== "AD_LEAD" && leadType !== "QUOTE_FORM") return 0;
+
+  const campaigns = await prisma.campaign.findMany({
+    where: { type: "DRIP", active: true },
+    include: { steps: { orderBy: { stepOrder: "asc" } } },
+  });
+  const returning = campaigns.filter((c) => {
+    const f = (c.audienceFilter || {}) as { leadTypes?: string[] };
+    return (f.leadTypes || []).includes("returning") && c.steps.length > 0;
+  });
+  if (returning.length === 0) return 0;
+
+  // Contact info (and skip archived leads).
+  let phone = "";
+  let name: string | null = null;
+  if (leadType === "AD_LEAD") {
+    const l = await prisma.adLead.findUnique({ where: { id: leadId }, select: { phone: true, firstName: true, lastName: true, fullName: true, archived: true } });
+    if (!l || l.archived) return 0;
+    phone = l.phone || "";
+    name = l.fullName || [l.firstName, l.lastName].filter(Boolean).join(" ") || null;
+  } else {
+    const l = await prisma.quoteLead.findUnique({ where: { id: leadId }, select: { phone: true, firstName: true, lastName: true, archived: true } });
+    if (!l || l.archived) return 0;
+    phone = l.phone || "";
+    name = [l.firstName, l.lastName].filter(Boolean).join(" ") || null;
+  }
+
+  // Opt-out guard (mirrors findDripCandidates).
+  if (phone) {
+    const optedOut = await optedOutKeys();
+    const k = optOutKey(phone);
+    if (k && optedOut.has(k)) return 0;
+  }
+
+  const window = await loadSendWindow();
+  let n = 0;
+  for (const c of returning) {
+    const firstAt = clampToSendWindow(new Date(Date.now() + (c.steps[0].delayMinutes || 0) * MINUTE_MS), window);
+    const existing = await prisma.campaignRecipient.findUnique({
+      where: { campaignId_leadType_leadId: { campaignId: c.id, leadType, leadId } },
+      select: { id: true, status: true },
+    });
+    try {
+      if (!existing) {
+        await prisma.campaignRecipient.create({
+          data: { campaignId: c.id, leadType, leadId, phone, name, status: "ACTIVE", currentStep: 0, nextSendAt: firstAt },
+        });
+        n++;
+      } else if (existing.status === "COMPLETED" || existing.status === "STOPPED") {
+        await prisma.campaignRecipient.update({
+          where: { id: existing.id },
+          data: { status: "ACTIVE", currentStep: 0, nextSendAt: firstAt, error: null, sentAt: null, phone },
+        });
+        n++;
+      }
+      // status ACTIVE → already mid-sequence, leave it.
+    } catch {
+      // unique race / transient — skip.
+    }
+  }
+  return n;
 }

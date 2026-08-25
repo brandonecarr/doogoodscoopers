@@ -402,6 +402,13 @@ export async function recordReengagement(
   } catch (e) {
     console.error("[reengagement] note failed:", e);
   }
+  // Enroll into any "returning lead" drip campaigns (their own message sequence).
+  try {
+    const { enrollReturningLead } = await import("@/lib/drip");
+    await enrollReturningLead(sourceEnum[survivor.type], survivor.id);
+  } catch (e) {
+    console.error("[reengagement] returning-drip enroll failed:", e);
+  }
 }
 
 /**
