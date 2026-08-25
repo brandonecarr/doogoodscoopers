@@ -139,7 +139,11 @@ export async function POST(request: NextRequest) {
           // can never fire twice for the same person, even on rapid messages.
           // Only greet real ad/form leads — not cold random messagers.
           const autoReplyOn = (await getSetting("messenger.autoReplyEnabled")) === "true";
-          if (autoReplyOn && lead.matched && isMessengerConfigured()) {
+          // Review/testing mode: greet EVERYONE (not just matched ad/form leads),
+          // so the owner can record the App Review screencast and Meta's reviewer
+          // gets a reply when they message the Page cold. Turn OFF after approval.
+          const greetEveryone = (await getSetting("messenger.greetEveryone")) === "true";
+          if (autoReplyOn && (lead.matched || greetEveryone) && isMessengerConfigured()) {
             const won = await prisma.adLead.updateMany({
               where: { id: lead.id, messengerGreetedAt: null },
               data: { messengerGreetedAt: new Date() },

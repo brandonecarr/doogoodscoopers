@@ -12,6 +12,7 @@ export async function GET() {
   return NextResponse.json({
     enabled: (await getSetting("messenger.autoReplyEnabled")) === "true",
     message: (await getSetting("messenger.autoReply")) || "",
+    greetEveryone: (await getSetting("messenger.greetEveryone")) === "true",
   });
 }
 
@@ -21,5 +22,6 @@ export async function POST(request: Request) {
   const b = await request.json().catch(() => ({}));
   if (typeof b.enabled === "boolean") await setSetting("messenger.autoReplyEnabled", b.enabled ? "true" : "false");
   if (typeof b.message === "string") await setSetting("messenger.autoReply", b.message.slice(0, 1000));
+  if (typeof b.greetEveryone === "boolean") await setSetting("messenger.greetEveryone", b.greetEveryone ? "true" : "false");
   return NextResponse.json({ ok: true });
 }

@@ -10,6 +10,7 @@ const PLACEHOLDER =
 export function MessengerAutoReplyCard() {
   const [enabled, setEnabled] = useState(false);
   const [message, setMessage] = useState("");
+  const [greetEveryone, setGreetEveryone] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -17,12 +18,12 @@ export function MessengerAutoReplyCard() {
   useEffect(() => {
     fetch("/api/admin/messenger-settings")
       .then((r) => r.json())
-      .then((d) => { setEnabled(!!d.enabled); setMessage(d.message || ""); })
+      .then((d) => { setEnabled(!!d.enabled); setMessage(d.message || ""); setGreetEveryone(!!d.greetEveryone); })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
-  const save = async (next: { enabled?: boolean; message?: string }) => {
+  const save = async (next: { enabled?: boolean; message?: string; greetEveryone?: boolean }) => {
     setSaving(true); setSaved(false);
     try {
       await fetch("/api/admin/messenger-settings", {
@@ -34,6 +35,7 @@ export function MessengerAutoReplyCard() {
   };
 
   const toggle = () => { const v = !enabled; setEnabled(v); void save({ enabled: v }); };
+  const toggleEveryone = () => { const v = !greetEveryone; setGreetEveryone(v); void save({ greetEveryone: v }); };
 
   return (
     <div className="dgs-card p-4">
@@ -74,6 +76,26 @@ export function MessengerAutoReplyCard() {
             <p className="text-[11px] text-gray-400">Leave blank to use the default. Saves when you click away.</p>
             {saving ? <span className="text-[11px] text-gray-400 inline-flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Saving</span>
               : saved ? <span className="text-[11px] text-green-600 inline-flex items-center gap-1"><Check className="w-3 h-3" /> Saved</span> : null}
+          </div>
+
+          {/* Review/testing mode: greet everyone, not just matched ad/form leads. */}
+          <div className="mt-3 pt-3 border-t border-gray-100 flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[12px] font-semibold text-navy-900">Greet everyone (App Review / testing)</p>
+              <p className="text-[11px] text-gray-500">
+                Normally the greeting only fires for real ad/form leads. Turn this ON to greet <b>anyone</b> who messages — needed so your App Review screencast and Meta&apos;s reviewer get a reply. <b>Turn it back OFF after approval.</b>
+              </p>
+            </div>
+            <button
+              role="switch"
+              aria-checked={greetEveryone}
+              onClick={toggleEveryone}
+              disabled={loading || saving}
+              className="relative inline-flex h-6 w-11 flex-shrink-0 rounded-full transition-colors disabled:opacity-50"
+              style={{ background: greetEveryone ? "#D97706" : "#D1D5DB" }}
+            >
+              <span className={`inline-block h-5 w-5 rounded-full bg-white shadow transform transition-transform mt-0.5 ${greetEveryone ? "translate-x-[22px]" : "translate-x-0.5"}`} />
+            </button>
           </div>
         </div>
       )}
