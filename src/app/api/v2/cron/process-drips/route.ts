@@ -144,7 +144,7 @@ export async function GET(request: NextRequest) {
       // thread and the window is still open; otherwise it falls back to SMS, then
       // email. Every other campaign sends SMS exactly as before.
       let provider = "quo";
-      let result: { success: boolean; messageId?: string | null; status?: string; error?: string };
+      let result: { success: boolean; messageId?: string | null; status?: string; error?: string } | null = null;
       if (campaign.channel === "messenger" && r.leadType === "AD_LEAD") {
         const ad = await prisma.adLead.findUnique({
           where: { id: r.leadId },
@@ -153,25 +153,34 @@ export async function GET(request: NextRequest) {
         const psid = ad?.messengerPsid || null;
         // 7-day human-agent window (the RESPONSE type covers the first 24h).
         const windowOpen = ad?.messengerLastInboundAt ? Date.now() - ad.messengerLastInboundAt.getTime() < 7 * 24 * 60 * 60 * 1000 : false;
+
+        // Try Messenger first — but only keep it if it actually sent. A failed
+        // Messenger send falls through to the SMS/email fallback below.
         if (psid && windowOpen && isMessengerConfigured()) {
           const m = await sendMessengerMessage({ psid, text: body });
-          provider = "messenger";
-          result = { success: m.ok, messageId: m.messageId ?? null, status: m.ok ? "SENT" : "FAILED", error: m.error };
-        } else if (r.phone && isQuoConfigured()) {
-          provider = "quo";
-          result = await sendSms({ to: r.phone, body });
-        } else if (ad?.email) {
-          const safe = body.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-          const e = await sendEmail({ to: ad.email, subject: "A quick note from DooGoodScoopers", text: body, html: wrapEmailHtml(`<p>${safe}</p>`) });
-          provider = "email";
-          result = { success: e.success, messageId: e.messageId ?? null, status: e.success ? "SENT" : "FAILED", error: e.error };
-        } else {
-          provider = "none";
-          result = { success: false, error: "no channel available (no messenger/phone/email)" };
+          if (m.ok) { provider = "messenger"; result = { success: true, messageId: m.messageId ?? null, status: "SENT" }; }
+        }
+        // Fallback chain: SMS → email (covers no-thread, closed-window, AND a
+        // Messenger send that errored).
+        if (!result) {
+          if (r.phone && isQuoConfigured()) {
+            provider = "quo";
+            result = await sendSms({ to: r.phone, body });
+          } else if (ad?.email) {
+            const safe = body.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            const e = await sendEmail({ to: ad.email, subject: "A quick note from DooGoodScoopers", text: body, html: wrapEmailHtml(`<p>${safe}</p>`) });
+            provider = "email";
+            result = { success: e.success, messageId: e.messageId ?? null, status: e.success ? "SENT" : "FAILED", error: e.error };
+          } else {
+            provider = "none";
+            result = { success: false, error: "no channel available (no messenger/phone/email)" };
+          }
         }
       } else {
+        provider = "quo";
         result = await sendSms({ to: r.phone, body });
       }
+      if (!result) { provider = "none"; result = { success: false, error: "no send path" }; }
 
       await prisma.leadMessage.create({
         data: {
