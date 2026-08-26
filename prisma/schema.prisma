@@ -1181,3 +1181,53 @@ model RoutePlanAssignment {
 
   @@index([dayOfWeek])
 }
+
+// =====================
+// SWEEP&GO BILLING MIRROR
+// =====================
+// Invoices + payments pulled from Sweep&Go's Open API (v2) by the sync-billing
+// cron. Money is stored in CENTS (integers) so lifetime sums never drift.
+// Sweep&Go's billing feeds carry NO client id — only `client_name` — so
+// `nameKey` (normalized "first last") is the join back to SweepandgoCustomer.
+model SngInvoice {
+  id              String    @id @default(cuid())
+  invoiceNumber   String    @unique
+  clientName      String?
+  nameKey         String
+  status          String? // paid | unpaid | ...
+  type            String? // subscription | one_time | initial | prorated | variable
+  category        String? // postpaid | prepaid | cleanup | variable
+  billingInterval String? // monthly | weekly | bi-weekly | one_time | ...
+  payMethod       String?
+  totalCents      Int       @default(0)
+  paidCents       Int       @default(0)
+  refundedCents   Int       @default(0)
+  remainingCents  Int       @default(0)
+  tipCents        Int       @default(0)
+  periodStart     DateTime?
+  periodEnd       DateTime?
+  sngCreatedAt    DateTime?
+  syncedAt        DateTime  @default(now())
+
+  @@index([nameKey])
+  @@index([status])
+  @@index([sngCreatedAt])
+}
+
+model SngPayment {
+  id            String    @id @default(cuid())
+  clientName    String?
+  nameKey       String
+  paidOn        DateTime?
+  amountCents   Int       @default(0)
+  refundedCents Int       @default(0)
+  tipCents      Int       @default(0)
+  status        String? // succeeded | failed | ...
+  method        String? // credit_card | check | ...
+  description   String?
+  syncedAt      DateTime  @default(now())
+
+  @@index([nameKey])
+  @@index([status])
+  @@index([paidOn])
+}

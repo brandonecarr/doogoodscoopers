@@ -6,6 +6,8 @@ import { CustomerReviewControl } from "@/components/admin/CustomerReviewControl"
 import { SendReviewRequestButton } from "@/components/admin/SendReviewRequestButton";
 import { AddToReviewCampaign } from "@/components/admin/AddToReviewCampaign";
 import { ArrangeableBoard, type ArrangeableCard } from "@/components/admin/ArrangeableBoard";
+import { BillingStats, InvoiceList } from "@/components/admin/CustomerBilling";
+import { getCustomerBilling } from "@/lib/sweepandgo-billing";
 
 export const dynamic = "force-dynamic";
 
@@ -69,7 +71,15 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
     </div>
   );
 
+  // Sweep&Go billing rollup (from the local mirror, not a live API call).
+  const billing = await getCustomerBilling(customer);
+
   const cards: ArrangeableCard[] = [
+    {
+      id: "invoices",
+      zone: "main",
+      node: <InvoiceList billing={billing} />,
+    },
     {
       id: "contact",
       zone: "main",
@@ -241,6 +251,9 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
           </div>
         </div>
       </div>
+
+      {/* Value band: current rate, tenure, lifetime revenue */}
+      <BillingStats billing={billing} startDate={customer.startDate ?? customer.firstSeenAt} />
 
       <ArrangeableBoard layoutId="customer" cards={cards} />
     </div>
