@@ -1222,7 +1222,11 @@ model SngPayment {
   amountCents   Int       @default(0)
   refundedCents Int       @default(0)
   tipCents      Int       @default(0)
-  status        String? // succeeded | failed | ...
+  status        String? // succeeded | failed | refunded | partially_refunded
+  /// amount - refunded: what we actually kept on this payment.
+  netCents      Int       @default(0)
+  /// false for failed/void charge attempts (the feed is ~36% failed retries).
+  isRevenue     Boolean   @default(true)
   method        String? // credit_card | check | ...
   description   String?
   syncedAt      DateTime  @default(now())
@@ -1230,4 +1234,5 @@ model SngPayment {
   @@index([nameKey])
   @@index([status])
   @@index([paidOn])
+  @@index([isRevenue])
 }
