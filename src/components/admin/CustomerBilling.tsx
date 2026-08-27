@@ -42,8 +42,11 @@ export function BillingStats({ billing, startDate }: { billing: CustomerBilling;
     {
       icon: DollarSign,
       label: "Lifetime revenue",
-      value: fmtMoney(billing.lifetimeCents),
-      sub: `${billing.paymentCount} payment${billing.paymentCount === 1 ? "" : "s"} collected`,
+      // A failed sync must never masquerade as "$0.00 lifetime".
+      value: billing.syncOk ? fmtMoney(billing.lifetimeCents) : "—",
+      sub: billing.syncOk
+        ? `${billing.paymentCount} successful payment${billing.paymentCount === 1 ? "" : "s"}`
+        : "billing sync incomplete",
       tint: "#16A34A",
     },
   ];
@@ -66,6 +69,12 @@ export function BillingStats({ billing, startDate }: { billing: CustomerBilling;
         ))}
       </div>
 
+      {!billing.syncOk && (
+        <p className="mt-2 text-[11.5px] text-red-800 bg-red-50 border border-red-100 rounded-lg px-3 py-2 inline-flex items-start gap-1.5">
+          <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+          <span>The last Sweep&amp;Go billing sync did not complete, so revenue figures are hidden rather than shown incomplete. They will return automatically on the next successful sync.</span>
+        </p>
+      )}
       {billing.ambiguousName && (
         <p className="mt-2 text-[11.5px] text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 inline-flex items-start gap-1.5">
           <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />

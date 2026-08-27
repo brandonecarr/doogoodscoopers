@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { getSetting } from "@/lib/google-business";
 
 /**
  * Sweep&Go billing mirror — invoices + payments.
@@ -20,10 +21,17 @@ import prisma from "@/lib/prisma";
  */
 
 const SNG_BASE = "https://openapi.sweepandgo.com/api/v2";
-const CONCURRENCY = 4;
+// Sweep&Go rate-limits (HTTP 429). Two in flight with a little spacing gets the
+// whole dataset without tripping it; a full pull at concurrency 4 did.
+const CONCURRENCY = 2;
+const BATCH_SPACING_MS = 250;
 const PAGE_TIMEOUT_MS = 20_000;
-const RETRIES = 3;
+const RETRIES = 5;
 const MAX_PAGES = 1_000;
+// Ask for large pages. If the API honours it, a full pull drops from ~300
+// requests to ~30; if it ignores it, `last_page` still describes reality and the
+// loop below is unchanged either way.
+const PER_PAGE = 100;
 
 /** Payment statuses that are NOT money we received. Everything else counts. */
 const NON_REVENUE_STATUSES = new Set([
@@ -85,12 +93,19 @@ async function getPage(path: string): Promise<Record<string, unknown>> {
       });
       if (res.ok) return (await res.json()) as Record<string, unknown>;
       lastErr = `HTTP ${res.status}`;
+      if (res.status === 429) {
+        // Rate limited: honour Retry-After when present, else back off hard.
+        const ra = Number(res.headers.get("retry-after")) || 0;
+        clearTimeout(timer);
+        if (attempt < RETRIES) await sleep(ra > 0 ? Math.min(ra * 1000, 30_000) : Math.min(2_000 * 2 ** (attempt - 1), 30_000));
+        continue;
+      }
     } catch (e) {
       lastErr = e instanceof Error ? e.message : "fetch failed";
     } finally {
       clearTimeout(timer);
     }
-    if (attempt < RETRIES) await sleep(300 * attempt * attempt); // 300ms, 1.2s
+    if (attempt < RETRIES) await sleep(400 * attempt * attempt);
   }
   throw new Error(`${path} failed after ${RETRIES} attempts: ${lastErr}`);
 }
@@ -104,7 +119,7 @@ async function getAllPages(
   buildPath: (page: number) => string,
   envelope: string
 ): Promise<Record<string, unknown>[]> {
-  const first = await getPage(buildPath(1));
+  const first = await getPage(`${buildPath(1)}&per_page=${PER_PAGE}`);
   const env1 = first?.[envelope] as { data?: unknown[]; last_page?: number; total?: number } | undefined;
   if (!env1) throw new Error(`${envelope}: unexpected response shape`);
 
@@ -114,13 +129,14 @@ async function getAllPages(
 
   for (let start = 2; start <= lastPage; start += CONCURRENCY) {
     const batch: Promise<Record<string, unknown>>[] = [];
-    for (let p = start; p < start + CONCURRENCY && p <= lastPage; p++) batch.push(getPage(buildPath(p)));
+    for (let p = start; p < start + CONCURRENCY && p <= lastPage; p++) batch.push(getPage(`${buildPath(p)}&per_page=${PER_PAGE}`));
     // Promise.all rejects if ANY page ultimately failed — which aborts the sync.
     const settled = await Promise.all(batch);
     for (const r of settled) {
       const env = r?.[envelope] as { data?: unknown[] } | undefined;
       if (env?.data) rows.push(...(env.data as Record<string, unknown>[]));
     }
+    if (start + CONCURRENCY <= lastPage) await sleep(BATCH_SPACING_MS);
   }
 
   if (rows.length < expected) {
@@ -149,11 +165,11 @@ export async function syncSngBilling(): Promise<BillingSyncResult> {
   let oneTime: Record<string, unknown>[];
   let payments: Record<string, unknown>[];
   try {
-    [recurring, oneTime, payments] = await Promise.all([
-      getAllPages((p) => `/invoices?type=recurring&page=${p}`, "invoices"),
-      getAllPages((p) => `/invoices?type=one_time&page=${p}`, "invoices"),
-      getAllPages((p) => `/payments?page=${p}`, "payments"),
-    ]);
+    // Sequential, not parallel: three concurrent full pulls is what tripped the
+    // rate limiter in the first place.
+    recurring = await getAllPages((p) => `/invoices?type=recurring&page=${p}`, "invoices");
+    oneTime = await getAllPages((p) => `/invoices?type=one_time&page=${p}`, "invoices");
+    payments = await getAllPages((p) => `/payments?page=${p}`, "payments");
   } catch (e) {
     // Keep the existing mirror rather than replacing it with partial data.
     return { ok: false, invoices: 0, payments: 0, error: e instanceof Error ? e.message : "pull failed" };
@@ -270,6 +286,8 @@ export interface CustomerBilling {
   ambiguousName: boolean;
   /** No billing rows matched this name at all. */
   noMatch: boolean;
+  /** False when the last billing sync failed — totals below may be incomplete. */
+  syncOk: boolean;
 }
 
 /** Human label for a Sweep&Go billing interval. */
@@ -305,11 +323,11 @@ export async function getCustomerBilling(customer: {
   const key = customerNameKey(customer);
   const empty: CustomerBilling = {
     lifetimeCents: 0, paymentCount: 0, rateCents: null, rateInterval: null,
-    firstInvoiceAt: null, lastPaymentAt: null, invoices: [], ambiguousName: false, noMatch: true,
+    firstInvoiceAt: null, lastPaymentAt: null, invoices: [], ambiguousName: false, noMatch: true, syncOk: true,
   };
   if (!key) return empty;
 
-  const [payAgg, invoices, sameName] = await Promise.all([
+  const [payAgg, invoices, sameName, lastSync] = await Promise.all([
     // Successful payments only — failed charge attempts are excluded at sync
     // time via isRevenue, and netCents is already net of any refund.
     prisma.sngPayment.aggregate({
@@ -330,7 +348,11 @@ export async function getCustomerBilling(customer: {
         lastName: { equals: customer.lastName ?? "", mode: "insensitive" },
       },
     }),
+    // If the last sync failed, the mirror may be stale/partial — say so rather
+    // than presenting whatever is left as a confident lifetime figure.
+    getSetting("billing.lastSync").catch(() => null),
   ]);
+  const syncOk = !lastSync || /ok=true/.test(lastSync);
 
   const lifetimeCents = payAgg._sum.netCents || 0;
 
@@ -354,5 +376,6 @@ export async function getCustomerBilling(customer: {
     })),
     ambiguousName: sameName > 1,
     noMatch: invoices.length === 0 && payAgg._count._all === 0,
+    syncOk,
   };
 }
