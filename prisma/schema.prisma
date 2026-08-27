@@ -1213,29 +1213,3 @@ model SngInvoice {
   @@index([status])
   @@index([sngCreatedAt])
 }
-
-model SngPayment {
-  id            String    @id @default(cuid())
-  /// Natural key (payments have no Sweep&Go id) so the sync can upsert instead
-  /// of wiping and rewriting — required for the resumable, rate-limit-tolerant sync.
-  dedupeKey     String    @unique
-  clientName    String?
-  nameKey       String
-  paidOn        DateTime?
-  amountCents   Int       @default(0)
-  refundedCents Int       @default(0)
-  tipCents      Int       @default(0)
-  status        String? // succeeded | failed | refunded | partially_refunded
-  /// amount - refunded: what we actually kept on this payment.
-  netCents      Int       @default(0)
-  /// false for failed/void charge attempts (the feed is ~36% failed retries).
-  isRevenue     Boolean   @default(true)
-  method        String? // credit_card | check | ...
-  description   String?
-  syncedAt      DateTime  @default(now())
-
-  @@index([nameKey])
-  @@index([status])
-  @@index([paidOn])
-  @@index([isRevenue])
-}
