@@ -919,8 +919,15 @@ model SubscriptionEvent {
   dedupeKey  String   @unique
   createdAt  DateTime @default(now())
 
+  /// Test signups made while trialling the Sweep&Go onboarding flow. Sweep&Go
+  /// cannot delete them, so they are flagged out of the growth stats here
+  /// rather than destroyed — reversible, and the audit trail survives.
+  excluded       Boolean @default(false)
+  excludedReason String?
+
   @@index([kind])
   @@index([occurredAt])
+  @@index([excluded])
 }
 
 // =====================

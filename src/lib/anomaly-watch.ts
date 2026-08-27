@@ -36,7 +36,7 @@ async function leadsBetween(start: Date, end: Date): Promise<number> {
 }
 
 async function cancelsBetween(start: Date, end: Date): Promise<number> {
-  return prisma.subscriptionEvent.count({ where: { kind: "CANCELLATION", occurredAt: { gte: start, lt: end } } });
+  return prisma.subscriptionEvent.count({ where: { excluded: false, kind: "CANCELLATION", occurredAt: { gte: start, lt: end } } });
 }
 
 /** Run every check and return whatever is currently off. */
@@ -75,7 +75,7 @@ export async function detectAnomalies(now = new Date()): Promise<Anomaly[]> {
   const [cancels7, cancels56, signups7] = await Promise.all([
     cancelsBetween(ago(7), now),
     cancelsBetween(ago(56), now),
-    prisma.subscriptionEvent.count({ where: { kind: "SIGNUP", occurredAt: { gte: ago(7), lt: now } } }),
+    prisma.subscriptionEvent.count({ where: { excluded: false, kind: "SIGNUP", occurredAt: { gte: ago(7), lt: now } } }),
   ]);
   const weeklyCancelAvg = cancels56 / 8;
 

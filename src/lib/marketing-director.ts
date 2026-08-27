@@ -117,12 +117,12 @@ export async function gatherContext(): Promise<Context> {
   const [activeCustomers, sigRev, canRev, signups30, cancels30, quotes30, reasonsRaw, zipsRaw, reviewsAgg] =
     await Promise.all([
       prisma.sweepandgoCustomer.count({ where: { active: true } }),
-      prisma.subscriptionEvent.aggregate({ _sum: { revenue: true }, where: { kind: "SIGNUP" } }),
-      prisma.subscriptionEvent.aggregate({ _sum: { revenue: true }, where: { kind: "CANCELLATION" } }),
-      prisma.subscriptionEvent.count({ where: { kind: "SIGNUP", occurredAt: { gte: d30 } } }),
-      prisma.subscriptionEvent.count({ where: { kind: "CANCELLATION", occurredAt: { gte: d30 } } }),
-      prisma.subscriptionEvent.count({ where: { kind: "QUOTE", occurredAt: { gte: d30 } } }),
-      prisma.subscriptionEvent.groupBy({ by: ["reason"], where: { kind: "CANCELLATION", reason: { not: null } }, _count: { _all: true } }),
+      prisma.subscriptionEvent.aggregate({ _sum: { revenue: true }, where: { excluded: false, kind: "SIGNUP" } }),
+      prisma.subscriptionEvent.aggregate({ _sum: { revenue: true }, where: { excluded: false, kind: "CANCELLATION" } }),
+      prisma.subscriptionEvent.count({ where: { excluded: false, kind: "SIGNUP", occurredAt: { gte: d30 } } }),
+      prisma.subscriptionEvent.count({ where: { excluded: false, kind: "CANCELLATION", occurredAt: { gte: d30 } } }),
+      prisma.subscriptionEvent.count({ where: { excluded: false, kind: "QUOTE", occurredAt: { gte: d30 } } }),
+      prisma.subscriptionEvent.groupBy({ by: ["reason"], where: { excluded: false, kind: "CANCELLATION", reason: { not: null } }, _count: { _all: true } }),
       prisma.sweepandgoCustomer.groupBy({ by: ["zipCode"], where: { active: true, zipCode: { not: null } }, _count: { _all: true } }),
       prisma.review.aggregate({ _count: { _all: true }, _avg: { rating: true }, where: { rating: { not: null } } }),
     ]);

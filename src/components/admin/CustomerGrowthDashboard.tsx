@@ -41,6 +41,8 @@ function Stat({ icon: Icon, label, value, sub, tone = "ink" }: {
 
 export async function CustomerGrowthDashboard() {
   const events = await prisma.subscriptionEvent.findMany({
+    // Flagged test signups are left out of every growth statistic.
+    where: { excluded: false },
     select: { kind: true, occurredAt: true, revenue: true, reason: true },
     orderBy: { occurredAt: "asc" },
   });
