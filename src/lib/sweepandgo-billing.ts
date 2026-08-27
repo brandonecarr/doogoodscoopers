@@ -264,12 +264,21 @@ export async function syncSngBilling(): Promise<BillingSyncResult> {
 
       const env = res[feed.envelope] as { data?: unknown[]; last_page?: number } | undefined;
       const data = (env?.data as Record<string, unknown>[]) || [];
+      // ⚠️ `last_page` is computed for the DEFAULT page size, not the per_page we
+      // ask for — with per_page=100 the recurring feed reports 86 pages when it
+      // really has 9. Trusting it walked dozens of empty pages and burned the
+      // rate-limit quota for nothing. The data itself is the honest terminator:
+      // an empty page means done, a short page means this was the last one.
       lastPage = Number(env?.last_page) || 1;
+
+      if (data.length === 0) break;
 
       if (feed.envelope === "invoices") await writeInvoicePage(data);
       else await writePaymentPage(data, unknown);
       rows += data.length;
       pagesThisRun++;
+
+      if (data.length < PER_PAGE) break; // short page → end of this feed
 
       page++;
       if (page <= lastPage) await sleep(SPACING_MS);
