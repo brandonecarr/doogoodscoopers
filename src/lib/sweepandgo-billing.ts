@@ -32,7 +32,7 @@ const RETRIES = 2;             // for transient errors only — NEVER for 429s
 // through a 429 just deepens the hole (one run burned 5 minutes on backoff and
 // was killed at the 300s function limit). So: take a small bite each run, and
 // the instant we see a 429, save our place and leave the API alone.
-const MAX_PAGES_PER_RUN = 6;
+const MAX_PAGES_PER_RUN = 12;
 const BUDGET_MS = 120_000;
 // Once the history is fully imported, only the newest pages need re-reading.
 const REFRESH_PAGES = 2;
@@ -264,11 +264,14 @@ export async function syncSngBilling(): Promise<BillingSyncResult> {
 
       const env = res[feed.envelope] as { data?: unknown[]; last_page?: number } | undefined;
       const data = (env?.data as Record<string, unknown>[]) || [];
-      // ⚠️ `last_page` is computed for the DEFAULT page size, not the per_page we
-      // ask for — with per_page=100 the recurring feed reports 86 pages when it
-      // really has 9. Trusting it walked dozens of empty pages and burned the
-      // rate-limit quota for nothing. The data itself is the honest terminator:
-      // an empty page means done, a short page means this was the last one.
+      // ⚠️ The two feeds paginate DIFFERENTLY and neither self-describes cleanly:
+      //   /invoices honours per_page=100 → 9 real pages, but still reports
+      //             last_page=86 (computed for the default size).
+      //   /payments IGNORES per_page → 10 rows a page, last_page=140 (correct).
+      // So neither `last_page` alone nor a short-page heuristic is safe. Judging
+      // "short page" against our requested per_page ended the payments feed after
+      // ONE 10-row page and falsely declared the whole import complete.
+      // Terminate only on hard evidence: an empty page, or last_page reached.
       lastPage = Number(env?.last_page) || 1;
 
       if (data.length === 0) break;
@@ -278,7 +281,7 @@ export async function syncSngBilling(): Promise<BillingSyncResult> {
       rows += data.length;
       pagesThisRun++;
 
-      if (data.length < PER_PAGE) break; // short page → end of this feed
+      if (page >= lastPage) break; // reached the end this feed reports
 
       page++;
       if (page <= lastPage) await sleep(SPACING_MS);

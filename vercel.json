@@ -30,7 +30,7 @@
     },
     {
       "path": "/api/v2/cron/sync-billing",
-      "schedule": "*/15 * * * *"
+      "schedule": "*/10 * * * *"
     },
     {
       "path": "/api/v2/cron/process-email-campaigns",
