@@ -42,21 +42,20 @@ class RateLimited extends Error {}
 const STATE_KEY = "billing.syncState";
 const COMPLETE_KEY = "billing.complete";
 
-/** Payment statuses that are NOT money we received. Everything else counts. */
-const NON_REVENUE_STATUSES = new Set([
-  "failed", "pending", "canceled", "cancelled", "voided", "void", "declined", "disputed",
-]);
-
 interface Feed {
   key: string;
   envelope: string;
   path: (page: number) => string;
 }
 
+// Invoices ONLY. Every invoice carries `paid` and `refunded`, so lifetime
+// revenue is already answerable from this feed — there is no need to also walk
+// /payments (1,391 records at 10 per page, ~140 requests against a rate limit,
+// hours of backfill) to compute a number invoices already contain. The payments
+// feed adds only per-charge detail (card retries, methods) that nothing here uses.
 const FEEDS: Feed[] = [
   { key: "recurring", envelope: "invoices", path: (p) => `/invoices?type=recurring&page=${p}&per_page=${PER_PAGE}` },
   { key: "one_time", envelope: "invoices", path: (p) => `/invoices?type=one_time&page=${p}&per_page=${PER_PAGE}` },
-  { key: "payments", envelope: "payments", path: (p) => `/payments?page=${p}&per_page=${PER_PAGE}` },
 ];
 
 function token(): string | undefined {
@@ -127,12 +126,6 @@ async function getPage(path: string): Promise<Record<string, unknown>> {
   throw new Error(`${path}: ${lastErr}`);
 }
 
-/** Payment natural key. `isRevenue` disambiguates a failed attempt from the
- *  successful charge for the same invoice/date/amount, while keeping a later
- *  refund of that charge mapped onto the SAME row (status mutates in place). */
-function paymentKey(date: unknown, nk: string, amount: number, description: string, isRevenue: boolean): string {
-  return [String(date ?? ""), nk, amount, description, isRevenue ? "R" : "F"].join("|");
-}
 
 async function writeInvoicePage(rows: Record<string, unknown>[]): Promise<void> {
   for (const r of rows) {
@@ -164,38 +157,6 @@ async function writeInvoicePage(rows: Record<string, unknown>[]): Promise<void> 
   }
 }
 
-async function writePaymentPage(rows: Record<string, unknown>[], unknown: Set<string>): Promise<void> {
-  const known = new Set(["succeeded", "refunded", "partially_refunded", ...NON_REVENUE_STATUSES]);
-  for (const r of rows) {
-    const status = ((r.status as string) || "").toLowerCase();
-    if (status && !known.has(status)) unknown.add(status);
-    const nk = nameKey(r.client_name as string);
-    const amount = cents(r.amount);
-    const refunded = cents(r.amount_refunded);
-    const isRevenue = !NON_REVENUE_STATUSES.has(status);
-    const description = (r.description as string) || "";
-    const dedupeKey = paymentKey(r.date, nk, amount, description, isRevenue);
-    const data = {
-      clientName: (r.client_name as string) || null,
-      nameKey: nk,
-      paidOn: parseDate(r.date),
-      amountCents: amount,
-      refundedCents: refunded,
-      netCents: isRevenue ? amount - refunded : 0,
-      isRevenue,
-      tipCents: cents(r.tip_amount),
-      status: (r.status as string) || null,
-      method: (r.type as string) || null,
-      description: description || null,
-      syncedAt: new Date(),
-    };
-    await prisma.sngPayment.upsert({
-      where: { dedupeKey },
-      create: { dedupeKey, ...data },
-      update: data,
-    });
-  }
-}
 
 export interface BillingSyncResult {
   ok: boolean;
@@ -276,8 +237,7 @@ export async function syncSngBilling(): Promise<BillingSyncResult> {
 
       if (data.length === 0) break;
 
-      if (feed.envelope === "invoices") await writeInvoicePage(data);
-      else await writePaymentPage(data, unknown);
+      await writeInvoicePage(data);
       rows += data.length;
       pagesThisRun++;
 
@@ -370,46 +330,42 @@ export async function getCustomerBilling(customer: {
   };
   if (!key) return empty;
 
-  const [payAgg, invoices, sameName, lastSync] = await Promise.all([
-    // Successful payments only — failed charge attempts are excluded at sync
-    // time via isRevenue, and netCents is already net of any refund.
-    prisma.sngPayment.aggregate({
-      where: { nameKey: key, isRevenue: true },
-      _sum: { netCents: true },
+  const [paidAgg, invoices, sameName, completedAt] = await Promise.all([
+    // Money actually collected: what was paid on their invoices, less refunds.
+    // Unpaid/outstanding balances are excluded because paidCents only counts
+    // what was received.
+    prisma.sngInvoice.aggregate({
+      where: { nameKey: key },
+      _sum: { paidCents: true, refundedCents: true },
       _count: { _all: true },
-      _max: { paidOn: true },
     }),
     prisma.sngInvoice.findMany({
       where: { nameKey: key },
       orderBy: { sngCreatedAt: "desc" },
       take: 200,
     }),
-    // >1 customer record sharing this exact name → the totals below are shared.
     prisma.sweepandgoCustomer.count({
       where: {
         firstName: { equals: customer.firstName ?? "", mode: "insensitive" },
         lastName: { equals: customer.lastName ?? "", mode: "insensitive" },
       },
     }),
-    // Totals are only trustworthy once a FULL pass has completed at least once.
-    // Mid-backfill the mirror is real but incomplete, and must not be shown as fact.
+    // Totals are only trustworthy once a full pass has completed at least once.
     getSetting(COMPLETE_KEY).catch(() => null),
   ]);
-  const syncOk = Boolean(lastSync);
 
-  const lifetimeCents = payAgg._sum.netCents || 0;
-
-  // Current recurring rate = the newest subscription-type invoice.
+  const lifetimeCents = (paidAgg._sum.paidCents || 0) - (paidAgg._sum.refundedCents || 0);
+  const paidInvoices = invoices.filter((i) => i.paidCents > 0);
   const sub = invoices.find((i) => i.type === "subscription") || null;
   const oldest = invoices.length ? invoices[invoices.length - 1] : null;
 
   return {
     lifetimeCents,
-    paymentCount: payAgg._count._all,
+    paymentCount: paidInvoices.length,
     rateCents: sub ? sub.totalCents : null,
     rateInterval: sub ? sub.billingInterval : null,
     firstInvoiceAt: oldest?.sngCreatedAt ?? null,
-    lastPaymentAt: payAgg._max.paidOn ?? null,
+    lastPaymentAt: paidInvoices[0]?.sngCreatedAt ?? null,
     invoices: invoices.map((i) => ({
       invoiceNumber: i.invoiceNumber, status: i.status, type: i.type,
       billingInterval: i.billingInterval, payMethod: i.payMethod,
@@ -418,7 +374,8 @@ export async function getCustomerBilling(customer: {
       sngCreatedAt: i.sngCreatedAt,
     })),
     ambiguousName: sameName > 1,
-    noMatch: invoices.length === 0 && payAgg._count._all === 0,
-    syncOk,
+    noMatch: paidAgg._count._all === 0,
+    syncOk: Boolean(completedAt),
   };
 }
+
