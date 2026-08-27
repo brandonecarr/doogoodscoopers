@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Copy, Check, Info, FileDown, Loader2 } from "lucide-react";
+import { Copy, Check, Info, FileDown, Loader2, Ruler, ChevronDown } from "lucide-react";
 import type { ContractData } from "@/components/admin/CommunityContractDocument";
+import { AreaMeasureMap } from "@/components/admin/AreaMeasureMap";
 
 // Community / HOA quote calculator. The price is BUILT from serviceable area ×
 // frequency × a loaded hourly rate (with a per-visit floor), then PRESENTED as a
@@ -103,8 +104,9 @@ function Num({
   );
 }
 
-export function CommunityQuoteCalculator() {
+export function CommunityQuoteCalculator({ mapboxToken }: { mapboxToken?: string }) {
   const [f, setF] = useState<Fields>(DEFAULTS);
+  const [measuring, setMeasuring] = useState(false);
   const set = (k: keyof Fields, v: string) => setF((p) => ({ ...p, [k]: v }));
   const [copied, setCopied] = useState(false);
 
@@ -226,8 +228,35 @@ export function CommunityQuoteCalculator() {
               <input value={f.property} onChange={(e) => set("property", e.target.value)} placeholder="e.g. Riverside Condominiums" className={inputCls} />
             </label>
             <Num label="Number of units / homes" value={f.units} onChange={(v) => set("units", v)} suffix="units" />
-            <Num label="Serviceable common area" value={f.acres} onChange={(v) => set("acres", v)} suffix="acres" step="0.1" hint="Only the areas dogs use — measure from satellite." />
+            <Num label="Serviceable common area" value={f.acres} onChange={(v) => set("acres", v)} suffix="acres" step="0.1" hint="Only the areas dogs use — trace it on the map below." />
           </div>
+
+          {/* Satellite measuring: turns "guess the acreage" into tracing the lawns. */}
+          <button
+            type="button"
+            onClick={() => setMeasuring((v) => !v)}
+            className="mt-3 w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg border border-dashed transition-colors"
+            style={{ borderColor: measuring ? "#6D3EF0" : "#D1D5DB", background: measuring ? "#F5F2FF" : "transparent" }}
+          >
+            <span className="inline-flex items-center gap-2 text-[13px] font-semibold" style={{ color: measuring ? "#6D3EF0" : "#374151" }}>
+              <Ruler className="w-4 h-4" />
+              Measure the area from satellite
+            </span>
+            <ChevronDown className={`w-4 h-4 transition-transform ${measuring ? "rotate-180" : ""}`} style={{ color: measuring ? "#6D3EF0" : "#9CA3AF" }} />
+          </button>
+
+          {measuring && (
+            <div className="mt-3">
+              <AreaMeasureMap
+                token={mapboxToken}
+                onApply={(acres, place) => {
+                  set("acres", String(acres));
+                  // Offer the searched place as the property name if none typed yet.
+                  if (place && !f.property.trim()) set("property", place.split(",")[0]);
+                }}
+              />
+            </div>
+          )}
         </div>
 
         <div className="dgs-card p-4">

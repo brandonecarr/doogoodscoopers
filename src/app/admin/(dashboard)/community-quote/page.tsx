@@ -22,7 +22,7 @@ export default async function CommunityQuotePage() {
           </div>
         }
       />
-      <CommunityQuoteCalculator />
+      <CommunityQuoteCalculator mapboxToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN} />
     </div>
   );
 }
