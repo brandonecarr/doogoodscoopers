@@ -13,6 +13,9 @@ const SUGGESTIONS = [
   "How did signups this month compare to last month?",
   "What are the most common cancellation reasons?",
   "Which ZIP codes have the most active customers?",
+  "How is each canvasser performing this week?",
+  "How many doors has my canvasser knocked, and what's their lead rate?",
+  "Who are my highest lifetime-value customers?",
 ];
 
 const THINKING = ["Reading the question…", "Pulling live numbers…", "Running the query…", "Double-checking the data…", "Writing it up…"];

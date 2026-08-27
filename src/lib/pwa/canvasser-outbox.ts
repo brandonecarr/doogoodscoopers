@@ -113,10 +113,15 @@ export async function processOutbox(): Promise<void> {
           const data = await res.json().catch(() => ({}));
           await db.delete(STORE, item.id);
           emit("canvasser-synced", { kind: item.kind, clientKey: item.id, data });
-        } else if (res.status === 400 || res.status === 403) {
-          // Permanent rejection — don't retry forever; surface and drop.
+        } else if (res.status === 400 || res.status === 403 || res.status === 409) {
+          // Permanent rejection (bad payload, not yours, or that home is already
+          // pinned) — retrying can never succeed, so drop it and say why.
+          const body = await res.json().catch(() => ({} as { message?: string }));
           await db.delete(STORE, item.id);
-          emit("canvasser-sync-error", { kind: item.kind, clientKey: item.id, status: res.status });
+          emit("canvasser-sync-error", {
+            kind: item.kind, clientKey: item.id, status: res.status,
+            message: (body as { message?: string })?.message,
+          });
         } else {
           item.status = "pending";
           item.retryCount += 1;

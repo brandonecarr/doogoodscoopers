@@ -37,6 +37,33 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "lat and lng are required" }, { status: 400 });
   }
 
+  // One pin per home. The client guards this too, but the offline queue and a
+  // second device can both replay a fresh create, so the rule is enforced here.
+  // Only NEW pins are checked — replaying an existing clientKey is an update.
+  const preExisting = await prisma.canvassVisit.findUnique({ where: { clientKey }, select: { id: true } });
+  if (!preExisting) {
+    const box = 0.0005; // ~55 m — a generous prefilter before exact distance
+    const near = await prisma.canvassVisit.findMany({
+      where: { lat: { gte: lat - box, lte: lat + box }, lng: { gte: lng - box, lte: lng + box } },
+      select: { clientKey: true, lat: true, lng: true, address: true, canvasserName: true, status: true },
+      take: 50,
+    });
+    const mLat = 111_320, mLng = 111_320 * Math.cos(lat * (Math.PI / 180));
+    const dupe = near.find((v) => Math.hypot((v.lng - lng) * mLng, (v.lat - lat) * mLat) <= 18);
+    if (dupe) {
+      return NextResponse.json(
+        {
+          error: "duplicate_home",
+          message: dupe.canvasserName
+            ? `${dupe.address || "This home"} already has a pin from ${dupe.canvasserName}.`
+            : `${dupe.address || "This home"} already has a pin.`,
+          existing: dupe,
+        },
+        { status: 409 }
+      );
+    }
+  }
+
   // Ownership guard: never let one canvasser overwrite another's pin.
   const existing = await prisma.canvassVisit.findUnique({ where: { clientKey } });
   if (existing && existing.canvasserId !== user.id) {

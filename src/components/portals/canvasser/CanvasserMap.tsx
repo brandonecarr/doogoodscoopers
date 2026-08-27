@@ -74,6 +74,14 @@ const uuid = () =>
     : `ck_${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
 
 // Ray-casting point-in-polygon on a [lng,lat] ring.
+/** Metres between two lng/lat points (equirectangular — plenty at door range). */
+function metresBetween(aLng: number, aLat: number, bLng: number, bLat: number): number {
+  const mLat = 111_320, mLng = 111_320 * Math.cos(((aLat + bLat) / 2) * (Math.PI / 180));
+  return Math.hypot((aLng - bLng) * mLng, (aLat - bLat) * mLat);
+}
+/** Two pins this close are the same house. */
+const SAME_HOME_M = 18;
+
 function pointInRing(lng: number, lat: number, ring: [number, number][]): boolean {
   let inside = false;
   for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
@@ -117,6 +125,15 @@ export function CanvasserMap({ token }: { token: string | undefined }) {
   // Latest visits, readable from marker drag callbacks without stale closures.
   const visitsRef = useRef<VisitRow[]>([]);
   useEffect(() => { visitsRef.current = visits; }, [visits]);
+  // Doors knocked inside each assigned area, against its home count.
+  const coverage = territories.map((t) => {
+    const ring = Array.isArray(t.polygon) ? t.polygon : [];
+    const hit = ring.length >= 3 ? visits.filter((v) => pointInRing(v.lng, v.lat, ring)).length : 0;
+    return { id: t.id, name: t.name, color: t.color || "#6D3EF0", hit, homes: t.homeCount || 0 };
+  });
+  const totalHit = coverage.reduce((n, c) => n + c.hit, 0);
+  const totalHomes = coverage.reduce((n, c) => n + c.homes, 0);
+
   const territoriesRef = useRef<typeof territories>([]);
   useEffect(() => { territoriesRef.current = territories; }, [territories]);
 
@@ -161,11 +178,18 @@ export function CanvasserMap({ token }: { token: string | undefined }) {
         .filter((t) => Array.isArray(t.polygon) && t.polygon.length >= 3)
         .map((t) => ({
           type: "Feature",
-          properties: { color: t.color || "#6D3EF0", label: `${t.name} · ${t.homeCount} homes` },
+          properties: {
+            color: t.color || "#6D3EF0",
+            label: (() => {
+              const ring = Array.isArray(t.polygon) ? t.polygon : [];
+              const hit = ring.length >= 3 ? visitsRef.current.filter((v) => pointInRing(v.lng, v.lat, ring)).length : 0;
+              return `${t.name} · ${hit}/${t.homeCount || 0} homes`;
+            })(),
+          },
           geometry: { type: "Polygon", coordinates: [[...t.polygon, t.polygon[0]]] },
         })),
     });
-  }, [territories, ready]);
+  }, [territories, visits, ready]);
 
   // Deep-link from a pin detail page (?pin=<clientKey>): select + fly to it once.
   const didPinParamRef = useRef(false);
@@ -190,7 +214,23 @@ export function CanvasserMap({ token }: { token: string | undefined }) {
       }
     };
     window.addEventListener("canvasser-synced", onSynced);
-    return () => window.removeEventListener("canvasser-synced", onSynced);
+
+    // A pin the server refused (duplicate home, not yours) must not linger on
+    // the map pretending to be saved.
+    const onSyncError = (e: Event) => {
+      const d = (e as CustomEvent).detail as { kind?: string; clientKey?: string; message?: string } | undefined;
+      if (!d?.clientKey || d.kind !== "visit") return;
+      setVisits((prev) => prev.filter((x) => x.clientKey !== d.clientKey));
+      setSelected((cur) => (cur === d.clientKey ? null : cur));
+      setToast(d.message || "That pin couldn't be saved.");
+      setTimeout(() => setToast(""), 3200);
+    };
+    window.addEventListener("canvasser-sync-error", onSyncError);
+
+    return () => {
+      window.removeEventListener("canvasser-synced", onSynced);
+      window.removeEventListener("canvasser-sync-error", onSyncError);
+    };
   }, [upsertLocal]);
 
   // Init map.
@@ -227,6 +267,17 @@ export function CanvasserMap({ token }: { token: string | undefined }) {
         if (terrs.length && !terrs.some((t) => pointInRing(e.lngLat.lng, e.lngLat.lat, t.polygon))) {
           setToast("That's outside your assigned area — no pin dropped.");
           setTimeout(() => setToast(""), 2600);
+          return;
+        }
+        // One pin per home: if this door already has a pin, open it instead of
+        // stacking a duplicate on top.
+        const dupe = visitsRef.current.find(
+          (v) => metresBetween(v.lng, v.lat, e.lngLat.lng, e.lngLat.lat) <= SAME_HOME_M
+        );
+        if (dupe) {
+          setToast("This home already has a pin — opening it.");
+          setTimeout(() => setToast(""), 2600);
+          setSelected(dupe.clientKey);
           return;
         }
         const clientKey = uuid();
@@ -396,6 +447,34 @@ export function CanvasserMap({ token }: { token: string | undefined }) {
       <p className="absolute left-3 top-3 z-10 text-[11px] font-medium text-gray-700 bg-white/90 rounded-full px-2.5 py-1 shadow">
         Tap the map to drop a pin
       </p>
+
+      {/* Coverage: doors knocked vs homes in the assigned area(s). */}
+      {totalHomes > 0 && (
+        <div className="absolute right-3 top-3 z-10 bg-white/95 backdrop-blur rounded-xl px-3 py-2 shadow max-w-[190px]">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Area progress</p>
+          <p className="text-[17px] font-extrabold text-gray-900 leading-tight">
+            {totalHit.toLocaleString()}<span className="text-gray-400">/{totalHomes.toLocaleString()}</span>
+          </p>
+          <p className="text-[11px] text-gray-500 leading-tight">
+            {Math.max(totalHomes - totalHit, 0).toLocaleString()} homes left
+          </p>
+          <div className="mt-1.5 h-1.5 rounded-full bg-gray-200 overflow-hidden">
+            <div className="h-full rounded-full transition-all"
+              style={{ width: `${Math.min(100, totalHomes ? (totalHit / totalHomes) * 100 : 0)}%`, background: "#16A34A" }} />
+          </div>
+          {coverage.length > 1 && (
+            <ul className="mt-1.5 space-y-0.5">
+              {coverage.map((c) => (
+                <li key={c.id} className="flex items-center gap-1.5 text-[10.5px] text-gray-600">
+                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: c.color }} />
+                  <span className="truncate flex-1">{c.name}</span>
+                  <span className="font-semibold text-gray-900">{c.hit}/{c.homes}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       {toast && (
         <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 inline-flex items-center gap-1.5 bg-gray-900 text-white text-[12px] font-semibold rounded-full px-3 py-1.5 shadow-lg">

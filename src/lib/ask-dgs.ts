@@ -121,6 +121,13 @@ DOMAIN NOTES
 - Estimated MRR ≈ sum of "SubscriptionEvent"."revenue" where "kind" = 'SIGNUP' minus where "kind" = 'CANCELLATION'. SubscriptionEvent."kind" is one of SIGNUP / CANCELLATION / QUOTE; "occurredAt" is the timestamp.
 - Leads live in several pipelines — inspect the schema: "QuoteLead" (website/quote + Meta/IG), "AdLead", "CanvasserLead" (door-to-door), "OutOfAreaLead". Most lead tables have "status", "createdAt", "source", "zipCode", "archived".
 - Reviews are in "Review" ("rating" 1–5). Funnels: "Funnel", "FunnelSession", "FunnelEvent".
+- Lifetime revenue per customer comes from "SngInvoice" (mirrored Sweep&Go invoices): sum("paidCents" - "refundedCents") / 100, matched to a customer by "nameKey" = lowercased "firstName" || ' ' || "lastName". Amounts are INTEGER CENTS. "remainingCents" > 0 means still owed.
+- "SubscriptionEvent"."excluded" = true marks test signups made while trialling Sweep&Go. ALWAYS add "excluded" = false to signup/cancellation stats, or the numbers are inflated.
+- CANVASSERS (door-to-door reps) live in "Canvasser" ("name", "email", "active", "lastLoginAt", "invitedAt"). Their fieldwork:
+  · "CanvassVisit" = every door knocked. Join "CanvassVisit"."canvasserId" = "Canvasser"."id" (the column comment says Supabase users.id, but it holds the Canvasser id). Columns: "status" (NOT_HOME | NOT_INTERESTED | CALLBACK | INTERESTED | LEAD | DO_NOT_KNOCK), "notes", "aiNotes" (AI summary of the at-the-door pitch), "address", "zipCode", "lat"/"lng", "createdAt".
+  · "CanvasserLead" = doors that became leads ("canvasserId", "canvasserName", "status", "aiNotes", plus normal lead columns).
+  · "CanvassTerritory" = assigned areas ("name", "polygon", "homeCount", "assignedCanvasserId", "color").
+- Canvasser metrics worth reporting: doors knocked per day/week, contact rate (visits with "status" <> 'NOT_HOME' ÷ all visits), lead rate (visits with "status" = 'LEAD' ÷ visits), leads per 100 doors, territory coverage (visits inside their territory ÷ that territory's "homeCount"), days active / recency, and how many of their leads converted. When asked about ONE rep, match "Canvasser"."name" ILIKE '%name%' and cover BOTH activity (volume, recency) and quality (contact rate, conversion, whether notes are being written).
 - Postgres identifiers are case-sensitive: ALWAYS double-quote table and column names exactly as in the schema below. Use now() and intervals for dates, e.g. "createdAt" >= now() - interval '7 days'.
 
 DATABASE SCHEMA (public tables — name(columns)):
