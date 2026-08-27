@@ -1,42 +1,54 @@
 import prisma from "@/lib/prisma";
-import { getSetting } from "@/lib/google-business";
+import { getSetting, setSetting } from "@/lib/google-business";
 
 /**
  * Sweep&Go billing mirror — invoices + payments.
  *
- * Why mirror instead of calling live: the Open API pages 10 records at a time,
- * so a full pull is ~300 requests. Far too slow for a profile page load, so a
- * cron syncs it into Postgres and the UI reads locally.
+ * ⚠️ These numbers are money shown on a customer's profile. Two hard-won rules:
  *
- * ⚠️ CORRECTNESS RULES — these numbers are money on a customer's profile:
- *  1. A page fetch that fails is RETRIED, and if it still fails the whole sync
- *     ABORTS. Silently skipping a page loses real payments and understates
- *     lifetime revenue (it did exactly that: 490 of 1,391 rows on first run).
- *  2. The row count is checked against the API's own reported `total`. A short
- *     pull is treated as a failure, never written.
- *  3. Nothing is written unless BOTH pulls fully succeed (atomic swap).
+ * 1. RATE LIMITS ARE THE BINDING CONSTRAINT. Sweep&Go returns HTTP 429 well
+ *    before a full dataset can be pulled in one invocation — even at ~24
+ *    requests with `per_page=100` and backoff. So the sync is RESUMABLE: it
+ *    walks the feeds page by page, writes as it goes, and on a rate-limit stop
+ *    it saves its position and continues on the next cron tick.
+ * 2. WRITES ARE CUMULATIVE (upsert), never wipe-and-replace. A run that stops
+ *    early therefore loses nothing — it just leaves the mirror less complete.
+ *    An earlier wipe-and-replace design silently stored 490 of 1,391 payments
+ *    and understated lifetime revenue by ~4x.
+ *
+ * The UI only trusts the totals once a FULL pass has completed at least once
+ * (`billing.complete`), so a mid-backfill mirror is never presented as fact.
  *
  * ⚠️ Sweep&Go's billing feeds carry NO client id — a row identifies its customer
- * only by `client_name` — so every row is stored with a normalized `nameKey`.
+ * only by `client_name` — so every row stores a normalized `nameKey`.
  */
 
 const SNG_BASE = "https://openapi.sweepandgo.com/api/v2";
-// Sweep&Go rate-limits (HTTP 429). Two in flight with a little spacing gets the
-// whole dataset without tripping it; a full pull at concurrency 4 did.
-const CONCURRENCY = 2;
-const BATCH_SPACING_MS = 250;
+const PER_PAGE = 100;        // honoured by the API: 1,391 payments → 14 pages
+const SPACING_MS = 1_500;    // deliberate pacing between pages
 const PAGE_TIMEOUT_MS = 20_000;
 const RETRIES = 5;
-const MAX_PAGES = 1_000;
-// Ask for large pages. If the API honours it, a full pull drops from ~300
-// requests to ~30; if it ignores it, `last_page` still describes reality and the
-// loop below is unchanged either way.
-const PER_PAGE = 100;
+const BUDGET_MS = 230_000;   // stop and resume next tick, well inside maxDuration
+
+const STATE_KEY = "billing.syncState";
+const COMPLETE_KEY = "billing.complete";
 
 /** Payment statuses that are NOT money we received. Everything else counts. */
 const NON_REVENUE_STATUSES = new Set([
   "failed", "pending", "canceled", "cancelled", "voided", "void", "declined", "disputed",
 ]);
+
+interface Feed {
+  key: string;
+  envelope: string;
+  path: (page: number) => string;
+}
+
+const FEEDS: Feed[] = [
+  { key: "recurring", envelope: "invoices", path: (p) => `/invoices?type=recurring&page=${p}&per_page=${PER_PAGE}` },
+  { key: "one_time", envelope: "invoices", path: (p) => `/invoices?type=one_time&page=${p}&per_page=${PER_PAGE}` },
+  { key: "payments", envelope: "payments", path: (p) => `/payments?page=${p}&per_page=${PER_PAGE}` },
+];
 
 function token(): string | undefined {
   return process.env.SWEEPANDGO_API_TOKEN || process.env.SWEEPANDGO_WEBHOOK_SECRET || undefined;
@@ -50,7 +62,7 @@ function token(): string | undefined {
 export function nameKey(raw: string | null | undefined): string {
   return (raw || "")
     .toLowerCase()
-    .replace(/[.,'`]/g, "")
+    .replace(/[.,\'`]/g, "")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -76,7 +88,7 @@ function parseDate(v: unknown): Date | null {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-/** Fetch one page, retrying transient failures. Throws if it never succeeds. */
+/** Fetch one page, retrying transient failures and honouring 429 Retry-After. */
 async function getPage(path: string): Promise<Record<string, unknown>> {
   const t = token();
   if (!t) throw new Error("SWEEPANDGO_API_TOKEN not set");
@@ -94,10 +106,9 @@ async function getPage(path: string): Promise<Record<string, unknown>> {
       if (res.ok) return (await res.json()) as Record<string, unknown>;
       lastErr = `HTTP ${res.status}`;
       if (res.status === 429) {
-        // Rate limited: honour Retry-After when present, else back off hard.
         const ra = Number(res.headers.get("retry-after")) || 0;
         clearTimeout(timer);
-        if (attempt < RETRIES) await sleep(ra > 0 ? Math.min(ra * 1000, 30_000) : Math.min(2_000 * 2 ** (attempt - 1), 30_000));
+        if (attempt < RETRIES) await sleep(ra > 0 ? Math.min(ra * 1000, 30_000) : Math.min(3_000 * 2 ** (attempt - 1), 30_000));
         continue;
       }
     } catch (e) {
@@ -105,150 +116,150 @@ async function getPage(path: string): Promise<Record<string, unknown>> {
     } finally {
       clearTimeout(timer);
     }
-    if (attempt < RETRIES) await sleep(400 * attempt * attempt);
+    if (attempt < RETRIES) await sleep(500 * attempt * attempt);
   }
-  throw new Error(`${path} failed after ${RETRIES} attempts: ${lastErr}`);
+  throw new Error(`${path}: ${lastErr}`);
 }
 
-/**
- * Pull EVERY page of a paginated endpoint. Throws if any page can't be fetched
- * or if the collected count falls short of the API's reported total — a partial
- * pull must never be mistaken for the whole dataset.
- */
-async function getAllPages(
-  buildPath: (page: number) => string,
-  envelope: string
-): Promise<Record<string, unknown>[]> {
-  const first = await getPage(`${buildPath(1)}&per_page=${PER_PAGE}`);
-  const env1 = first?.[envelope] as { data?: unknown[]; last_page?: number; total?: number } | undefined;
-  if (!env1) throw new Error(`${envelope}: unexpected response shape`);
-
-  const rows: Record<string, unknown>[] = [...((env1.data as Record<string, unknown>[]) || [])];
-  const lastPage = Math.min(Number(env1.last_page) || 1, MAX_PAGES);
-  const expected = Number(env1.total) || rows.length;
-
-  for (let start = 2; start <= lastPage; start += CONCURRENCY) {
-    const batch: Promise<Record<string, unknown>>[] = [];
-    for (let p = start; p < start + CONCURRENCY && p <= lastPage; p++) batch.push(getPage(`${buildPath(p)}&per_page=${PER_PAGE}`));
-    // Promise.all rejects if ANY page ultimately failed — which aborts the sync.
-    const settled = await Promise.all(batch);
-    for (const r of settled) {
-      const env = r?.[envelope] as { data?: unknown[] } | undefined;
-      if (env?.data) rows.push(...(env.data as Record<string, unknown>[]));
-    }
-    if (start + CONCURRENCY <= lastPage) await sleep(BATCH_SPACING_MS);
-  }
-
-  if (rows.length < expected) {
-    throw new Error(`${envelope}: incomplete pull — got ${rows.length} of ${expected}`);
-  }
-  return rows;
+/** Payment natural key. `isRevenue` disambiguates a failed attempt from the
+ *  successful charge for the same invoice/date/amount, while keeping a later
+ *  refund of that charge mapped onto the SAME row (status mutates in place). */
+function paymentKey(date: unknown, nk: string, amount: number, description: string, isRevenue: boolean): string {
+  return [String(date ?? ""), nk, amount, description, isRevenue ? "R" : "F"].join("|");
 }
 
-export interface BillingSyncResult {
-  ok: boolean;
-  invoices: number;
-  payments: number;
-  /** Any payment status we did not recognise — worth eyeballing if non-empty. */
-  unknownStatuses?: string[];
-  error?: string;
+async function writeInvoicePage(rows: Record<string, unknown>[]): Promise<void> {
+  for (const r of rows) {
+    const invoiceNumber = String(r.invoice_number || "").trim();
+    if (!invoiceNumber) continue;
+    const data = {
+      clientName: (r.client_name as string) || null,
+      nameKey: nameKey(r.client_name as string),
+      status: (r.status as string) || null,
+      type: (r.type as string) || null,
+      category: (r.category as string) || null,
+      billingInterval: (r.billing_interval as string) || null,
+      payMethod: (r.pay_method as string) || null,
+      totalCents: cents(r.total),
+      paidCents: cents(r.paid),
+      refundedCents: cents(r.refunded),
+      remainingCents: cents(r.remaining),
+      tipCents: cents(r.tip_amount),
+      periodStart: parseDate(r.period_start),
+      periodEnd: parseDate(r.period_end),
+      sngCreatedAt: parseDate(r.created_at),
+      syncedAt: new Date(),
+    };
+    await prisma.sngInvoice.upsert({
+      where: { invoiceNumber },
+      create: { invoiceNumber, ...data },
+      update: data,
+    });
+  }
 }
 
-/**
- * Full refresh of the billing mirror. Everything is fetched and validated FIRST;
- * the swap happens only once both pulls are provably complete.
- */
-export async function syncSngBilling(): Promise<BillingSyncResult> {
-  if (!token()) return { ok: false, invoices: 0, payments: 0, error: "SWEEPANDGO_API_TOKEN not set" };
-
-  let recurring: Record<string, unknown>[];
-  let oneTime: Record<string, unknown>[];
-  let payments: Record<string, unknown>[];
-  try {
-    // Sequential, not parallel: three concurrent full pulls is what tripped the
-    // rate limiter in the first place.
-    recurring = await getAllPages((p) => `/invoices?type=recurring&page=${p}`, "invoices");
-    oneTime = await getAllPages((p) => `/invoices?type=one_time&page=${p}`, "invoices");
-    payments = await getAllPages((p) => `/payments?page=${p}`, "payments");
-  } catch (e) {
-    // Keep the existing mirror rather than replacing it with partial data.
-    return { ok: false, invoices: 0, payments: 0, error: e instanceof Error ? e.message : "pull failed" };
-  }
-
-  // De-dupe invoices by invoice_number (the unique key) before writing.
-  const byNumber = new Map<string, Record<string, unknown>>();
-  for (const r of recurring.concat(oneTime)) {
-    const num = String(r.invoice_number || "").trim();
-    if (num) byNumber.set(num, r);
-  }
-
-  const invoiceData = [...byNumber.values()].map((r) => ({
-    invoiceNumber: String(r.invoice_number),
-    clientName: (r.client_name as string) || null,
-    nameKey: nameKey(r.client_name as string),
-    status: (r.status as string) || null,
-    type: (r.type as string) || null,
-    category: (r.category as string) || null,
-    billingInterval: (r.billing_interval as string) || null,
-    payMethod: (r.pay_method as string) || null,
-    totalCents: cents(r.total),
-    paidCents: cents(r.paid),
-    refundedCents: cents(r.refunded),
-    remainingCents: cents(r.remaining),
-    tipCents: cents(r.tip_amount),
-    periodStart: parseDate(r.period_start),
-    periodEnd: parseDate(r.period_end),
-    sngCreatedAt: parseDate(r.created_at),
-  }));
-
-  const knownStatuses = new Set(["succeeded", "refunded", "partially_refunded", ...NON_REVENUE_STATUSES]);
-  const unknown = new Set<string>();
-
-  const paymentData = payments.map((r) => {
+async function writePaymentPage(rows: Record<string, unknown>[], unknown: Set<string>): Promise<void> {
+  const known = new Set(["succeeded", "refunded", "partially_refunded", ...NON_REVENUE_STATUSES]);
+  for (const r of rows) {
     const status = ((r.status as string) || "").toLowerCase();
-    if (status && !knownStatuses.has(status)) unknown.add(status);
+    if (status && !known.has(status)) unknown.add(status);
+    const nk = nameKey(r.client_name as string);
     const amount = cents(r.amount);
     const refunded = cents(r.amount_refunded);
     const isRevenue = !NON_REVENUE_STATUSES.has(status);
-    return {
+    const description = (r.description as string) || "";
+    const dedupeKey = paymentKey(r.date, nk, amount, description, isRevenue);
+    const data = {
       clientName: (r.client_name as string) || null,
-      nameKey: nameKey(r.client_name as string),
+      nameKey: nk,
       paidOn: parseDate(r.date),
       amountCents: amount,
       refundedCents: refunded,
-      // What we actually kept. A fully refunded payment nets to zero.
       netCents: isRevenue ? amount - refunded : 0,
       isRevenue,
       tipCents: cents(r.tip_amount),
       status: (r.status as string) || null,
       method: (r.type as string) || null,
-      description: (r.description as string) || null,
+      description: description || null,
+      syncedAt: new Date(),
     };
-  });
-
-  // Atomic swap: wipe + rewrite inside one interactive transaction.
-  await prisma.$transaction(
-    async (tx) => {
-      await tx.sngInvoice.deleteMany({});
-      await tx.sngPayment.deleteMany({});
-      for (const c of chunk(invoiceData, 500)) await tx.sngInvoice.createMany({ data: c, skipDuplicates: true });
-      for (const c of chunk(paymentData, 500)) await tx.sngPayment.createMany({ data: c });
-    },
-    { timeout: 120_000, maxWait: 20_000 }
-  );
-
-  return {
-    ok: true,
-    invoices: invoiceData.length,
-    payments: paymentData.length,
-    ...(unknown.size ? { unknownStatuses: [...unknown] } : {}),
-  };
+    await prisma.sngPayment.upsert({
+      where: { dedupeKey },
+      create: { dedupeKey, ...data },
+      update: data,
+    });
+  }
 }
 
-function chunk<T>(arr: T[], size: number): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
-  return out;
+export interface BillingSyncResult {
+  ok: boolean;
+  /** True when a full pass finished during this run. */
+  complete: boolean;
+  rows: number;
+  /** Where the next run will resume, when this one stopped early. */
+  resumeAt?: string;
+  unknownStatuses?: string[];
+  error?: string;
+}
+
+/**
+ * Advance the billing mirror. Resumes from wherever the last run stopped and
+ * runs until the data is exhausted, the time budget is spent, or the API rate
+ * limit stops us — whichever comes first. Progress is always preserved.
+ */
+export async function syncSngBilling(): Promise<BillingSyncResult> {
+  if (!token()) return { ok: false, complete: false, rows: 0, error: "SWEEPANDGO_API_TOKEN not set" };
+
+  const raw = await getSetting(STATE_KEY).catch(() => null);
+  let state: { feed?: string; page?: number } = {};
+  try { state = raw ? JSON.parse(raw) : {}; } catch { state = {}; }
+
+  const deadline = Date.now() + BUDGET_MS;
+  const unknown = new Set<string>();
+  let rows = 0;
+
+  const startIndex = Math.max(0, FEEDS.findIndex((f) => f.key === state.feed));
+  for (let fi = startIndex; fi < FEEDS.length; fi++) {
+    const feed = FEEDS[fi];
+    let page = feed.key === state.feed && state.page ? state.page : 1;
+    let lastPage = Number.POSITIVE_INFINITY;
+
+    while (page <= lastPage) {
+      if (Date.now() > deadline) {
+        await setSetting(STATE_KEY, JSON.stringify({ feed: feed.key, page }));
+        return { ok: true, complete: false, rows, resumeAt: `${feed.key}:${page}`, ...(unknown.size ? { unknownStatuses: [...unknown] } : {}) };
+      }
+
+      let res: Record<string, unknown>;
+      try {
+        res = await getPage(feed.path(page));
+      } catch (e) {
+        // Rate limited / unreachable: keep the ground already covered.
+        await setSetting(STATE_KEY, JSON.stringify({ feed: feed.key, page }));
+        return {
+          ok: false, complete: false, rows, resumeAt: `${feed.key}:${page}`,
+          error: e instanceof Error ? e.message : "pull failed",
+          ...(unknown.size ? { unknownStatuses: [...unknown] } : {}),
+        };
+      }
+
+      const env = res[feed.envelope] as { data?: unknown[]; last_page?: number } | undefined;
+      const data = (env?.data as Record<string, unknown>[]) || [];
+      lastPage = Number(env?.last_page) || 1;
+
+      if (feed.envelope === "invoices") await writeInvoicePage(data);
+      else await writePaymentPage(data, unknown);
+      rows += data.length;
+
+      page++;
+      if (page <= lastPage) await sleep(SPACING_MS);
+    }
+  }
+
+  // Every feed walked to its last page — the mirror is whole.
+  await setSetting(STATE_KEY, JSON.stringify({}));
+  await setSetting(COMPLETE_KEY, new Date().toISOString());
+  return { ok: true, complete: true, rows, ...(unknown.size ? { unknownStatuses: [...unknown] } : {}) };
 }
 
 // ---------------------------------------------------------------------------
@@ -348,11 +359,11 @@ export async function getCustomerBilling(customer: {
         lastName: { equals: customer.lastName ?? "", mode: "insensitive" },
       },
     }),
-    // If the last sync failed, the mirror may be stale/partial — say so rather
-    // than presenting whatever is left as a confident lifetime figure.
-    getSetting("billing.lastSync").catch(() => null),
+    // Totals are only trustworthy once a FULL pass has completed at least once.
+    // Mid-backfill the mirror is real but incomplete, and must not be shown as fact.
+    getSetting(COMPLETE_KEY).catch(() => null),
   ]);
-  const syncOk = !lastSync || /ok=true/.test(lastSync);
+  const syncOk = Boolean(lastSync);
 
   const lifetimeCents = payAgg._sum.netCents || 0;
 

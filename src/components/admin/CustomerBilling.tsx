@@ -46,7 +46,7 @@ export function BillingStats({ billing, startDate }: { billing: CustomerBilling;
       value: billing.syncOk ? fmtMoney(billing.lifetimeCents) : "—",
       sub: billing.syncOk
         ? `${billing.paymentCount} successful payment${billing.paymentCount === 1 ? "" : "s"}`
-        : "billing sync incomplete",
+        : "importing billing history\u2026",
       tint: "#16A34A",
     },
   ];
@@ -72,7 +72,7 @@ export function BillingStats({ billing, startDate }: { billing: CustomerBilling;
       {!billing.syncOk && (
         <p className="mt-2 text-[11.5px] text-red-800 bg-red-50 border border-red-100 rounded-lg px-3 py-2 inline-flex items-start gap-1.5">
           <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-          <span>The last Sweep&amp;Go billing sync did not complete, so revenue figures are hidden rather than shown incomplete. They will return automatically on the next successful sync.</span>
+          <span>Billing history is still being imported from Sweep&amp;Go. Revenue is hidden until the full history has loaded, so you are never shown a partial total. This resumes automatically every few minutes.</span>
         </p>
       )}
       {billing.ambiguousName && (

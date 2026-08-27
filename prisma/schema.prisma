@@ -1216,6 +1216,9 @@ model SngInvoice {
 
 model SngPayment {
   id            String    @id @default(cuid())
+  /// Natural key (payments have no Sweep&Go id) so the sync can upsert instead
+  /// of wiping and rewriting — required for the resumable, rate-limit-tolerant sync.
+  dedupeKey     String    @unique
   clientName    String?
   nameKey       String
   paidOn        DateTime?
