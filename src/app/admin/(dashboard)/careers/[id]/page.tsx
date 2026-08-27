@@ -17,6 +17,7 @@ import prisma from "@/lib/prisma";
 import type { LeadStatus } from "@/types/leads";
 import StatusUpdateForm from "@/components/admin/StatusUpdateForm";
 import { ArrangeableBoard, type ArrangeableCard } from "@/components/admin/ArrangeableBoard";
+import { LeadActions } from "@/components/admin/LeadActions";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -289,6 +290,11 @@ export default async function CareerDetailPage({ params }: PageProps) {
           },
         ]
       : []),
+    {
+      id: "actions",
+      zone: "side",
+      node: <LeadActions leadId={app.id} leadType="career" isArchived={app.archived} />,
+    },
     {
       id: "status",
       zone: "side",

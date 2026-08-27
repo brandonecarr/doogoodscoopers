@@ -5,14 +5,16 @@ import type { LeadStatus, CareerApplication } from "@/types/leads";
 import { PageHero } from "@/components/admin/PageHero";
 
 interface PageProps {
-  searchParams: Promise<{ status?: string; search?: string; page?: string }>;
+  searchParams: Promise<{ status?: string; search?: string; page?: string; archived?: string }>;
 }
 
-async function getCareerApplications(status?: string, search?: string, page: number = 1) {
+async function getCareerApplications(status?: string, search?: string, page: number = 1, archived = false) {
   const pageSize = 20;
   const skip = (page - 1) * pageSize;
 
-  const where: Record<string, unknown> = {};
+  // Archiving has to actually hide something, so the list shows live
+  // applications by default and archived ones only on request.
+  const where: Record<string, unknown> = { archived };
 
   if (status && status !== "all") {
     where.status = status as LeadStatus;
@@ -81,10 +83,12 @@ function getStatusBadge(status: LeadStatus) {
 
 export default async function CareersPage({ searchParams }: PageProps) {
   const params = await searchParams;
+  const showArchived = params.archived === "1";
   const { applications, total, pageSize, currentPage } = await getCareerApplications(
     params.status,
     params.search,
-    params.page ? parseInt(params.page) : 1
+    params.page ? parseInt(params.page) : 1,
+    showArchived
   );
 
   const totalPages = Math.ceil(total / pageSize);
@@ -133,6 +137,15 @@ export default async function CareersPage({ searchParams }: PageProps) {
               <option value="CONVERTED">Converted</option>
             </select>
           </div>
+
+          {showArchived && <input type="hidden" name="archived" value="1" />}
+
+          <a
+            href={`/admin/careers${showArchived ? "" : "?archived=1"}`}
+            className="px-4 py-2 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors whitespace-nowrap text-sm font-medium"
+          >
+            {showArchived ? "← Back to active" : "View archived"}
+          </a>
 
           <button
             type="submit"
