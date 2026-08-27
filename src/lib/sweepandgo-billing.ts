@@ -166,6 +166,8 @@ async function writeInvoicePage(rows: Record<string, unknown>[]): Promise<void> 
       periodStart: parseDate(r.period_start),
       periodEnd: parseDate(r.period_end),
       sngCreatedAt: parseDate(r.created_at),
+      // Present when a card was declined and Sweep&Go has queued a retry.
+      nextTryChargingAt: parseDate(r.next_try_charging),
       syncedAt: new Date(),
     };
     await prisma.sngInvoice.upsert({

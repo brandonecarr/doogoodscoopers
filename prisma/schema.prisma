@@ -1216,7 +1216,16 @@ model SngInvoice {
   sngCreatedAt    DateTime?
   syncedAt        DateTime  @default(now())
 
+  /// Set by Sweep&Go when a card was declined and a retry is scheduled. With an
+  /// unpaid balance this is the "payment failed" signal the recovery flow uses.
+  nextTryChargingAt DateTime?
+  /// Local dunning bookkeeping — never written by the sync.
+  dunningStage      Int       @default(0)
+  dunningLastAt     DateTime?
+  dunningResolvedAt DateTime?
+
   @@index([nameKey])
   @@index([status])
   @@index([sngCreatedAt])
+  @@index([remainingCents])
 }
