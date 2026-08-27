@@ -107,6 +107,7 @@ function Num({
 export function CommunityQuoteCalculator({ mapboxToken }: { mapboxToken?: string }) {
   const [f, setF] = useState<Fields>(DEFAULTS);
   const [measuring, setMeasuring] = useState(false);
+  const [measured, setMeasured] = useState(0); // live total from the map
   const set = (k: keyof Fields, v: string) => setF((p) => ({ ...p, [k]: v }));
   const [copied, setCopied] = useState(false);
 
@@ -141,6 +142,17 @@ export function CommunityQuoteCalculator({ mapboxToken }: { mapboxToken?: string
       perUnitMo, perUnitYr, installTotal, oneTime, estDogs, tiers,
     };
   }, [f]);
+
+  // What the currently-traced area would do to the quote, at today's settings.
+  const measuredImpact = useMemo(() => {
+    if (measured <= 0) return null;
+    const onSite = measured * num(f.minutesPerAcre);
+    const labor = ((onSite + num(f.driveMinutes)) / 60) * num(f.loadedRate);
+    const perVisit = Math.max(labor, num(f.visitMinimum));
+    const monthly = perVisit * num(f.freqPerWeek) * 4.33 + num(f.stations) * num(f.stationMonthly);
+    const units = num(f.units);
+    return { onSite, perVisit, monthly, perUnit: units > 0 ? monthly / units : NaN, floored: labor > 0 && labor < num(f.visitMinimum) };
+  }, [measured, f]);
 
   const proposal = useMemo(() => {
     const name = f.property.trim() || "Your Community";
@@ -249,11 +261,43 @@ export function CommunityQuoteCalculator({ mapboxToken }: { mapboxToken?: string
             <div className="mt-3">
               <AreaMeasureMap
                 token={mapboxToken}
+                onTotalChange={setMeasured}
                 onApply={(acres, place) => {
                   set("acres", String(acres));
                   // Offer the searched place as the property name if none typed yet.
                   if (place && !f.property.trim()) set("property", place.split(",")[0]);
+                  // Collapse back to the form so the updated acres field is in view.
+                  setMeasuring(false);
                 }}
+                impact={
+                  measuredImpact && (
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-1.5">What this area prices at</p>
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] text-gray-600">
+                        <span><b className="text-navy-900">{measured.toFixed(2)}</b> ac</span>
+                        <span className="text-gray-300">×</span>
+                        <span>{f.minutesPerAcre} min/ac</span>
+                        <span className="text-gray-300">=</span>
+                        <span><b className="text-navy-900">{Math.round(measuredImpact.onSite)}</b> min on site</span>
+                        <span className="text-gray-300">→</span>
+                        <span><b className="text-navy-900">${measuredImpact.perVisit.toFixed(2)}</b>/visit</span>
+                        <span className="text-gray-300">→</span>
+                        <span><b className="text-green-700">${Math.round(measuredImpact.monthly).toLocaleString()}</b>/mo</span>
+                        {Number.isFinite(measuredImpact.perUnit) && (
+                          <>
+                            <span className="text-gray-300">→</span>
+                            <span><b className="text-navy-900">${measuredImpact.perUnit.toFixed(2)}</b>/unit/mo</span>
+                          </>
+                        )}
+                      </div>
+                      <p className="text-[11.5px] text-gray-500 mt-1.5">
+                        {measuredImpact.floored
+                          ? "Below your per-visit minimum, so the floor price applies."
+                          : "Tune sweep time per acre, drive time and rate under Service & pricing."}
+                      </p>
+                    </div>
+                  )
+                }
               />
             </div>
           )}

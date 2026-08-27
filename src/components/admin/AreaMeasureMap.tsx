@@ -36,9 +36,15 @@ interface Hit { name: string; center: [number, number] }
 export function AreaMeasureMap({
   token,
   onApply,
+  onTotalChange,
+  impact,
 }: {
   token: string | undefined;
   onApply?: (acres: number, note: string) => void;
+  /** Fires whenever the measured total changes, so the caller can price it live. */
+  onTotalChange?: (acres: number) => void;
+  /** Rendered under the tally — what this area does to the quote. */
+  impact?: React.ReactNode;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -51,6 +57,8 @@ export function AreaMeasureMap({
   const [mode, setMode] = useState<"idle" | "drawing">("idle");
   const modeRef = useRef(mode);
   modeRef.current = mode;
+  const draftRef = useRef<[number, number][]>(draft);
+  draftRef.current = draft;
 
   const [q, setQ] = useState("");
   const [hits, setHits] = useState<Hit[]>([]);
@@ -88,9 +96,15 @@ export function AreaMeasureMap({
         setReady(true);
       });
 
-      map.on("click", (e: { lngLat: { lng: number; lat: number } }) => {
+      map.on("click", (e: { lngLat: { lng: number; lat: number }; point: { x: number; y: number } }) => {
         if (modeRef.current !== "drawing") return;
-        setDraft((d) => [...d, [e.lngLat.lng, e.lngLat.lat]]);
+        const d = draftRef.current;
+        // Clicking back on the first point closes the shape (as well as double-click).
+        if (d.length >= 3) {
+          const p0 = map.project(d[0]);
+          if (Math.hypot(p0.x - e.point.x, p0.y - e.point.y) < 12) { finishShape(); return; }
+        }
+        setDraft((prev) => [...prev, [e.lngLat.lng, e.lngLat.lat]]);
       });
       map.on("mousemove", (e: { lngLat: { lng: number; lat: number } }) => {
         if (modeRef.current === "drawing") setCursor([e.lngLat.lng, e.lngLat.lat]);
@@ -134,22 +148,43 @@ export function AreaMeasureMap({
   }, [draft, cursor, mode, ready]);
 
   // ---- drawing ------------------------------------------------------------
-  const startDraw = () => { setDraft([]); setCursor(null); setMode("drawing"); setApplied(false); };
+  const startDraw = () => {
+    setDraft([]); setCursor(null); setMode("drawing"); setApplied(false);
+    mapRef.current?.doubleClickZoom?.disable();   // dbl-click closes a shape here
+  };
 
+  /** Close the current ring and immediately arm the next one — a community is
+   *  several separate lawns, so drawing stays on until you say you're done. */
   const finishShape = useCallback(() => {
-    setDraft((d) => {
-      if (d.length >= 3) {
-        const ring = d;
-        setShapes((s) => [...s, { id: `s${Date.now()}${s.length}`, ring, acres: acresOf(ring) }]);
-      }
-      return [];
-    });
+    const ring = draftRef.current;
+    if (ring.length >= 3) {
+      setShapes((s) => [...s, { id: `s${Date.now()}_${s.length}`, ring, acres: acresOf(ring) }]);
+      setApplied(false);
+    }
+    setDraft([]);
     setCursor(null);
-    setMode("idle");
+    setMode("drawing"); // keep going
   }, []);
 
   const undoPoint = () => setDraft((d) => d.slice(0, -1));
-  const cancelDraw = () => { setDraft([]); setCursor(null); setMode("idle"); };
+  const stopDrawing = () => {
+    setDraft([]); setCursor(null); setMode("idle");
+    mapRef.current?.doubleClickZoom?.enable();
+  };
+
+  // Enter closes the current shape, Escape stops drawing.
+  useEffect(() => {
+    if (mode !== "drawing") return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Enter") { e.preventDefault(); finishShape(); }
+      if (e.key === "Escape") { e.preventDefault(); stopDrawing(); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [mode, finishShape]);
+
+  // Report the running total so the caller can price it live.
+  useEffect(() => { onTotalChange?.(Math.round(total * 100) / 100); }, [total, onTotalChange]);
 
   // ---- search -------------------------------------------------------------
   const search = async (e?: React.FormEvent) => {
@@ -224,8 +259,9 @@ export function AreaMeasureMap({
       <div className="relative">
         <div ref={containerRef} className="w-full h-[460px] rounded-xl overflow-hidden border border-gray-200" />
         {mode === "drawing" && (
-          <div className="absolute top-3 left-3 bg-white/95 backdrop-blur px-3 py-2 rounded-lg shadow text-[12px] text-navy-900">
-            Click each corner of the grass area · <b>double-click to close it</b>
+          <div className="absolute top-3 left-3 bg-white/95 backdrop-blur px-3 py-2 rounded-lg shadow text-[12px] text-navy-900 max-w-[300px]">
+            Click each corner of a grass area, then <b>double-click</b> (or press <b>Enter</b>) to close it.
+            {shapes.length > 0 && <span className="block mt-0.5 text-green-700 font-semibold">{shapes.length} area{shapes.length === 1 ? "" : "s"} saved — keep drawing to add more.</span>}
           </div>
         )}
       </div>
@@ -243,15 +279,16 @@ export function AreaMeasureMap({
             <button type="button" onClick={finishShape} disabled={draft.length < 3}
               className="px-3.5 py-2 rounded-lg text-white text-[13px] font-semibold disabled:opacity-40 inline-flex items-center gap-1.5"
               style={{ background: "#16A34A" }}>
-              <Check className="w-4 h-4" /> Finish area
+              <Check className="w-4 h-4" /> Finish this area
             </button>
             <button type="button" onClick={undoPoint} disabled={!draft.length}
               className="px-3 py-2 rounded-lg border border-gray-200 text-[13px] font-semibold text-gray-700 disabled:opacity-40 inline-flex items-center gap-1.5">
               <Undo2 className="w-4 h-4" /> Undo point
             </button>
-            <button type="button" onClick={cancelDraw}
-              className="px-3 py-2 rounded-lg border border-gray-200 text-[13px] font-semibold text-gray-700">
-              Cancel
+            <button type="button" onClick={stopDrawing}
+              className="px-3 py-2 rounded-lg border text-[13px] font-semibold"
+              style={{ borderColor: "#6D3EF0", color: "#6D3EF0" }}>
+              Done measuring
             </button>
           </>
         )}
@@ -305,6 +342,10 @@ export function AreaMeasureMap({
               </li>
             ))}
           </ul>
+        )}
+
+        {impact && total > 0 && (
+          <div className="mt-3 pt-3 border-t border-gray-100">{impact}</div>
         )}
 
         {shapes.length === 0 && (
