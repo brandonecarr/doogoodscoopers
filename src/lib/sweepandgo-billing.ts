@@ -24,11 +24,20 @@ import { getSetting, setSetting } from "@/lib/google-business";
  */
 
 const SNG_BASE = "https://openapi.sweepandgo.com/api/v2";
-const PER_PAGE = 100;        // honoured by the API: 1,391 payments → 14 pages
-const SPACING_MS = 1_500;    // deliberate pacing between pages
+const PER_PAGE = 100;          // honoured by the API: 1,391 payments → 14 pages
+const SPACING_MS = 2_000;      // deliberate pacing between pages
 const PAGE_TIMEOUT_MS = 20_000;
-const RETRIES = 5;
-const BUDGET_MS = 230_000;   // stop and resume next tick, well inside maxDuration
+const RETRIES = 2;             // for transient errors only — NEVER for 429s
+// Sweep&Go enforces a quota over a window, not just a burst rate. Retrying hard
+// through a 429 just deepens the hole (one run burned 5 minutes on backoff and
+// was killed at the 300s function limit). So: take a small bite each run, and
+// the instant we see a 429, save our place and leave the API alone.
+const MAX_PAGES_PER_RUN = 6;
+const BUDGET_MS = 120_000;
+// Once the history is fully imported, only the newest pages need re-reading.
+const REFRESH_PAGES = 2;
+
+class RateLimited extends Error {}
 
 const STATE_KEY = "billing.syncState";
 const COMPLETE_KEY = "billing.complete";
@@ -105,12 +114,9 @@ async function getPage(path: string): Promise<Record<string, unknown>> {
       });
       if (res.ok) return (await res.json()) as Record<string, unknown>;
       lastErr = `HTTP ${res.status}`;
-      if (res.status === 429) {
-        const ra = Number(res.headers.get("retry-after")) || 0;
-        clearTimeout(timer);
-        if (attempt < RETRIES) await sleep(ra > 0 ? Math.min(ra * 1000, 30_000) : Math.min(3_000 * 2 ** (attempt - 1), 30_000));
-        continue;
-      }
+      // Rate limited: stop the run immediately. Progress is saved by the caller
+      // and the next tick resumes — no point burning the function's clock here.
+      if (res.status === 429) throw new RateLimited(`${path}: rate limited`);
     } catch (e) {
       lastErr = e instanceof Error ? e.message : "fetch failed";
     } finally {
@@ -217,6 +223,12 @@ export async function syncSngBilling(): Promise<BillingSyncResult> {
   const deadline = Date.now() + BUDGET_MS;
   const unknown = new Set<string>();
   let rows = 0;
+  let pagesThisRun = 0;
+
+  // Two modes. Until the history is fully imported we are BACKFILLING and must
+  // walk every page. Once complete, a refresh only needs the newest pages.
+  const completedAt = await getSetting(COMPLETE_KEY).catch(() => null);
+  const refreshing = Boolean(completedAt) && !state.feed;
 
   const startIndex = Math.max(0, FEEDS.findIndex((f) => f.key === state.feed));
   for (let fi = startIndex; fi < FEEDS.length; fi++) {
@@ -225,6 +237,11 @@ export async function syncSngBilling(): Promise<BillingSyncResult> {
     let lastPage = Number.POSITIVE_INFINITY;
 
     while (page <= lastPage) {
+      if (refreshing && page > REFRESH_PAGES) break;
+      if (!refreshing && pagesThisRun >= MAX_PAGES_PER_RUN) {
+        await setSetting(STATE_KEY, JSON.stringify({ feed: feed.key, page }));
+        return { ok: true, complete: false, rows, resumeAt: `${feed.key}:${page}`, ...(unknown.size ? { unknownStatuses: [...unknown] } : {}) };
+      }
       if (Date.now() > deadline) {
         await setSetting(STATE_KEY, JSON.stringify({ feed: feed.key, page }));
         return { ok: true, complete: false, rows, resumeAt: `${feed.key}:${page}`, ...(unknown.size ? { unknownStatuses: [...unknown] } : {}) };
@@ -234,11 +251,13 @@ export async function syncSngBilling(): Promise<BillingSyncResult> {
       try {
         res = await getPage(feed.path(page));
       } catch (e) {
-        // Rate limited / unreachable: keep the ground already covered.
+        // Rate limited / unreachable: keep the ground already covered and stop.
         await setSetting(STATE_KEY, JSON.stringify({ feed: feed.key, page }));
+        const limited = e instanceof RateLimited;
         return {
-          ok: false, complete: false, rows, resumeAt: `${feed.key}:${page}`,
-          error: e instanceof Error ? e.message : "pull failed",
+          ok: limited, // being throttled is expected pacing, not a failure
+          complete: false, rows, resumeAt: `${feed.key}:${page}`,
+          error: limited ? "rate limited — will resume next run" : e instanceof Error ? e.message : "pull failed",
           ...(unknown.size ? { unknownStatuses: [...unknown] } : {}),
         };
       }
@@ -250,6 +269,7 @@ export async function syncSngBilling(): Promise<BillingSyncResult> {
       if (feed.envelope === "invoices") await writeInvoicePage(data);
       else await writePaymentPage(data, unknown);
       rows += data.length;
+      pagesThisRun++;
 
       page++;
       if (page <= lastPage) await sleep(SPACING_MS);

@@ -5,7 +5,7 @@ import { setSetting } from "@/lib/google-business";
 // Refreshes the Sweep&Go billing mirror (invoices + payments) that powers the
 // lifetime-value header and invoice list on each customer profile.
 export const dynamic = "force-dynamic";
-export const maxDuration = 300;
+export const maxDuration = 150;
 
 export async function GET(request: NextRequest) {
   const secret = process.env.CRON_SECRET;
