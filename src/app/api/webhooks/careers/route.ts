@@ -59,15 +59,19 @@ function keyForms(k: string): string[] {
   return forms;
 }
 
-/** First value whose KEY loosely matches any pattern. */
-function pick(flat: Flat, patterns: RegExp[]): string {
-  for (const p of patterns) {
-    for (const [k, v] of Object.entries(flat)) {
-      if (!String(v).trim()) continue;
-      if (keyForms(k).some((form) => p.test(form))) return String(v).trim();
+/** First value whose KEY loosely matches any pattern; records the key used. */
+function makePicker(flat: Flat) {
+  const used = new Set<string>();
+  const pick = (patterns: RegExp[]): string => {
+    for (const p of patterns) {
+      for (const [k, v] of Object.entries(flat)) {
+        if (!String(v).trim() || used.has(k)) continue;
+        if (keyForms(k).some((form) => p.test(form))) { used.add(k); return String(v).trim(); }
+      }
     }
-  }
-  return "";
+    return "";
+  };
+  return { pick, used };
 }
 
 const yes = (v: string) => /^(1|y|yes|true|on|checked)$/i.test(v.trim());
@@ -101,44 +105,40 @@ export async function POST(request: NextRequest) {
   }
 
   const flat = flatten(raw);
+  const { pick, used } = makePicker(flat);
 
   // --- map the fields we care about ----------------------------------------
-  let firstName = pick(flat, [/^firstname$/, /firstname/, /^fname$/]);
-  let lastName = pick(flat, [/^lastname$/, /lastname/, /^lname$/, /surname/]);
-  const fullName = pick(flat, [/^name$/, /^fullname$/, /yourname/, /applicantname/]);
+  let firstName = pick([/^firstname$/, /firstname/, /^fname$/]);
+  let lastName = pick([/^lastname$/, /lastname/, /^lname$/, /surname/]);
+  const fullName = pick([/^name$/, /^fullname$/, /yourname/, /applicantname/]);
   if ((!firstName || !lastName) && fullName) {
     const parts = fullName.split(/\s+/);
     firstName = firstName || parts[0] || "";
     lastName = lastName || parts.slice(1).join(" ") || "";
   }
 
-  const email = pick(flat, [/email/]);
-  const phone = pick(flat, [/phone/, /mobile/, /cell/, /tel/, /number/]);
+  const email = pick([/email/]);
+  const phone = pick([/phonenumber/, /^phone/, /mobile/, /cell/, /^tel/]);
 
   if (!email && !phone) {
     return NextResponse.json({ success: false, error: "Need at least an email or phone" }, { status: 400 });
   }
 
-  const address = pick(flat, [/^address$/, /street/, /address1/, /addressline/]);
-  const city = pick(flat, [/^city$/, /town/]);
-  const dateOfBirth = pick(flat, [/dob/, /dateofbirth/, /birth/]);
-  const driversLicense = pick(flat, [/license/, /licence/, /^dl$/]);
-  const ssnLast4 = pick(flat, [/ssn/, /social/]);
-  const references = pick(flat, [/reference/]);
-  const currentEmployment = pick(flat, [/currentemploy/, /employer/, /currentjob/]);
-  const workDuties = pick(flat, [/duties/, /responsibilit/]);
-  const whyLeftPrevious = pick(flat, [/whyleft/, /reasonforleaving/, /leaving/]);
-  const previousBossContact = pick(flat, [/previousboss/, /formersupervisor/, /supervisor/]);
-  const whyWorkHere = pick(flat, [/whywork/, /whyhere/, /whyjoin/, /tellus/, /message/, /comment/]);
+  const address = pick([/^address$/, /street/, /address1/, /addressline/]);
+  const city = pick([/^city$/, /town/]);
+  const dateOfBirth = pick([/dob/, /dateofbirth/, /birth/]);
+  const driversLicense = pick([/license/, /licence/, /^dl$/]);
+  const ssnLast4 = pick([/ssn/, /social/, /ss#/, /last4/]);
+  const references = pick([/reference/]);
+  const currentEmployment = pick([/currentemploy/, /currentlyemployed/, /currentjob/]);
+  const workDuties = pick([/duties/, /responsibilit/]);
+  const whyLeftPrevious = pick([/whyleft/, /leaveyourprevious/, /leaveprevious/, /reasonforleaving/, /leaving/, /youleave/]);
+  const previousBossContact = pick([/previousboss/, /oldboss/, /bossname/, /formersupervisor/, /supervisor/]);
+  const whyWorkHere = pick([/whywork/, /workhere/, /whyhere/, /whyjoin/, /wanttowork/]);
 
   // Anything not mapped is still worth keeping — recruiters read it.
-  const mappedValues = new Set(
-    [firstName, lastName, fullName, email, phone, address, city, dateOfBirth, driversLicense,
-      ssnLast4, references, currentEmployment, workDuties, whyLeftPrevious, previousBossContact, whyWorkHere]
-      .filter(Boolean)
-  );
   const extras = Object.entries(flat)
-    .filter(([k, v]) => v.trim() && !mappedValues.has(v.trim()) && !/^(key|_wpnonce|action|form_id|post_id|referrer|page_url|user_agent|remote_ip)$/i.test(k))
+    .filter(([k, v]) => v.trim() && !used.has(k) && !/^(key|_wpnonce|action|form_id|post_id)$/i.test(k))
     .map(([k, v]) => `${k}: ${v}`);
 
   const noteLines = ["Submitted via doogoodscoopers.com/careers"];
@@ -157,10 +157,10 @@ export async function POST(request: NextRequest) {
         dateOfBirth: dateOfBirth || null,
         driversLicense: driversLicense || null,
         ssnLast4: ssnLast4 || null,
-        legalCitizen: yes(pick(flat, [/citizen/, /legallyauthorized/, /eligibletowork/])),
-        hasAutoInsurance: yes(pick(flat, [/insurance/])),
-        convictedFelony: yes(pick(flat, [/felony/, /convicted/])),
-        mayContactEmployers: yes(pick(flat, [/contactemployer/, /maycontact/])),
+        legalCitizen: yes(pick([/citizen/, /legallyauthorized/, /eligibletowork/])),
+        hasAutoInsurance: yes(pick([/insurance/])),
+        convictedFelony: yes(pick([/felony/, /convicted/])),
+        mayContactEmployers: yes(pick([/contactemployer/, /maycontact/, /wecontact/, /contactyour/])),
         references: references || null,
         currentEmployment: currentEmployment || null,
         workDuties: workDuties || null,
