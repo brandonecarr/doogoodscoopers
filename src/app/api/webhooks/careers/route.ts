@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
   }
 
   const email = pick(flat, [/email/]);
-  const phone = pick(flat, [/phone/, /^tel$/, /mobile/, /cell/]);
+  const phone = pick(flat, [/phone/, /mobile/, /cell/, /tel/, /number/]);
 
   if (!email && !phone) {
     return NextResponse.json({ success: false, error: "Need at least an email or phone" }, { status: 400 });
