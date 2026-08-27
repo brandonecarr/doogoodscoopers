@@ -36,11 +36,30 @@ const MAX_PAGES_PER_RUN = 12;
 const BUDGET_MS = 120_000;
 // Once the history is fully imported, only the newest pages need re-reading.
 const REFRESH_PAGES = 2;
+// ...but a refresh only sees the NEWEST invoices, and invoices are ordered by
+// creation date, not payment date. A long-overdue invoice settled months later
+// would never re-enter that window, silently understating lifetime revenue. So
+// re-walk everything once a night (~2am Pacific), with a staleness safety net.
+const FULL_SYNC_UTC_HOUR = 9;
+const FULL_MIN_AGE_MS = 12 * 60 * 60 * 1000;
+const FULL_MAX_AGE_MS = 30 * 60 * 60 * 1000;
 
 class RateLimited extends Error {}
 
 const STATE_KEY = "billing.syncState";
 const COMPLETE_KEY = "billing.complete";
+const FULL_KEY = "billing.lastFullSync";
+
+/** Is a full re-walk of every invoice due? */
+function fullSyncDue(lastFull: string | null): boolean {
+  if (!lastFull) return true;
+  const age = Date.now() - Date.parse(lastFull);
+  if (Number.isNaN(age)) return true;
+  // Preferred: the quiet hour, once we're comfortably past the last full pass.
+  if (new Date().getUTCHours() === FULL_SYNC_UTC_HOUR && age > FULL_MIN_AGE_MS) return true;
+  // Safety net, in case the quiet-hour tick was missed entirely.
+  return age > FULL_MAX_AGE_MS;
+}
 
 interface Feed {
   key: string;
@@ -160,8 +179,10 @@ async function writeInvoicePage(rows: Record<string, unknown>[]): Promise<void> 
 
 export interface BillingSyncResult {
   ok: boolean;
-  /** True when a full pass finished during this run. */
+  /** True when a pass finished during this run. */
   complete: boolean;
+  /** True when the finished pass re-walked every invoice, not just the newest. */
+  full?: boolean;
   rows: number;
   /** Where the next run will resume, when this one stopped early. */
   resumeAt?: string;
@@ -186,10 +207,13 @@ export async function syncSngBilling(): Promise<BillingSyncResult> {
   let rows = 0;
   let pagesThisRun = 0;
 
-  // Two modes. Until the history is fully imported we are BACKFILLING and must
-  // walk every page. Once complete, a refresh only needs the newest pages.
-  const completedAt = await getSetting(COMPLETE_KEY).catch(() => null);
-  const refreshing = Boolean(completedAt) && !state.feed;
+  // Three cases. Mid-backfill (state.feed set) we continue the full walk. A due
+  // nightly pass also walks everything. Otherwise we just refresh the newest pages.
+  const [completedAt, lastFull] = await Promise.all([
+    getSetting(COMPLETE_KEY).catch(() => null),
+    getSetting(FULL_KEY).catch(() => null),
+  ]);
+  const refreshing = Boolean(completedAt) && !state.feed && !fullSyncDue(lastFull);
 
   const startIndex = Math.max(0, FEEDS.findIndex((f) => f.key === state.feed));
   for (let fi = startIndex; fi < FEEDS.length; fi++) {
@@ -251,7 +275,9 @@ export async function syncSngBilling(): Promise<BillingSyncResult> {
   // Every feed walked to its last page — the mirror is whole.
   await setSetting(STATE_KEY, JSON.stringify({}));
   await setSetting(COMPLETE_KEY, new Date().toISOString());
-  return { ok: true, complete: true, rows, ...(unknown.size ? { unknownStatuses: [...unknown] } : {}) };
+  // Only a FULL walk re-verifies old invoices, so only that resets the clock.
+  if (!refreshing) await setSetting(FULL_KEY, new Date().toISOString());
+  return { ok: true, complete: true, full: !refreshing, rows, ...(unknown.size ? { unknownStatuses: [...unknown] } : {}) };
 }
 
 // ---------------------------------------------------------------------------

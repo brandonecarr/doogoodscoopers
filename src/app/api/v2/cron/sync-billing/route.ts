@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
   const result = await syncSngBilling();
   await setSetting(
     "billing.lastSync",
-    `${new Date().toISOString()} ok=${result.ok} complete=${result.complete} rows=${result.rows}` +
+    `${new Date().toISOString()} ok=${result.ok} complete=${result.complete}${result.full ? " full=true" : ""} rows=${result.rows}` +
       `${result.resumeAt ? ` resumeAt=${result.resumeAt}` : ""}` +
       `${result.unknownStatuses?.length ? ` unknownStatuses=${result.unknownStatuses.join(",")}` : ""}` +
       `${result.error ? ` error=${result.error}` : ""}`
