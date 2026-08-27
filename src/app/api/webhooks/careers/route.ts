@@ -43,11 +43,28 @@ function flatten(input: unknown, prefix = "", out: Flat = {}): Flat {
   return out;
 }
 
+const norm = (x: string) => x.toLowerCase().replace(/[\s_-]+/g, "");
+
+/**
+ * Every way a key might reasonably be written, so anchored patterns still work.
+ * Elementor posts `form_fields[name]` and Gravity `input_3` — matching only the
+ * whole key means /^name$/ never fires and the applicant arrives nameless.
+ */
+function keyForms(k: string): string[] {
+  const forms = [norm(k)];
+  const bracket = k.match(/\[([^\]]+)\]\s*$/);   // form_fields[name] -> name
+  if (bracket) forms.push(norm(bracket[1]));
+  const leaf = k.split(".").pop();                // a.b.city -> city
+  if (leaf && leaf !== k) forms.push(norm(leaf));
+  return forms;
+}
+
 /** First value whose KEY loosely matches any pattern. */
 function pick(flat: Flat, patterns: RegExp[]): string {
   for (const p of patterns) {
     for (const [k, v] of Object.entries(flat)) {
-      if (p.test(k.toLowerCase().replace(/[\s_-]+/g, "")) && String(v).trim()) return String(v).trim();
+      if (!String(v).trim()) continue;
+      if (keyForms(k).some((form) => p.test(form))) return String(v).trim();
     }
   }
   return "";
