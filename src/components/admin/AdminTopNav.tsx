@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   TrendingUp,
+  Grid3x3,
   Users2,
   Dog,
   Star,
@@ -41,6 +42,7 @@ const primaryNav: NavItem[] = [
   { name: "Marketing", short: "Marketing", href: "/admin/marketing", icon: Rocket },
   { name: "Ask DGS",   short: "Ask DGS",   href: "/admin/ask",       icon: Bot },
   { name: "Profitability", short: "Profit", href: "/admin/profitability", icon: TrendingUp },
+  { name: "Local Rank Grid", short: "Rank Grid", href: "/admin/rank-grid", icon: Grid3x3 },
 ];
 
 const moreNav: NavItem[] = [

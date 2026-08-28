@@ -1261,3 +1261,59 @@ model Expense {
   @@index([occurredOn])
   @@index([startedOn])
 }
+
+// =====================
+// LOCAL RANK GRID (Local Falcon style)
+// =====================
+// Local search ranking is distance-sensitive: you can be #1 at your own address
+// and invisible three miles away. So rank is sampled from a grid of points
+// around a city rather than asked once.
+model RankGridCity {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  name      String
+  lat       Float
+  lng       Float
+  /// N x N sample points.
+  gridSize  Int      @default(7)
+  spacingKm Float    @default(2)
+  active    Boolean  @default(true)
+
+  @@index([active])
+}
+
+model RankGridScan {
+  id           String   @id @default(cuid())
+  createdAt    DateTime @default(now())
+  cityId       String
+  cityName     String
+  keyword      String
+  businessName String
+  gridSize     Int
+  spacingKm    Float
+  pointCount   Int      @default(0)
+  /// Points where we appeared in the results at all.
+  foundCount   Int      @default(0)
+  /// Points where we made the local 3-pack.
+  top3Count    Int      @default(0)
+  /// Mean rank across points where we were found.
+  avgRank      Float?
+  status       String   @default("ok")
+  error        String?
+
+  @@index([cityId])
+  @@index([createdAt])
+}
+
+model RankGridPoint {
+  id       String  @id @default(cuid())
+  scanId   String
+  lat      Float
+  lng      Float
+  /// null = we did not appear in the results at this point.
+  rank     Int?
+  /// Who outranked us here.
+  topNames String?
+
+  @@index([scanId])
+}
