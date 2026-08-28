@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Plus, Trash2, Loader2, Play, MapPin, Trophy, AlertTriangle } from "lucide-react";
+import { Plus, Trash2, Loader2, Play, MapPin, Trophy, AlertTriangle, Search } from "lucide-react";
 import "mapbox-gl/dist/mapbox-gl.css";
 
 /**
@@ -17,7 +17,7 @@ interface Scan {
 }
 interface Point { lat: number; lng: number; rank: number | null; topNames: string | null }
 
-const COST_PER_CALL = 0.032;
+const COST = { dataforseo: 0.002, places: 0.032 } as const;
 const inputCls = "w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#6D3EF0]/30 focus:border-transparent";
 
 /** Local Falcon-style scale: green = in the 3-pack, red = nowhere. */
@@ -31,6 +31,9 @@ function rankColor(rank: number | null): string {
 }
 
 export function RankGrid({ token, defaultBusiness }: { token?: string; defaultBusiness: string }) {
+  const [provider, setProvider] = useState<"dataforseo" | "places">("places");
+  const [test, setTest] = useState<{ ok: boolean; found: boolean; rank: number | null; topNames: string; error?: string } | null>(null);
+  const [testing, setTesting] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mapRef = useRef<any>(null);
@@ -53,7 +56,7 @@ export function RankGrid({ token, defaultBusiness }: { token?: string; defaultBu
 
   const city = cities.find((c) => c.id === cityId) || null;
   const pointCount = city ? city.gridSize * city.gridSize : 0;
-  const estCost = pointCount * COST_PER_CALL;
+  const estCost = pointCount * COST[provider];
 
   const loadCities = useCallback(() => {
     fetch("/api/admin/rank-grid/cities")
@@ -66,6 +69,15 @@ export function RankGrid({ token, defaultBusiness }: { token?: string; defaultBu
       .catch(() => {});
   }, []);
   useEffect(loadCities, [loadCities]);
+
+  // Which data source is live? Places cannot see service-area businesses, so
+  // this is worth stating plainly rather than discovering mid-scan.
+  useEffect(() => {
+    fetch("/api/admin/rank-grid/test")
+      .then((r) => r.json())
+      .then((d) => { if (d.provider) setProvider(d.provider); })
+      .catch(() => {});
+  }, []);
 
   // ---- map ---------------------------------------------------------------
   useEffect(() => {
@@ -162,6 +174,21 @@ export function RankGrid({ token, defaultBusiness }: { token?: string; defaultBu
     if (cityId === id) { setCityId(""); setScan(null); setPoints([]); }
   };
 
+  const runTest = async () => {
+    setError(""); setTest(null);
+    if (!cityId) return setError("Add and select a city first.");
+    setTesting(true);
+    try {
+      const res = await fetch("/api/admin/rank-grid/test", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cityId, keyword, businessName: business }),
+      });
+      const d = await res.json();
+      if (!res.ok) { setError(d.error || "Test failed."); return; }
+      setTest(d);
+    } finally { setTesting(false); }
+  };
+
   const run = async () => {
     setError("");
     if (!cityId) return setError("Add and select a city first.");
@@ -209,11 +236,41 @@ export function RankGrid({ token, defaultBusiness }: { token?: string; defaultBu
             <input value={business} onChange={(e) => setBusiness(e.target.value)} className={inputCls} />
           </div>
 
+          <div className="rounded-lg px-3 py-2 text-[11.5px]"
+            style={provider === "dataforseo"
+              ? { background: "#F0FDF4", border: "1px solid #BBF7D0", color: "#166534" }
+              : { background: "#FFFBEB", border: "1px solid #FDE68A", color: "#92400E" }}>
+            {provider === "dataforseo" ? (
+              <>Source: <b>DataForSEO</b> — reads live Google Maps, which includes service-area businesses.</>
+            ) : (
+              <>Source: <b>Google Places</b> — it cannot see service-area businesses with hidden addresses, so <b>DooGoodScoopers will show as “not ranking” everywhere</b>. Fine for tracking competitors. Add <code className="bg-white/60 px-1 rounded">DATAFORSEO_LOGIN</code> and <code className="bg-white/60 px-1 rounded">DATAFORSEO_PASSWORD</code> to track yourself.</>
+            )}
+          </div>
+
           {city && (
             <p className="text-[11.5px] text-gray-500">
-              {pointCount} points · about <b>${estCost.toFixed(2)}</b> in Google Places calls
-              <span className="block text-gray-400">First 5,000 calls each month are free.</span>
+              {pointCount} points · about <b>${estCost.toFixed(2)}</b> per scan
+              {provider === "places" && <span className="block text-gray-400">First 5,000 Places calls each month are free.</span>}
             </p>
+          )}
+
+          <button onClick={runTest} disabled={testing || !cityId}
+            className="w-full px-3 py-2 rounded-lg border border-gray-200 text-[13px] font-semibold text-gray-700 disabled:opacity-50 inline-flex items-center justify-center gap-1.5">
+            {testing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+            Test one point first (${COST[provider].toFixed(3)})
+          </button>
+
+          {test && (
+            <div className="rounded-lg px-3 py-2 text-[12px]"
+              style={test.found
+                ? { background: "#F0FDF4", border: "1px solid #BBF7D0", color: "#166534" }
+                : { background: "#FEF2F2", border: "1px solid #FECACA", color: "#991B1B" }}>
+              {test.error
+                ? <>Test failed: {test.error}</>
+                : test.found
+                  ? <><b>Found you at rank #{test.rank}</b> from the city centre. This source can see your listing — a full grid will be meaningful.</>
+                  : <><b>Not found</b> from the city centre. Top results here: {test.topNames || "none"}. A full grid would be all red — check the business name spelling, or the source can&apos;t see service-area businesses.</>}
+            </div>
           )}
 
           {error && (

@@ -9,12 +9,27 @@ import prisma from "@/lib/prisma";
  * lat/lng points across a city and records the rank at each one, which is what
  * turns ranking into a map you can act on.
  *
- * Data source: Google Places API (New) Text Search, biased to each grid point.
- * ⚠️ It approximates the live 3-pack rather than reproducing it exactly — the
- * same caveat every tool in this category carries.
+ * TWO DATA SOURCES, and the choice matters enormously:
+ *
+ *  - DataForSEO (preferred): reads the live Google Maps result set, which
+ *    INCLUDES service-area businesses. DooGoodScoopers is an SAB with a hidden
+ *    address, so this is the only source that can see us at all.
+ *  - Google Places API (fallback): cheaper and already configured, but Google's
+ *    Places index OMITS service-area businesses with hidden addresses (a
+ *    long-standing documented limitation). Verified live: a name search for
+ *    "DooGoodScoopers" returns 0 results with no location bias, while
+ *    competitors with public addresses return fine. Useful for competitor
+ *    tracking; useless for tracking ourselves.
+ *
+ * Whichever source is used, it approximates the live 3-pack rather than
+ * reproducing it exactly — the caveat every tool in this category carries.
  */
 
 const SEARCH_URL = "https://places.googleapis.com/v1/places:searchText";
+// Live mode: synchronous (~6s), so a scan completes in one request instead of
+// polling a 5-minute queue. $0.002/point vs $0.0006 standard — pennies either
+// way, and worth it for a scan you trigger from a button.
+const DFS_URL = "https://api.dataforseo.com/v3/serp/google/maps/live/advanced";
 const MAX_RESULTS = 20;      // Text Search caps here
 const CONCURRENCY = 5;
 const POINT_TIMEOUT_MS = 12_000;
@@ -22,6 +37,24 @@ const POINT_TIMEOUT_MS = 12_000;
 export const MAX_GRID = 13;
 /** Google Places Text Search (Pro SKU), USD per call, after 5,000 free/month. */
 export const COST_PER_CALL_USD = 0.032;
+/** DataForSEO Google Maps SERP, live mode, USD per point. */
+export const DFS_COST_PER_CALL_USD = 0.002;
+
+export type Provider = "dataforseo" | "places";
+
+function dfsAuth(): string | null {
+  const login = process.env.DATAFORSEO_LOGIN;
+  const password = process.env.DATAFORSEO_PASSWORD;
+  if (!login || !password) return null;
+  return Buffer.from(`${login}:${password}`).toString("base64");
+}
+
+/** DataForSEO when configured (it can see SABs); Places only as a fallback. */
+export function activeProvider(): Provider {
+  return dfsAuth() ? "dataforseo" : "places";
+}
+
+export const costPerCall = (p: Provider) => (p === "dataforseo" ? DFS_COST_PER_CALL_USD : COST_PER_CALL_USD);
 
 export interface GridPoint { lat: number; lng: number }
 
@@ -43,7 +76,8 @@ export function buildGrid(lat: number, lng: number, size: number, spacingKm: num
   return pts;
 }
 
-export const estimateCostUsd = (points: number) => points * COST_PER_CALL_USD;
+export const estimateCostUsd = (points: number, provider: Provider = activeProvider()) =>
+  points * costPerCall(provider);
 
 function apiKey(): string | undefined {
   return process.env.GOOGLE_MAPS_SERVER_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || undefined;
@@ -58,6 +92,54 @@ function matches(candidate: string, business: string): boolean {
 }
 
 interface PointResult { lat: number; lng: number; rank: number | null; topNames: string }
+
+/**
+ * One Google Maps result set as seen FROM this coordinate.
+ * `location_coordinate` ("lat,lng,zoom") is purpose-built for geo-grids — it is
+ * what makes each point a genuinely different vantage rather than one search
+ * re-filtered.
+ */
+async function rankAtPointDfs(p: GridPoint, keyword: string, business: string, auth: string): Promise<PointResult> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 30_000);
+  try {
+    const res = await fetch(DFS_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Basic ${auth}` },
+      body: JSON.stringify([{
+        keyword,
+        location_coordinate: `${p.lat.toFixed(6)},${p.lng.toFixed(6)},14z`,
+        language_code: "en",
+        device: "desktop",
+        os: "windows",
+      }]),
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+
+    // DataForSEO reports failures INSIDE a 200 response, so the envelope has to
+    // be checked or every point silently becomes "not ranking".
+    const task = json?.tasks?.[0];
+    if (!task) throw new Error("no task in response");
+    if (task.status_code && task.status_code !== 20000) {
+      throw new Error(`${task.status_code}: ${task.status_message || "task failed"}`);
+    }
+
+    const items = (task.result?.[0]?.items || []) as { title?: string; rank_absolute?: number; type?: string }[];
+    const listings = items.filter((i) => i.title);
+    const idx = listings.findIndex((i) => matches(i.title as string, business));
+    return {
+      lat: p.lat,
+      lng: p.lng,
+      // Prefer Google's own rank when present; fall back to list position.
+      rank: idx >= 0 ? (listings[idx].rank_absolute ?? idx + 1) : null,
+      topNames: listings.slice(0, 3).map((i) => i.title as string).join(", "),
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 async function rankAtPoint(p: GridPoint, keyword: string, business: string, key: string): Promise<PointResult> {
   const controller = new AbortController();
@@ -109,8 +191,11 @@ export async function runRankScan(opts: {
   keyword: string;
   businessName: string;
 }): Promise<ScanResult> {
+  const provider = activeProvider();
+  const auth = dfsAuth();
   const key = apiKey();
-  if (!key) return { ok: false, error: "No Google Maps API key configured." };
+  if (provider === "dataforseo" && !auth) return { ok: false, error: "DataForSEO credentials missing." };
+  if (provider === "places" && !key) return { ok: false, error: "No Google Maps API key configured." };
 
   const city = await prisma.rankGridCity.findUnique({ where: { id: opts.cityId } });
   if (!city) return { ok: false, error: "City not found." };
@@ -122,7 +207,11 @@ export async function runRankScan(opts: {
   for (let i = 0; i < points.length; i += CONCURRENCY) {
     const batch = points.slice(i, i + CONCURRENCY);
     const settled = await Promise.allSettled(
-      batch.map((p) => rankAtPoint(p, opts.keyword, opts.businessName, key))
+      batch.map((p) =>
+        provider === "dataforseo"
+          ? rankAtPointDfs(p, opts.keyword, opts.businessName, auth as string)
+          : rankAtPoint(p, opts.keyword, opts.businessName, key as string)
+      )
     );
     for (let j = 0; j < settled.length; j++) {
       const s = settled[j];
@@ -169,4 +258,43 @@ export async function runRankScan(opts: {
   });
 
   return { ok: true, scanId: scan.id };
+}
+
+/**
+ * ONE lookup, to answer the question that actually matters before spending a
+ * grid: can this data source see us at all? Places could not (service-area
+ * businesses are absent from its index), and finding that out cost a whole
+ * feature. A fraction of a cent is a better way to learn it.
+ */
+export async function testProvider(opts: {
+  keyword: string;
+  businessName: string;
+  lat: number;
+  lng: number;
+}): Promise<{
+  provider: Provider;
+  ok: boolean;
+  found: boolean;
+  rank: number | null;
+  topNames: string;
+  costUsd: number;
+  error?: string;
+}> {
+  const provider = activeProvider();
+  const auth = dfsAuth();
+  const key = apiKey();
+  const base = { provider, found: false, rank: null as number | null, topNames: "", costUsd: costPerCall(provider) };
+
+  try {
+    if (provider === "dataforseo") {
+      if (!auth) return { ...base, ok: false, error: "DataForSEO credentials missing." };
+      const r = await rankAtPointDfs({ lat: opts.lat, lng: opts.lng }, opts.keyword, opts.businessName, auth);
+      return { ...base, ok: true, found: r.rank !== null, rank: r.rank, topNames: r.topNames };
+    }
+    if (!key) return { ...base, ok: false, error: "No Google Maps API key configured." };
+    const r = await rankAtPoint({ lat: opts.lat, lng: opts.lng }, opts.keyword, opts.businessName, key);
+    return { ...base, ok: true, found: r.rank !== null, rank: r.rank, topNames: r.topNames };
+  } catch (e) {
+    return { ...base, ok: false, error: e instanceof Error ? e.message : "lookup failed" };
+  }
 }
