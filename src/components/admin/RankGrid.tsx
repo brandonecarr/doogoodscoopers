@@ -17,7 +17,8 @@ interface Scan {
 }
 interface Point { lat: number; lng: number; rank: number | null; topNames: string | null }
 
-const COST = { dataforseo: 0.002, places: 0.032 } as const;
+const COST = { scrappa: 0, dataforseo: 0.002, places: 0.032 } as const;
+const SCRAPPA_FREE_MONTHLY = 500;
 const inputCls = "w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#6D3EF0]/30 focus:border-transparent";
 
 /** Local Falcon-style scale: green = in the 3-pack, red = nowhere. */
@@ -31,7 +32,7 @@ function rankColor(rank: number | null): string {
 }
 
 export function RankGrid({ token, defaultBusiness }: { token?: string; defaultBusiness: string }) {
-  const [provider, setProvider] = useState<"dataforseo" | "places">("places");
+  const [provider, setProvider] = useState<"scrappa" | "dataforseo" | "places">("places");
   const [test, setTest] = useState<{ ok: boolean; found: boolean; rank: number | null; topNames: string; error?: string } | null>(null);
   const [testing, setTesting] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -237,10 +238,12 @@ export function RankGrid({ token, defaultBusiness }: { token?: string; defaultBu
           </div>
 
           <div className="rounded-lg px-3 py-2 text-[11.5px]"
-            style={provider === "dataforseo"
+            style={provider !== "places"
               ? { background: "#F0FDF4", border: "1px solid #BBF7D0", color: "#166534" }
               : { background: "#FFFBEB", border: "1px solid #FDE68A", color: "#92400E" }}>
-            {provider === "dataforseo" ? (
+            {provider === "scrappa" ? (
+              <>Source: <b>Scrappa</b> — reads live Google Maps, which includes service-area businesses. 1 credit per point, {SCRAPPA_FREE_MONTHLY} free every month.</>
+            ) : provider === "dataforseo" ? (
               <>Source: <b>DataForSEO</b> — reads live Google Maps, which includes service-area businesses.</>
             ) : (
               <>Source: <b>Google Places</b> — it cannot see service-area businesses with hidden addresses, so <b>DooGoodScoopers will show as “not ranking” everywhere</b>. Fine for tracking competitors. Add <code className="bg-white/60 px-1 rounded">DATAFORSEO_LOGIN</code> and <code className="bg-white/60 px-1 rounded">DATAFORSEO_PASSWORD</code> to track yourself.</>
@@ -249,15 +252,26 @@ export function RankGrid({ token, defaultBusiness }: { token?: string; defaultBu
 
           {city && (
             <p className="text-[11.5px] text-gray-500">
-              {pointCount} points · about <b>${estCost.toFixed(2)}</b> per scan
-              {provider === "places" && <span className="block text-gray-400">First 5,000 Places calls each month are free.</span>}
+              {provider === "scrappa" ? (
+                <>
+                  {pointCount} points · <b>{pointCount} credits</b> of your {SCRAPPA_FREE_MONTHLY}/month
+                  <span className="block text-gray-400">
+                    About {Math.floor(SCRAPPA_FREE_MONTHLY / Math.max(pointCount, 1))} scans a month on the free tier.
+                  </span>
+                </>
+              ) : (
+                <>
+                  {pointCount} points · about <b>${estCost.toFixed(2)}</b> per scan
+                  {provider === "places" && <span className="block text-gray-400">First 5,000 Places calls each month are free.</span>}
+                </>
+              )}
             </p>
           )}
 
           <button onClick={runTest} disabled={testing || !cityId}
             className="w-full px-3 py-2 rounded-lg border border-gray-200 text-[13px] font-semibold text-gray-700 disabled:opacity-50 inline-flex items-center justify-center gap-1.5">
             {testing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-            Test one point first (${COST[provider].toFixed(3)})
+            {provider === "scrappa" ? "Test one point first (1 credit)" : `Test one point first ($${COST[provider].toFixed(3)})`}
           </button>
 
           {test && (
