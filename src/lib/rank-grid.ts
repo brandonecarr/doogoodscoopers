@@ -115,7 +115,22 @@ async function rankAtPointDfs(p: GridPoint, keyword: string, business: string, a
       }]),
       signal: controller.signal,
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) {
+      // DataForSEO explains refusals in the body (no balance, IP not allowed,
+      // endpoint not enabled). Reporting only the status hides the one thing
+      // that would tell you how to fix it.
+      const body = await res.text().catch(() => "");
+      let detail = body.replace(/\s+/g, " ").slice(0, 300);
+      try {
+        const j = JSON.parse(body);
+        detail = [j.status_code, j.status_message].filter(Boolean).join(" ") || detail;
+      } catch { /* keep raw text */ }
+      const hint =
+        res.status === 403
+          ? " — 403 usually means the account has no balance yet, or your IP is blocked by DataForSEO's whitelist (API Access → IP restrictions)."
+          : "";
+      throw new Error(`HTTP ${res.status}${detail ? `: ${detail}` : ""}${hint}`);
+    }
     const json = await res.json();
 
     // DataForSEO reports failures INSIDE a 200 response, so the envelope has to
