@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
+  TrendingUp,
   Users2,
   Dog,
   Star,
@@ -39,6 +40,7 @@ const primaryNav: NavItem[] = [
   { name: "Campaigns", short: "Campaigns", href: "/admin/campaigns", icon: Megaphone },
   { name: "Marketing", short: "Marketing", href: "/admin/marketing", icon: Rocket },
   { name: "Ask DGS",   short: "Ask DGS",   href: "/admin/ask",       icon: Bot },
+  { name: "Profitability", short: "Profit", href: "/admin/profitability", icon: TrendingUp },
 ];
 
 const moreNav: NavItem[] = [

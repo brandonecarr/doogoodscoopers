@@ -1229,3 +1229,35 @@ model SngInvoice {
   @@index([sngCreatedAt])
   @@index([remainingCents])
 }
+
+// =====================
+// EXPENSES / PROFITABILITY
+// =====================
+// Costs entered by the owner, so collected revenue (SngInvoice) can be judged
+// against something. Money is INTEGER CENTS, matching the invoice mirror.
+model Expense {
+  id          String    @id @default(cuid())
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  /// "recurring" = fixed monthly overhead; "onetime" = a single dated cost.
+  kind        String    @default("recurring")
+  category    String    @default("other")
+  label       String
+  vendor      String?
+  /// Recurring: the amount PER MONTH. One-time: the amount of that one cost.
+  amountCents Int       @default(0)
+
+  /// One-time only.
+  occurredOn  DateTime?
+  /// Recurring only. endedOn null = still running.
+  startedOn   DateTime?
+  endedOn     DateTime?
+
+  notes       String?
+
+  @@index([kind])
+  @@index([category])
+  @@index([occurredOn])
+  @@index([startedOn])
+}
