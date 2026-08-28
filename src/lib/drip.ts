@@ -130,9 +130,15 @@ export async function isLeadArchived(leadType: LeadSource, leadId: string): Prom
 const MINUTE_MS = 60 * 1000;
 
 /**
- * Enroll a lead into every active "returning lead" drip campaign the instant
- * they re-engage. These campaigns carry `"returning"` in their trigger
- * `leadTypes` and get their OWN message sequence (different from a cold lead).
+ * Enroll a lead into every active "returning lead" drip the instant they
+ * re-engage, with its OWN message sequence (different from a cold lead).
+ *
+ * The source is selectable, because "came back through the quote form" and
+ * "re-submitted a Meta ad" deserve different copy:
+ *   "returning-meta"  → only a returning AdLead
+ *   "returning-quote" → only a returning QuoteLead
+ *   both selected     → both
+ *   "returning"       → legacy token, still honoured, means BOTH
  *
  * Why this can't ride the normal auto-enroll: consolidation backdates a
  * returning lead's `createdAt` to first contact, so `findDripCandidates`
@@ -151,9 +157,12 @@ export async function enrollReturningLead(leadType: LeadSource, leadId: string):
     where: { type: "DRIP", active: true },
     include: { steps: { orderBy: { stepOrder: "asc" } } },
   });
+  // Match only campaigns that asked for THIS lead's source.
+  const wanted = leadType === "AD_LEAD" ? "returning-meta" : "returning-quote";
   const returning = campaigns.filter((c) => {
     const f = (c.audienceFilter || {}) as { leadTypes?: string[] };
-    return (f.leadTypes || []).includes("returning") && c.steps.length > 0;
+    const types = f.leadTypes || [];
+    return (types.includes(wanted) || types.includes("returning")) && c.steps.length > 0;
   });
   if (returning.length === 0) return 0;
 

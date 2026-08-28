@@ -145,17 +145,23 @@ export function DripForm({ mode, campaignId, initial }: DripFormProps) {
           )}
 
           <div className="mt-3 pt-3 border-t border-gray-100">
-            <p className="text-sm text-gray-500 mb-2">…or enroll on re-engagement</p>
-            <button
-              type="button"
-              onClick={() => setLeadTypes(toggle(leadTypes, "returning"))}
-              className={chip(leadTypes.includes("returning"))}
-            >
-              🔁 Returning lead (re-submitted)
-            </button>
-            {leadTypes.includes("returning") && (
+            <p className="text-sm text-gray-500 mb-2">…or enroll on re-engagement — pick either, or both</p>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={() => setLeadTypes(toggle(leadTypes, "returning-meta"))}
+                className={chip(leadTypes.includes("returning-meta") || leadTypes.includes("returning"))}>
+                🔁 Returning Meta lead
+              </button>
+              <button type="button" onClick={() => setLeadTypes(toggle(leadTypes, "returning-quote"))}
+                className={chip(leadTypes.includes("returning-quote") || leadTypes.includes("returning"))}>
+                🔁 Returning quote-form lead
+              </button>
+            </div>
+            {(leadTypes.includes("returning-meta") || leadTypes.includes("returning-quote") || leadTypes.includes("returning")) && (
               <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 mt-2">
-                Enrolls a lead the moment they <b>re-submit a form</b> after already being in your system — a strong buying signal. Perfect for a &quot;welcome back&quot; sequence with different messaging than a cold lead. Fires on re-engagement (not on creation), and re-triggers if a lead who finished/stopped the sequence comes back again.
+                Enrolls a lead the moment they <b>re-submit</b> after already being in your system — a strong buying signal, worth different copy than a cold lead. Fires on re-engagement (not on creation), and re-triggers if someone who finished or stopped the sequence comes back again.
+                {leadTypes.includes("returning") && (
+                  <span className="block mt-1"><b>Note:</b> this campaign uses the older combined setting, which covers <b>both</b> sources. Tap a chip above to narrow it.</span>
+                )}
               </p>
             )}
           </div>
