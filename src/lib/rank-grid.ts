@@ -11,7 +11,7 @@ import prisma from "@/lib/prisma";
  *
  * TWO DATA SOURCES, and the choice matters enormously:
  *
- *  - DataForSEO (preferred): reads the live Google Maps result set, which
+ *  - Scrappa (preferred): reads the live Google Maps result set, which
  *    INCLUDES service-area businesses. DooGoodScoopers is an SAB with a hidden
  *    address, so this is the only source that can see us at all.
  *  - Google Places API (fallback): cheaper and already configured, but Google's
@@ -26,10 +26,6 @@ import prisma from "@/lib/prisma";
  */
 
 const SEARCH_URL = "https://places.googleapis.com/v1/places:searchText";
-// Live mode: synchronous (~6s), so a scan completes in one request instead of
-// polling a 5-minute queue. $0.002/point vs $0.0006 standard — pennies either
-// way, and worth it for a scan you trigger from a button.
-const DFS_URL = "https://api.dataforseo.com/v3/serp/google/maps/live/advanced";
 const MAX_RESULTS = 20;      // Text Search caps here
 const CONCURRENCY = 5;
 const POINT_TIMEOUT_MS = 12_000;
@@ -37,10 +33,7 @@ const POINT_TIMEOUT_MS = 12_000;
 export const MAX_GRID = 13;
 /** Google Places Text Search (Pro SKU), USD per call, after 5,000 free/month. */
 export const COST_PER_CALL_USD = 0.032;
-/** DataForSEO Google Maps SERP, live mode, USD per point. */
-export const DFS_COST_PER_CALL_USD = 0.002;
-
-export type Provider = "scrappa" | "dataforseo" | "places";
+export type Provider = "scrappa" | "places";
 
 const SCRAPPA_URL = "https://scrappa.co/api/maps/advanced-search";
 /** Scrappa bills 1 credit per request; the free tier is 500 credits a month. */
@@ -51,26 +44,15 @@ function scrappaKey(): string | undefined {
   return process.env.SCRAPPA_API_KEY || undefined;
 }
 
-function dfsAuth(): string | null {
-  const login = process.env.DATAFORSEO_LOGIN;
-  const password = process.env.DATAFORSEO_PASSWORD;
-  if (!login || !password) return null;
-  return Buffer.from(`${login}:${password}`).toString("base64");
-}
-
 /**
- * Any source that reads real Google Maps results beats Places, which cannot see
- * service-area businesses at all. Scrappa first (it has a recurring free tier),
- * then DataForSEO, then Places as a last resort.
+ * Scrappa reads real Google Maps results, so it can see service-area businesses.
+ * Places cannot, and is only a fallback for competitor tracking.
  */
 export function activeProvider(): Provider {
-  if (scrappaKey()) return "scrappa";
-  if (dfsAuth()) return "dataforseo";
-  return "places";
+  return scrappaKey() ? "scrappa" : "places";
 }
 
-export const costPerCall = (p: Provider) =>
-  p === "scrappa" ? 0 : p === "dataforseo" ? DFS_COST_PER_CALL_USD : COST_PER_CALL_USD;
+export const costPerCall = (p: Provider) => (p === "scrappa" ? 0 : COST_PER_CALL_USD);
 
 export interface GridPoint { lat: number; lng: number }
 
@@ -109,6 +91,45 @@ function matches(candidate: string, business: string): boolean {
 
 interface PointResult { lat: number; lng: number; rank: number | null; topNames: string }
 
+/** One Google Maps-ish result set from Google Places, biased to this point. */
+async function rankAtPoint(p: GridPoint, keyword: string, business: string, key: string): Promise<PointResult> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), POINT_TIMEOUT_MS);
+  try {
+    const res = await fetch(SEARCH_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": key,
+        // Minimal field mask — extra fields reprice the call to a dearer SKU,
+        // and rank only needs the name.
+        "X-Goog-FieldMask": "places.displayName",
+      },
+      body: JSON.stringify({
+        textQuery: keyword,
+        locationBias: { circle: { center: { latitude: p.lat, longitude: p.lng }, radius: 1500 } },
+        maxResultCount: MAX_RESULTS,
+      }),
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new Error(`HTTP ${res.status}${body ? `: ${body.slice(0, 180)}` : ""}`);
+    }
+    const json = (await res.json()) as { places?: { displayName?: { text?: string } }[] };
+    const names = (json.places || []).map((x) => x.displayName?.text || "").filter(Boolean);
+    const idx = names.findIndex((n) => matches(n, business));
+    return {
+      lat: p.lat,
+      lng: p.lng,
+      rank: idx >= 0 ? idx + 1 : null,
+      topNames: names.slice(0, 3).join(", "),
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** One Google Maps result set as seen from this coordinate, via Scrappa. */
 async function rankAtPointScrappa(p: GridPoint, keyword: string, business: string, key: string): Promise<PointResult> {
   const controller = new AbortController();
@@ -143,108 +164,6 @@ async function rankAtPointScrappa(p: GridPoint, keyword: string, business: strin
   }
 }
 
-/**
- * One Google Maps result set as seen FROM this coordinate.
- * `location_coordinate` ("lat,lng,zoom") is purpose-built for geo-grids — it is
- * what makes each point a genuinely different vantage rather than one search
- * re-filtered.
- */
-async function rankAtPointDfs(p: GridPoint, keyword: string, business: string, auth: string): Promise<PointResult> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 30_000);
-  try {
-    const res = await fetch(DFS_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Basic ${auth}` },
-      body: JSON.stringify([{
-        keyword,
-        location_coordinate: `${p.lat.toFixed(6)},${p.lng.toFixed(6)},14z`,
-        language_code: "en",
-        device: "desktop",
-        os: "windows",
-      }]),
-      signal: controller.signal,
-    });
-    if (!res.ok) {
-      // DataForSEO explains refusals in the body (no balance, IP not allowed,
-      // endpoint not enabled). Reporting only the status hides the one thing
-      // that would tell you how to fix it.
-      const body = await res.text().catch(() => "");
-      let detail = body.replace(/\s+/g, " ").slice(0, 300);
-      try {
-        const j = JSON.parse(body);
-        detail = [j.status_code, j.status_message].filter(Boolean).join(" ") || detail;
-      } catch { /* keep raw text */ }
-      const hint =
-        res.status === 403
-          ? " — 403 usually means the account has no balance yet, or your IP is blocked by DataForSEO's whitelist (API Access → IP restrictions)."
-          : "";
-      throw new Error(`HTTP ${res.status}${detail ? `: ${detail}` : ""}${hint}`);
-    }
-    const json = await res.json();
-
-    // DataForSEO reports failures INSIDE a 200 response, so the envelope has to
-    // be checked or every point silently becomes "not ranking".
-    const task = json?.tasks?.[0];
-    if (!task) throw new Error("no task in response");
-    if (task.status_code && task.status_code !== 20000) {
-      throw new Error(`${task.status_code}: ${task.status_message || "task failed"}`);
-    }
-
-    const items = (task.result?.[0]?.items || []) as { title?: string; rank_absolute?: number; type?: string }[];
-    const listings = items.filter((i) => i.title);
-    const idx = listings.findIndex((i) => matches(i.title as string, business));
-    return {
-      lat: p.lat,
-      lng: p.lng,
-      // Prefer Google's own rank when present; fall back to list position.
-      rank: idx >= 0 ? (listings[idx].rank_absolute ?? idx + 1) : null,
-      topNames: listings.slice(0, 3).map((i) => i.title as string).join(", "),
-    };
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-async function rankAtPoint(p: GridPoint, keyword: string, business: string, key: string): Promise<PointResult> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), POINT_TIMEOUT_MS);
-  try {
-    const res = await fetch(SEARCH_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Goog-Api-Key": key,
-        // Keep the field mask minimal — extra fields reprice the call to a
-        // dearer SKU, and rank only needs the name.
-        "X-Goog-FieldMask": "places.displayName",
-      },
-      body: JSON.stringify({
-        textQuery: keyword,
-        locationBias: { circle: { center: { latitude: p.lat, longitude: p.lng }, radius: 1500 } },
-        maxResultCount: MAX_RESULTS,
-      }),
-      signal: controller.signal,
-    });
-    if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      throw new Error(`HTTP ${res.status}${body ? `: ${body.slice(0, 180)}` : ""}`);
-    }
-    const json = (await res.json()) as { places?: { displayName?: { text?: string } }[] };
-    const names = (json.places || []).map((x) => x.displayName?.text || "").filter(Boolean);
-    const idx = names.findIndex((n) => matches(n, business));
-    return {
-      lat: p.lat,
-      lng: p.lng,
-      rank: idx >= 0 ? idx + 1 : null,
-      // Who is winning here — the actionable half of a red square.
-      topNames: names.slice(0, 3).join(", "),
-    };
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
 export interface ScanResult {
   ok: boolean;
   scanId?: string;
@@ -257,11 +176,9 @@ export async function runRankScan(opts: {
   businessName: string;
 }): Promise<ScanResult> {
   const provider = activeProvider();
-  const auth = dfsAuth();
   const key = apiKey();
   const sKey = scrappaKey();
   if (provider === "scrappa" && !sKey) return { ok: false, error: "Scrappa API key missing." };
-  if (provider === "dataforseo" && !auth) return { ok: false, error: "DataForSEO credentials missing." };
   if (provider === "places" && !key) return { ok: false, error: "No Google Maps API key configured." };
 
   const city = await prisma.rankGridCity.findUnique({ where: { id: opts.cityId } });
@@ -277,9 +194,7 @@ export async function runRankScan(opts: {
       batch.map((p) =>
         provider === "scrappa"
           ? rankAtPointScrappa(p, opts.keyword, opts.businessName, sKey as string)
-          : provider === "dataforseo"
-            ? rankAtPointDfs(p, opts.keyword, opts.businessName, auth as string)
-            : rankAtPoint(p, opts.keyword, opts.businessName, key as string)
+          : rankAtPoint(p, opts.keyword, opts.businessName, key as string)
       )
     );
     for (let j = 0; j < settled.length; j++) {
@@ -350,7 +265,6 @@ export async function testProvider(opts: {
   error?: string;
 }> {
   const provider = activeProvider();
-  const auth = dfsAuth();
   const key = apiKey();
   const base = { provider, found: false, rank: null as number | null, topNames: "", costUsd: costPerCall(provider) };
 
@@ -359,11 +273,6 @@ export async function testProvider(opts: {
       const sKey = scrappaKey();
       if (!sKey) return { ...base, ok: false, error: "Scrappa API key missing." };
       const r = await rankAtPointScrappa({ lat: opts.lat, lng: opts.lng }, opts.keyword, opts.businessName, sKey);
-      return { ...base, ok: true, found: r.rank !== null, rank: r.rank, topNames: r.topNames };
-    }
-    if (provider === "dataforseo") {
-      if (!auth) return { ...base, ok: false, error: "DataForSEO credentials missing." };
-      const r = await rankAtPointDfs({ lat: opts.lat, lng: opts.lng }, opts.keyword, opts.businessName, auth);
       return { ...base, ok: true, found: r.rank !== null, rank: r.rank, topNames: r.topNames };
     }
     if (!key) return { ...base, ok: false, error: "No Google Maps API key configured." };

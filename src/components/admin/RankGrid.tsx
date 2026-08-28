@@ -17,7 +17,7 @@ interface Scan {
 }
 interface Point { lat: number; lng: number; rank: number | null; topNames: string | null }
 
-const COST = { scrappa: 0, dataforseo: 0.002, places: 0.032 } as const;
+const COST = { scrappa: 0, places: 0.032 } as const;
 const SCRAPPA_FREE_MONTHLY = 500;
 const inputCls = "w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#6D3EF0]/30 focus:border-transparent";
 
@@ -32,7 +32,7 @@ function rankColor(rank: number | null): string {
 }
 
 export function RankGrid({ token, defaultBusiness }: { token?: string; defaultBusiness: string }) {
-  const [provider, setProvider] = useState<"scrappa" | "dataforseo" | "places">("places");
+  const [provider, setProvider] = useState<"scrappa" | "places">("places");
   const [test, setTest] = useState<{ ok: boolean; found: boolean; rank: number | null; topNames: string; error?: string } | null>(null);
   const [testing, setTesting] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -243,10 +243,8 @@ export function RankGrid({ token, defaultBusiness }: { token?: string; defaultBu
               : { background: "#FFFBEB", border: "1px solid #FDE68A", color: "#92400E" }}>
             {provider === "scrappa" ? (
               <>Source: <b>Scrappa</b> — reads live Google Maps, which includes service-area businesses. 1 credit per point, {SCRAPPA_FREE_MONTHLY} free every month.</>
-            ) : provider === "dataforseo" ? (
-              <>Source: <b>DataForSEO</b> — reads live Google Maps, which includes service-area businesses.</>
             ) : (
-              <>Source: <b>Google Places</b> — it cannot see service-area businesses with hidden addresses, so <b>DooGoodScoopers will show as “not ranking” everywhere</b>. Fine for tracking competitors. Add <code className="bg-white/60 px-1 rounded">DATAFORSEO_LOGIN</code> and <code className="bg-white/60 px-1 rounded">DATAFORSEO_PASSWORD</code> to track yourself.</>
+              <>Source: <b>Google Places</b> — it cannot see service-area businesses with hidden addresses, so <b>DooGoodScoopers will show as “not ranking” everywhere</b>. Fine for tracking competitors. Add <code className="bg-white/60 px-1 rounded">SCRAPPA_API_KEY</code> to track yourself.</>
             )}
           </div>
 
