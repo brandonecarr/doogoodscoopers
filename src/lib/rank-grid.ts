@@ -81,12 +81,26 @@ function apiKey(): string | undefined {
   return process.env.GOOGLE_MAPS_SERVER_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || undefined;
 }
 
-/** Loose name match — "DooGoodScoopers" vs "Doo Good Scoopers LLC". */
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+/**
+ * Match a listing to OUR business.
+ *
+ * ⚠️ This was symmetric (`a.includes(b) || b.includes(a)`) and produced false
+ * positives: a competitor literally named "Scoopers" matched "DooGoodScoopers",
+ * because our own name contains theirs. A whole scan reported us at rank 3
+ * everywhere we appeared — a competitor's ranking wearing our name.
+ *
+ * So: the listing may EXTEND our name ("Doo Good Scoopers LLC"), but a shorter
+ * candidate only matches if it is nearly the whole thing — never a generic
+ * fragment.
+ */
 function matches(candidate: string, business: string): boolean {
   const a = norm(candidate), b = norm(business);
   if (!a || !b) return false;
-  return a.includes(b) || b.includes(a);
+  if (a === b) return true;
+  if (a.includes(b)) return true;
+  return b.includes(a) && a.length >= Math.ceil(b.length * 0.8);
 }
 
 interface PointResult { lat: number; lng: number; rank: number | null; topNames: string }
