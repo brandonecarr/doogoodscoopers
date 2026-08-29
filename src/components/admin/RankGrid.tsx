@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Plus, Trash2, Loader2, Play, MapPin, Trophy, AlertTriangle, Search } from "lucide-react";
+import { Plus, Trash2, Loader2, Play, MapPin, Trophy, AlertTriangle, Search, History, Stethoscope } from "lucide-react";
 import "mapbox-gl/dist/mapbox-gl.css";
 
 /**
@@ -35,6 +35,9 @@ export function RankGrid({ token, defaultBusiness }: { token?: string; defaultBu
   const [provider, setProvider] = useState<"scrappa" | "places">("places");
   const [test, setTest] = useState<{ ok: boolean; found: boolean; rank: number | null; topNames: string; error?: string } | null>(null);
   const [testing, setTesting] = useState(false);
+  const [history, setHistory] = useState<Scan[]>([]);
+  const [diag, setDiag] = useState<null | { variant: string; status: number; rowCount: number; sample: string[] }[]>(null);
+  const [diagBusy, setDiagBusy] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mapRef = useRef<any>(null);
@@ -143,6 +146,14 @@ export function RankGrid({ token, defaultBusiness }: { token?: string; defaultBu
     }
   }, [points, ready]);
 
+  const loadHistory = useCallback(() => {
+    fetch("/api/admin/rank-grid/scans")
+      .then((r) => r.json())
+      .then((d) => setHistory(d.scans ?? []))
+      .catch(() => {});
+  }, []);
+  useEffect(loadHistory, [loadHistory]);
+
   // Load the latest scan whenever the city changes.
   useEffect(() => {
     if (!cityId) { setScan(null); setPoints([]); return; }
@@ -151,6 +162,27 @@ export function RankGrid({ token, defaultBusiness }: { token?: string; defaultBu
       .then((d) => { setScan(d.scan ?? null); setPoints(d.points ?? []); })
       .catch(() => {});
   }, [cityId]);
+
+  /** Redraw the map from a saved scan. */
+  const openScan = async (id: string) => {
+    const d = await fetch(`/api/admin/rank-grid/scan?scanId=${encodeURIComponent(id)}`).then((r) => r.json());
+    setScan(d.scan ?? null);
+    setPoints(d.points ?? []);
+  };
+
+  const runDiagnose = async () => {
+    if (!cityId) return setError("Select a city first.");
+    setDiagBusy(true); setDiag(null); setError("");
+    try {
+      const res = await fetch("/api/admin/rank-grid/diagnose", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cityId, keyword }),
+      });
+      const d = await res.json();
+      if (!res.ok) { setError(d.error || "Diagnostic failed."); return; }
+      setDiag(d.variants ?? []);
+    } finally { setDiagBusy(false); }
+  };
 
   const addCity = async () => {
     setError("");
@@ -202,7 +234,7 @@ export function RankGrid({ token, defaultBusiness }: { token?: string; defaultBu
       });
       const d = await res.json();
       if (!res.ok) { setError(d.error || "Scan failed."); return; }
-      setScan(d.scan); setPoints(d.points ?? []);
+      setScan(d.scan); setPoints(d.points ?? []); loadHistory();
     } catch {
       setError("Scan failed.");
     } finally { setBusy(false); }
@@ -272,6 +304,29 @@ export function RankGrid({ token, defaultBusiness }: { token?: string; defaultBu
             {provider === "scrappa" ? "Test one point first (1 credit)" : `Test one point first ($${COST[provider].toFixed(3)})`}
           </button>
 
+          <button onClick={runDiagnose} disabled={diagBusy || !cityId}
+            className="w-full px-3 py-2 rounded-lg border text-[13px] font-semibold disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
+            style={{ borderColor: "#FDE68A", background: "#FFFBEB", color: "#92400E" }}>
+            {diagBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Stethoscope className="w-4 h-4" />}
+            Diagnose geo-targeting (5 credits)
+          </button>
+
+          {diag && (
+            <div className="rounded-lg border border-gray-200 p-3 text-[12px] space-y-2.5">
+              <p className="text-gray-600">
+                The winning variant is whichever returns businesses <b>actually in this city</b>.
+              </p>
+              {diag.map((v) => (
+                <div key={v.variant}>
+                  <p className="font-semibold text-navy-900">{v.variant} <span className="font-normal text-gray-400">· {v.status} · {v.rowCount} results</span></p>
+                  <ul className="mt-0.5 pl-3 text-gray-600 space-y-0.5">
+                    {v.sample.map((n, i) => <li key={i} className="truncate">{n}</li>)}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          )}
+
           {test && (
             <div className="rounded-lg px-3 py-2 text-[12px]"
               style={test.found
@@ -326,6 +381,42 @@ export function RankGrid({ token, defaultBusiness }: { token?: string; defaultBu
                     <span className="block text-[11px] text-gray-400">{c.gridSize}×{c.gridSize} · {c.spacingKm}km</span>
                   </button>
                   <button onClick={() => removeCity(c.id)} className="text-gray-400 hover:text-red-600 flex-shrink-0" aria-label={`Remove ${c.name}`}>
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {/* History */}
+        <div className="dgs-card p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <History className="w-4 h-4 text-gray-400" />
+            <h2 className="text-lg font-semibold text-navy-900">Past scans</h2>
+          </div>
+          {history.length === 0 ? (
+            <p className="text-[13px] text-gray-500">No scans yet.</p>
+          ) : (
+            <ul className="divide-y divide-gray-100">
+              {history.map((h) => (
+                <li key={h.id} className="py-2 flex items-start justify-between gap-2">
+                  <button onClick={() => openScan(h.id)} className="text-left min-w-0 flex-1">
+                    <span className={`block text-[13px] font-medium truncate ${scan?.id === h.id ? "text-[#6D3EF0]" : "text-navy-900"}`}>
+                      {h.keyword}
+                    </span>
+                    <span className="block text-[11px] text-gray-400 truncate">
+                      {h.cityName.split(",")[0]} · {new Date(h.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                      {" · "}{h.top3Count}/{h.pointCount} in 3-pack
+                    </span>
+                  </button>
+                  <button
+                    onClick={async () => {
+                      await fetch(`/api/admin/rank-grid/scans?id=${encodeURIComponent(h.id)}`, { method: "DELETE" });
+                      setHistory((x) => x.filter((y) => y.id !== h.id));
+                      if (scan?.id === h.id) { setScan(null); setPoints([]); }
+                    }}
+                    className="text-gray-300 hover:text-red-600 flex-shrink-0 mt-0.5" aria-label="Delete scan">
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </li>
