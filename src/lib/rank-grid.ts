@@ -144,34 +144,41 @@ async function rankAtPoint(p: GridPoint, keyword: string, business: string, key:
   }
 }
 
-/** One Google Maps result set as seen from this coordinate, via Scrappa. */
-async function rankAtPointScrappa(p: GridPoint, keyword: string, business: string, key: string): Promise<PointResult> {
+/**
+ * One Google Maps result set for a place, via Scrappa.
+ *
+ * ⚠️ Coordinates DO NOT WORK on this API. A probe of five parameter shapes
+ * against Fontana returned: Colorado (lat/lon + zoom 14), a nationwide mix
+ * (zoom 11), and German drugstores (lng spelling). Only the PLACE NAME inside
+ * the query localises — that variant returned a correct Fontana set including
+ * Burrtec Waste and the Fontana Household Hazardous Waste Facility.
+ *
+ * So rank is sampled per CITY, not per coordinate. A 49-point grid would have
+ * been 49 identical queries.
+ */
+async function rankInPlace(place: string, keyword: string, business: string, key: string): Promise<{ rank: number | null; topNames: string; total: number }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 30_000);
   try {
     const url =
-      `${SCRAPPA_URL}?query=${encodeURIComponent(keyword)}` +
-      `&lat=${p.lat.toFixed(6)}&lon=${p.lng.toFixed(6)}&zoom=14&limit=20&hl=en&gl=us`;
+      `${SCRAPPA_URL}?query=${encodeURIComponent(`${keyword} ${place}`)}` +
+      `&zoom=13&limit=20&hl=en&gl=us`;
     const res = await fetch(url, { headers: { "x-api-key": key }, signal: controller.signal });
     if (!res.ok) {
       const body = await res.text().catch(() => "");
       throw new Error(`HTTP ${res.status}${body ? `: ${body.replace(/\s+/g, " ").slice(0, 240)}` : ""}`);
     }
     const json = await res.json();
-
-    // Their docs disagree on the wrapper (`items` in one place, `results` in
-    // another). Accepting both costs nothing; guessing wrong would silently
-    // report "not ranking" at every single point.
     const rows = (json?.items ?? json?.results ?? json?.data ?? []) as { name?: string; title?: string }[];
     if (!Array.isArray(rows)) throw new Error("unexpected response shape");
 
     const names = rows.map((r) => r.name || r.title || "").filter(Boolean);
     const idx = names.findIndex((n) => matches(n, business));
     return {
-      lat: p.lat,
-      lng: p.lng,
       rank: idx >= 0 ? idx + 1 : null,
-      topNames: names.slice(0, 3).join(", "),
+      // Everyone above us — the actionable half of a bad rank.
+      topNames: names.slice(0, Math.max(idx >= 0 ? idx : 5, 5)).join(", "),
+      total: names.length,
     };
   } finally {
     clearTimeout(timer);
@@ -184,49 +191,55 @@ export interface ScanResult {
   error?: string;
 }
 
+/**
+ * Check one keyword across every active city — one credit each.
+ *
+ * This replaced a 49-point grid. Since only the place name localises, a grid
+ * was the same query 49 times over: 49 credits for one credit of information.
+ * The same free tier now covers ~500 city checks a month instead of 10 scans.
+ */
 export async function runRankScan(opts: {
   cityId: string;
   keyword: string;
   businessName: string;
 }): Promise<ScanResult> {
   const provider = activeProvider();
-  const key = apiKey();
   const sKey = scrappaKey();
+  const key = apiKey();
   if (provider === "scrappa" && !sKey) return { ok: false, error: "Scrappa API key missing." };
   if (provider === "places" && !key) return { ok: false, error: "No Google Maps API key configured." };
 
-  const city = await prisma.rankGridCity.findUnique({ where: { id: opts.cityId } });
-  if (!city) return { ok: false, error: "City not found." };
+  // The picked city leads; every other active city rides along, because the
+  // marginal cost of the rest of the service area is one credit each.
+  const picked = await prisma.rankGridCity.findUnique({ where: { id: opts.cityId } });
+  if (!picked) return { ok: false, error: "City not found." };
+  const others = await prisma.rankGridCity.findMany({
+    where: { active: true, id: { not: picked.id } },
+    orderBy: { name: "asc" },
+  });
+  const cities = [picked, ...others];
 
-  const points = buildGrid(city.lat, city.lng, city.gridSize, city.spacingKm);
-
-  const results: PointResult[] = [];
+  const results: { lat: number; lng: number; rank: number | null; topNames: string }[] = [];
   let firstError = "";
-  for (let i = 0; i < points.length; i += CONCURRENCY) {
-    const batch = points.slice(i, i + CONCURRENCY);
-    const settled = await Promise.allSettled(
-      batch.map((p) =>
+
+  for (const c of cities) {
+    const place = c.name.split(",").slice(0, 2).join(", ").trim();
+    try {
+      const r =
         provider === "scrappa"
-          ? rankAtPointScrappa(p, opts.keyword, opts.businessName, sKey as string)
-          : rankAtPoint(p, opts.keyword, opts.businessName, key as string)
-      )
-    );
-    for (let j = 0; j < settled.length; j++) {
-      const s = settled[j];
-      if (s.status === "fulfilled") results.push(s.value);
-      else {
-        if (!firstError) firstError = s.reason instanceof Error ? s.reason.message : "point failed";
-        // A failed point is UNKNOWN, not "not ranking" — recording it as a miss
-        // would quietly turn an API problem into a fake red square.
-        results.push({ lat: batch[j].lat, lng: batch[j].lng, rank: null, topNames: "" });
-      }
+          ? await rankInPlace(place, opts.keyword, opts.businessName, sKey as string)
+          : await rankAtPoint({ lat: c.lat, lng: c.lng }, opts.keyword, opts.businessName, key as string)
+              .then((x) => ({ rank: x.rank, topNames: x.topNames, total: 0 }));
+      results.push({ lat: c.lat, lng: c.lng, rank: r.rank, topNames: `${place} · ${r.topNames}` });
+    } catch (e) {
+      if (!firstError) firstError = e instanceof Error ? e.message : "lookup failed";
+      // A failed lookup is UNKNOWN, never "not ranking" — an outage must not be
+      // presentable as an SEO collapse.
+      results.push({ lat: c.lat, lng: c.lng, rank: null, topNames: `${place} · lookup failed` });
     }
   }
 
-  // If every single point failed, the scan is meaningless — surface it instead
-  // of storing a grid of red.
-  const allFailed = firstError && results.every((r) => r.rank === null && !r.topNames);
-  if (allFailed) return { ok: false, error: firstError };
+  if (firstError && results.every((r) => r.rank === null)) return { ok: false, error: firstError };
 
   const found = results.filter((r) => r.rank !== null);
   const top3 = found.filter((r) => (r.rank as number) <= 3);
@@ -234,12 +247,12 @@ export async function runRankScan(opts: {
 
   const scan = await prisma.rankGridScan.create({
     data: {
-      cityId: city.id,
-      cityName: city.name,
+      cityId: picked.id,
+      cityName: cities.length > 1 ? `${cities.length} cities` : picked.name,
       keyword: opts.keyword,
       businessName: opts.businessName,
-      gridSize: city.gridSize,
-      spacingKm: city.spacingKm,
+      gridSize: 1,
+      spacingKm: 0,
       pointCount: results.length,
       foundCount: found.length,
       top3Count: top3.length,
@@ -250,9 +263,7 @@ export async function runRankScan(opts: {
   });
 
   await prisma.rankGridPoint.createMany({
-    data: results.map((r) => ({
-      scanId: scan.id, lat: r.lat, lng: r.lng, rank: r.rank, topNames: r.topNames || null,
-    })),
+    data: results.map((r) => ({ scanId: scan.id, lat: r.lat, lng: r.lng, rank: r.rank, topNames: r.topNames })),
   });
 
   return { ok: true, scanId: scan.id };
@@ -269,6 +280,7 @@ export async function testProvider(opts: {
   businessName: string;
   lat: number;
   lng: number;
+  place?: string;
 }): Promise<{
   provider: Provider;
   ok: boolean;
@@ -286,7 +298,7 @@ export async function testProvider(opts: {
     if (provider === "scrappa") {
       const sKey = scrappaKey();
       if (!sKey) return { ...base, ok: false, error: "Scrappa API key missing." };
-      const r = await rankAtPointScrappa({ lat: opts.lat, lng: opts.lng }, opts.keyword, opts.businessName, sKey);
+      const r = await rankInPlace(opts.place || "", opts.keyword, opts.businessName, sKey);
       return { ...base, ok: true, found: r.rank !== null, rank: r.rank, topNames: r.topNames };
     }
     if (!key) return { ...base, ok: false, error: "No Google Maps API key configured." };

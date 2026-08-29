@@ -23,7 +23,10 @@ export async function POST(request: Request) {
   const city = await prisma.rankGridCity.findUnique({ where: { id: cityId } });
   if (!city) return NextResponse.json({ error: "City not found" }, { status: 404 });
 
-  const result = await testProvider({ keyword, businessName, lat: city.lat, lng: city.lng });
+  const result = await testProvider({
+    keyword, businessName, lat: city.lat, lng: city.lng,
+    place: city.name.split(",").slice(0, 2).join(", ").trim(),
+  });
   return NextResponse.json(result);
 }
 

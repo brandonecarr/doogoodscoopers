@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Plus, Trash2, Loader2, Play, MapPin, Trophy, AlertTriangle, Search, History, Stethoscope } from "lucide-react";
+import { RankAdvice } from "@/components/admin/RankAdvice";
 import "mapbox-gl/dist/mapbox-gl.css";
 
 /**
@@ -254,7 +255,7 @@ export function RankGrid({ token, defaultBusiness }: { token?: string; defaultBu
             <select value={cityId} onChange={(e) => setCityId(e.target.value)} className={inputCls}>
               {cities.length === 0 && <option value="">Add a city below…</option>}
               {cities.map((c) => (
-                <option key={c.id} value={c.id}>{c.name} · {c.gridSize}×{c.gridSize} @ {c.spacingKm}km</option>
+                <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
           </div>
@@ -284,9 +285,9 @@ export function RankGrid({ token, defaultBusiness }: { token?: string; defaultBu
             <p className="text-[11.5px] text-gray-500">
               {provider === "scrappa" ? (
                 <>
-                  {pointCount} points · <b>{pointCount} credits</b> of your {SCRAPPA_FREE_MONTHLY}/month
+                  1 credit per city · <b>{cities.length} credit{cities.length === 1 ? "" : "s"}</b> of your {SCRAPPA_FREE_MONTHLY}/month
                   <span className="block text-gray-400">
-                    About {Math.floor(SCRAPPA_FREE_MONTHLY / Math.max(pointCount, 1))} scans a month on the free tier.
+                    Checks every city you&apos;ve added, not just the selected one.
                   </span>
                 </>
               ) : (
@@ -355,7 +356,7 @@ export function RankGrid({ token, defaultBusiness }: { token?: string; defaultBu
           <button onClick={run} disabled={busy || !cityId}
             className="w-full px-3 py-2.5 rounded-lg text-white text-[13px] font-semibold disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
             style={{ background: "#6D3EF0" }}>
-            {busy ? <><Loader2 className="w-4 h-4 animate-spin" /> Scanning {pointCount} points…</> : <><Play className="w-4 h-4" /> Run scan</>}
+            {busy ? <><Loader2 className="w-4 h-4 animate-spin" /> Checking {cities.length} cit{cities.length === 1 ? "y" : "ies"}…</> : <><Play className="w-4 h-4" /> Check rankings</>}
           </button>
         </div>
 
@@ -364,14 +365,6 @@ export function RankGrid({ token, defaultBusiness }: { token?: string; defaultBu
           <h2 className="text-lg font-semibold text-navy-900 mb-3">Cities</h2>
           <div className="space-y-2">
             <input value={newCity} onChange={(e) => setNewCity(e.target.value)} placeholder="Fontana, CA  or  92336" className={inputCls} />
-            <div className="grid grid-cols-2 gap-2">
-              <select value={gridSize} onChange={(e) => setGridSize(Number(e.target.value))} className={inputCls}>
-                {[5, 7, 9, 11, 13].map((n) => <option key={n} value={n}>{n} × {n} ({n * n} pts)</option>)}
-              </select>
-              <select value={spacingKm} onChange={(e) => setSpacingKm(Number(e.target.value))} className={inputCls}>
-                {[0.5, 1, 2, 3, 5].map((n) => <option key={n} value={n}>{n} km apart</option>)}
-              </select>
-            </div>
             <button onClick={addCity} disabled={adding}
               className="w-full px-3 py-2 rounded-lg border border-gray-200 text-[13px] font-semibold text-gray-700 inline-flex items-center justify-center gap-1.5 disabled:opacity-50">
               {adding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Add city
@@ -384,7 +377,6 @@ export function RankGrid({ token, defaultBusiness }: { token?: string; defaultBu
                 <li key={c.id} className="flex items-center justify-between py-2 text-[13px]">
                   <button onClick={() => setCityId(c.id)} className="text-left min-w-0 flex-1">
                     <span className={cityId === c.id ? "font-semibold text-navy-900" : "text-gray-700"}>{c.name}</span>
-                    <span className="block text-[11px] text-gray-400">{c.gridSize}×{c.gridSize} · {c.spacingKm}km</span>
                   </button>
                   <button onClick={() => removeCity(c.id)} className="text-gray-400 hover:text-red-600 flex-shrink-0" aria-label={`Remove ${c.name}`}>
                     <Trash2 className="w-3.5 h-3.5" />
@@ -436,10 +428,10 @@ export function RankGrid({ token, defaultBusiness }: { token?: string; defaultBu
       <div className="lg:col-span-2 space-y-3.5">
         {scan && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <Stat icon={Trophy} label="In the 3-pack" value={`${scan.top3Count}/${scan.pointCount}`} sub={coverage !== null ? `${coverage.toFixed(0)}% of the area` : ""} tint="#16A34A" />
-            <Stat icon={MapPin} label="Appear at all" value={`${scan.foundCount}/${scan.pointCount}`} sub="in top 20" tint="#0EA5E9" />
+            <Stat icon={Trophy} label="In the 3-pack" value={`${scan.top3Count}/${scan.pointCount}`} sub="cities" tint="#16A34A" />
+            <Stat icon={MapPin} label="Ranking at all" value={`${scan.foundCount}/${scan.pointCount}`} sub="cities, top 20" tint="#0EA5E9" />
             <Stat icon={Trophy} label="Average rank" value={scan.avgRank ? scan.avgRank.toFixed(1) : "—"} sub="where found" tint="#6D3EF0" />
-            <Stat icon={MapPin} label="Blind spots" value={`${scan.pointCount - scan.foundCount}`} sub="not ranking" tint="#DC2626" />
+            <Stat icon={MapPin} label="Not ranking" value={`${scan.pointCount - scan.foundCount}`} sub="cities" tint="#DC2626" />
           </div>
         )}
 
@@ -464,6 +456,8 @@ export function RankGrid({ token, defaultBusiness }: { token?: string; defaultBu
             {scan.status === "partial" && <span className="text-amber-700"> · some points failed ({scan.error})</span>}
           </p>
         )}
+        {scan && points.length > 0 && <RankAdvice points={points} keyword={scan.keyword} />}
+
         {!scan && cities.length > 0 && (
           <p className="text-[13px] text-gray-500">No scan yet for this city — run one to see where you rank.</p>
         )}
