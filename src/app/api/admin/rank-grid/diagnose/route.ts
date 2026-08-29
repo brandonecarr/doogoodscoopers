@@ -28,6 +28,14 @@ export async function POST(request: Request) {
   const b = await request.json().catch(() => ({}));
   const cityId = String(b.cityId ?? "");
   const keyword = String(b.keyword ?? "dog poop removal").trim();
+  const business = String(b.businessName ?? "DooGoodScoopers").trim();
+  const norm = (x: string) => x.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const isUs = (candidate: string) => {
+    const a = norm(candidate), bn = norm(business);
+    if (!a || !bn) return false;
+    if (a === bn || a.includes(bn)) return true;
+    return bn.includes(a) && a.length >= Math.ceil(bn.length * 0.8);
+  };
   const city = cityId ? await prisma.rankGridCity.findUnique({ where: { id: cityId } }) : null;
   if (!city) return NextResponse.json({ error: "City not found" }, { status: 404 });
 
@@ -53,17 +61,22 @@ export async function POST(request: Request) {
       const text = await res.text();
       let names: string[] = [];
       let rowCount = 0;
+      let foundRank: number | null = null;
       try {
         const j = JSON.parse(text);
         const rows = (j?.items ?? j?.results ?? j?.data ?? []) as { name?: string; title?: string; address?: string; full_address?: string }[];
         rowCount = Array.isArray(rows) ? rows.length : 0;
-        names = (Array.isArray(rows) ? rows : []).slice(0, 5).map(
-          (r) => `${r.name || r.title || "?"}${r.address || r.full_address ? ` — ${r.address || r.full_address}` : ""}`
+        const all = (Array.isArray(rows) ? rows : []).map((r) => r.name || r.title || "?");
+        const idx = all.findIndex((n) => isUs(n));
+        foundRank = idx >= 0 ? idx + 1 : null;
+        // Full list, so it is obvious whether we are absent or simply further down.
+        names = (Array.isArray(rows) ? rows : []).map(
+          (r, i) => `${i + 1}. ${r.name || r.title || "?"}${r.address || r.full_address ? ` — ${r.address || r.full_address}` : " (no address · service-area)"}`
         );
       } catch {
         names = [text.replace(/\s+/g, " ").slice(0, 200)];
       }
-      out.push({ variant: v.label, status: res.status, rowCount, sample: names });
+      out.push({ variant: v.label, status: res.status, rowCount, foundRank, sample: names });
     } catch (e) {
       out.push({ variant: v.label, status: 0, rowCount: 0, sample: [e instanceof Error ? e.message : "failed"] });
     }
@@ -73,7 +86,8 @@ export async function POST(request: Request) {
     city: city.name,
     coordinate: `${lat},${lon}`,
     keyword,
-    note: "The winning variant is whichever returns businesses actually IN or NEAR this city.",
+    business,
+    note: "foundRank is where WE appear in that variant's list — null means absent from all 20.",
     variants: out,
   });
 }

@@ -36,7 +36,7 @@ export function RankGrid({ token, defaultBusiness }: { token?: string; defaultBu
   const [test, setTest] = useState<{ ok: boolean; found: boolean; rank: number | null; topNames: string; error?: string } | null>(null);
   const [testing, setTesting] = useState(false);
   const [history, setHistory] = useState<Scan[]>([]);
-  const [diag, setDiag] = useState<null | { variant: string; status: number; rowCount: number; sample: string[] }[]>(null);
+  const [diag, setDiag] = useState<null | { variant: string; status: number; rowCount: number; foundRank: number | null; sample: string[] }[]>(null);
   const [diagBusy, setDiagBusy] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -176,7 +176,7 @@ export function RankGrid({ token, defaultBusiness }: { token?: string; defaultBu
     try {
       const res = await fetch("/api/admin/rank-grid/diagnose", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cityId, keyword }),
+        body: JSON.stringify({ cityId, keyword, businessName: business }),
       });
       const d = await res.json();
       if (!res.ok) { setError(d.error || "Diagnostic failed."); return; }
@@ -318,9 +318,15 @@ export function RankGrid({ token, defaultBusiness }: { token?: string; defaultBu
               </p>
               {diag.map((v) => (
                 <div key={v.variant}>
-                  <p className="font-semibold text-navy-900">{v.variant} <span className="font-normal text-gray-400">· {v.status} · {v.rowCount} results</span></p>
+                  <p className="font-semibold text-navy-900">
+                    {v.variant}{" "}
+                    <span className="font-normal text-gray-400">· {v.rowCount} results ·</span>{" "}
+                    <span style={{ color: v.foundRank ? "#16A34A" : "#DC2626" }}>
+                      {v.foundRank ? `we are #${v.foundRank}` : "we are absent"}
+                    </span>
+                  </p>
                   <ul className="mt-0.5 pl-3 text-gray-600 space-y-0.5">
-                    {v.sample.map((n, i) => <li key={i} className="truncate">{n}</li>)}
+                    {v.sample.slice(0, 20).map((n, i) => <li key={i} className="truncate">{n}</li>)}
                   </ul>
                 </div>
               ))}
