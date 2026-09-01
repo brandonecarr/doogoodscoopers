@@ -85,6 +85,11 @@ model QuoteLead {
   // backdates createdAt to the earliest contact.
   lastActivityAt  DateTime?   @default(now())
 
+  // Set the first time this prospect submits a form again. Drip auto-enrollment
+  // skips any lead with this set — a returning lead belongs in a returning
+  // campaign only, never in the cold-lead drip.
+  returnedAt      DateTime?
+
   @@index([status])
   @@index([archived])
   @@index([createdAt])
@@ -92,6 +97,7 @@ model QuoteLead {
   @@index([followupDate])
   @@index([instagramLeadId])
   @@index([lastActivityAt])
+  @@index([returnedAt])
 }
 
 // =====================
@@ -435,6 +441,11 @@ model AdLead {
   // backdates createdAt to the earliest contact.
   lastActivityAt  DateTime?   @default(now())
 
+  // Set the first time this prospect submits a form again. Drip auto-enrollment
+  // skips any lead with this set — a returning lead belongs in a returning
+  // campaign only, never in the cold-lead drip.
+  returnedAt      DateTime?
+
   @@index([status])
   @@index([archived])
   @@index([createdAt])
@@ -442,6 +453,7 @@ model AdLead {
   @@index([privyrLeadId])
   @@index([followupDate])
   @@index([lastActivityAt])
+  @@index([returnedAt])
 }
 
 // =====================

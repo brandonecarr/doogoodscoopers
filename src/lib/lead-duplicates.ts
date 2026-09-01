@@ -381,10 +381,14 @@ export async function recordReengagement(
 ): Promise<void> {
   const now = new Date();
   try {
+    // returnedAt is the durable "this prospect came back" flag. Drip
+    // auto-enrollment skips any lead that has it, so they can never be swept
+    // into a cold-lead drip as if they were new.
+    const data = { lastActivityAt: now, returnedAt: now };
     if (survivor.type === "quote") {
-      await prisma.quoteLead.update({ where: { id: survivor.id }, data: { lastActivityAt: now } });
+      await prisma.quoteLead.update({ where: { id: survivor.id }, data });
     } else {
-      await prisma.adLead.update({ where: { id: survivor.id }, data: { lastActivityAt: now } });
+      await prisma.adLead.update({ where: { id: survivor.id }, data });
     }
   } catch (e) {
     console.error("[reengagement] bump failed:", e);

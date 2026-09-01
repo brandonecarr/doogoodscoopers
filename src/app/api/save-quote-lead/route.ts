@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { syncContactToQuo } from "@/lib/quo";
-import { findProspectLeadsByPhone, consolidateByPhone } from "@/lib/lead-duplicates";
+import { findProspectLeadsByPhone, consolidateByPhone, recordReengagement } from "@/lib/lead-duplicates";
 
 interface QuoteLeadData {
   // Contact info
@@ -94,7 +94,17 @@ export async function POST(request: NextRequest) {
     if (prospects.length > (existingQuote ? 1 : 0)) {
       try {
         const survivor = await consolidateByPhone(data.phone);
-        if (survivor) leadId = survivor.id;
+        if (survivor) {
+          leadId = survivor.id;
+          // A known contact running the quote again is a RETURNING lead. Log it
+          // and hand them to the returning drip, which also takes them off the
+          // cold-lead drip so they don't get both sequences at once.
+          if (survivor.isReturning) {
+            await recordReengagement(survivor, {
+              message: "🔁 Returning lead — ran a quote on the website again.",
+            });
+          }
+        }
       } catch (e) {
         console.error("[save-quote-lead] consolidation failed:", e);
       }

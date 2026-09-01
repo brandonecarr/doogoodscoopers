@@ -28,12 +28,36 @@ interface DripCampaign {
   audienceFilter: unknown;
 }
 
+/** Audience tokens that mark a campaign as "returning leads only". */
+const RETURNING_TOKENS = ["returning", "returning-meta", "returning-quote"];
+
+/**
+ * True if this campaign's audience includes any returning token.
+ *
+ * A returning campaign is enrolled EXCLUSIVELY by `enrollReturningLead`, at the
+ * moment a lead re-engages — the cron must never auto-enroll into it. Without
+ * this guard a campaign configured as e.g. ["quote","returning"] matches on the
+ * plain "quote" token and sweeps in every brand-new quote lead, so cold leads
+ * receive the returning sequence (and both sequences at once, since they're
+ * enrolled in the regular quote drip in the same pass).
+ */
+export function isReturningCampaign(audienceFilter: unknown): boolean {
+  const f = (audienceFilter || {}) as { leadTypes?: string[] };
+  const types = f.leadTypes || [];
+  return RETURNING_TOKENS.some((t) => types.includes(t));
+}
+
 export async function findDripCandidates(campaign: DripCampaign): Promise<DripCandidate[]> {
   const filter = (campaign.audienceFilter || {}) as { leadTypes?: string[] };
   const types = new Set(filter.leadTypes || []);
   if (types.size === 0) return [];
+  // Returning campaigns enroll only via enrollReturningLead — never on a timer.
+  if (isReturningCampaign(campaign.audienceFilter)) return [];
   const since = campaign.createdAt;
   const base = { archived: false, createdAt: { gt: since } };
+  // Only NEW people belong in a cold-lead drip. Once a prospect has come back
+  // (returnedAt set), the returning campaign owns them.
+  const prospectBase = { ...base, returnedAt: null };
   const out: DripCandidate[] = [];
 
   if (types.has("quote") || types.has("manual")) {
@@ -46,7 +70,7 @@ export async function findDripCandidates(campaign: DripCampaign): Promise<DripCa
 
     const rows = await prisma.quoteLead.findMany({
       where: {
-        ...base,
+        ...prospectBase,
         // Phone-call leads live in QuoteLead but never ran a quote — they just
         // called. Auto-enrolling them in a quote drip sends copy that is plainly
         // wrong ("I saw that you ran a quote on our website"). They are never
@@ -58,7 +82,7 @@ export async function findDripCandidates(campaign: DripCampaign): Promise<DripCa
     for (const r of rows) out.push({ leadType: "QUOTE_FORM", leadId: r.id, phone: r.phone, name: [r.firstName, r.lastName].filter(Boolean).join(" ") || null });
   }
   if (types.has("meta")) {
-    const rows = await prisma.adLead.findMany({ where: base, select: { id: true, phone: true, firstName: true, lastName: true, fullName: true } });
+    const rows = await prisma.adLead.findMany({ where: prospectBase, select: { id: true, phone: true, firstName: true, lastName: true, fullName: true } });
     for (const r of rows) out.push({ leadType: "AD_LEAD", leadId: r.id, phone: r.phone || "", name: r.fullName || [r.firstName, r.lastName].filter(Boolean).join(" ") || null });
   }
   if (types.has("outofarea")) {
@@ -130,6 +154,36 @@ export async function isLeadArchived(leadType: LeadSource, leadId: string): Prom
 const MINUTE_MS = 60 * 1000;
 
 /**
+ * Take a lead off every cold-lead drip they're currently mid-way through.
+ *
+ * A returning lead belongs in the returning sequence ONLY. Without this they
+ * keep stepping through the campaign they joined when they were new, and
+ * receive two message streams at once. Returning campaigns are left alone.
+ * Best-effort — never throws into lead capture. Returns how many it stopped.
+ */
+async function stopColdDrips(leadType: LeadSource, leadId: string): Promise<number> {
+  const active = await prisma.campaignRecipient.findMany({
+    where: { leadType, leadId, status: "ACTIVE" },
+    select: { id: true, campaignId: true },
+  });
+  if (active.length === 0) return 0;
+
+  const camps = await prisma.campaign.findMany({
+    where: { id: { in: active.map((a) => a.campaignId) }, type: "DRIP" },
+    select: { id: true, audienceFilter: true },
+  });
+  const cold = new Set(camps.filter((c) => !isReturningCampaign(c.audienceFilter)).map((c) => c.id));
+  const ids = active.filter((a) => cold.has(a.campaignId)).map((a) => a.id);
+  if (ids.length === 0) return 0;
+
+  const r = await prisma.campaignRecipient.updateMany({
+    where: { id: { in: ids } },
+    data: { status: "STOPPED", nextSendAt: null, error: "Moved to returning-lead drip" },
+  });
+  return r.count;
+}
+
+/**
  * Enroll a lead into every active "returning lead" drip the instant they
  * re-engage, with its OWN message sequence (different from a cold lead).
  *
@@ -164,7 +218,12 @@ export async function enrollReturningLead(leadType: LeadSource, leadId: string):
     const types = f.leadTypes || [];
     return (types.includes(wanted) || types.includes("returning")) && c.steps.length > 0;
   });
-  if (returning.length === 0) return 0;
+  // Even with no returning campaign to move them to, a lead who came back must
+  // come off the cold-lead drip — its copy ("I saw you ran a quote") is wrong now.
+  if (returning.length === 0) {
+    await stopColdDrips(leadType, leadId);
+    return 0;
+  }
 
   // Contact info (and skip archived leads).
   let phone = "";
@@ -213,6 +272,12 @@ export async function enrollReturningLead(leadType: LeadSource, leadId: string):
     } catch {
       // unique race / transient — skip.
     }
+  }
+  // They're on the returning sequence now — stop the cold-lead one.
+  try {
+    await stopColdDrips(leadType, leadId);
+  } catch (e) {
+    console.error("[drip] stopColdDrips failed:", e);
   }
   return n;
 }
