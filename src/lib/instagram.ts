@@ -39,10 +39,17 @@ export function verifyMetaSignature(rawBody: string, signatureHeader: string | n
   }
 }
 
-/** Does a comment trigger a campaign? Case-insensitive; whole-word or substring. */
+/**
+ * Does a comment trigger a campaign? Case-insensitive; whole-word or substring.
+ *
+ * @-mentions are stripped before matching. Commenters routinely tag us
+ * ("@doogoodscoopers do you clean turf"), and our own handle contains "scoop" —
+ * so a partial match on SCOOP fired on the brand name rather than on anything
+ * the person actually said. Only the commenter's own words should trigger.
+ */
 export function matchesKeywords(commentText: string, keywords: string[], matchType: string): boolean {
-  const text = (commentText || "").toLowerCase();
-  if (!text) return false;
+  const text = (commentText || "").replace(/@[\w.]+/g, " ").toLowerCase();
+  if (!text.trim()) return false;
   return keywords.some((kw) => {
     const k = kw.trim().toLowerCase();
     if (!k) return false;
