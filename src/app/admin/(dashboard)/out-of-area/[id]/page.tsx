@@ -5,6 +5,10 @@ import prisma from "@/lib/prisma";
 import type { LeadStatus } from "@/types/leads";
 import StatusUpdateForm from "@/components/admin/StatusUpdateForm";
 import { LeadQuickActions } from "@/components/admin/LeadQuickActions";
+import { LeadUpdates } from "@/components/admin/LeadUpdates";
+import { LeadMessages } from "@/components/admin/LeadMessages";
+import { LeadActions } from "@/components/admin/LeadActions";
+import { isOptedOut } from "@/lib/sms-optout";
 import { ArrangeableBoard, type ArrangeableCard } from "@/components/admin/ArrangeableBoard";
 
 interface PageProps {
@@ -17,6 +21,22 @@ async function getOutOfAreaLead(id: string) {
   });
 
   return lead;
+}
+
+// A lead moved here from Meta or the quote form brings its history along, so
+// this page shows the same timeline and conversation as the pipeline pages.
+async function getLeadUpdates(leadId: string) {
+  return prisma.leadUpdate.findMany({
+    where: { leadId, leadType: "OUT_OF_AREA" },
+    orderBy: { createdAt: "desc" },
+  });
+}
+
+async function getLeadMessages(leadId: string) {
+  return prisma.leadMessage.findMany({
+    where: { leadId, leadType: "OUT_OF_AREA" },
+    orderBy: { createdAt: "asc" },
+  });
 }
 
 function formatDate(date: Date) {
@@ -60,11 +80,24 @@ function getStatusBadge(status: LeadStatus) {
 
 export default async function OutOfAreaDetailPage({ params }: PageProps) {
   const { id } = await params;
-  const lead = await getOutOfAreaLead(id);
+  const [lead, updates, messages] = await Promise.all([
+    getOutOfAreaLead(id),
+    getLeadUpdates(id),
+    getLeadMessages(id),
+  ]);
 
   if (!lead) {
     notFound();
   }
+
+  const optedOut = await isOptedOut(lead.phone);
+  const typedUpdates = updates.map((u) => ({
+    id: u.id,
+    createdAt: u.createdAt.toISOString(),
+    message: u.message || "",
+    communicationType: u.communicationType || "",
+    adminEmail: u.adminEmail || "",
+  }));
 
   const cards: ArrangeableCard[] = [
     {
@@ -126,6 +159,36 @@ export default async function OutOfAreaDetailPage({ params }: PageProps) {
           </div>
         </div>
       ),
+    },
+    {
+      id: "messages",
+      zone: "main",
+      node: (
+        <LeadMessages
+          leadId={lead.id}
+          leadType="outofarea"
+          phone={lead.phone}
+          optedOut={optedOut}
+          initialMessages={messages.map((m) => ({
+            id: m.id,
+            createdAt: m.createdAt.toISOString(),
+            direction: m.direction,
+            body: m.body,
+            status: m.status,
+            adminEmail: m.adminEmail,
+          }))}
+        />
+      ),
+    },
+    {
+      id: "updates",
+      zone: "main",
+      node: <LeadUpdates leadId={lead.id} leadType="outofarea" updates={typedUpdates} />,
+    },
+    {
+      id: "actions",
+      zone: "side",
+      node: <LeadActions leadId={lead.id} leadType="outofarea" isArchived={lead.archived} />,
     },
     {
       id: "quick-actions",

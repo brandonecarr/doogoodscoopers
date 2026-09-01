@@ -8,8 +8,11 @@ type LeadTypeKey = "quote" | "outofarea" | "career" | "commercial" | "adlead" | 
 interface LeadActionData {
   leadId: string;
   leadType: LeadTypeKey;
-  action: "archive" | "unarchive" | "delete";
+  action: "archive" | "unarchive" | "delete" | "move-out-of-area";
 }
+
+/** Lead types that can be moved into the out-of-area list. */
+const MOVABLE_TO_OUT_OF_AREA: LeadTypeKey[] = ["quote", "adlead"];
 
 const leadTypeMap: Record<LeadTypeKey, LeadSource> = {
   quote: "QUOTE_FORM",
@@ -44,6 +47,98 @@ async function deleteLead(leadType: LeadTypeKey, id: string) {
   }
 }
 
+/**
+ * Move a prospect we don't service yet into the out-of-area list.
+ *
+ * Meta feeds us leads from well outside the route, and they shouldn't sit in the
+ * working pipeline or keep receiving a drip that promises service. This parks
+ * them where they can be picked back up when a route opens in their area.
+ *
+ * The person's history follows them — timeline entries and messages are
+ * re-pointed at the new record. Any live drip is stopped (the copy is wrong for
+ * someone we can't serve). The original row is archived rather than deleted, so
+ * ad attribution and the original submission survive.
+ */
+async function moveToOutOfArea(leadType: LeadTypeKey, id: string, adminEmail: string) {
+  const src =
+    leadType === "quote"
+      ? await prisma.quoteLead.findUnique({ where: { id } })
+      : await prisma.adLead.findUnique({ where: { id } });
+  if (!src) throw new Error("Lead not found");
+
+  // OutOfAreaLead requires these; ad leads can arrive with any of them blank.
+  const first = src.firstName || "";
+  const last =
+    src.lastName || ("fullName" in src ? (src.fullName || "").split(" ").slice(1).join(" ") : "");
+  const name = [first, last].filter(Boolean).join(" ") || "Unknown";
+
+  const origin =
+    leadType === "quote"
+      ? "Moved from Quote Leads"
+      : `Moved from Meta Ad Leads${"adSource" in src && src.adSource ? ` (${src.adSource})` : ""}`;
+  const carried = [origin, src.notes?.trim()].filter(Boolean).join("\n\n");
+
+  const created = await prisma.outOfAreaLead.create({
+    data: {
+      firstName: first || name,
+      lastName: last,
+      email: src.email || "",
+      phone: src.phone || "",
+      zipCode: src.zipCode || "",
+      notes: carried || null,
+      grade: src.grade ?? null,
+      followupDate: src.followupDate ?? null,
+    },
+  });
+
+  const from = leadTypeMap[leadType];
+  await prisma.$transaction([
+    // History follows the person to their new record.
+    prisma.leadUpdate.updateMany({
+      where: { leadId: id, leadType: from },
+      data: { leadId: created.id, leadType: "OUT_OF_AREA" },
+    }),
+    prisma.leadMessage.updateMany({
+      where: { leadId: id, leadType: from },
+      data: { leadId: created.id, leadType: "OUT_OF_AREA" },
+    }),
+    // Stop any live sequence — we can't service them, so the copy is wrong.
+    prisma.campaignRecipient.updateMany({
+      where: { leadId: id, leadType: from, status: "ACTIVE" },
+      data: { status: "STOPPED", nextSendAt: null, error: "Moved to out of area" },
+    }),
+  ]);
+
+  // Breadcrumbs in both directions.
+  await prisma.leadUpdate.create({
+    data: {
+      leadType: "OUT_OF_AREA",
+      leadId: created.id,
+      message: `📍 ${origin}. Outside the current service area — pick back up when a route opens near ${src.zipCode || "this zip"}.`,
+      communicationType: "other",
+      adminEmail,
+    },
+  });
+
+  if (leadType === "quote") {
+    await prisma.quoteLead.update({ where: { id }, data: { archived: true } });
+  } else {
+    await prisma.adLead.update({ where: { id }, data: { archived: true } });
+  }
+
+  await prisma.activityLog.create({
+    data: {
+      action: "LEAD_MOVED_OUT_OF_AREA",
+      leadType: from,
+      leadId: id,
+      details: { movedTo: created.id, zipCode: src.zipCode ?? null },
+      adminEmail,
+    },
+  });
+
+  return created.id;
+}
+
 export async function POST(request: Request) {
   try {
     const session = await getSession();
@@ -57,7 +152,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    const validActions = ["archive", "unarchive", "delete"];
+    const validActions = ["archive", "unarchive", "delete", "move-out-of-area"];
     if (!validActions.includes(data.action)) {
       return NextResponse.json({ error: "Invalid action" }, { status: 400 });
     }
@@ -89,6 +184,17 @@ export async function POST(request: Request) {
       });
 
       return NextResponse.json({ success: true, action: "deleted" });
+    }
+
+    if (data.action === "move-out-of-area") {
+      if (!MOVABLE_TO_OUT_OF_AREA.includes(data.leadType)) {
+        return NextResponse.json(
+          { error: "Only quote and ad leads can be moved to out of area" },
+          { status: 400 }
+        );
+      }
+      const outOfAreaId = await moveToOutOfArea(data.leadType, data.leadId, session.email);
+      return NextResponse.json({ success: true, action: "moved", outOfAreaId });
     }
 
     if (data.action === "archive" || data.action === "unarchive") {

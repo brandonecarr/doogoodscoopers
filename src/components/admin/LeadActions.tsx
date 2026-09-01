@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Archive, ArchiveRestore, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, MapPinOff, Trash2 } from "lucide-react";
 
 interface LeadActionsProps {
   leadId: string;
@@ -24,10 +24,21 @@ export function LeadActions({ leadId, leadType, isArchived }: LeadActionsProps) 
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showMoveConfirm, setShowMoveConfirm] = useState(false);
 
-  const handleAction = async (action: "archive" | "unarchive" | "delete") => {
+  // Only a residential prospect can be "out of area" — a job applicant or a
+  // commercial account that already lives elsewhere in the pipeline can't.
+  const canMoveOutOfArea = leadType === "quote" || leadType === "adlead";
+
+  const handleAction = async (
+    action: "archive" | "unarchive" | "delete" | "move-out-of-area"
+  ) => {
     if (action === "delete" && !showDeleteConfirm) {
       setShowDeleteConfirm(true);
+      return;
+    }
+    if (action === "move-out-of-area" && !showMoveConfirm) {
+      setShowMoveConfirm(true);
       return;
     }
 
@@ -40,7 +51,11 @@ export function LeadActions({ leadId, leadType, isArchived }: LeadActionsProps) 
       });
 
       if (response.ok) {
-        if (action === "delete") {
+        if (action === "move-out-of-area") {
+          const { outOfAreaId } = await response.json();
+          // Land on the new record so it's obvious where the lead went.
+          router.push(outOfAreaId ? `/admin/out-of-area/${outOfAreaId}` : "/admin/out-of-area");
+        } else if (action === "delete") {
           router.push(LIST_PATH[leadType] ?? "/admin/leads");
         } else {
           router.refresh();
@@ -54,6 +69,7 @@ export function LeadActions({ leadId, leadType, isArchived }: LeadActionsProps) 
     } finally {
       setIsLoading(false);
       setShowDeleteConfirm(false);
+      setShowMoveConfirm(false);
     }
   };
 
@@ -84,6 +100,44 @@ export function LeadActions({ leadId, leadType, isArchived }: LeadActionsProps) 
             </>
           )}
         </button>
+
+        {/* Move to Out of Area — park a prospect we can't service yet */}
+        {canMoveOutOfArea && !isArchived && (
+          showMoveConfirm ? (
+            <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
+              <p className="text-sm text-amber-900 mb-3">
+                Move this lead to Out of Area? Their history and messages come with
+                them, any active drip stops, and this record is archived. You can
+                reach back out when a route opens near them.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleAction("move-out-of-area")}
+                  disabled={isLoading}
+                  className="flex-1 px-3 py-2 bg-amber-600 text-white text-sm font-medium rounded-lg hover:bg-amber-700 disabled:opacity-50"
+                >
+                  {isLoading ? "Moving..." : "Yes, Move"}
+                </button>
+                <button
+                  onClick={() => setShowMoveConfirm(false)}
+                  disabled={isLoading}
+                  className="flex-1 px-3 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-300 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => handleAction("move-out-of-area")}
+              disabled={isLoading}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-amber-50 text-amber-800 rounded-lg font-medium hover:bg-amber-100 transition-colors disabled:opacity-50"
+            >
+              <MapPinOff className="w-4 h-4" />
+              Move to Out of Area
+            </button>
+          )
+        )}
 
         {/* Delete Button */}
         {showDeleteConfirm ? (
