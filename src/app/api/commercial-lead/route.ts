@@ -1,45 +1,66 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { syncContactToQuo } from "@/lib/quo";
+import { flatten, makePicker, readPayload, secretOk } from "@/lib/form-payload";
 
-interface CommercialLeadData {
-  name: string;
-  propertyName: string;
-  phone: string;
-  email: string;
-  city: string;
-  state: string;
-  zipCode: string;
-  notes?: string;
-}
+/**
+ * Commercial inquiry intake.
+ *
+ * Two senders land here:
+ *   1. The in-app commercial form, posting JSON:
+ *      { name, propertyName, phone, email, city, state, zipCode, notes }
+ *   2. The Elementor form on https://doogoodscoopers.com/commercial-services/
+ *      (form_id 6d489d82), posting urlencoded `form_fields[...]`:
+ *      name, property_name, phone, email, city, zip, questions, and a privacy
+ *      checkbox. It has NO state field.
+ *
+ * The previous version read JSON only, required exact camelCase keys, and
+ * required `state`, so every submission from the website form was rejected with
+ * a 400 and never became a lead. Fields are now matched loosely by key (see
+ * form-payload.ts), and state defaults to CA — every city we serve is in it.
+ */
+
+const SECRET = process.env.COMMERCIAL_WEBHOOK_SECRET; // optional; enforced once set
 
 export async function POST(request: Request) {
+  if (!secretOk(request, SECRET)) {
+    return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+  }
+
+  let raw: unknown;
   try {
-    const data: CommercialLeadData = await request.json();
+    raw = await readPayload(request);
+  } catch {
+    return NextResponse.json({ success: false, message: "Unreadable payload" }, { status: 400 });
+  }
 
-    // Validate required fields
-    const requiredFields = ["name", "propertyName", "phone", "email", "city", "state", "zipCode"];
-    for (const field of requiredFields) {
-      if (!data[field as keyof CommercialLeadData]) {
-        return NextResponse.json(
-          { success: false, message: `Missing required field: ${field}` },
-          { status: 400 }
-        );
-      }
-    }
+  const flat = flatten(raw);
+  const { pick } = makePicker(flat);
 
-    // Store in database
+  // Order matters: the specific key first, then looser fallbacks.
+  const propertyName = pick([/^propertyname$/, /property/, /^company$/, /business/, /hoa/, /communit/]);
+  const name = pick([/^name$/, /^fullname$/, /contactname/, /yourname/, /^contact$/]);
+  const email = pick([/^email$/, /email/]);
+  const phone = pick([/^phone$/, /phonenumber/, /^phone/, /mobile/, /cell/, /^tel/]);
+  const city = pick([/^city$/, /town/]);
+  const zipCode = pick([/^zipcode$/, /^zip$/, /zip/, /postal/]);
+  const state = pick([/^state$/]) || "CA";
+  const inquiry = pick([/^notes$/, /^questions$/, /question/, /message/, /comment/, /inquiry/, /details/]);
+
+  const missing = Object.entries({ name, propertyName, phone, email, city, zipCode })
+    .filter(([, v]) => !v)
+    .map(([k]) => k);
+  if (missing.length) {
+    console.warn("[commercial-lead] rejected: missing", missing, "keys seen:", Object.keys(flat));
+    return NextResponse.json(
+      { success: false, message: `Missing required field: ${missing[0]}`, missing },
+      { status: 400 }
+    );
+  }
+
+  try {
     const lead = await prisma.commercialLead.create({
-      data: {
-        contactName: data.name,
-        propertyName: data.propertyName,
-        email: data.email,
-        phone: data.phone,
-        city: data.city,
-        state: data.state,
-        zipCode: data.zipCode,
-        inquiry: data.notes || null,
-      },
+      data: { contactName: name, propertyName, email, phone, city, state, zipCode, inquiry: inquiry || null },
     });
 
     syncContactToQuo({
@@ -51,41 +72,27 @@ export async function POST(request: Request) {
       source: "DooGoodScoopers Commercial",
     });
 
-    // Send notification email via webhook (if configured)
     const webhookUrl = process.env.WEBHOOK_URL;
     if (webhookUrl) {
-      const emailContent = `
-New Commercial Service Inquiry!
-
-CONTACT INFORMATION
--------------------
-Name: ${data.name}
-Property: ${data.propertyName}
-Email: ${data.email}
-Phone: ${data.phone}
-
-LOCATION
---------
-City: ${data.city}
-State: ${data.state}
-ZIP: ${data.zipCode}
-
-${data.notes ? `ADDITIONAL NOTES\n----------------\n${data.notes}` : ""}
-      `.trim();
-
+      const text = [
+        "New Commercial Service Inquiry!", "",
+        "CONTACT INFORMATION", "-------------------",
+        `Name: ${name}`, `Property: ${propertyName}`, `Email: ${email}`, `Phone: ${phone}`, "",
+        "LOCATION", "--------", `City: ${city}`, `State: ${state}`, `ZIP: ${zipCode}`,
+        ...(inquiry ? ["", "ADDITIONAL NOTES", "----------------", inquiry] : []),
+      ].join("\n");
       try {
         await fetch(webhookUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             to: process.env.NOTIFICATION_EMAIL || "service@doogoodscoopers.com",
-            subject: `New Commercial Inquiry: ${data.propertyName}`,
-            text: emailContent,
+            subject: `New Commercial Inquiry: ${propertyName}`,
+            text,
           }),
         });
       } catch (emailError) {
         console.error("Error sending notification email:", emailError);
-        // Don't fail the request if email fails
       }
     }
 

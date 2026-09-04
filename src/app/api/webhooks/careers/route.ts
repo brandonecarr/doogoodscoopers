@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { flatten, makePicker, yes, type Flat } from "@/lib/form-payload";
 import prisma from "@/lib/prisma";
 import { notify } from "@/lib/notify";
 
@@ -18,63 +19,7 @@ const SECRET = process.env.CAREERS_WEBHOOK_SECRET;
 
 export const dynamic = "force-dynamic";
 
-type Flat = Record<string, string>;
-
-/** Flatten one level of nesting and stringify every leaf. */
-function flatten(input: unknown, prefix = "", out: Flat = {}): Flat {
-  if (!input || typeof input !== "object") return out;
-  for (const [k, v] of Object.entries(input as Record<string, unknown>)) {
-    const key = prefix ? `${prefix}.${k}` : k;
-    if (v && typeof v === "object" && !Array.isArray(v)) {
-      // WPForms sends { fields: { "1": { name, value } } }
-      const o = v as Record<string, unknown>;
-      if (typeof o.value === "string" || typeof o.value === "number") {
-        const label = String(o.name ?? o.label ?? key);
-        out[label] = String(o.value);
-      } else {
-        flatten(v, key, out);
-      }
-    } else if (Array.isArray(v)) {
-      out[key] = v.map((x) => String(x)).join(", ");
-    } else if (v !== null && v !== undefined) {
-      out[key] = String(v);
-    }
-  }
-  return out;
-}
-
-const norm = (x: string) => x.toLowerCase().replace(/[\s_-]+/g, "");
-
-/**
- * Every way a key might reasonably be written, so anchored patterns still work.
- * Elementor posts `form_fields[name]` and Gravity `input_3` — matching only the
- * whole key means /^name$/ never fires and the applicant arrives nameless.
- */
-function keyForms(k: string): string[] {
-  const forms = [norm(k)];
-  const bracket = k.match(/\[([^\]]+)\]\s*$/);   // form_fields[name] -> name
-  if (bracket) forms.push(norm(bracket[1]));
-  const leaf = k.split(".").pop();                // a.b.city -> city
-  if (leaf && leaf !== k) forms.push(norm(leaf));
-  return forms;
-}
-
-/** First value whose KEY loosely matches any pattern; records the key used. */
-function makePicker(flat: Flat) {
-  const used = new Set<string>();
-  const pick = (patterns: RegExp[]): string => {
-    for (const p of patterns) {
-      for (const [k, v] of Object.entries(flat)) {
-        if (!String(v).trim() || used.has(k)) continue;
-        if (keyForms(k).some((form) => p.test(form))) { used.add(k); return String(v).trim(); }
-      }
-    }
-    return "";
-  };
-  return { pick, used };
-}
-
-const yes = (v: string) => /^(1|y|yes|true|on|checked)$/i.test(v.trim());
+// flatten / keyForms / makePicker / yes now live in @/lib/form-payload (shared with commercial intake).
 
 export async function POST(request: NextRequest) {
   // Secret is optional (matching the Zapier webhook), but enforced once set.
