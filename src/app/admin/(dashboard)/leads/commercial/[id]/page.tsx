@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Phone, Mail, MapPin, Building2, Calendar, Clock, MessageSquare, Archive } from "lucide-react";
+import { ArrowLeft, Phone, Mail, MapPin, Building2, Calendar, Clock, MessageSquare, Archive, Pencil } from "lucide-react";
 import prisma from "@/lib/prisma";
 import type { LeadStatus } from "@/types/leads";
 import StatusUpdateForm from "@/components/admin/StatusUpdateForm";
@@ -346,7 +346,16 @@ export default async function CommercialDetailPage({ params }: PageProps) {
         </div>
       </div>
 
-      <ArrangeableBoard layoutId="commercial" cards={cards} />
+      <ArrangeableBoard layoutId="commercial" actions={
+          <Link
+            href={`/admin/leads/commercial/${lead.id}/edit`}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-navy-600 text-white rounded-lg hover:bg-navy-700 transition-colors text-sm font-medium flex-shrink-0"
+          >
+            <Pencil className="w-3.5 h-3.5" />
+            Edit
+          </Link>
+        }
+        cards={cards} />
     </div>
   );
 }

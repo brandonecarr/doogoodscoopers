@@ -17,13 +17,19 @@ const STATUSES: { value: LeadStatus; label: string }[] = [
 const input = "w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent";
 const label = "block text-sm font-medium text-gray-700 mb-1";
 
-export function CommercialLeadForm() {
+export interface EditableCommercialLead {
+  id: string; contactName: string; propertyName: string; phone: string; email: string;
+  city: string; state: string; zipCode: string; status: LeadStatus; inquiry: string | null;
+}
+
+export function CommercialLeadForm({ lead, mode = "create" }: { lead?: EditableCommercialLead; mode?: "create" | "edit" }) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
-    contactName: "", propertyName: "", phone: "", email: "",
-    city: "", state: "CA", zipCode: "", status: "NEW" as LeadStatus, inquiry: "",
+    contactName: lead?.contactName || "", propertyName: lead?.propertyName || "", phone: lead?.phone || "", email: lead?.email || "",
+    city: lead?.city || "", state: lead?.state || "CA", zipCode: lead?.zipCode || "",
+    status: (lead?.status || "NEW") as LeadStatus, inquiry: lead?.inquiry || "",
   });
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setFormData((p) => ({ ...p, [e.target.name]: e.target.value }));
@@ -32,12 +38,14 @@ export function CommercialLeadForm() {
     e.preventDefault();
     setIsSubmitting(true); setError(null);
     try {
-      const res = await fetch("/api/admin/create-commercial-lead", {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(formData),
-      });
+      const res = await fetch(
+        mode === "edit" && lead ? `/api/admin/commercial-leads/${lead.id}` : "/api/admin/create-commercial-lead",
+        { method: mode === "edit" ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(formData) }
+      );
       const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.error || "Failed to create lead");
+      if (!res.ok || !data.success) throw new Error(data.error || (mode === "edit" ? "Failed to save changes" : "Failed to create lead"));
       router.push(`/admin/leads/commercial/${data.id}`);
+      router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
@@ -115,7 +123,7 @@ export function CommercialLeadForm() {
           Cancel
         </button>
         <button type="submit" disabled={isSubmitting} className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-          {isSubmitting ? "Saving..." : "Create Lead"}
+          {isSubmitting ? "Saving..." : mode === "create" ? "Create Lead" : "Save Changes"}
         </button>
       </div>
     </form>
