@@ -19,7 +19,7 @@ const pathFor: Record<LeadSource, string> = {
   CAREERS: "careers",
   CUSTOMER: "customers",
   INSTAGRAM: "instagram-leads",
-  CANVASSER: "canvasser-leads",
+  CANVASSER: "canvasser-leads",  COMMERCIAL_PROSPECT: "Call-list prospect",
 };
 
 function fmt(d: Date | null, timeZone: string) {

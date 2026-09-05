@@ -30,6 +30,7 @@ enum LeadSource {
   CUSTOMER         // Active Sweep&Go customer (for review-request / customer drips)
   INSTAGRAM        // Instagram comment → auto-DM commenter
   CANVASSER        // Door-to-door canvasser marked a home as a lead
+  COMMERCIAL_PROSPECT // Researched HOA / apartment / 55+ prospect on the call list
 }
 
 // =====================
@@ -1361,10 +1362,13 @@ model CommercialProspect {
   lastAttemptAt   DateTime?
   convertedLeadId String?
   archivedAt      DateTime?
+  followupDate    DateTime?
+  grade           String?   // A–F, same scale as leads
 
   @@index([status])
   @@index([propertyType])
   @@index([city])
   @@index([zipCode])
   @@index([createdAt])
+  @@index([followupDate])
 }

@@ -6,9 +6,12 @@ import type { LeadStatus } from "@/types/leads";
 
 interface StatusUpdateFormProps {
   leadId: string;
-  leadType: "quote" | "outofarea" | "career" | "commercial" | "adlead" | "canvasser";
-  currentStatus: LeadStatus;
+  leadType: "quote" | "outofarea" | "career" | "commercial" | "adlead" | "canvasser" | "prospect";
+  currentStatus: LeadStatus | string;
   notes: string | null;
+  /** Override the status choices (call-list prospects use their own set). */
+  options?: { value: string; label: string; color: string }[];
+  submitLabel?: string;
 }
 
 const statusOptions: { value: LeadStatus; label: string; color: string }[] = [
@@ -26,9 +29,12 @@ export default function StatusUpdateForm({
   leadType,
   currentStatus,
   notes: initialNotes,
+  options,
+  submitLabel,
 }: StatusUpdateFormProps) {
+  const choices = options ?? statusOptions;
   const router = useRouter();
-  const [status, setStatus] = useState(currentStatus);
+  const [status, setStatus] = useState<string>(currentStatus);
   const [notes, setNotes] = useState(initialNotes || "");
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(
@@ -75,7 +81,7 @@ export default function StatusUpdateForm({
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
           <div className="grid grid-cols-1 @lg:grid-cols-2 @2xl:grid-cols-3 gap-2">
-            {statusOptions.map((option) => (
+            {choices.map((option) => (
               <label
                 key={option.value}
                 className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
@@ -89,7 +95,7 @@ export default function StatusUpdateForm({
                   name="status"
                   value={option.value}
                   checked={status === option.value}
-                  onChange={(e) => setStatus(e.target.value as LeadStatus)}
+                  onChange={(e) => setStatus(e.target.value)}
                   className="sr-only"
                 />
                 <div className={`w-3 h-3 rounded-full ${option.color}`} />
@@ -130,7 +136,7 @@ export default function StatusUpdateForm({
           disabled={isLoading}
           className="w-full px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {isLoading ? "Updating..." : "Update Lead"}
+          {isLoading ? "Updating..." : submitLabel || "Update Lead"}
         </button>
       </form>
     </div>

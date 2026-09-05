@@ -4,18 +4,19 @@ import prisma from "@/lib/prisma";
 
 interface CreateUpdateData {
   leadId: string;
-  leadType: "quote" | "outofarea" | "career" | "commercial" | "adlead" | "canvasser";
+  leadType: "quote" | "outofarea" | "career" | "commercial" | "adlead" | "canvasser" | "prospect";
   message: string;
   communicationType: string;
 }
 
-const leadTypeMap: Record<string, "QUOTE_FORM" | "OUT_OF_AREA" | "CAREERS" | "COMMERCIAL" | "AD_LEAD" | "CANVASSER"> = {
+const leadTypeMap: Record<string, "QUOTE_FORM" | "OUT_OF_AREA" | "CAREERS" | "COMMERCIAL" | "AD_LEAD" | "CANVASSER" | "COMMERCIAL_PROSPECT"> = {
   quote: "QUOTE_FORM",
   outofarea: "OUT_OF_AREA",
   career: "CAREERS",
   commercial: "COMMERCIAL",
   adlead: "AD_LEAD",
   canvasser: "CANVASSER",
+  prospect: "COMMERCIAL_PROSPECT",
 };
 
 const validCommunicationTypes = ["phone_call", "text_message", "email", "in_person", "other"];

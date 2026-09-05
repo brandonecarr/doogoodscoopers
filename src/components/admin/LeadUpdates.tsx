@@ -14,7 +14,7 @@ interface LeadUpdate {
 
 interface LeadUpdatesProps {
   leadId: string;
-  leadType: "quote" | "outofarea" | "career" | "commercial" | "adlead" | "canvasser";
+  leadType: "quote" | "outofarea" | "career" | "commercial" | "adlead" | "canvasser" | "prospect";
   updates: LeadUpdate[];
 }
 

@@ -21,6 +21,7 @@ const LEAD_TYPE_LABELS: Record<string, string> = {
   career: "Career Application",
   commercial: "Commercial Lead",
   adlead: "Ad Lead",
+  prospect: "Call-list Prospect",
 };
 
 const LEAD_TYPE_PATHS: Record<string, string> = {
@@ -29,6 +30,7 @@ const LEAD_TYPE_PATHS: Record<string, string> = {
   career: "/admin/careers",
   commercial: "/admin/leads/commercial",
   adlead: "/admin/ad-leads",
+  prospect: "/admin/leads/commercial/call-list",
 };
 
 type LeadRow = { id: string; firstName?: string | null; lastName?: string | null };
@@ -71,6 +73,7 @@ export async function GET(req: NextRequest) {
     careerDue,   careerOverdue,
     commercialDue, commercialOverdue,
     adDue,       adOverdue,
+    prospectDue, prospectOverdue,
   ] = await Promise.all([
     prisma.quoteLead.findMany({ where: dueSoonFilter,  select: { id: true, firstName: true, lastName: true } }),
     prisma.quoteLead.findMany({ where: overdueFilter,  select: { id: true, firstName: true, lastName: true } }),
@@ -96,6 +99,9 @@ export async function GET(req: NextRequest) {
     }),
     prisma.adLead.findMany({ where: dueSoonFilter,  select: { id: true, firstName: true, lastName: true } }),
     prisma.adLead.findMany({ where: overdueFilter,  select: { id: true, firstName: true, lastName: true } }),
+    // Call-list prospects: their own status set; archived is a status here.
+    prisma.commercialProspect.findMany({ where: { followupDate: dueSoonFilter.followupDate, status: { notIn: ["CONVERTED", "NOT_INTERESTED", "ARCHIVED"] } }, select: { id: true, propertyName: true } }),
+    prisma.commercialProspect.findMany({ where: { followupDate: overdueFilter.followupDate, status: { notIn: ["CONVERTED", "NOT_INTERESTED", "ARCHIVED"] } }, select: { id: true, propertyName: true } }),
   ]);
 
   const notifications: Promise<unknown>[] = [];
@@ -107,6 +113,7 @@ export async function GET(req: NextRequest) {
     { type: "career",     leads: careerDue.map((l) => ({ id: l.id, name: fullName(l) })) },
     { type: "commercial", leads: commercialDue.map((l) => ({ id: l.id, name: l.contactName })) },
     { type: "adlead",     leads: adDue.map((l) => ({ id: l.id, name: fullName(l) })) },
+    { type: "prospect",   leads: prospectDue.map((l) => ({ id: l.id, name: l.propertyName })) },
   ];
 
   for (const { type, leads } of dueGroups) {
@@ -128,7 +135,8 @@ export async function GET(req: NextRequest) {
     ooaOverdue.length +
     careerOverdue.length +
     commercialOverdue.length +
-    adOverdue.length;
+    adOverdue.length +
+    prospectOverdue.length;
 
   if (overdueCount > 0) {
     // Surface the most-overdue lead for the notification URL

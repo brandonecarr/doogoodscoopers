@@ -6,7 +6,7 @@ import { CalendarClock, Star, Check, X, Loader2 } from "lucide-react";
 
 interface FollowupGradeProps {
   leadId: string;
-  leadType: "quote" | "outofarea" | "career" | "commercial" | "adlead" | "canvasser";
+  leadType: "quote" | "outofarea" | "career" | "commercial" | "adlead" | "canvasser" | "prospect";
   currentFollowupDate?: string | null;
   currentGrade?: string | null;
 }

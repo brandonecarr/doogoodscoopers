@@ -2,11 +2,12 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import type { LeadStatus } from "@/types/leads";
+import { PROSPECT_STATUSES } from "@/lib/commercial-prospect-types";
 
 interface UpdateLeadData {
   leadId: string;
-  leadType: "quote" | "outofarea" | "career" | "commercial" | "adlead" | "instagram" | "canvasser";
-  status?: LeadStatus;
+  leadType: "quote" | "outofarea" | "career" | "commercial" | "adlead" | "instagram" | "canvasser" | "prospect";
+  status?: LeadStatus | string;
   notes?: string;
   followupDate?: string | null;
   grade?: string | null;
@@ -26,9 +27,11 @@ export async function POST(request: Request) {
     const data: UpdateLeadData = await request.json();
     const { leadId, leadType, status, notes, followupDate, grade } = data;
 
-    // Validate status if provided
+    // Validate status if provided (call-list prospects have their own set)
     if (status) {
-      const validStatuses: LeadStatus[] = ["NEW", "CONTACTED", "NO_ANSWER", "NOT_INTERESTED", "WAITING_FOR_SIGNUP", "CONVERTED"];
+      const validStatuses: string[] = leadType === "prospect"
+        ? [...PROSPECT_STATUSES]
+        : (["NEW", "CONTACTED", "NO_ANSWER", "NOT_INTERESTED", "WAITING_FOR_SIGNUP", "CONVERTED"] as LeadStatus[]);
       if (!validStatuses.includes(status)) {
         return NextResponse.json(
           { success: false, message: "Invalid status" },
@@ -47,7 +50,7 @@ export async function POST(request: Request) {
 
     // Build update data - only include fields that were provided
     const updateData: Record<string, unknown> = {};
-    if (status !== undefined) updateData.status = status;
+    if (status !== undefined) updateData.status = status as string;
     if (notes !== undefined) updateData.notes = notes;
     if (followupDate !== undefined) updateData.followupDate = followupDate ? new Date(followupDate) : null;
     if (grade !== undefined) updateData.grade = grade;
@@ -103,6 +106,15 @@ export async function POST(request: Request) {
         });
         break;
 
+      case "prospect": {
+        // Archived is a status here, so keep archivedAt in step with it.
+        const data = { ...updateData } as Record<string, unknown>;
+        if (status === "ARCHIVED") data.archivedAt = new Date();
+        else if (status !== undefined) data.archivedAt = null;
+        await prisma.commercialProspect.update({ where: { id: leadId }, data });
+        break;
+      }
+
       default:
         return NextResponse.json(
           { success: false, message: "Invalid lead type" },
@@ -111,7 +123,7 @@ export async function POST(request: Request) {
     }
 
     // Map leadType to LeadSource enum value
-    const leadTypeMap: Record<string, "QUOTE_FORM" | "OUT_OF_AREA" | "CAREERS" | "COMMERCIAL" | "AD_LEAD" | "INSTAGRAM" | "CANVASSER"> = {
+    const leadTypeMap: Record<string, "QUOTE_FORM" | "OUT_OF_AREA" | "CAREERS" | "COMMERCIAL" | "AD_LEAD" | "INSTAGRAM" | "CANVASSER" | "COMMERCIAL_PROSPECT"> = {
       quote: "QUOTE_FORM",
       outofarea: "OUT_OF_AREA",
       career: "CAREERS",
@@ -119,6 +131,7 @@ export async function POST(request: Request) {
       adlead: "AD_LEAD",
       instagram: "INSTAGRAM",
       canvasser: "CANVASSER",
+      prospect: "COMMERCIAL_PROSPECT",
     };
 
     // Determine action type based on what was updated

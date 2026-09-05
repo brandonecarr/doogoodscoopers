@@ -4,16 +4,13 @@ import { ArrowLeft, Phone, Mail, MapPin, Building2, Calendar, Clock, PhoneCall, 
 import prisma from "@/lib/prisma";
 import { ArrangeableBoard, type ArrangeableCard } from "@/components/admin/ArrangeableBoard";
 import { ProspectRowActions } from "@/components/admin/ProspectRowActions";
-import { PROSPECT_TYPE_LABEL, type ProspectType } from "@/lib/commercial-prospect-types";
+import { PROSPECT_TYPE_LABEL, PROSPECT_STATUSES, PROSPECT_STATUS_META, type ProspectType, type ProspectStatus } from "@/lib/commercial-prospect-types";
+import StatusUpdateForm from "@/components/admin/StatusUpdateForm";
+import { FollowupGrade } from "@/components/admin/FollowupGrade";
+import { LeadUpdates } from "@/components/admin/LeadUpdates";
 
 interface PageProps { params: Promise<{ id: string }> }
 
-const STATUS: Record<string, [string, string]> = {
-  TO_CALL: ["To call", "bg-teal-100 text-teal-800 border-teal-300"],
-  ATTEMPTED: ["Attempted", "bg-blue-100 text-blue-800 border-blue-300"],
-  CONVERTED: ["Converted", "bg-green-100 text-green-800 border-green-300"],
-  ARCHIVED: ["Archived", "bg-gray-100 text-gray-800 border-gray-300"],
-};
 const TYPE_BADGE: Record<string, string> = { HOA: "bg-violet-100 text-violet-800", APARTMENTS: "bg-amber-100 text-amber-800", SENIOR_55: "bg-sky-100 text-sky-800", OTHER: "bg-gray-100 text-gray-700" };
 
 function formatDate(date: Date) {
@@ -26,7 +23,9 @@ export default async function ProspectDetailPage({ params }: PageProps) {
   const p = await prisma.commercialProspect.findUnique({ where: { id } });
   if (!p) notFound();
   const convertedLead = p.convertedLeadId ? await prisma.commercialLead.findUnique({ where: { id: p.convertedLeadId }, select: { id: true, propertyName: true, status: true } }) : null;
-  const [statusLabel, statusStyle] = STATUS[p.status] || [p.status, "bg-gray-100 text-gray-800 border-gray-300"];
+  const updates = await prisma.leadUpdate.findMany({ where: { leadId: id, leadType: "COMMERCIAL_PROSPECT" }, orderBy: { createdAt: "desc" } });
+  const statusMeta = PROSPECT_STATUS_META[p.status as ProspectStatus];
+  const statusLabel = statusMeta?.label || p.status; const statusStyle = (statusMeta?.badge || "bg-gray-100 text-gray-800") + " border-transparent";
   const typeLabel = PROSPECT_TYPE_LABEL[p.propertyType as ProspectType] || p.propertyType;
   const hasContact = !!(p.phone || p.email);
 
@@ -85,6 +84,27 @@ export default async function ProspectDetailPage({ params }: PageProps) {
       ),
     }] : []),
     {
+      id: "updates", zone: "main",
+      node: <LeadUpdates leadId={p.id} leadType="prospect" updates={updates.map((u) => ({ id: u.id, createdAt: u.createdAt.toISOString(), message: u.message, communicationType: u.communicationType, adminEmail: u.adminEmail }))} />,
+    },
+    {
+      id: "status", zone: "side",
+      node: (
+        <StatusUpdateForm
+          leadId={p.id}
+          leadType="prospect"
+          currentStatus={p.status}
+          notes={p.notes}
+          submitLabel="Update Prospect"
+          options={PROSPECT_STATUSES.map((st) => ({ value: st, label: PROSPECT_STATUS_META[st].label, color: PROSPECT_STATUS_META[st].dot }))}
+        />
+      ),
+    },
+    {
+      id: "followup", zone: "side",
+      node: <FollowupGrade leadId={p.id} leadType="prospect" currentFollowupDate={p.followupDate?.toISOString()} currentGrade={p.grade} />,
+    },
+    {
       id: "actions", zone: "side",
       node: (
         <div className="dgs-card p-6">
@@ -122,6 +142,7 @@ export default async function ProspectDetailPage({ params }: PageProps) {
           <div className="space-y-4">
             <div className="flex items-start gap-3"><div className="w-8 h-8 rounded-full bg-teal-100 flex items-center justify-center flex-shrink-0"><Calendar className="w-4 h-4 text-teal-600" /></div><div><p className="text-sm font-medium text-navy-900">Added to call list</p><p className="text-xs text-gray-500">{formatDate(p.createdAt)}</p></div></div>
             {p.lastAttemptAt && <div className="flex items-start gap-3"><div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0"><PhoneCall className="w-4 h-4 text-blue-600" /></div><div><p className="text-sm font-medium text-navy-900">Last call attempt</p><p className="text-xs text-gray-500">{formatDate(p.lastAttemptAt)}</p></div></div>}
+            {p.followupDate && <div className="flex items-start gap-3"><div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${p.followupDate < new Date() ? "bg-red-100" : "bg-teal-100"}`}><Calendar className={`w-4 h-4 ${p.followupDate < new Date() ? "text-red-600" : "text-teal-600"}`} /></div><div><p className="text-sm font-medium text-navy-900">{p.followupDate < new Date() ? "Follow-up overdue" : "Follow-up scheduled"}</p><p className="text-xs text-gray-500">{formatDate(p.followupDate)}</p></div></div>}
             {p.archivedAt && <div className="flex items-start gap-3"><div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0"><Archive className="w-4 h-4 text-gray-600" /></div><div><p className="text-sm font-medium text-navy-900">Archived</p><p className="text-xs text-gray-500">{formatDate(p.archivedAt)}</p></div></div>}
             {p.status === "CONVERTED" && <div className="flex items-start gap-3"><div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0"><ArrowRightCircle className="w-4 h-4 text-green-600" /></div><div><p className="text-sm font-medium text-navy-900">Converted to lead</p><p className="text-xs text-gray-500">{formatDate(p.updatedAt)}</p></div></div>}
             {p.updatedAt > p.createdAt && <div className="flex items-start gap-3"><div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0"><Clock className="w-4 h-4 text-gray-600" /></div><div><p className="text-sm font-medium text-navy-900">Last updated</p><p className="text-xs text-gray-500">{formatDate(p.updatedAt)}</p></div></div>}
@@ -141,6 +162,7 @@ export default async function ProspectDetailPage({ params }: PageProps) {
             <p className="text-[#9C9CB0] text-[12.5px] mt-2">Call list prospect · {p.city}, {p.state}</p>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
+            {p.grade && <span className="px-3 py-1 text-sm font-bold rounded-full border border-white/20 bg-white/10 text-white whitespace-nowrap">Grade: {p.grade}</span>}
             <span className={`px-3 py-1 text-xs font-medium rounded-full whitespace-nowrap ${TYPE_BADGE[p.propertyType] || TYPE_BADGE.OTHER}`}>{typeLabel}</span>
             <span className={`px-3 py-1 text-sm font-medium rounded-full border whitespace-nowrap ${statusStyle}`}>{statusLabel}</span>
           </div>
