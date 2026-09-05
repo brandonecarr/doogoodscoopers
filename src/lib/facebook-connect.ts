@@ -28,7 +28,7 @@ export interface FbPage { id: string; name: string; access_token: string; pictur
  */
 export async function buildFbAuthUrl(origin: string, state: string): Promise<string> {
   const configId = (await getSetting("facebook.loginConfigId")) || "";
-  const p = new URLSearchParams({ client_id: fbAppId(), redirect_uri: fbRedirectUri(origin), state, response_type: "code", auth_type: "rerequest" });
+  const p = new URLSearchParams({ client_id: fbAppId(), redirect_uri: fbRedirectUri(origin), state, response_type: "code" });
   if (configId) { p.set("config_id", configId); p.set("override_default_response_type", "true"); }
   else p.set("scope", FB_SCOPES.join(","));
   return `https://www.facebook.com/v21.0/dialog/oauth?${p}`;
