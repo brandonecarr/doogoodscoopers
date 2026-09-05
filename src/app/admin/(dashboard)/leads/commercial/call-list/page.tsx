@@ -64,17 +64,17 @@ export default async function CallListPage({ searchParams }: PageProps) {
           {rows.length === 0 ? <tr><td colSpan={6} className="px-6 py-12 text-center text-gray-500">{showArchived ? "Nothing archived" : "The call list is empty — upload a CSV or Excel file, or add a prospect"}</td></tr> : rows.map((r) => {
             const [sl, sc] = STATUS_BADGE[r.status] || [r.status, "bg-gray-100 text-gray-800"];
             return (<tr key={r.id} className="hover:bg-gray-50 transition-colors align-top">
-              <td className="px-6 py-4"><p className="font-semibold text-navy-900">{r.propertyName}</p>
-                <p className="mt-1 flex items-center gap-2 flex-wrap"><span className={`px-2 py-0.5 text-[11px] font-medium rounded-full ${TYPE_BADGE[r.propertyType] || TYPE_BADGE.OTHER}`}>{PROSPECT_TYPE_LABEL[r.propertyType as ProspectType] || r.propertyType}</span>{r.units ? <span className="text-xs text-gray-500">{r.units} units</span> : null}</p>
+              <td className="px-6 py-4"><Link href={`/admin/leads/commercial/call-list/${r.id}`} className="font-semibold text-navy-900 hover:text-teal-700 hover:underline">{r.propertyName}</Link>
+                <p className="mt-1 flex items-center gap-2 flex-wrap"><span className={`px-2 py-0.5 text-[11px] font-medium rounded-full whitespace-nowrap ${TYPE_BADGE[r.propertyType] || TYPE_BADGE.OTHER}`}>{PROSPECT_TYPE_LABEL[r.propertyType as ProspectType] || r.propertyType}</span>{r.units ? <span className="text-xs text-gray-500">{r.units} units</span> : null}</p>
                 {r.notes ? <p className="text-xs text-gray-500 mt-1 whitespace-pre-line line-clamp-3 max-w-md">{r.notes}</p> : null}</td>
               <td className="px-6 py-4 text-sm"><p className="text-navy-900">{r.contactName || <span className="text-gray-400">—</span>}</p>
                 {r.phone && <p><a href={`tel:${r.phone.replace(/\D/g, "")}`} className="text-teal-700 hover:underline">{r.phone}</a></p>}
                 {r.email && <p><a href={`mailto:${r.email}`} className="text-teal-700 hover:underline break-all">{r.email}</a></p>}</td>
               <td className="px-6 py-4 text-sm text-navy-900">{r.address && <p className="text-gray-600">{r.address}</p>}<p>{r.city}, {r.state} {r.zipCode}</p></td>
               <td className="px-6 py-4 text-sm text-navy-900"><p>{r.attempts}</p><p className="text-xs text-gray-500">last {fmt(r.lastAttemptAt)}</p></td>
-              <td className="px-6 py-4"><span className={`px-2 py-1 text-xs font-medium rounded-full ${sc}`}>{sl}</span>
+              <td className="px-6 py-4"><span className={`inline-block px-2 py-1 text-xs font-medium rounded-full whitespace-nowrap ${sc}`}>{sl}</span>
                 {r.status === "CONVERTED" && r.convertedLeadId && <p className="mt-1"><Link href={`/admin/leads/commercial/${r.convertedLeadId}`} className="text-xs text-teal-700 hover:underline">Open lead →</Link></p>}</td>
-              <td className="px-6 py-4"><ProspectRowActions id={r.id} status={r.status} hasContact={!!(r.phone || r.email)} /></td>
+              <td className="px-6 py-4"><ProspectRowActions id={r.id} status={r.status} hasContact={!!(r.phone || r.email)} showView /></td>
             </tr>);
           })}
         </tbody></table></div>

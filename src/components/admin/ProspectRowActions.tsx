@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { PhoneCall, ArrowRightCircle, Archive, ArchiveRestore, Loader2, Pencil } from "lucide-react";
+import { PhoneCall, ArrowRightCircle, Archive, ArchiveRestore, Loader2, Pencil, Eye } from "lucide-react";
 import Link from "next/link";
 
-export function ProspectRowActions({ id, status, hasContact }: { id: string; status: string; hasContact: boolean }) {
+export function ProspectRowActions({ id, status, hasContact, showView = false }: { id: string; status: string; hasContact: boolean; showView?: boolean }) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [noteFor, setNoteFor] = useState<"attempt" | "archive" | null>(null);
@@ -50,6 +50,7 @@ export function ProspectRowActions({ id, status, hasContact }: { id: string; sta
         <button onClick={convert} disabled={!!busy || !hasContact} title={hasContact ? "" : "Add a phone or email first"} className={`${btn} bg-green-50 text-green-700 hover:bg-green-100`}>{busy === "convert" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ArrowRightCircle className="w-3.5 h-3.5" />} Convert to lead</button>
         <button onClick={() => setNoteFor("archive")} disabled={!!busy} className={`${btn} bg-gray-100 text-gray-700 hover:bg-gray-200`}><Archive className="w-3.5 h-3.5" /> Archive</button>
       </>)}
+      {showView && <Link href={`/admin/leads/commercial/call-list/${id}`} className={`${btn} text-gray-500 hover:bg-gray-100`}><Eye className="w-3.5 h-3.5" /> View</Link>}
       {status !== "CONVERTED" && <Link href={`/admin/leads/commercial/call-list/${id}/edit`} className={`${btn} text-gray-500 hover:bg-gray-100`}><Pencil className="w-3.5 h-3.5" /> Edit</Link>}
     </div>
   );
