@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { syncContactToQuo } from "@/lib/quo";
 import { flatten, makePicker, readPayload, secretOk } from "@/lib/form-payload";
+import { notify } from "@/lib/notify";
 
 /**
  * Commercial inquiry intake.
@@ -62,6 +63,19 @@ export async function POST(request: Request) {
     const lead = await prisma.commercialLead.create({
       data: { contactName: name, propertyName, email, phone, city, state, zipCode, inquiry: inquiry || null },
     });
+
+    // The bell in the admin header plus a push to the owner's phone — the same
+    // path every other lead type uses. The WEBHOOK_URL email below is a legacy
+    // hook that is not configured, which is why commercial inquiries arrived
+    // silently before this.
+    await notify({
+      type: "lead_created",
+      severity: "info",
+      title: "🏢 New commercial inquiry",
+      body: `${propertyName} — ${name}, ${city} ${zipCode}`,
+      link: `/admin/commercial/${lead.id}`,
+      push: true,
+    }).catch(() => {});
 
     syncContactToQuo({
       externalId: `commerciallead:${lead.id}`,
