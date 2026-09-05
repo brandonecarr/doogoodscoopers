@@ -159,6 +159,7 @@ export interface FbConnection {
   /** Page IDs the pages_show_list grant covers: null = all Pages the profile has a role on; [] = none. */
   pageScope: string[] | null;
   webhook: WebhookDiag;
+  recentHits: { at: string; sig: string; object: string; events: number; len: number; outcome: string }[];
 }
 
 export async function getFbConnection(): Promise<FbConnection> {
@@ -171,12 +172,14 @@ export async function getFbConnection(): Promise<FbConnection> {
   const granular = userToken ? await fbGranularPages(userToken).catch(() => []) : [];
   const pageScope = granular.find((g) => g.scope === "pages_show_list")?.targetIds ?? null;
   const webhook = await getWebhookDiag(pageId || null, pageToken || null);
+  let recentHits: FbConnection["recentHits"] = [];
+  try { recentHits = JSON.parse((await getSetting("messenger.recentHits")) || "[]"); } catch { recentHits = []; }
   let pendingPages: FbPage[] = [];
   try { pendingPages = pending ? (JSON.parse(pending) as FbPage[]).map((p) => ({ ...p, access_token: "" })) : []; } catch { pendingPages = []; }
   return {
     configured: fbConfigured(), connected: !!pageToken, usingEnvToken: !pageToken && !!process.env.PAGE_ACCESS_TOKEN,
     pageId: pageId || null, pageName: pageName || null, pagePicture: pagePicture || null, userName: userName || null,
-    connectedAt: connectedAt || null, webhookFields: webhookFields || null, pendingPages, loginConfigId: loginConfigId || "", permissions, pageScope, webhook,
+    connectedAt: connectedAt || null, webhookFields: webhookFields || null, pendingPages, loginConfigId: loginConfigId || "", permissions, pageScope, webhook, recentHits,
   };
 }
 

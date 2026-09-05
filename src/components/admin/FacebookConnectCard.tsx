@@ -16,6 +16,7 @@ interface Status {
     app: { callbackUrl: string | null; fields: string[]; active: boolean | null; error?: string };
     page: { apps: { id: string; name?: string; fields: string[] }[]; error?: string } | null;
   };
+  recentHits: { at: string; sig: string; object: string; events: number; len: number; outcome: string }[];
 }
 const APP_ID = "3321005114736574";
 const OUR_WEBHOOK = "https://doogoodscoopers.vercel.app/api/webhooks/messenger";
@@ -192,6 +193,23 @@ export function FacebookConnectCard() {
               </div>
             );
           })()}
+
+          {/* Did Facebook actually call us? */}
+          <div className="mb-4 p-3 rounded-lg border border-gray-200">
+            <p className="text-xs font-semibold text-gray-500 mb-1.5">Recent webhook deliveries to this server</p>
+            {s.recentHits.length === 0 ? <p className="text-xs text-gray-500">None recorded yet. Message the Page, then click Refresh.</p> : (
+              <ul className="space-y-1">
+                {s.recentHits.map((h, i) => (
+                  <li key={i} className="text-xs flex flex-wrap gap-x-2 gap-y-0.5">
+                    <span className="text-gray-500 whitespace-nowrap">{new Date(h.at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", second: "2-digit" })}</span>
+                    <span className={h.sig === "ok" ? "text-green-700" : "text-red-700"}>signature {h.sig}</span>
+                    <span className="text-gray-600">{h.events} event{h.events === 1 ? "" : "s"}</span>
+                    <span className="text-navy-900 break-words">{h.outcome}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
 
           <div className="flex flex-wrap items-center gap-3">
             <a href="/api/admin/facebook/connect" className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg text-white ${s.configured ? "bg-[#1877F2] hover:bg-[#166fe5]" : "bg-gray-300 pointer-events-none"}`}>

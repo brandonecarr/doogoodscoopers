@@ -18,6 +18,22 @@ const DEFAULT_AUTOREPLY =
 
 const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
 
+interface Hit { at: string; sig: "ok" | "FAIL"; object: string; events: number; len: number; outcome: string }
+/** Keep the last 8 webhook deliveries in AppSetting messenger.recentHits. Returns the index of this one. */
+async function recordHit(h: Hit): Promise<number> {
+  let hits: Hit[] = [];
+  try { hits = JSON.parse((await getSetting("messenger.recentHits")) || "[]"); } catch { hits = []; }
+  hits.unshift(h); hits = hits.slice(0, 8);
+  await setSetting("messenger.recentHits", JSON.stringify(hits)).catch(() => {});
+  return 0;
+}
+async function updateHitOutcome(idx: number, outcome: string) {
+  try {
+    const hits: Hit[] = JSON.parse((await getSetting("messenger.recentHits")) || "[]");
+    if (hits[idx]) { hits[idx].outcome = outcome; await setSetting("messenger.recentHits", JSON.stringify(hits)); }
+  } catch { /* ignore */ }
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const mode = searchParams.get("hub.mode");
@@ -83,10 +99,12 @@ async function linkOrCreateLead(psid: string): Promise<{ id: string; phone: stri
 export async function POST(request: NextRequest) {
   const raw = await request.text();
   const sigOk = !hasMessengerSecret() || verifyMessengerSignature(raw, request.headers.get("x-hub-signature-256"));
-  // Diagnostic breadcrumb (readable via AppSetting) to confirm delivery + signature.
-  let obj = "?";
-  try { obj = JSON.parse(raw)?.object ?? "?"; } catch { /* ignore */ }
-  await setSetting("messenger.lastHit", `${new Date().toISOString()} sig=${sigOk ? "ok" : "FAIL"} object=${obj} len=${raw.length}`).catch(() => {});
+  // Diagnostic breadcrumbs: the last few deliveries, with signature result and
+  // what we did with each, shown on /admin/messenger. Answers "did Facebook
+  // even call us?" without digging through server logs.
+  let obj = "?"; let events = 0;
+  try { const b = JSON.parse(raw); obj = b?.object ?? "?"; events = (b?.entry ?? []).reduce((n: number, e: { messaging?: unknown[] }) => n + (e.messaging?.length ?? 0), 0); } catch { /* ignore */ }
+  const hitId = await recordHit({ at: new Date().toISOString(), sig: sigOk ? "ok" : "FAIL", object: obj, events, len: raw.length, outcome: sigOk ? "received" : "rejected: bad signature" });
 
   if (!sigOk) return new NextResponse("Invalid signature", { status: 401 });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -95,6 +113,7 @@ export async function POST(request: NextRequest) {
   if (body?.object !== "page") return NextResponse.json({ ok: true });
 
   after(async () => {
+    const done: string[] = [];
     try {
       for (const entry of body.entry ?? []) {
         for (const ev of entry.messaging ?? []) {
@@ -105,7 +124,8 @@ export async function POST(request: NextRequest) {
           if (!inbound) continue;
 
           const lead = await linkOrCreateLead(psid);
-          if (!lead) continue;
+          if (!lead) { done.push("could not resolve lead"); continue; }
+          done.push(`${lead.matched ? "matched" : "created"} lead ${lead.id}`);
 
           await prisma.adLead.update({ where: { id: lead.id }, data: { messengerLastInboundAt: new Date() } }).catch(() => {});
 
@@ -172,8 +192,10 @@ export async function POST(request: NextRequest) {
           });
         }
       }
+      await updateHitOutcome(hitId, done.length ? done.join("; ") : "no inbound events (echo/read/delivery receipts)");
     } catch (e) {
       console.error("[messenger webhook]", e);
+      await updateHitOutcome(hitId, `error: ${e instanceof Error ? e.message : String(e)}`);
     }
   });
 
