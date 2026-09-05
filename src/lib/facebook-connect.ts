@@ -68,6 +68,18 @@ export async function fbPermissions(userToken: string): Promise<FbPermissions> {
   return { granted: rows.filter((x) => x.status === "granted").map((x) => x.permission), declined: rows.filter((x) => x.status !== "granted").map((x) => x.permission) };
 }
 
+/**
+ * Which Pages the granted permissions actually cover, from Facebook's token
+ * debugger (needs the app token). `target_ids` absent = every Page the user
+ * has a role on; present = only those Pages; an empty list = none chosen.
+ */
+export async function fbGranularPages(userToken: string): Promise<{ scope: string; targetIds: string[] | null }[]> {
+  const appToken = `${fbAppId()}|${process.env.FB_APP_SECRET || ""}`;
+  const r = await graph<{ data?: { granular_scopes?: { scope: string; target_ids?: string[] }[] } }>(
+    `debug_token?input_token=${encodeURIComponent(userToken)}&access_token=${encodeURIComponent(appToken)}`);
+  return (r.data?.granular_scopes || []).map((g) => ({ scope: g.scope, targetIds: g.target_ids ?? null }));
+}
+
 /** Subscribe the app to the Page's Messenger webhooks (pages_manage_metadata). */
 export async function subscribePageWebhooks(pageId: string, pageToken: string): Promise<string[]> {
   const fields = ["messages", "messaging_postbacks", "messaging_optins", "messaging_referrals"];
@@ -87,6 +99,8 @@ export interface FbConnection {
   pendingPages: FbPage[]; loginConfigId: string;
   /** Live check of the last Facebook login's token; null when nobody has logged in. */
   permissions: FbPermissions | null;
+  /** Page IDs the pages_show_list grant covers: null = all Pages the profile has a role on; [] = none. */
+  pageScope: string[] | null;
 }
 
 export async function getFbConnection(): Promise<FbConnection> {
@@ -96,12 +110,14 @@ export async function getFbConnection(): Promise<FbConnection> {
     getSetting("facebook.userToken"),
   ]);
   const permissions = userToken ? await fbPermissions(userToken).catch(() => null) : null;
+  const granular = userToken ? await fbGranularPages(userToken).catch(() => []) : [];
+  const pageScope = granular.find((g) => g.scope === "pages_show_list")?.targetIds ?? null;
   let pendingPages: FbPage[] = [];
   try { pendingPages = pending ? (JSON.parse(pending) as FbPage[]).map((p) => ({ ...p, access_token: "" })) : []; } catch { pendingPages = []; }
   return {
     configured: fbConfigured(), connected: !!pageToken, usingEnvToken: !pageToken && !!process.env.PAGE_ACCESS_TOKEN,
     pageId: pageId || null, pageName: pageName || null, pagePicture: pagePicture || null, userName: userName || null,
-    connectedAt: connectedAt || null, webhookFields: webhookFields || null, pendingPages, loginConfigId: loginConfigId || "", permissions,
+    connectedAt: connectedAt || null, webhookFields: webhookFields || null, pendingPages, loginConfigId: loginConfigId || "", permissions, pageScope,
   };
 }
 

@@ -11,6 +11,7 @@ interface Status {
   userName: string | null; connectedAt: string | null; webhookFields: string | null;
   pendingPages: Page[]; loginConfigId: string;
   permissions: { granted: string[]; declined: string[] } | null;
+  pageScope: string[] | null;
 }
 const NEEDED = ["pages_show_list", "pages_messaging", "pages_manage_metadata"];
 
@@ -56,6 +57,16 @@ export function FacebookConnectCard() {
     if (!confirm("Disconnect the Facebook Page? Messenger replies and drips stop until you connect again.")) return;
     setBusy("disconnect");
     try { await fetch("/api/admin/facebook/disconnect", { method: "POST" }); setResult({ kind: "ok", text: "Disconnected." }); await load(); } finally { setBusy(null); }
+  }
+  async function relist() {
+    setBusy("relist"); setResult(null);
+    try {
+      const r = await fetch("/api/admin/facebook/status", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "relist" }) });
+      const d = await r.json();
+      if (!r.ok) { setResult({ kind: "err", text: d.error || "Could not list Pages" }); return; }
+      setResult(d.count ? { kind: "ok", text: `Facebook now lists ${d.count} Page${d.count === 1 ? "" : "s"} for this profile — choose one below.` } : { kind: "warn", text: "Facebook still returns no Pages for this profile." });
+      await load(); router.replace("/admin/messenger");
+    } finally { setBusy(null); }
   }
   async function saveConfigId() {
     setBusy("config");
@@ -118,7 +129,15 @@ export function FacebookConnectCard() {
                       : "Connect again and accept every permission in the dialog."}
                   </p>
                 ) : noPages ? (
-                  <p className="text-xs text-amber-800 mt-2">All three permissions were granted, but the Page wasn&apos;t selected in the dialog. Connect again and, on the &quot;What Pages do you want to use?&quot; step, choose the DooGoodScoopers Page (or &quot;Opt in to all current Pages&quot;).</p>
+                  s.pageScope && s.pageScope.length === 0 ? (
+                    <p className="text-xs text-amber-800 mt-2">All three permissions were granted, but no Page was selected in the dialog. Connect again and, on the &quot;What Pages do you want to use?&quot; step, choose the DooGoodScoopers Page.</p>
+                  ) : s.pageScope && s.pageScope.length > 0 ? (
+                    <p className="text-xs text-amber-800 mt-2">The login covers Page ID {s.pageScope.join(", ")}, yet Facebook returned no Pages for this profile. Click <b>List Pages again</b>; if it is still empty, this profile has no role on that Page.</p>
+                  ) : (
+                    <p className="text-xs text-amber-800 mt-2">
+                      All three permissions were granted for <b>every Page this profile has a role on</b>, and Facebook returned none. So the Facebook profile &quot;{s.userName}&quot; is not an admin of the DooGoodScoopers Page (the Page is likely owned by your Business portfolio). Fix: on facebook.com open the Page → Settings → <b>Page access</b> (or Business Settings → Accounts → Pages → Add people) and give this profile full control. Then click <b>List Pages again</b> below.
+                    </p>
+                  )
                 ) : null}
               </div>
             );
@@ -146,6 +165,11 @@ export function FacebookConnectCard() {
             <a href="/api/admin/facebook/connect" className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg text-white ${s.configured ? "bg-[#1877F2] hover:bg-[#166fe5]" : "bg-gray-300 pointer-events-none"}`}>
               <Facebook className="w-4 h-4" /> {s.connected ? "Reconnect with Facebook" : "Connect with Facebook"}
             </a>
+            {s.permissions && !s.connected && (
+              <button onClick={relist} disabled={!!busy} className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+                {busy === "relist" ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} List Pages again
+              </button>
+            )}
             <button onClick={() => load()} className="inline-flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700"><RefreshCw className="w-3.5 h-3.5" /> Refresh</button>
           </div>
           {!s.configured && <p className="text-xs text-red-600 mt-2">FB_APP_SECRET is not set on the server, so the Facebook login cannot start.</p>}
