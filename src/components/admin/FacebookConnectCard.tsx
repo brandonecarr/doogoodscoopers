@@ -10,7 +10,9 @@ interface Status {
   pageId: string | null; pageName: string | null; pagePicture: string | null;
   userName: string | null; connectedAt: string | null; webhookFields: string | null;
   pendingPages: Page[]; loginConfigId: string;
+  permissions: { granted: string[]; declined: string[] } | null;
 }
+const NEEDED = ["pages_show_list", "pages_messaging", "pages_manage_metadata"];
 
 const NOTICE: Record<string, [string, "ok" | "warn" | "err"]> = {
   choose: ["Logged in to Facebook. Now choose the Page this app should message from.", "ok"],
@@ -96,6 +98,31 @@ export function FacebookConnectCard() {
           {!s.connected && s.usingEnvToken && (
             <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">Currently sending with the server-side Page token. Connect below to switch to a Page you authorize here.</p>
           )}
+
+          {/* What Facebook actually granted on the last login — explains an empty Page list. */}
+          {s.permissions && (() => {
+            const missing = NEEDED.filter((n) => !s.permissions!.granted.includes(n));
+            const noPages = s.pendingPages.length === 0 && !s.connected;
+            return (
+              <div className="mb-4 p-3 rounded-lg border border-gray-200">
+                <p className="text-xs font-semibold text-gray-500 mb-1.5">Permissions on the last Facebook login{s.userName ? ` (${s.userName})` : ""}</p>
+                <ul className="flex flex-wrap gap-2">
+                  {NEEDED.map((n) => { const ok = s.permissions!.granted.includes(n); return (
+                    <li key={n} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${ok ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>{ok ? <Check className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}{n}</li>
+                  ); })}
+                </ul>
+                {missing.length > 0 ? (
+                  <p className="text-xs text-amber-800 mt-2">
+                    Facebook did not grant {missing.join(", ")}. {missing.includes("pages_show_list")
+                      ? "When the login dialog never offered Page permissions, the app is a Business-type app that ignores the scope list — create a Facebook Login for Business configuration (Advanced, below), save its ID, and connect again. If the dialog did offer them and you declined, connect again and accept."
+                      : "Connect again and accept every permission in the dialog."}
+                  </p>
+                ) : noPages ? (
+                  <p className="text-xs text-amber-800 mt-2">All three permissions were granted, but the Page wasn&apos;t selected in the dialog. Connect again and, on the &quot;What Pages do you want to use?&quot; step, choose the DooGoodScoopers Page (or &quot;Opt in to all current Pages&quot;).</p>
+                ) : null}
+              </div>
+            );
+          })()}
 
           {/* Page picker after login */}
           {s.pendingPages.length > 0 && (

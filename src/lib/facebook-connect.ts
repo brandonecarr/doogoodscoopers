@@ -25,7 +25,7 @@ export interface FbPage { id: string; name: string; access_token: string; pictur
  */
 export async function buildFbAuthUrl(origin: string, state: string): Promise<string> {
   const configId = (await getSetting("facebook.loginConfigId")) || "";
-  const p = new URLSearchParams({ client_id: fbAppId(), redirect_uri: fbRedirectUri(origin), state, response_type: "code" });
+  const p = new URLSearchParams({ client_id: fbAppId(), redirect_uri: fbRedirectUri(origin), state, response_type: "code", auth_type: "rerequest" });
   if (configId) { p.set("config_id", configId); p.set("override_default_response_type", "true"); }
   else p.set("scope", FB_SCOPES.join(","));
   return `https://www.facebook.com/v21.0/dialog/oauth?${p}`;
@@ -60,6 +60,14 @@ export async function listFbPages(userToken: string): Promise<FbPage[]> {
   return (r.data || []).map((p) => ({ id: p.id, name: p.name, access_token: p.access_token, category: p.category, picture: p.picture?.data?.url }));
 }
 
+export interface FbPermissions { granted: string[]; declined: string[] }
+/** What the user token actually carries (me/permissions) — the answer to "why are there no Pages?". */
+export async function fbPermissions(userToken: string): Promise<FbPermissions> {
+  const r = await graph<{ data?: { permission: string; status: string }[] }>(`me/permissions?access_token=${encodeURIComponent(userToken)}`);
+  const rows = r.data || [];
+  return { granted: rows.filter((x) => x.status === "granted").map((x) => x.permission), declined: rows.filter((x) => x.status !== "granted").map((x) => x.permission) };
+}
+
 /** Subscribe the app to the Page's Messenger webhooks (pages_manage_metadata). */
 export async function subscribePageWebhooks(pageId: string, pageToken: string): Promise<string[]> {
   const fields = ["messages", "messaging_postbacks", "messaging_optins", "messaging_referrals"];
@@ -77,19 +85,23 @@ export interface FbConnection {
   pageId: string | null; pageName: string | null; pagePicture: string | null;
   userName: string | null; connectedAt: string | null; webhookFields: string | null;
   pendingPages: FbPage[]; loginConfigId: string;
+  /** Live check of the last Facebook login's token; null when nobody has logged in. */
+  permissions: FbPermissions | null;
 }
 
 export async function getFbConnection(): Promise<FbConnection> {
-  const [pageToken, pageId, pageName, pagePicture, userName, connectedAt, webhookFields, pending, loginConfigId] = await Promise.all([
+  const [pageToken, pageId, pageName, pagePicture, userName, connectedAt, webhookFields, pending, loginConfigId, userToken] = await Promise.all([
     getSetting("facebook.pageToken"), getSetting("facebook.pageId"), getSetting("facebook.pageName"), getSetting("facebook.pagePicture"),
     getSetting("facebook.userName"), getSetting("facebook.connectedAt"), getSetting("facebook.webhookFields"), getSetting("facebook.pendingPages"), getSetting("facebook.loginConfigId"),
+    getSetting("facebook.userToken"),
   ]);
+  const permissions = userToken ? await fbPermissions(userToken).catch(() => null) : null;
   let pendingPages: FbPage[] = [];
   try { pendingPages = pending ? (JSON.parse(pending) as FbPage[]).map((p) => ({ ...p, access_token: "" })) : []; } catch { pendingPages = []; }
   return {
     configured: fbConfigured(), connected: !!pageToken, usingEnvToken: !pageToken && !!process.env.PAGE_ACCESS_TOKEN,
     pageId: pageId || null, pageName: pageName || null, pagePicture: pagePicture || null, userName: userName || null,
-    connectedAt: connectedAt || null, webhookFields: webhookFields || null, pendingPages, loginConfigId: loginConfigId || "",
+    connectedAt: connectedAt || null, webhookFields: webhookFields || null, pendingPages, loginConfigId: loginConfigId || "", permissions,
   };
 }
 
