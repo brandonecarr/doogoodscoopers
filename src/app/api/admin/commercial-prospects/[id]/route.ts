@@ -29,11 +29,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     } else if (b.action === "edit") {
       const s = (k: string) => (typeof b[k] === "string" ? (b[k] as string).trim() : undefined);
       const propertyType = s("propertyType"); const unitsRaw = s("units");
-      if (!s("propertyName") || !s("city") || !s("zipCode")) return NextResponse.json({ success: false, error: "Property, city and ZIP are required" }, { status: 400 });
+      if (!s("propertyName") || !s("city")) return NextResponse.json({ success: false, error: "Property and city are required" }, { status: 400 });
       await prisma.commercialProspect.update({ where: { id }, data: {
         propertyName: s("propertyName")!, propertyType: (PROSPECT_TYPES as readonly string[]).includes(propertyType || "") ? (propertyType as ProspectType) : p.propertyType,
         contactName: s("contactName") || null, phone: s("phone") || null, email: s("email") || null, city: s("city")!, state: (s("state") || "CA").toUpperCase().slice(0, 2),
-        zipCode: s("zipCode")!, units: unitsRaw ? parseInt(unitsRaw, 10) || null : null, notes: s("notes") || null, source: s("source") || null } });
+        zipCode: s("zipCode") || "", address: s("address") || null, units: unitsRaw ? parseInt(unitsRaw, 10) || null : null, notes: s("notes") || null, source: s("source") || null } });
     } else return NextResponse.json({ success: false, error: "Unknown action" }, { status: 400 });
     return NextResponse.json({ success: true });
   } catch (e) {

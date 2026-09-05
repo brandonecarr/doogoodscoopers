@@ -1351,7 +1351,8 @@ model CommercialProspect {
   email           String?
   city            String
   state           String    @default("CA")
-  zipCode         String
+  zipCode         String    @default("")
+  address         String?
   units           Int?
   notes           String?   @db.Text
   source          String?

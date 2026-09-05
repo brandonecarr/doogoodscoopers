@@ -18,7 +18,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     const lead = await prisma.commercialLead.create({ data: {
       contactName: p.contactName || "Unknown", propertyName: p.propertyName, phone: p.phone || "", email: p.email || "",
       city: p.city, state: p.state, zipCode: p.zipCode, status: "CONTACTED",
-      inquiry: [`From the call list — ${typeLabel}${p.units ? `, ${p.units} units` : ""}${p.source ? ` (${p.source})` : ""}`, p.notes].filter(Boolean).join("\n\n") } });
+      inquiry: [`From the call list — ${typeLabel}${p.units ? `, ${p.units} units` : ""}${p.source ? ` (${p.source})` : ""}`, p.address ? `Address: ${p.address}, ${p.city} ${p.zipCode}`.trim() : null, p.notes].filter(Boolean).join("\n\n") } });
     await prisma.commercialProspect.update({ where: { id }, data: { status: "CONVERTED", convertedLeadId: lead.id } });
     await prisma.activityLog.create({ data: { action: "LEAD_CREATED", leadType: "COMMERCIAL", leadId: lead.id, details: { fromProspect: id, createdManually: true }, adminEmail: session.email } });
     syncContactToQuo({ externalId: `commerciallead:${lead.id}`, firstName: lead.contactName, email: lead.email || null, phone: lead.phone, company: lead.propertyName, source: "DooGoodScoopers Call List" });

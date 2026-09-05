@@ -14,7 +14,7 @@ export default async function EditProspectPage({ params }: { params: Promise<{ i
         <Link href="/admin/leads/commercial/call-list" className="p-2 hover:bg-gray-100 rounded-lg transition-colors"><ArrowLeft className="w-5 h-5 text-gray-600" /></Link>
         <div><h1 className="dgs-title">Edit Prospect</h1><p className="text-navy-600 mt-1">{p.propertyName}</p></div>
       </div>
-      <CommercialProspectForm mode="edit" prospect={{ id: p.id, propertyName: p.propertyName, propertyType: p.propertyType, contactName: p.contactName, phone: p.phone, email: p.email, city: p.city, state: p.state, zipCode: p.zipCode, units: p.units, notes: p.notes, source: p.source }} />
+      <CommercialProspectForm mode="edit" prospect={{ id: p.id, propertyName: p.propertyName, propertyType: p.propertyType, contactName: p.contactName, phone: p.phone, email: p.email, city: p.city, state: p.state, zipCode: p.zipCode, address: p.address, units: p.units, notes: p.notes, source: p.source }} />
     </div>
   );
 }

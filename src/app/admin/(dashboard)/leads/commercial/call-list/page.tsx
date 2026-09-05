@@ -21,7 +21,7 @@ export default async function CallListPage({ searchParams }: PageProps) {
   const p = await searchParams; const showArchived = p.archived === "true"; const pageSize = 25; const page = p.page ? parseInt(p.page) : 1;
   const where: Record<string, unknown> = showArchived ? { status: "ARCHIVED" } : (p.status && p.status !== "all" ? { status: p.status } : { status: { in: ["TO_CALL", "ATTEMPTED", "CONVERTED"] } });
   if (p.type && p.type !== "all") where.propertyType = p.type;
-  if (p.search) where.OR = ["propertyName", "contactName", "email", "phone", "city", "zipCode", "notes"].map((k) => ({ [k]: { contains: p.search, mode: "insensitive" } }));
+  if (p.search) where.OR = ["propertyName", "contactName", "email", "phone", "city", "zipCode", "address", "notes"].map((k) => ({ [k]: { contains: p.search, mode: "insensitive" } }));
   const [rows, total, counts] = await Promise.all([
     prisma.commercialProspect.findMany({ where, orderBy: [{ status: "asc" }, { lastAttemptAt: "asc" }, { createdAt: "desc" }], skip: (page - 1) * pageSize, take: pageSize }),
     prisma.commercialProspect.count({ where }),
@@ -70,7 +70,7 @@ export default async function CallListPage({ searchParams }: PageProps) {
               <td className="px-6 py-4 text-sm"><p className="text-navy-900">{r.contactName || <span className="text-gray-400">—</span>}</p>
                 {r.phone && <p><a href={`tel:${r.phone.replace(/\D/g, "")}`} className="text-teal-700 hover:underline">{r.phone}</a></p>}
                 {r.email && <p><a href={`mailto:${r.email}`} className="text-teal-700 hover:underline break-all">{r.email}</a></p>}</td>
-              <td className="px-6 py-4 text-sm text-navy-900">{r.city}, {r.state} {r.zipCode}</td>
+              <td className="px-6 py-4 text-sm text-navy-900">{r.address && <p className="text-gray-600">{r.address}</p>}<p>{r.city}, {r.state} {r.zipCode}</p></td>
               <td className="px-6 py-4 text-sm text-navy-900"><p>{r.attempts}</p><p className="text-xs text-gray-500">last {fmt(r.lastAttemptAt)}</p></td>
               <td className="px-6 py-4"><span className={`px-2 py-1 text-xs font-medium rounded-full ${sc}`}>{sl}</span>
                 {r.status === "CONVERTED" && r.convertedLeadId && <p className="mt-1"><Link href={`/admin/leads/commercial/${r.convertedLeadId}`} className="text-xs text-teal-700 hover:underline">Open lead →</Link></p>}</td>
