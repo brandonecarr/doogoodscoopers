@@ -1,13 +1,13 @@
 import Link from "next/link";
-import { Building2, Home } from "lucide-react";
+import { Building2, Home, PhoneCall } from "lucide-react";
 
 /**
  * Residential | Commercial, at the top of the Leads section. Two lists that
  * share a status model but never merge — a commercial inquiry is never folded
  * into a residential quote — so they live side by side rather than as one feed.
  */
-export function LeadsSectionSwitch({ active }: { active: "residential" | "commercial" }) {
-  const item = (key: "residential" | "commercial", href: string, label: string, Icon: typeof Home) => (
+export function LeadsSectionSwitch({ active }: { active: "residential" | "commercial" | "callList" }) {
+  const item = (key: "residential" | "commercial" | "callList", href: string, label: string, Icon: typeof Home) => (
     <Link
       key={key}
       href={href}
@@ -24,6 +24,7 @@ export function LeadsSectionSwitch({ active }: { active: "residential" | "commer
     <div className="flex items-center bg-white/10 rounded-[12px] p-1">
       {item("residential", "/admin/leads", "Residential", Home)}
       {item("commercial", "/admin/leads/commercial", "Commercial", Building2)}
+      {item("callList", "/admin/leads/commercial/call-list", "Call List", PhoneCall)}
     </div>
   );
 }

@@ -1334,3 +1334,36 @@ model RankGridPoint {
 
   @@index([scanId])
 }
+
+/// Researched commercial prospect (HOA, apartment complex, 55+ community) on the
+/// call list. Sits here until contacted; then becomes a CommercialLead (convert)
+/// or is archived. Never auto-merged with any lead type.
+model CommercialProspect {
+  id              String    @id @default(cuid())
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  status          String    @default("TO_CALL")  // TO_CALL | ATTEMPTED | CONVERTED | ARCHIVED
+  propertyType    String    @default("OTHER")    // HOA | APARTMENTS | SENIOR_55 | OTHER
+  propertyName    String
+  contactName     String?
+  phone           String?
+  email           String?
+  city            String
+  state           String    @default("CA")
+  zipCode         String
+  units           Int?
+  notes           String?   @db.Text
+  source          String?
+
+  attempts        Int       @default(0)
+  lastAttemptAt   DateTime?
+  convertedLeadId String?
+  archivedAt      DateTime?
+
+  @@index([status])
+  @@index([propertyType])
+  @@index([city])
+  @@index([zipCode])
+  @@index([createdAt])
+}
