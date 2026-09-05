@@ -13,7 +13,7 @@ interface Status {
   permissions: { granted: string[]; declined: string[] } | null;
   pageScope: string[] | null;
 }
-const NEEDED = ["pages_show_list", "pages_messaging", "pages_manage_metadata"];
+const NEEDED = ["pages_show_list", "pages_messaging", "pages_manage_metadata", "pages_read_engagement"];
 
 const NOTICE: Record<string, [string, "ok" | "warn" | "err"]> = {
   choose: ["Logged in to Facebook. Now choose the Page this app should message from.", "ok"],
@@ -125,7 +125,7 @@ export function FacebookConnectCard() {
                 </ul>
                 {missing.length > 0 ? (
                   <p className="text-xs text-amber-800 mt-2">
-                    Facebook did not grant {missing.join(", ")}. {missing.includes("pages_show_list")
+                    Facebook did not grant {missing.join(", ")}. {missing.includes("pages_show_list") || missing.includes("pages_read_engagement")
                       ? "When the login dialog never offered Page permissions, the app is a Business-type app that ignores the scope list — create a Facebook Login for Business configuration (Advanced, below), save its ID, and connect again. If the dialog did offer them and you declined, connect again and accept."
                       : "Connect again and accept every permission in the dialog."}
                   </p>
@@ -177,7 +177,7 @@ export function FacebookConnectCard() {
 
           <details className="mt-4 text-sm">
             <summary className="cursor-pointer text-gray-600">Advanced: Facebook Login for Business configuration</summary>
-            <p className="text-xs text-gray-500 mt-2">If Facebook rejects the login with an &quot;invalid scopes&quot; error, the app is a Business-type app and needs a Login for Business configuration. In the Meta dashboard open Facebook Login for Business → Configurations, create one with pages_show_list, pages_messaging and pages_manage_metadata, and paste its Configuration ID here.</p>
+            <p className="text-xs text-gray-500 mt-2">If Facebook rejects the login with an &quot;invalid scopes&quot; error, the app is a Business-type app and needs a Login for Business configuration. In the Meta dashboard open Facebook Login for Business → Configurations, create one with pages_show_list, pages_messaging, pages_manage_metadata and pages_read_engagement, and paste its Configuration ID here.</p>
             <div className="flex items-center gap-2 mt-2">
               <input value={configId} onChange={(e) => setConfigId(e.target.value)} placeholder="Configuration ID (numbers only)" className="w-64 px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent" />
               <button onClick={saveConfigId} disabled={busy === "config"} className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-50">Save</button>

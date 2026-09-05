@@ -11,7 +11,10 @@ import { getSetting, setSetting } from "@/lib/google-business";
  * first connect.
  */
 const GRAPH = "https://graph.facebook.com/v21.0";
-export const FB_SCOPES = ["pages_show_list", "pages_messaging", "pages_manage_metadata"];
+// pages_read_engagement is what lets the app read the Page object and mint its
+// token — without it Facebook answers "(#100) Object does not exist … requires
+// the 'pages_read_engagement' permission" even with the other three granted.
+export const FB_SCOPES = ["pages_show_list", "pages_messaging", "pages_manage_metadata", "pages_read_engagement"];
 /** App ID of "DooGoodScoopers PM System" (public; the secret stays in FB_APP_SECRET). */
 export const fbAppId = () => process.env.FB_APP_ID || "3321005114736574";
 export const fbConfigured = () => !!process.env.FB_APP_SECRET;
