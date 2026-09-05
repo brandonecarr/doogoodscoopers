@@ -79,8 +79,8 @@ export function FacebookConnectCard() {
 
   return (
     <div className="dgs-card p-6">
-      <div className="flex items-start justify-between gap-3 mb-4">
-        <div className="flex items-center gap-3 min-w-0">
+      <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
           <div className="w-10 h-10 rounded-lg bg-[#1877F2]/10 flex items-center justify-center flex-shrink-0"><Facebook className="w-5 h-5 text-[#1877F2]" /></div>
           <div className="min-w-0">
             <h2 className="text-lg font-semibold text-navy-900">Facebook Page connection</h2>
@@ -91,20 +91,20 @@ export function FacebookConnectCard() {
       </div>
 
       {notice && <div className={`flex items-start gap-2 text-sm border rounded-lg px-3 py-2 mb-4 ${tone(notice[1])}`}><AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" /><span>{notice[0]}{msg ? ` (${msg})` : ""}</span></div>}
-      {result && <div className={`flex items-start gap-2 text-sm border rounded-lg px-3 py-2 mb-4 ${tone(result.kind)}`}><AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" /><span>{result.text}</span></div>}
+      {result && <div className={`flex items-start gap-2 text-sm border rounded-lg px-3 py-2 mb-4 ${tone(result.kind)}`}><AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" /><span className="min-w-0 break-words">{result.text}</span></div>}
 
       {!s ? <p className="text-sm text-gray-400 inline-flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Checking connection…</p> : (
         <>
           {/* Connected Page */}
           {s.connected && (
-            <div className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 bg-gray-50 mb-4">
-              {s.pagePicture ? <img src={s.pagePicture} alt="" className="w-10 h-10 rounded-full" /> : <div className="w-10 h-10 rounded-full bg-[#1877F2]/10" />}
-              <div className="min-w-0 flex-1">
-                <p className="font-semibold text-navy-900 truncate">{s.pageName}</p>
-                <p className="text-xs text-gray-500">Page ID {s.pageId}{s.userName ? ` · connected by ${s.userName}` : ""}{s.connectedAt ? ` · ${new Date(s.connectedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}` : ""}</p>
-                <p className="text-xs text-gray-500">{s.webhookFields ? `Webhooks: ${s.webhookFields}` : "Webhooks: not subscribed"}</p>
+            <div className="flex flex-wrap items-center gap-3 p-3 rounded-lg border border-gray-200 bg-gray-50 mb-4">
+              {s.pagePicture ? <img src={s.pagePicture} alt="" className="w-10 h-10 rounded-full flex-shrink-0" /> : <div className="w-10 h-10 rounded-full bg-[#1877F2]/10 flex-shrink-0" />}
+              <div className="min-w-0 flex-1 basis-40">
+                <p className="font-semibold text-navy-900 break-words">{s.pageName}</p>
+                <p className="text-xs text-gray-500 break-words">Page ID {s.pageId}{s.userName ? ` · connected by ${s.userName}` : ""}{s.connectedAt ? ` · ${new Date(s.connectedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}` : ""}</p>
+                <p className="text-xs text-gray-500 break-words">{s.webhookFields ? `Webhooks: ${s.webhookFields.split(",").join(", ")}` : "Webhooks: not subscribed"}</p>
               </div>
-              <button onClick={disconnect} disabled={!!busy} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 text-gray-700 hover:bg-white disabled:opacity-50"><Unplug className="w-3.5 h-3.5" /> Disconnect</button>
+              <button onClick={disconnect} disabled={!!busy} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 text-gray-700 hover:bg-white disabled:opacity-50 flex-shrink-0"><Unplug className="w-3.5 h-3.5" /> Disconnect</button>
             </div>
           )}
           {!s.connected && s.usingEnvToken && (
@@ -152,8 +152,8 @@ export function FacebookConnectCard() {
                 {s.pendingPages.map((p) => (
                   <li key={p.id} className="flex items-center gap-3 p-3 bg-white">
                     {p.picture ? <img src={p.picture} alt="" className="w-9 h-9 rounded-full" /> : <div className="w-9 h-9 rounded-full bg-gray-100" />}
-                    <div className="min-w-0 flex-1"><p className="font-medium text-navy-900 truncate">{p.name}</p><p className="text-xs text-gray-500">{p.category || "Page"} · ID {p.id}</p></div>
-                    <button onClick={() => choose(p.id)} disabled={!!busy} className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-[#1877F2] text-white hover:bg-[#166fe5] disabled:opacity-50 inline-flex items-center gap-1.5">
+                    <div className="min-w-0 flex-1"><p className="font-medium text-navy-900 break-words">{p.name}</p><p className="text-xs text-gray-500 break-words">{p.category || "Page"} · ID {p.id}</p></div>
+                    <button onClick={() => choose(p.id)} disabled={!!busy} className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-[#1877F2] text-white hover:bg-[#166fe5] disabled:opacity-50 inline-flex items-center gap-1.5 flex-shrink-0">
                       {busy === p.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}{s.pageId === p.id ? "Reconnect" : "Use this Page"}
                     </button>
                   </li>
