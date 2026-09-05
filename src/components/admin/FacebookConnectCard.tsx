@@ -19,6 +19,7 @@ interface Status {
   recentHits: { at: string; sig: string; object: string; events: number; len: number; outcome: string }[];
 }
 const APP_ID = "3321005114736574";
+const DGS_PAGE_ID = "497888203408431";
 const OUR_WEBHOOK = "https://doogoodscoopers.vercel.app/api/webhooks/messenger";
 const NEEDED = ["pages_show_list", "pages_messaging", "pages_manage_metadata", "pages_read_engagement"];
 
@@ -152,6 +153,14 @@ export function FacebookConnectCard() {
           })()}
 
           {/* Page picker after login */}
+          {s.pendingPages.length > 0 && !s.pendingPages.some((p) => p.id === DGS_PAGE_ID) && (
+            <div className="flex items-start gap-2 text-sm border rounded-lg px-3 py-2 mb-3 text-amber-700 bg-amber-50 border-amber-200">
+              <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <span>Doo Good Scoopers (Page ID {DGS_PAGE_ID}) isn&apos;t in this list. {s.pageScope && !s.pageScope.includes(DGS_PAGE_ID)
+                ? "This login didn't include it: click Connect with Facebook again and, on the \"What Pages do you want to use?\" step, make sure Doo Good Scoopers is ticked."
+                : "The grant covers it but Facebook wouldn't return it. Click List Pages again; if it's still missing, the error will be shown here."}</span>
+            </div>
+          )}
           {s.pendingPages.length > 0 && (
             <div className="mb-4">
               <p className="text-sm font-medium text-gray-700 mb-2">Choose the Page to connect</p>
@@ -215,7 +224,7 @@ export function FacebookConnectCard() {
             <a href="/api/admin/facebook/connect" className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg text-white ${s.configured ? "bg-[#1877F2] hover:bg-[#166fe5]" : "bg-gray-300 pointer-events-none"}`}>
               <Facebook className="w-4 h-4" /> {s.connected ? "Reconnect with Facebook" : "Connect with Facebook"}
             </a>
-            {s.permissions && !s.connected && (
+            {s.permissions && (
               <button onClick={relist} disabled={!!busy} className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 disabled:opacity-50">
                 {busy === "relist" ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} List Pages again
               </button>

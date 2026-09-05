@@ -15,6 +15,8 @@ const GRAPH = "https://graph.facebook.com/v21.0";
 // token — without it Facebook answers "(#100) Object does not exist … requires
 // the 'pages_read_engagement' permission" even with the other three granted.
 export const FB_SCOPES = ["pages_show_list", "pages_messaging", "pages_manage_metadata", "pages_read_engagement"];
+/** The Doo Good Scoopers Facebook Page (confirmed via the connect flow on Sep 4, 2026). */
+export const DGS_PAGE_ID = "497888203408431";
 /** App ID of "DooGoodScoopers PM System" (public; the secret stays in FB_APP_SECRET). */
 export const fbAppId = () => process.env.FB_APP_ID || "3321005114736574";
 export const fbConfigured = () => !!process.env.FB_APP_SECRET;
@@ -77,9 +79,12 @@ export async function listFbPagesDetailed(userToken: string): Promise<{ pages: F
     const r = await graph<{ data?: Raw[] }>(`me/accounts?fields=${fields}&limit=100&access_token=${encodeURIComponent(userToken)}`);
     pages = (r.data || []).map(toPage);
   } catch (e) { errors.push(`me/accounts: ${e instanceof Error ? e.message : "failed"}`); }
-  if (pages.length === 0) {
+  // /me/accounts can omit Pages the grant explicitly covers (seen with the
+  // DooGoodScoopers Page). Fill in any covered Page the listing left out.
+  {
     const granular = await fbGranularPages(userToken).catch(() => []);
-    const ids = new Set(granular.flatMap((g) => g.targetIds || []));
+    const listed = new Set(pages.map((p) => p.id));
+    const ids = new Set(granular.flatMap((g) => g.targetIds || []).filter((id) => !listed.has(id)));
     for (const id of ids) {
       try {
         const p = await graph<Raw>(`${id}?fields=${fields}&access_token=${encodeURIComponent(userToken)}`);
@@ -87,6 +92,7 @@ export async function listFbPagesDetailed(userToken: string): Promise<{ pages: F
       } catch (e) { errors.push(`Page ${id}: ${e instanceof Error ? e.message : "failed"}`); }
     }
   }
+  pages.sort((a, b) => (a.id === DGS_PAGE_ID ? -1 : b.id === DGS_PAGE_ID ? 1 : a.name.localeCompare(b.name)));
   return { pages, errors };
 }
 
