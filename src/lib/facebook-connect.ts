@@ -53,15 +53,42 @@ export async function fbUserName(userToken: string): Promise<string> {
   return me.name || "";
 }
 
-/** Pages the user manages (pages_show_list). Page tokens minted from a long-lived user token don't expire. */
+/**
+ * Pages the user manages (pages_show_list). Page tokens minted from a long-lived
+ * user token don't expire. When /me/accounts comes back empty even though the
+ * grant names specific Pages, each of those is fetched directly by ID — that
+ * works in cases where the listing doesn't. Facebook's own error text is kept
+ * so the card can show it.
+ */
 export async function listFbPages(userToken: string): Promise<FbPage[]> {
-  const r = await graph<{ data?: { id: string; name: string; access_token: string; category?: string; picture?: { data?: { url?: string } } }[] }>(
-    `me/accounts?fields=id,name,access_token,category,picture{url}&limit=100&access_token=${encodeURIComponent(userToken)}`);
-  return (r.data || []).map((p) => ({ id: p.id, name: p.name, access_token: p.access_token, category: p.category, picture: p.picture?.data?.url }));
+  const r = await listFbPagesDetailed(userToken);
+  return r.pages;
+}
+export async function listFbPagesDetailed(userToken: string): Promise<{ pages: FbPage[]; errors: string[] }> {
+  const fields = "id,name,access_token,category,picture{url}";
+  const errors: string[] = [];
+  type Raw = { id: string; name: string; access_token?: string; category?: string; picture?: { data?: { url?: string } } };
+  const toPage = (p: Raw): FbPage => ({ id: p.id, name: p.name, access_token: p.access_token || "", category: p.category, picture: p.picture?.data?.url });
+  let pages: FbPage[] = [];
+  try {
+    const r = await graph<{ data?: Raw[] }>(`me/accounts?fields=${fields}&limit=100&access_token=${encodeURIComponent(userToken)}`);
+    pages = (r.data || []).map(toPage);
+  } catch (e) { errors.push(`me/accounts: ${e instanceof Error ? e.message : "failed"}`); }
+  if (pages.length === 0) {
+    const granular = await fbGranularPages(userToken).catch(() => []);
+    const ids = new Set(granular.flatMap((g) => g.targetIds || []));
+    for (const id of ids) {
+      try {
+        const p = await graph<Raw>(`${id}?fields=${fields}&access_token=${encodeURIComponent(userToken)}`);
+        if (p.access_token) pages.push(toPage(p)); else errors.push(`Page ${id} (${p.name}): Facebook returned the Page but no access token — this profile has no admin role on it`);
+      } catch (e) { errors.push(`Page ${id}: ${e instanceof Error ? e.message : "failed"}`); }
+    }
+  }
+  return { pages, errors };
 }
 
 export interface FbPermissions { granted: string[]; declined: string[] }
-/** What the user token actually carries (me/permissions) — the answer to "why are there no Pages?". */
+/** What the user token actually carries (me/permissions). */
 export async function fbPermissions(userToken: string): Promise<FbPermissions> {
   const r = await graph<{ data?: { permission: string; status: string }[] }>(`me/permissions?access_token=${encodeURIComponent(userToken)}`);
   const rows = r.data || [];

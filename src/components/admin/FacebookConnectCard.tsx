@@ -64,7 +64,8 @@ export function FacebookConnectCard() {
       const r = await fetch("/api/admin/facebook/status", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "relist" }) });
       const d = await r.json();
       if (!r.ok) { setResult({ kind: "err", text: d.error || "Could not list Pages" }); return; }
-      setResult(d.count ? { kind: "ok", text: `Facebook now lists ${d.count} Page${d.count === 1 ? "" : "s"} for this profile — choose one below.` } : { kind: "warn", text: "Facebook still returns no Pages for this profile." });
+      const detail = Array.isArray(d.errors) && d.errors.length ? ` Facebook said: ${d.errors.join(" · ")}` : "";
+      setResult(d.count ? { kind: "ok", text: `Facebook now lists ${d.count} Page${d.count === 1 ? "" : "s"} for this profile — choose one below.` } : { kind: "warn", text: `Facebook still returns no Pages for this profile.${detail}` });
       await load(); router.replace("/admin/messenger");
     } finally { setBusy(null); }
   }
