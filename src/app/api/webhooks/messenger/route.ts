@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import prisma from "@/lib/prisma";
-import { verifyMessengerSignature, hasMessengerSecret, messengerVerifyToken, getMessengerProfile, sendMessengerMessage, isMessengerConfigured } from "@/lib/messenger";
+import { verifyMessengerSignature, hasMessengerSecret, messengerVerifyToken, getMessengerProfileDetailed, sendMessengerMessage, isMessengerConfigured } from "@/lib/messenger";
 import { notify } from "@/lib/notify";
 import { setSetting, getSetting } from "@/lib/google-business";
 
@@ -49,12 +49,20 @@ export async function GET(request: NextRequest) {
 /** Resolve a PSID to an AdLead. `matched` = it was an existing ad/form lead (a
  *  real funnel lead); `false` = a cold messager we just captured. We only
  *  auto-greet matched leads. */
-async function linkOrCreateLead(psid: string): Promise<{ id: string; phone: string | null; matched: boolean } | null> {
-  const existing = await prisma.adLead.findUnique({ where: { messengerPsid: psid }, select: { id: true, phone: true, adSource: true } });
-  if (existing) return { id: existing.id, phone: existing.phone, matched: existing.adSource !== "messenger" };
+const PLACEHOLDER_NAME = "Messenger user";
 
-  const profile = await getMessengerProfile(psid);
+async function linkOrCreateLead(psid: string): Promise<{ id: string; phone: string | null; matched: boolean; note?: string } | null> {
+  const { profile, error: profileError } = await getMessengerProfileDetailed(psid);
   const name = profile?.name;
+
+  const existing = await prisma.adLead.findUnique({ where: { messengerPsid: psid }, select: { id: true, phone: true, adSource: true, fullName: true } });
+  if (existing) {
+    // A lead captured before their name was readable gets it filled in now.
+    if (name && (!existing.fullName || existing.fullName === PLACEHOLDER_NAME)) {
+      await prisma.adLead.update({ where: { id: existing.id }, data: { fullName: name, firstName: profile?.firstName ?? null, lastName: profile?.lastName ?? null } }).catch(() => {});
+    }
+    return { id: existing.id, phone: existing.phone, matched: existing.adSource !== "messenger" };
+  }
 
   if (name) {
     const target = norm(name);
@@ -79,17 +87,17 @@ async function linkOrCreateLead(psid: string): Promise<{ id: string; phone: stri
     }
   }
 
-  // No match. Only capture a cold messager as a lead when we could identify them
-  // (we have a name) — never create a nameless "Unknown" lead. In development mode
-  // Meta blocks reading non-tester names, so unidentifiable inbound is skipped
-  // until the app is live/approved.
-  if (!name) return null;
+  // No match: capture the messager as a lead. When Facebook won't give us the
+  // name (Development mode only reads names of people with a role on the app;
+  // Live mode needs Business Asset User Profile Access), the lead is created
+  // under a placeholder and renamed on their next message once readable.
+  // Dropping the message instead would lose a real conversation.
   try {
     const created = await prisma.adLead.create({
-      data: { adSource: "messenger", messengerPsid: psid, firstName: profile?.firstName ?? null, lastName: profile?.lastName ?? null, fullName: name, status: "NEW" },
+      data: { adSource: "messenger", messengerPsid: psid, firstName: profile?.firstName ?? null, lastName: profile?.lastName ?? null, fullName: name || PLACEHOLDER_NAME, status: "NEW" },
       select: { id: true, phone: true },
     });
-    return { id: created.id, phone: created.phone, matched: false };
+    return { id: created.id, phone: created.phone, matched: false, note: name ? undefined : `name unreadable: ${profileError || "no profile returned"}` };
   } catch {
     const held = await prisma.adLead.findUnique({ where: { messengerPsid: psid }, select: { id: true, phone: true, adSource: true } });
     return held ? { id: held.id, phone: held.phone, matched: held.adSource !== "messenger" } : null;
@@ -125,7 +133,7 @@ export async function POST(request: NextRequest) {
 
           const lead = await linkOrCreateLead(psid);
           if (!lead) { done.push("could not resolve lead"); continue; }
-          done.push(`${lead.matched ? "matched" : "created"} lead ${lead.id}`);
+          done.push(`${lead.matched ? "matched" : "created"} lead ${lead.id}${lead.note ? ` (${lead.note})` : ""}`);
 
           await prisma.adLead.update({ where: { id: lead.id }, data: { messengerLastInboundAt: new Date() } }).catch(() => {});
 

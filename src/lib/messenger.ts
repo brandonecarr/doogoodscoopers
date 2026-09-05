@@ -64,17 +64,21 @@ export async function sendMessengerMessage(
 }
 
 /** Read a Messenger user's name from their PSID (needs Business Asset User Profile
- *  Access). Used to auto-link a thread to the AdLead by name. */
+ *  Access; in Development mode it only works for people with a role on the app).
+ *  Used to auto-link a thread to the AdLead by name. */
 export async function getMessengerProfile(psid: string): Promise<{ firstName?: string; lastName?: string; name?: string } | null> {
+  return (await getMessengerProfileDetailed(psid)).profile;
+}
+export async function getMessengerProfileDetailed(psid: string): Promise<{ profile: { firstName?: string; lastName?: string; name?: string } | null; error?: string }> {
   const token = await getPageAccessToken();
-  if (!token) return null;
+  if (!token) return { profile: null, error: "Messenger not configured" };
   try {
     const res = await fetch(`${GRAPH}/${encodeURIComponent(psid)}?fields=first_name,last_name&access_token=${encodeURIComponent(token)}`);
-    if (!res.ok) return null;
-    const d = (await res.json()) as { first_name?: string; last_name?: string };
+    const d = (await res.json().catch(() => ({}))) as { first_name?: string; last_name?: string; error?: { message?: string } };
+    if (!res.ok || d.error) return { profile: null, error: d.error?.message || `Graph error ${res.status}` };
     const name = [d.first_name, d.last_name].filter(Boolean).join(" ").trim() || undefined;
-    return { firstName: d.first_name, lastName: d.last_name, name };
-  } catch {
-    return null;
+    return { profile: { firstName: d.first_name, lastName: d.last_name, name } };
+  } catch (e) {
+    return { profile: null, error: e instanceof Error ? e.message : "profile fetch failed" };
   }
 }
