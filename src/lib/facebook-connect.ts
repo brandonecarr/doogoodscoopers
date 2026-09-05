@@ -117,6 +117,33 @@ export async function subscribePageWebhooks(pageId: string, pageToken: string): 
   return fields;
 }
 
+/**
+ * Webhook diagnostics straight from Facebook: what this app has registered
+ * for the "page" object (callback URL, fields, active) and which apps the
+ * connected Page is subscribed to. Explains "no message arrived" without guessing.
+ */
+export interface WebhookDiag {
+  app: { callbackUrl: string | null; fields: string[]; active: boolean | null; error?: string };
+  page: { apps: { id: string; name?: string; fields: string[] }[]; error?: string } | null;
+}
+export async function getWebhookDiag(pageId: string | null, pageToken: string | null): Promise<WebhookDiag> {
+  const appToken = `${fbAppId()}|${process.env.FB_APP_SECRET || ""}`;
+  const app: WebhookDiag["app"] = { callbackUrl: null, fields: [], active: null };
+  try {
+    const r = await graph<{ data?: { object: string; callback_url?: string; active?: boolean; fields?: { name: string }[] }[] }>(`${fbAppId()}/subscriptions?access_token=${encodeURIComponent(appToken)}`);
+    const page = (r.data || []).find((x) => x.object === "page");
+    if (page) { app.callbackUrl = page.callback_url || null; app.fields = (page.fields || []).map((f) => f.name); app.active = page.active ?? null; }
+  } catch (e) { app.error = e instanceof Error ? e.message : "failed"; }
+  let page: WebhookDiag["page"] = null;
+  if (pageId && pageToken) {
+    try {
+      const r = await graph<{ data?: { id: string; name?: string; subscribed_fields?: string[] }[] }>(`${pageId}/subscribed_apps?access_token=${encodeURIComponent(pageToken)}`);
+      page = { apps: (r.data || []).map((a) => ({ id: a.id, name: a.name, fields: a.subscribed_fields || [] })) };
+    } catch (e) { page = { apps: [], error: e instanceof Error ? e.message : "failed" }; }
+  }
+  return { app, page };
+}
+
 /** The token the Messenger sender should use: connected Page first, env fallback. */
 export async function getPageAccessToken(): Promise<string | null> {
   return (await getSetting("facebook.pageToken")) || process.env.PAGE_ACCESS_TOKEN || null;
@@ -131,6 +158,7 @@ export interface FbConnection {
   permissions: FbPermissions | null;
   /** Page IDs the pages_show_list grant covers: null = all Pages the profile has a role on; [] = none. */
   pageScope: string[] | null;
+  webhook: WebhookDiag;
 }
 
 export async function getFbConnection(): Promise<FbConnection> {
@@ -142,12 +170,13 @@ export async function getFbConnection(): Promise<FbConnection> {
   const permissions = userToken ? await fbPermissions(userToken).catch(() => null) : null;
   const granular = userToken ? await fbGranularPages(userToken).catch(() => []) : [];
   const pageScope = granular.find((g) => g.scope === "pages_show_list")?.targetIds ?? null;
+  const webhook = await getWebhookDiag(pageId || null, pageToken || null);
   let pendingPages: FbPage[] = [];
   try { pendingPages = pending ? (JSON.parse(pending) as FbPage[]).map((p) => ({ ...p, access_token: "" })) : []; } catch { pendingPages = []; }
   return {
     configured: fbConfigured(), connected: !!pageToken, usingEnvToken: !pageToken && !!process.env.PAGE_ACCESS_TOKEN,
     pageId: pageId || null, pageName: pageName || null, pagePicture: pagePicture || null, userName: userName || null,
-    connectedAt: connectedAt || null, webhookFields: webhookFields || null, pendingPages, loginConfigId: loginConfigId || "", permissions, pageScope,
+    connectedAt: connectedAt || null, webhookFields: webhookFields || null, pendingPages, loginConfigId: loginConfigId || "", permissions, pageScope, webhook,
   };
 }
 
