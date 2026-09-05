@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Copy, Check, Info, FileDown, Loader2, Ruler, ChevronDown } from "lucide-react";
 import type { ContractData } from "@/components/admin/CommunityContractDocument";
 import { AreaMeasureMap } from "@/components/admin/AreaMeasureMap";
@@ -9,7 +9,7 @@ import { AreaMeasureMap } from "@/components/admin/AreaMeasureMap";
 // frequency × a loaded hourly rate (with a per-visit floor), then PRESENTED as a
 // per-unit figure — the number an HOA board actually budgets against.
 
-type Fields = {
+export type Fields = {
   property: string;
   units: string;
   acres: string;
@@ -104,8 +104,17 @@ function Num({
   );
 }
 
-export function CommunityQuoteCalculator({ mapboxToken }: { mapboxToken?: string }) {
-  const [f, setF] = useState<Fields>(DEFAULTS);
+export function CommunityQuoteCalculator({
+  mapboxToken, initial, onChange,
+}: {
+  mapboxToken?: string;
+  /** Prefill (e.g. a saved quote on a commercial lead). Missing keys fall back to defaults. */
+  initial?: Partial<Fields>;
+  /** Fires with the full field record on every change, so a host can save it. */
+  onChange?: (fields: Fields) => void;
+}) {
+  const [f, setF] = useState<Fields>({ ...DEFAULTS, ...(initial || {}) });
+  useEffect(() => { onChange?.(f); }, [f, onChange]);
   const [measuring, setMeasuring] = useState(false);
   const [measured, setMeasured] = useState(0); // live total from the map
   const set = (k: keyof Fields, v: string) => setF((p) => ({ ...p, [k]: v }));

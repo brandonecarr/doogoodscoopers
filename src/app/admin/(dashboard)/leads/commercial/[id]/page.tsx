@@ -7,6 +7,7 @@ import StatusUpdateForm from "@/components/admin/StatusUpdateForm";
 import { LeadQuickActions } from "@/components/admin/LeadQuickActions";
 import { LeadUpdates } from "@/components/admin/LeadUpdates";
 import { LeadActions } from "@/components/admin/LeadActions";
+import { CommercialQuoteCard } from "@/components/admin/CommercialQuoteCard";
 import { FollowupGrade } from "@/components/admin/FollowupGrade";
 import { ArrangeableBoard, type ArrangeableCard } from "@/components/admin/ArrangeableBoard";
 
@@ -197,6 +198,26 @@ export default async function CommercialDetailPage({ params }: PageProps) {
           },
         ]
       : []),
+    {
+      id: "community-quote",
+      zone: "main",
+      node: (
+        <CommercialQuoteCard
+          leadId={lead.id}
+          savedAt={lead.communityQuotedAt ? lead.communityQuotedAt.toISOString() : null}
+          mapboxToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
+          initial={
+            (lead.communityQuote as Record<string, string> | null) ?? {
+              property: lead.propertyName,
+              clientLegalName: lead.propertyName,
+              propertyAddress: `${lead.city}, ${lead.state} ${lead.zipCode}`,
+              clientContact: lead.contactName,
+              clientEmail: lead.email,
+            }
+          }
+        />
+      ),
+    },
     {
       id: "updates",
       zone: "main",

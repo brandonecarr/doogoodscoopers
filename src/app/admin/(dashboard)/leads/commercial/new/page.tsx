@@ -4,14 +4,18 @@ import { CommercialLeadForm } from "@/components/admin/CommercialLeadForm";
 
 export default function NewCommercialLeadPage() {
   return (
-    <div className="space-y-6">
-      <div>
-        <Link href="/admin/leads/commercial" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800">
-          <ArrowLeft className="w-4 h-4" /> Commercial leads
+    <div className="space-y-6 pb-20 lg:pb-0">
+      {/* Header */}
+      <div className="flex items-center gap-4">
+        <Link href="/admin/leads/commercial" className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+          <ArrowLeft className="w-5 h-5 text-gray-600" />
         </Link>
-        <h1 className="text-2xl font-bold text-navy-900 mt-2">New commercial lead</h1>
-        <p className="text-sm text-gray-500 mt-1">An HOA, apartment complex, property manager or business you spoke to by phone, in person, or by email.</p>
+        <div>
+          <h1 className="dgs-title">Add New Commercial Lead</h1>
+          <p className="text-navy-600 mt-1">Create a new commercial lead manually</p>
+        </div>
       </div>
+
       <CommercialLeadForm />
     </div>
   );

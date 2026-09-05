@@ -379,6 +379,11 @@ model CommercialLead {
   // Additional notes from form
   inquiry         String?     @db.Text
 
+  // Community-quote inputs (the calculator's own field record) captured once
+  // the lead exists, so the quote can be reopened and the agreement generated.
+  communityQuote    Json?
+  communityQuotedAt DateTime?
+
   @@index([status])
   @@index([archived])
   @@index([createdAt])
