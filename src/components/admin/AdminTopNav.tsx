@@ -24,6 +24,7 @@ import {
   Briefcase,
   ChevronDown,
   LogOut,
+  Settings,
   ArrowUpRight,
 } from "lucide-react";
 import { NotificationBell } from "@/components/admin/NotificationBell";
@@ -54,6 +55,7 @@ const moreNav: NavItem[] = [
   { name: "Canvassers",           short: "Canvassers", href: "/admin/canvassers",   icon: Footprints },
   { name: "Out of Area",          short: "Out of Area", href: "/admin/out-of-area", icon: MapPinOff },
   { name: "Career Applications",  short: "Careers",    href: "/admin/careers",     icon: Briefcase },
+  { name: "Settings",             short: "Settings",   href: "/admin/settings",    icon: Settings },
 ];
 
 /** Whether a nav href matches the current path (exact for Dashboard; prefix otherwise). */
@@ -237,6 +239,14 @@ export function AdminTopNav({ email }: { email: string }) {
                 <div className="sm:hidden px-1 py-1">
                   <SmsBalanceChip />
                 </div>
+                <Link
+                  href="/admin/settings"
+                  onClick={() => setUserOpen(false)}
+                  className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-[12px] text-[13.5px] font-semibold text-bodytext hover:bg-surface2 transition-colors"
+                >
+                  <Settings className="w-4 h-4" />
+                  Settings &amp; users
+                </Link>
                 <button
                   onClick={handleLogout}
                   disabled={isLoggingOut}

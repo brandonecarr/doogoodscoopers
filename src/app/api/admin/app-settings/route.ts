@@ -39,3 +39,14 @@ export async function PUT(request: Request) {
   );
   return NextResponse.json({ success: true });
 }
+
+/** Remove a stored setting (the Advanced list on /admin/settings). Secrets can't be removed here. */
+export async function DELETE(request: Request) {
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { key } = await request.json().catch(() => ({}));
+  if (!key || typeof key !== "string") return NextResponse.json({ error: "key required" }, { status: 400 });
+  if (/secret|token/i.test(key)) return NextResponse.json({ error: "That setting is managed by its own page" }, { status: 400 });
+  await prisma.appSetting.delete({ where: { key } }).catch(() => {});
+  return NextResponse.json({ success: true });
+}
