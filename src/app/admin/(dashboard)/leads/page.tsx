@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import type { LeadStatus } from "@/types/leads";
 import { CallIntelCard } from "@/components/admin/CallIntelCard";
+import { LeadsSectionSwitch } from "@/components/admin/LeadsSectionSwitch";
 import type { MapPoint } from "@/components/admin/LeadsMap";
 
 // mapbox-gl is heavy and touches window — load it only when the Map view opens.
@@ -526,6 +527,7 @@ export default function LeadsPage() {
                 <span className="hidden sm:inline">{selectMode ? "Done" : "Select"}</span>
               </button>
             )}
+            <LeadsSectionSwitch active="residential" />
             <div className="flex items-center bg-white/10 rounded-[12px] p-1">
               {([
                 { v: "list" as const, icon: LayoutList, label: "List" },

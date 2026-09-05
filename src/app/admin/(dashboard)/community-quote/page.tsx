@@ -15,7 +15,7 @@ export default async function CommunityQuotePage() {
       <PageHero
         title="Community Quote"
         subtitle="Price an HOA / condo community by area & frequency — with a per-unit breakdown to pitch the board"
-        backHref="/admin/commercial"
+        backHref="/admin/leads/commercial"
         icon={
           <div className="w-11 h-11 rounded-[13px] flex items-center justify-center" style={{ background: "linear-gradient(150deg,#8B6BFF,#6D3EF0)" }}>
             <Calculator className="w-[22px] h-[22px] text-white" />

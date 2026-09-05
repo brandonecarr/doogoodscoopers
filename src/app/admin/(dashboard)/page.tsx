@@ -94,7 +94,7 @@ const statCards = [
   { name: "Ad Leads",             href: "/admin/ad-leads",    icon: Megaphone,  grad: "linear-gradient(150deg,#FFC9DE,#F0369C)" },
   { name: "Out of Area",          href: "/admin/out-of-area", icon: MapPinOff,  grad: "linear-gradient(150deg,#FFD9A8,#F5A623)" },
   { name: "Career Applications",  href: "/admin/careers",     icon: Briefcase,  grad: "linear-gradient(150deg,#C8B9FF,#7C5CFC)" },
-  { name: "Commercial Inquiries", href: "/admin/commercial",  icon: Building2,  grad: "linear-gradient(150deg,#9BE7C0,#12A150)" },
+  { name: "Commercial Leads", href: "/admin/leads/commercial",  icon: Building2,  grad: "linear-gradient(150deg,#9BE7C0,#12A150)" },
 ];
 
 function formatDate(date: Date) {
@@ -128,7 +128,7 @@ function getTypeHref(type: string, id: string) {
     case "adlead": return `/admin/ad-leads/${id}`;
     case "outofarea": return `/admin/out-of-area/${id}`;
     case "career": return `/admin/careers/${id}`;
-    case "commercial": return `/admin/commercial/${id}`;
+    case "commercial": return `/admin/leads/commercial/${id}`;
     default: return `/admin`;
   }
 }

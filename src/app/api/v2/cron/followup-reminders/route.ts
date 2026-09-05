@@ -27,7 +27,7 @@ const LEAD_TYPE_PATHS: Record<string, string> = {
   quote: "/admin/quote-leads",
   outofarea: "/admin/out-of-area-leads",
   career: "/admin/careers",
-  commercial: "/admin/commercial-leads",
+  commercial: "/admin/leads/commercial",
   adlead: "/admin/ad-leads",
 };
 

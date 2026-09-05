@@ -15,7 +15,7 @@ const LIST_PATH: Record<LeadActionsProps["leadType"], string> = {
   quote: "/admin/quote-leads",
   adlead: "/admin/ad-leads",
   outofarea: "/admin/out-of-area",
-  commercial: "/admin/commercial",
+  commercial: "/admin/leads/commercial",
   career: "/admin/careers",
   canvasser: "/admin/leads",
 };

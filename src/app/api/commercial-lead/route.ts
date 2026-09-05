@@ -73,7 +73,7 @@ export async function POST(request: Request) {
       severity: "info",
       title: "🏢 New commercial inquiry",
       body: `${propertyName} — ${name}, ${city} ${zipCode}`,
-      link: `/admin/commercial/${lead.id}`,
+      link: `/admin/leads/commercial/${lead.id}`,
       push: true,
     }).catch(() => {});
 
