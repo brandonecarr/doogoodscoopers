@@ -6,6 +6,7 @@ import { renderTemplate } from "@/lib/resend";
 import { isOptedOut } from "@/lib/sms-optout";
 import { getLeadPersonalization, firstNameOf } from "@/lib/personalization";
 import type { LeadSource } from "@prisma/client";
+import { sendMessengerMessage } from "@/lib/messenger";
 
 const leadTypeMap: Record<string, LeadSource> = {
   quote: "QUOTE_FORM",
@@ -74,12 +75,35 @@ export async function POST(request: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { leadId, leadType, body } = await request.json();
+  const { leadId, leadType, body, channel } = await request.json();
   if (!leadId || !leadType || !body?.trim()) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
   const mapped = leadTypeMap[leadType];
   if (!mapped) return NextResponse.json({ error: "Invalid lead type" }, { status: 400 });
+
+  // ── Facebook Messenger reply ────────────────────────────────────────────
+  // A lead who messaged the Page has a PSID. Inside 24h of their last message
+  // we reply as RESPONSE; up to 7 days we use the HUMAN_AGENT tag.
+  if (channel === "messenger") {
+    if (mapped !== "AD_LEAD") return NextResponse.json({ error: "Messenger is only available for Facebook leads" }, { status: 400 });
+    const ad = await prisma.adLead.findUnique({ where: { id: leadId }, select: { messengerPsid: true, messengerLastInboundAt: true, phone: true, firstName: true, fullName: true, lastName: true } });
+    if (!ad?.messengerPsid) return NextResponse.json({ error: "This lead has no Messenger conversation" }, { status: 400 });
+    const age = ad.messengerLastInboundAt ? Date.now() - ad.messengerLastInboundAt.getTime() : Infinity;
+    if (age > 7 * 86_400_000) return NextResponse.json({ error: "The Messenger window has closed (no message from them in 7 days). Text them instead." }, { status: 409 });
+    const vars = await getLeadPersonalization(mapped, leadId);
+    if (!vars.firstName) vars.firstName = firstNameOf(ad.firstName || ad.fullName || "");
+    if (!vars.lastName) vars.lastName = ad.lastName || "";
+    const rendered = renderTemplate(body, vars);
+    const m = await sendMessengerMessage({ psid: ad.messengerPsid, text: rendered, tag: age > 86_400_000 ? "HUMAN_AGENT" : undefined });
+    const message = await prisma.leadMessage.create({
+      data: { leadType: mapped, leadId, direction: "OUTBOUND", body: rendered, phone: ad.phone ?? "", provider: "messenger", status: m.ok ? "SENT" : "FAILED", adminEmail: session.email },
+    });
+    await prisma.activityLog.create({
+      data: { action: "MESSAGE_SENT", leadType: mapped, leadId, details: { channel: "messenger", sent: m.ok, error: m.ok ? undefined : m.error }, adminEmail: session.email },
+    });
+    return NextResponse.json({ success: true, message, sent: m.ok, error: m.error });
+  }
 
   const contact = await getLeadContact(mapped, leadId);
   if (!contact) return NextResponse.json({ error: "Lead not found" }, { status: 404 });

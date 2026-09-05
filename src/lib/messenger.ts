@@ -1,15 +1,17 @@
 import crypto from "crypto";
 import { verifyMetaSignature } from "@/lib/instagram";
+import { getPageAccessToken } from "@/lib/facebook-connect";
 
 // Facebook Messenger (Page) send + helpers. Unlike Instagram (graph.instagram.com),
 // Messenger uses graph.facebook.com with a Page access token and a recipient PSID.
-// Dormant until PAGE_ACCESS_TOKEN is set. Signature verification reuses the shared
-// META_APP_SECRET check from instagram.ts.
+// The Page token comes from the "Connect Facebook Page" login flow (AppSetting
+// facebook.pageToken), with PAGE_ACCESS_TOKEN in the environment as a fallback.
+// Signature verification reuses the shared META_APP_SECRET check from instagram.ts.
 
 const GRAPH = "https://graph.facebook.com/v21.0";
 
-export function isMessengerConfigured(): boolean {
-  return !!process.env.PAGE_ACCESS_TOKEN;
+export async function isMessengerConfigured(): Promise<boolean> {
+  return !!(await getPageAccessToken());
 }
 export function messengerVerifyToken(): string | undefined {
   return process.env.MESSENGER_VERIFY_TOKEN || process.env.IG_VERIFY_TOKEN || undefined;
@@ -38,7 +40,7 @@ export function hasMessengerSecret(): boolean {
 export async function sendMessengerMessage(
   { psid, text, tag }: { psid: string; text: string; tag?: string },
 ): Promise<{ ok: boolean; messageId?: string; error?: string }> {
-  const token = process.env.PAGE_ACCESS_TOKEN;
+  const token = await getPageAccessToken();
   if (!token) return { ok: false, error: "Messenger not configured" };
   try {
     const res = await fetch(`${GRAPH}/me/messages?access_token=${encodeURIComponent(token)}`, {
@@ -64,7 +66,7 @@ export async function sendMessengerMessage(
 /** Read a Messenger user's name from their PSID (needs Business Asset User Profile
  *  Access). Used to auto-link a thread to the AdLead by name. */
 export async function getMessengerProfile(psid: string): Promise<{ firstName?: string; lastName?: string; name?: string } | null> {
-  const token = process.env.PAGE_ACCESS_TOKEN;
+  const token = await getPageAccessToken();
   if (!token) return null;
   try {
     const res = await fetch(`${GRAPH}/${encodeURIComponent(psid)}?fields=first_name,last_name&access_token=${encodeURIComponent(token)}`);

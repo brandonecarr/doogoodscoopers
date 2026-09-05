@@ -143,7 +143,7 @@ export async function POST(request: NextRequest) {
           // so the owner can record the App Review screencast and Meta's reviewer
           // gets a reply when they message the Page cold. Turn OFF after approval.
           const greetEveryone = (await getSetting("messenger.greetEveryone")) === "true";
-          if (autoReplyOn && (lead.matched || greetEveryone) && isMessengerConfigured()) {
+          if (autoReplyOn && (lead.matched || greetEveryone) && (await isMessengerConfigured())) {
             const won = await prisma.adLead.updateMany({
               where: { id: lead.id, messengerGreetedAt: null },
               data: { messengerGreetedAt: new Date() },

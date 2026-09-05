@@ -273,6 +273,8 @@ export default async function AdLeadDetailPage({ params }: PageProps) {
           leadType="adlead"
           phone={typedLead.phone}
           optedOut={optedOut}
+          messengerPsid={lead.messengerPsid}
+          messengerLastInboundAt={lead.messengerLastInboundAt ? lead.messengerLastInboundAt.toISOString() : null}
           initialMessages={messages.map((m) => ({
             id: m.id,
             createdAt: m.createdAt.toISOString(),
@@ -280,6 +282,7 @@ export default async function AdLeadDetailPage({ params }: PageProps) {
             body: m.body,
             status: m.status,
             adminEmail: m.adminEmail,
+            provider: m.provider,
           }))}
         />
       ),

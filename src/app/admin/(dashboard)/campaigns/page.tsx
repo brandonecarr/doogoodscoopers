@@ -42,6 +42,9 @@ export default async function CampaignsPage() {
         subtitle="Bulk text a segment of your leads."
         actions={
           <>
+            <Link href="/admin/messenger" className={heroBtnSecondary}>
+              Messenger
+            </Link>
             <Link href="/admin/templates" className={heroBtnSecondary}>
               Templates
             </Link>

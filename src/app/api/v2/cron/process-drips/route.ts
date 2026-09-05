@@ -156,7 +156,7 @@ export async function GET(request: NextRequest) {
 
         // Try Messenger first — but only keep it if it actually sent. A failed
         // Messenger send falls through to the SMS/email fallback below.
-        if (psid && windowOpen && isMessengerConfigured()) {
+        if (psid && windowOpen && (await isMessengerConfigured())) {
           const m = await sendMessengerMessage({ psid, text: body });
           if (m.ok) { provider = "messenger"; result = { success: true, messageId: m.messageId ?? null, status: "SENT" }; }
         }

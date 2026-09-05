@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Send, MessageSquare, AlertCircle } from "lucide-react";
+import { Send, MessageSquare, AlertCircle, MessageCircle, Smartphone } from "lucide-react";
 
 interface LeadMessage {
   id: string;
@@ -10,6 +10,7 @@ interface LeadMessage {
   body: string;
   status: string | null;
   adminEmail: string | null;
+  provider?: string | null; // quo (SMS) | messenger | email
 }
 
 interface Template {
@@ -24,6 +25,9 @@ interface LeadMessagesProps {
   phone: string | null;
   initialMessages: LeadMessage[];
   optedOut?: boolean;
+  /** Facebook Messenger thread, when the lead messaged the Page. */
+  messengerPsid?: string | null;
+  messengerLastInboundAt?: string | null;
 }
 
 function formatTime(dateString: string) {
@@ -35,8 +39,12 @@ function formatTime(dateString: string) {
   });
 }
 
-export function LeadMessages({ leadId, leadType, phone, initialMessages, optedOut }: LeadMessagesProps) {
-  const canSend = !!phone && !optedOut;
+export function LeadMessages({ leadId, leadType, phone, initialMessages, optedOut, messengerPsid, messengerLastInboundAt }: LeadMessagesProps) {
+  // Messenger replies are allowed for 7 days after the lead's last message.
+  const messengerOpen = !!messengerPsid && !!messengerLastInboundAt && Date.now() - new Date(messengerLastInboundAt).getTime() < 7 * 86_400_000;
+  const [channel, setChannel] = useState<"sms" | "messenger">(messengerOpen && !phone ? "messenger" : "sms");
+  const viaMessenger = channel === "messenger";
+  const canSend = viaMessenger ? messengerOpen : !!phone && !optedOut;
   const [messages, setMessages] = useState<LeadMessage[]>(initialMessages);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [body, setBody] = useState("");
@@ -99,13 +107,13 @@ export function LeadMessages({ leadId, leadType, phone, initialMessages, optedOu
       const res = await fetch("/api/admin/lead-messages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ leadId, leadType, body: body.trim() }),
+        body: JSON.stringify({ leadId, leadType, body: body.trim(), channel }),
       });
       const data = await res.json();
       if (res.ok) {
         setBody("");
         if (data.sent === false) {
-          setError(data.error || "Message logged but not delivered (check Quo setup).");
+          setError(data.error || (viaMessenger ? "Message logged but Messenger did not deliver it." : "Message logged but not delivered (check Quo setup)."));
         }
         await fetchMessages();
       } else {
@@ -125,14 +133,34 @@ export function LeadMessages({ leadId, leadType, phone, initialMessages, optedOu
         <h2 className="text-lg font-semibold text-navy-900">Messages</h2>
       </div>
 
-      {!phone && (
+      {messengerPsid && (
+        <div className="flex items-center gap-1 mb-4 p-1 bg-gray-100 rounded-lg w-fit" role="tablist" aria-label="Send via">
+          <button type="button" role="tab" aria-selected={!viaMessenger} onClick={() => setChannel("sms")} disabled={!phone}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-colors disabled:opacity-40 ${!viaMessenger ? "bg-white text-teal-700 shadow-sm" : "text-gray-600"}`}>
+            <Smartphone className="w-3.5 h-3.5" /> Text (SMS)
+          </button>
+          <button type="button" role="tab" aria-selected={viaMessenger} onClick={() => setChannel("messenger")}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${viaMessenger ? "bg-white text-[#0084FF] shadow-sm" : "text-gray-600"}`}>
+            <MessageCircle className="w-3.5 h-3.5" /> Facebook Messenger
+          </button>
+        </div>
+      )}
+
+      {viaMessenger && !messengerOpen && (
+        <div className="flex items-center gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">
+          <AlertCircle className="w-4 h-4" />
+          The Messenger window has closed — they haven&apos;t messaged in 7 days. Text them instead.
+        </div>
+      )}
+
+      {!phone && !viaMessenger && (
         <div className="flex items-center gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">
           <AlertCircle className="w-4 h-4" />
           No phone number on file — add one to text this lead.
         </div>
       )}
 
-      {optedOut && (
+      {optedOut && !viaMessenger && (
         <div className="flex items-center gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-4">
           <AlertCircle className="w-4 h-4" />
           This lead replied STOP and opted out — messaging is disabled.
@@ -146,20 +174,21 @@ export function LeadMessages({ leadId, leadType, phone, initialMessages, optedOu
         ) : (
           messages.map((m) => {
             const outbound = m.direction === "OUTBOUND";
+            const fb = m.provider === "messenger";
             return (
               <div key={m.id} className={`flex ${outbound ? "justify-end" : "justify-start"}`}>
                 <div className={`max-w-[80%] ${outbound ? "items-end" : "items-start"} flex flex-col`}>
                   <div
                     className={`px-3 py-2 rounded-2xl text-sm whitespace-pre-wrap ${
                       outbound
-                        ? "bg-teal-600 text-white rounded-br-sm"
+                        ? fb ? "bg-[#0084FF] text-white rounded-br-sm" : "bg-teal-600 text-white rounded-br-sm"
                         : "bg-gray-100 text-gray-800 rounded-bl-sm"
                     }`}
                   >
                     {m.body}
                   </div>
                   <span className="text-[11px] text-gray-400 mt-0.5 px-1" suppressHydrationWarning>
-                    {formatTime(m.createdAt)}
+                    {fb ? "Messenger · " : ""}{formatTime(m.createdAt)}
                     {outbound && m.status ? ` · ${m.status.toLowerCase()}` : ""}
                   </span>
                 </div>
@@ -183,7 +212,9 @@ export function LeadMessages({ leadId, leadType, phone, initialMessages, optedOu
             value={body}
             onChange={(e) => setBody(e.target.value)}
             placeholder={
-              optedOut
+              viaMessenger
+                ? messengerOpen ? "Reply on Facebook Messenger…  (use {{firstName}}, {{zipCode}} or {{dogs}})" : "Messenger window closed"
+                : optedOut
                 ? "This lead opted out (STOP)"
                 : phone
                   ? "Type a message…  (use {{firstName}}, {{zipCode}} or {{dogs}})"
@@ -218,10 +249,10 @@ export function LeadMessages({ leadId, leadType, phone, initialMessages, optedOu
             <button
               type="submit"
               disabled={!canSend || !body.trim() || sending}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-white text-sm font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${viaMessenger ? "bg-[#0084FF] hover:bg-[#0070d9]" : "bg-teal-600 hover:bg-teal-700"}`}
             >
-              <Send className="w-3.5 h-3.5" />
-              {sending ? "Sending…" : "Send"}
+              {viaMessenger ? <MessageCircle className="w-3.5 h-3.5" /> : <Send className="w-3.5 h-3.5" />}
+              {sending ? "Sending…" : viaMessenger ? "Send on Messenger" : "Send"}
             </button>
           </div>
         </div>
