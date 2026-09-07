@@ -18,6 +18,15 @@ interface Intel {
   summary: string;
 }
 
+interface CommercialIntel {
+  reachedDecisionMaker: string; contactName: string; contactRole: string; email: string; propertyName: string; units: string;
+  petPolicy: string; currentVendor: string; painPoints: string; decisionProcess: string; interestLevel: string; objections: string; nextStep: string; followUpDate: string; summary: string;
+}
+const COMMERCIAL_FIELDS: [keyof CommercialIntel, string][] = [
+  ["contactName", "Spoke with"], ["contactRole", "Role"], ["reachedDecisionMaker", "Decision-maker"], ["propertyName", "Property"], ["units", "Units"],
+  ["email", "Email"], ["petPolicy", "Pets"], ["currentVendor", "Current vendor"], ["painPoints", "Pain points"], ["decisionProcess", "Decision process"], ["followUpDate", "Follow-up date"],
+];
+
 const FIELDS: [keyof Intel, string][] = [
   ["firstName", "First name"],
   ["lastName", "Last name"],
@@ -38,7 +47,7 @@ export function CallIntelCard() {
 
   const [phone, setPhone] = useState("");
   const [testing, setTesting] = useState(false);
-  const [result, setResult] = useState<{ intel: Intel | null; transcript: string; call: { duration?: number } } | null>(null);
+  const [result, setResult] = useState<{ intel: Intel | null; transcript: string; call: { duration?: number }; kind?: "residential" | "commercial"; matched?: { kind: string; id: string; name: string } | null } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showTranscript, setShowTranscript] = useState(false);
   const [applied, setApplied] = useState<{ action: string; leadType?: string; leadId?: string; fieldsFilled: string[]; reason?: string } | null>(null);
@@ -197,6 +206,12 @@ export function CallIntelCard() {
             {applied.leadType === "AD_LEAD" && applied.leadId ? (
               <> · <a href={`/admin/ad-leads/${applied.leadId}`} className="underline">open lead</a></>
             ) : null}
+            {applied.leadType === "COMMERCIAL" && applied.leadId ? (
+              <> · <a href={`/admin/leads/commercial/${applied.leadId}`} className="underline">open commercial lead</a></>
+            ) : null}
+            {applied.leadType === "COMMERCIAL_PROSPECT" && applied.leadId ? (
+              <> · <a href={`/admin/leads/commercial/call-list/${applied.leadId}`} className="underline">open prospect</a></>
+            ) : null}
           </p>
         )}
         {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
@@ -210,9 +225,12 @@ export function CallIntelCard() {
 
         {result?.intel && (
           <div className="mt-3 rounded-lg border border-gray-100 bg-gray-50 p-3 space-y-2">
+            {result.kind === "commercial" && result.matched && (
+              <p className="text-xs font-semibold text-violet-700">🏢 Commercial call · matched {result.matched.kind === "prospect" ? "call-list prospect" : "commercial lead"} “{result.matched.name}”</p>
+            )}
             <p className="text-sm text-navy-900">{result.intel.summary}</p>
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
-              {FIELDS.map(([k, label]) =>
+              {(result.kind === "commercial" ? (COMMERCIAL_FIELDS as unknown as [keyof Intel, string][]) : FIELDS).map(([k, label]) =>
                 String(result.intel![k] || "").trim() ? (
                   <span key={k} className="text-gray-700">
                     <span className="text-gray-400">{label}:</span> <strong>{String(result.intel![k])}</strong>
@@ -225,7 +243,7 @@ export function CallIntelCard() {
             </div>
             {result.intel.nextStep && <p className="text-xs text-gray-600">Next step: {result.intel.nextStep}</p>}
             {result.intel.objections && <p className="text-xs text-gray-600">Concerns: {result.intel.objections}</p>}
-            {!result.intel.isServiceInquiry && (
+            {result.kind !== "commercial" && !result.intel.isServiceInquiry && (
               <p className="text-xs text-amber-700">Not a service inquiry — this call would not create a lead.</p>
             )}
             <button onClick={() => setShowTranscript((v) => !v)} className="text-xs text-teal-600 hover:underline">

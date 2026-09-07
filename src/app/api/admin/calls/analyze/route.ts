@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { listCallsWith, normalizePhoneNumber, isQuoConfigured } from "@/lib/quo";
-import { analyzeCall, applyCallIntel, isCallIntelConfigured, formatTranscript } from "@/lib/call-intel";
+import { analyzeCallSmart, applyCallIntel, applyCommercialCallIntel, isCallIntelConfigured, formatTranscript } from "@/lib/call-intel";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -35,9 +35,9 @@ export async function POST(request: Request) {
   );
 
   let target: (typeof byRecency)[number] | undefined;
-  let analyzed: Awaited<ReturnType<typeof analyzeCall>> = null;
+  let analyzed: Awaited<ReturnType<typeof analyzeCallSmart>> = null;
   for (const c of byRecency.slice(0, 8)) {
-    const a = await analyzeCall(c.id);
+    const a = await analyzeCallSmart(c.id, normalized);
     if (a) {
       target = c;
       analyzed = a;
@@ -69,14 +69,20 @@ export async function POST(request: Request) {
 
   // apply:true runs the same path the webhook does — creates/enriches the lead.
   // Lets a call that happened before the webhook existed be backfilled.
+  const kind = analyzed.kind;
+  const matched = analyzed.kind === "commercial" ? analyzed.match : null;
   if (apply) {
     const caller = analyzed.externalNumber || normalized;
-    const result = await applyCallIntel({ phone: caller, intel: analyzed.result.intel, callId: target.id });
-    return NextResponse.json({ success: true, call, transcript, intel: analyzed.result.intel, applied: result });
+    const result = analyzed.kind === "commercial"
+      ? await applyCommercialCallIntel({ phone: caller, intel: analyzed.result.intel, callId: target.id, match: analyzed.match })
+      : await applyCallIntel({ phone: caller, intel: analyzed.result.intel, callId: target.id });
+    return NextResponse.json({ success: true, kind, matched, call, transcript, intel: analyzed.result.intel, applied: result });
   }
 
   return NextResponse.json({
     success: true,
+    kind,
+    matched,
     call,
     transcript,
     intel: analyzed.result.intel,

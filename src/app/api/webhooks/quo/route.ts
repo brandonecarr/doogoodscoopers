@@ -23,7 +23,7 @@ import {
   normalizePhoneNumber,
   getQuoFromNumber,
 } from "@/lib/quo";
-import { analyzeCall, applyCallIntel, isCallIntelConfigured } from "@/lib/call-intel";
+import { analyzeCallSmart, applyCallIntel, applyCommercialCallIntel, isCallIntelConfigured } from "@/lib/call-intel";
 
 function getSupabase(): SupabaseClient {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -583,13 +583,15 @@ async function handleCallTranscript(payload: unknown) {
   }
 
   try {
-    const analyzed = await analyzeCall(callId);
+    // Prefer the number carried on the payload (when present); otherwise the
+    // transcript's speaker identifiers reveal it. The number decides which
+    // extraction runs: commercial leads and call-list prospects get the
+    // commercial one, everyone else the residential one.
+    const analyzed = await analyzeCallSmart(callId, callExternalNumber(payload));
     if (!analyzed) {
       console.warn(`[call-ai] ${callId} skipped — no transcript returned by Quo`);
       return null;
     }
-    // Prefer the number carried on the payload (when present); otherwise use the
-    // one recovered from the transcript's speaker identifiers.
     const external = callExternalNumber(payload) || analyzed.externalNumber;
     if (!external) {
       console.warn(`[call-ai] ${callId} skipped — could not determine the caller's number`);
@@ -599,8 +601,10 @@ async function handleCallTranscript(payload: unknown) {
       console.warn(`[call-ai] ${callId} skipped — ${analyzed.result.reason}: ${analyzed.result.message}`);
       return null; // fall through to the plain timeline entry
     }
-    const result = await applyCallIntel({ phone: external, intel: analyzed.result.intel, callId });
-    console.log(`[call-ai] ${callId} (${external}) → ${result.action} ${result.fieldsFilled.join(",")}`);
+    const result = analyzed.kind === "commercial"
+      ? await applyCommercialCallIntel({ phone: external, intel: analyzed.result.intel, callId, match: analyzed.match })
+      : await applyCallIntel({ phone: external, intel: analyzed.result.intel, callId });
+    console.log(`[call-ai] ${callId} (${external}, ${analyzed.kind}) → ${result.action} ${result.fieldsFilled.join(",")}`);
     return NextResponse.json({ success: true, callAi: result });
   } catch (e) {
     console.error("[call-ai] failed:", e);

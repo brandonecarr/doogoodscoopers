@@ -85,6 +85,10 @@ const CallIntel = z.object({
   isServiceInquiry: z
     .boolean()
     .describe("True if the caller is a prospective or current customer asking about dog waste removal service. False for wrong numbers, spam, robocalls, vendors, or personal calls."),
+  isCommercialInquiry: z
+    .boolean()
+    .describe("True when the caller is asking on behalf of a property or organization rather than their own home: an HOA, apartment complex, mobile-home or 55+ community, property manager, business, park, or school. False for a homeowner or renter asking about their own yard."),
+  propertyName: z.string().describe("For a commercial inquiry, the name of the property, community, HOA, or company the caller represents. Empty string if never stated or not commercial."),
   firstName: z.string().describe("Caller's first name only, no last name. Empty string if never stated."),
   lastName: z.string().describe("Caller's last name. Empty string if never stated."),
   email: z.string().describe("Caller's email address. Empty string if never stated."),
@@ -200,6 +204,173 @@ export async function analyzeCall(
   const t = await fetchCallTranscript(callId);
   if (!t) return null;
   return { transcript: t.segments, externalNumber: t.externalNumber, result: await extractCallIntel(t.segments) };
+}
+
+// ── Commercial calls (commercial leads + call-list prospects) ───────────────
+
+const CommercialCallIntel = z.object({
+  reachedDecisionMaker: z
+    .enum(["yes", "no", "unknown"])
+    .describe("yes = we spoke with someone who can approve a service contract (board member, property manager, owner, community manager); no = a gatekeeper, receptionist, leasing agent or resident with no authority; unknown = can't tell."),
+  contactName: z.string().describe("Full name of the person we spoke with. Empty string if never stated."),
+  contactRole: z.string().describe("Their role or title, e.g. 'property manager', 'HOA board president', 'leasing agent'. Empty string if never stated."),
+  email: z.string().describe("Email address they gave for follow-up. Empty string if never stated."),
+  propertyName: z.string().describe("Name of the property, community, HOA or management company as stated on the call. Empty string if never stated."),
+  units: z.string().describe("Number of units, homes, or doors at the property, digits only. Empty string if never stated."),
+  petPolicy: z.string().describe("What they said about pets on the property: allowed, dog park, pet stations, restrictions. Empty string if not discussed."),
+  currentVendor: z.string().describe("Who currently handles pet waste or grounds cleanup, if mentioned (a vendor, landscapers, in-house staff, nobody). Empty string if not discussed."),
+  painPoints: z.string().describe("Problems they described: complaints, waste on common areas, cost, unreliable vendor. Empty string if none."),
+  decisionProcess: z.string().describe("How and when a decision gets made: board meeting date, budget cycle, who else must approve, need for a proposal or site visit. Empty string if not discussed."),
+  interestLevel: z
+    .enum(["hot", "warm", "cold", "not_interested", "unknown"])
+    .describe("hot = wants a proposal or site visit now; warm = interested, needs follow-up; cold = just gathering info; not_interested = declined; unknown = can't tell."),
+  objections: z.string().describe("Concerns or reasons for hesitation. Empty string if none."),
+  nextStep: z.string().describe("The agreed next action, e.g. 'email proposal', 'site visit Thursday 10am', 'call back after board meeting on the 14th'. Empty string if none."),
+  followUpDate: z.string().describe("If a specific follow-up date was agreed, as YYYY-MM-DD. Empty string if none."),
+  summary: z.string().describe("2-3 sentence summary of the call for the record. Always fill this in."),
+});
+export type CommercialCallIntel = z.infer<typeof CommercialCallIntel>;
+
+const COMMERCIAL_SYSTEM_PROMPT = `You extract details from phone call transcripts for DooGoodScoopers, a dog waste removal service in California's Inland Empire that also serves HOAs, apartment complexes, 55+ and mobile-home communities, and property management companies.
+
+This call is with a COMMERCIAL prospect or lead: a property, community, or management company, not a homeowner. The transcript labels each line AGENT (our side) or CALLER (the property's side, whether they called us or we called them).
+
+Rules:
+- Only record what the CALLER actually stated. Never infer, guess, or carry over an example from these instructions.
+- If a detail was never given, return an empty string. An empty string is always better than a wrong value.
+- Transcription is imperfect. Numbers may be spoken as words; normalize them.
+- Prices and service descriptions spoken by the AGENT are not caller details.
+- If the call reached only voicemail, a receptionist, or a gatekeeper, say so in the summary and set reachedDecisionMaker to "no".
+- Write the summary in plain past tense from our point of view, e.g. "Spoke with the community manager; they have 240 units, a dog park that residents complain about, and want a proposal emailed before the board meets on the 14th."`;
+
+export type CommercialExtractResult =
+  | { ok: true; intel: CommercialCallIntel }
+  | { ok: false; reason: "not_configured" | "too_short" | "api_error"; message: string };
+
+export async function extractCommercialCallIntel(segments: TranscriptSegment[]): Promise<CommercialExtractResult> {
+  const anthropic = client();
+  if (!anthropic) return { ok: false, reason: "not_configured", message: "ANTHROPIC_API_KEY is not set in this environment." };
+  const callerLines = segments.filter((s) => s.speaker === "caller");
+  if (segments.length < 4 || callerLines.length === 0) {
+    return { ok: false, reason: "too_short", message: `Transcript too short to extract from (${segments.length} lines, ${callerLines.length} from the other party).` };
+  }
+  try {
+    const res = await anthropic.messages.parse({
+      model: "claude-opus-5",
+      max_tokens: 4096,
+      system: COMMERCIAL_SYSTEM_PROMPT,
+      output_config: { format: zodOutputFormat(CommercialCallIntel), effort: "low" },
+      messages: [{ role: "user", content: `Extract the details from this call transcript.\n\n<transcript>\n${formatTranscript(segments)}\n</transcript>` }],
+    });
+    if (!res.parsed_output) return { ok: false, reason: "api_error", message: `Model returned no parsed output (stop_reason: ${res.stop_reason ?? "unknown"}).` };
+    return { ok: true, intel: res.parsed_output };
+  } catch (e) {
+    const message = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+    console.error("[call-intel] commercial extraction failed:", message);
+    return { ok: false, reason: "api_error", message };
+  }
+}
+
+export type CommercialMatch =
+  | { kind: "commercial"; id: string; name: string }
+  | { kind: "prospect"; id: string; name: string };
+
+/**
+ * Is this number a commercial lead or a call-list prospect? Checked before the
+ * residential tables so a property manager's call gets the commercial
+ * extraction. Newest record wins when a number appears more than once.
+ */
+export async function findCommercialMatch(phone: string): Promise<CommercialMatch | null> {
+  const candidates = phoneVariants(phone);
+  const lead = await prisma.commercialLead.findFirst({ where: { phone: { in: candidates } }, orderBy: [{ archived: "asc" }, { createdAt: "desc" }], select: { id: true, propertyName: true } });
+  if (lead) return { kind: "commercial", id: lead.id, name: lead.propertyName };
+  const prospect = await prisma.commercialProspect.findFirst({ where: { phone: { in: candidates } }, orderBy: { createdAt: "desc" }, select: { id: true, propertyName: true } });
+  if (prospect) return { kind: "prospect", id: prospect.id, name: prospect.propertyName };
+  return null;
+}
+
+/** Transcript → the right extraction for who is on the other end. */
+export type SmartAnalysis =
+  | { kind: "commercial"; match: CommercialMatch; transcript: TranscriptSegment[]; externalNumber: string | null; result: CommercialExtractResult }
+  | { kind: "residential"; match: null; transcript: TranscriptSegment[]; externalNumber: string | null; result: ExtractResult };
+
+export async function analyzeCallSmart(callId: string, phoneHint?: string | null): Promise<SmartAnalysis | null> {
+  const t = await fetchCallTranscript(callId);
+  if (!t) return null;
+  const external = phoneHint || t.externalNumber;
+  const match = external ? await findCommercialMatch(external) : null;
+  if (match) return { kind: "commercial", match, transcript: t.segments, externalNumber: t.externalNumber, result: await extractCommercialCallIntel(t.segments) };
+  return { kind: "residential", match: null, transcript: t.segments, externalNumber: t.externalNumber, result: await extractCallIntel(t.segments) };
+}
+
+/**
+ * Write a commercial call into its lead or prospect. Fills blanks only, logs
+ * the call in the Updates timeline, and for a prospect counts the attempt and
+ * moves To call / Attempted → Contacted when a real conversation happened.
+ */
+export async function applyCommercialCallIntel(opts: { phone: string; intel: CommercialCallIntel; callId: string; match: CommercialMatch }): Promise<ApplyResult> {
+  const { intel, callId, match } = opts;
+  try {
+    await prisma.processedCall.create({ data: { callId, action: "processing" } });
+  } catch {
+    return { action: "skipped", fieldsFilled: [], reason: "this call was already processed" };
+  }
+  const record = async (r: ApplyResult): Promise<ApplyResult> => {
+    await prisma.processedCall.update({ where: { callId }, data: { action: r.action, leadType: r.leadType ?? null, leadId: r.leadId ?? null } }).catch(() => {});
+    return r;
+  };
+  const who = [intel.contactName, intel.contactRole].filter((x) => x.trim()).join(", ");
+  const note = [
+    "📞 Call notes (AI)",
+    intel.summary,
+    who ? `Spoke with: ${who}${intel.reachedDecisionMaker === "yes" ? " (decision-maker)" : intel.reachedDecisionMaker === "no" ? " (not the decision-maker)" : ""}` : intel.reachedDecisionMaker === "no" ? "Did not reach a decision-maker" : "",
+    intel.units ? `Units: ${intel.units}` : "",
+    intel.petPolicy ? `Pets: ${intel.petPolicy}` : "",
+    intel.currentVendor ? `Current vendor: ${intel.currentVendor}` : "",
+    intel.painPoints ? `Pain points: ${intel.painPoints}` : "",
+    intel.decisionProcess ? `Decision process: ${intel.decisionProcess}` : "",
+    intel.interestLevel !== "unknown" ? `Interest: ${intel.interestLevel.replace("_", " ")}` : "",
+    intel.objections ? `Concerns: ${intel.objections}` : "",
+    intel.nextStep ? `Next step: ${intel.nextStep}` : "",
+  ].filter(Boolean).join("\n");
+  const followUp = /^\d{4}-\d{2}-\d{2}$/.test(intel.followUpDate) ? new Date(intel.followUpDate + "T17:00:00Z") : null;
+
+  if (match.kind === "commercial") {
+    const lead = await prisma.commercialLead.findUnique({ where: { id: match.id } });
+    if (!lead) return record({ action: "skipped", fieldsFilled: [], reason: "lead vanished" });
+    const data: Record<string, unknown> = {
+      contactName: fill(lead.contactName === "Unknown" ? "" : lead.contactName, intel.contactName),
+      email: fill(lead.email, intel.email),
+      propertyName: fill(lead.propertyName, intel.propertyName),
+      followupDate: !lead.followupDate && followUp ? followUp : undefined,
+    };
+    const filled = Object.entries(data).filter(([, v]) => v !== undefined).map(([k]) => k);
+    if (filled.length) await prisma.commercialLead.update({ where: { id: lead.id }, data });
+    await prisma.leadUpdate.create({ data: { leadType: "COMMERCIAL", leadId: lead.id, message: note, communicationType: "phone_call", adminEmail: "call-ai@system" } });
+    await markLeadContactedIfNew("COMMERCIAL", lead.id);
+    return record({ action: filled.length ? "enriched" : "noted", leadType: "COMMERCIAL", leadId: lead.id, fieldsFilled: filled });
+  }
+
+  const p = await prisma.commercialProspect.findUnique({ where: { id: match.id } });
+  if (!p) return record({ action: "skipped", fieldsFilled: [], reason: "prospect vanished" });
+  const units = parseInt(intel.units.replace(/\D/g, ""), 10);
+  const data: Record<string, unknown> = {
+    contactName: fill(p.contactName, who || intel.contactName),
+    email: fill(p.email, intel.email),
+    units: !p.units && isFinite(units) && units > 0 ? units : undefined,
+    followupDate: !p.followupDate && followUp ? followUp : undefined,
+  };
+  const filled = Object.entries(data).filter(([, v]) => v !== undefined).map(([k]) => k);
+  // The call itself is an attempt; a real conversation moves the status along.
+  data.attempts = { increment: 1 };
+  data.lastAttemptAt = new Date();
+  if (p.status === "TO_CALL" || p.status === "ATTEMPTED") data.status = intel.reachedDecisionMaker === "no" && !intel.contactName ? "ATTEMPTED" : "CONTACTED";
+  await prisma.commercialProspect.update({ where: { id: p.id }, data });
+  await prisma.leadUpdate.create({ data: { leadType: "COMMERCIAL_PROSPECT", leadId: p.id, message: note, communicationType: "phone_call", adminEmail: "call-ai@system" } });
+  if (intel.interestLevel === "hot") {
+    await notify({ type: "lead_replied", severity: "info", title: `🔥 Hot commercial prospect: ${p.propertyName}`, body: intel.nextStep || intel.summary, link: `/admin/leads/commercial/call-list/${p.id}`, push: true }).catch(() => {});
+  }
+  return record({ action: filled.length ? "enriched" : "noted", leadType: "COMMERCIAL_PROSPECT", leadId: p.id, fieldsFilled: filled });
 }
 
 // ── Applying intel to the CRM ───────────────────────────────────────────────
@@ -336,6 +507,21 @@ export async function applyCallIntel(opts: {
     (await prisma.appSetting.findUnique({ where: { key: "calls.ai.createLeads" } }))?.value === "true";
   if (!createEnabled) {
     return record({ action: "skipped", fieldsFilled: [], reason: "lead creation from calls is off" });
+  }
+
+  if (intel.isCommercialInquiry) {
+    const lead = await prisma.commercialLead.create({
+      data: {
+        contactName: [intel.firstName, intel.lastName].filter((x) => x.trim()).join(" ").trim() || "Caller",
+        propertyName: intel.propertyName.trim() || "Unknown property",
+        phone, email: intel.email.trim(), city: "", state: "CA", zipCode: intel.zipCode.trim(),
+        status: "PHONE_REVIEW",
+        inquiry: `Created from an inbound call (Quo call ${callId}).\n\n${intel.summary}`,
+      },
+    });
+    await timeline("COMMERCIAL", lead.id);
+    await notify({ type: "lead_created", severity: "info", title: `🏢 New commercial lead from a phone call: ${lead.propertyName}`, body: intel.summary, link: `/admin/leads/commercial/${lead.id}`, push: true });
+    return record({ action: "created", leadType: "COMMERCIAL", leadId: lead.id, fieldsFilled: Object.entries({ contactName: intel.firstName, propertyName: intel.propertyName, email: intel.email, zipCode: intel.zipCode }).filter(([, v]) => v.trim()).map(([k]) => k) });
   }
 
   const created = await prisma.quoteLead.create({
