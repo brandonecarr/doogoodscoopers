@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { listCallsWith, normalizePhoneNumber, isQuoConfigured } from "@/lib/quo";
+import { listCallsWith, normalizePhoneNumber, isQuoConfigured, quoFetch, getQuoPhoneNumberId } from "@/lib/quo";
 import { analyzeCallSmart, applyCallIntel, applyCommercialCallIntel, isCallIntelConfigured, formatTranscript } from "@/lib/call-intel";
 
 export const dynamic = "force-dynamic";
@@ -18,13 +18,35 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "ANTHROPIC_API_KEY isn't set, so AI call notes can't run." }, { status: 400 });
   }
 
-  const { phone, apply } = await request.json().catch(() => ({ phone: "", apply: false }));
+  const { phone, apply, callId } = await request.json().catch(() => ({ phone: "", apply: false, callId: "" }));
+
+  // Direct mode: a Quo call/activity id (AC…) skips the phone lookup entirely.
+  if (typeof callId === "string" && /^AC[A-Za-z0-9]+$/.test(callId)) {
+    const a = await analyzeCallSmart(callId, normalizePhoneNumber(String(phone || "")) || undefined);
+    if (!a) return NextResponse.json({ error: "Quo returned no transcript for that call id." }, { status: 404 });
+    const transcript = formatTranscript(a.transcript);
+    if (!a.result.ok) return NextResponse.json({ error: a.result.message, reason: a.result.reason, transcript }, { status: a.result.reason === "too_short" ? 200 : 502 });
+    const matched = a.kind === "commercial" ? a.match : null;
+    if (apply) {
+      const caller = a.externalNumber || normalizePhoneNumber(String(phone || "")) || "";
+      const result = a.kind === "commercial"
+        ? await applyCommercialCallIntel({ phone: caller, intel: a.result.intel, callId, match: a.match })
+        : await applyCallIntel({ phone: caller, intel: a.result.intel, callId });
+      return NextResponse.json({ success: true, kind: a.kind, matched, call: { id: callId }, transcript, intel: a.result.intel, applied: result });
+    }
+    return NextResponse.json({ success: true, kind: a.kind, matched, call: { id: callId }, externalNumber: a.externalNumber, transcript, intel: a.result.intel, note: "Dry run — nothing was saved." });
+  }
+
   const normalized = normalizePhoneNumber(String(phone || ""));
   if (!normalized) return NextResponse.json({ error: "Enter a valid 10-digit phone number." }, { status: 400 });
 
   const calls = await listCallsWith(normalized, 15);
   if (calls.length === 0) {
-    return NextResponse.json({ error: "No calls found with that number in Quo." }, { status: 404 });
+    // Say why, so an API problem doesn't masquerade as "no calls".
+    const pn = await getQuoPhoneNumberId();
+    const probe = pn ? await quoFetch(`/calls?phoneNumberId=${encodeURIComponent(pn)}&participants[]=${encodeURIComponent(normalized)}&maxResults=3`) : null;
+    const detail = !pn ? "could not resolve our Quo phone-number id" : probe && !probe.ok ? `Quo /calls returned ${probe.status}: ${JSON.stringify(probe.data).slice(0, 200)}` : "Quo /calls returned an empty list";
+    return NextResponse.json({ error: `No calls found with that number in Quo (${detail}).` }, { status: 404 });
   }
 
   // Newest first — you almost always mean the call you just made. Walk down
