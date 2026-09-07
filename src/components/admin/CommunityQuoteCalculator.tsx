@@ -31,6 +31,8 @@ export type Fields = {
   hwLocking: string;
   /** Traced service areas as JSON lng/lat rings — saved with the quote, drawn on the proposal map. */
   mapShapes: string;
+  /** Placed pet-waste stations as JSON lng/lat points — drawn on the proposal map with a legend. */
+  mapStations: string;
   // Rate card (defaults from the Swoop Scoop commercial calculator)
   rateEasy: string;
   rateStandard: string;
@@ -73,6 +75,7 @@ const DEFAULTS: Fields = {
   hwRound: "0",
   hwLocking: "0",
   mapShapes: "[]",
+  mapStations: "[]",
   rateEasy: "85",
   rateStandard: "135",
   rateOneTime: "380",
@@ -371,15 +374,17 @@ export function CommunityQuoteCalculator({
   const exportProposal = async () => {
     setProposalBusy(true);
     try {
-      let rings: unknown[] = [];
+      let rings: unknown[] = []; let pins: unknown[] = [];
       try { rings = JSON.parse(f.mapShapes || "[]"); } catch { rings = []; }
+      try { pins = JSON.parse(f.mapStations || "[]"); } catch { pins = []; }
       const origin = window.location.origin;
       const data: ProposalData = {
         baseUrl: origin,
         locationName: f.property.trim(),
         serviceAddress: f.propertyAddress.trim(),
         date: new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }),
-        mapUrl: rings.length ? `${origin}/api/admin/proposal-map?shapes=${encodeURIComponent(JSON.stringify(rings))}&w=934&h=630` : null,
+        mapUrl: rings.length || pins.length ? `${origin}/api/admin/proposal-map?shapes=${encodeURIComponent(JSON.stringify(rings))}&stations=${encodeURIComponent(JSON.stringify(pins))}&w=934&h=630` : null,
+        stationPins: pins.length,
         sqftTotal: sqft(c.acres),
         stations: String(Math.max(c.stations, c.hwCount)),
         plans: proposalPlans(f),
@@ -450,6 +455,9 @@ export function CommunityQuoteCalculator({
                 onTotalChange={setMeasured}
                 onShapesChange={(rings) => set("mapShapes", JSON.stringify(rings))}
                 initialShapes={(() => { try { return JSON.parse(f.mapShapes || "[]"); } catch { return []; } })()}
+                // Placed stations are the source of truth for the serviced count once any are on the map.
+                onStationsChange={(pts) => setF((p) => ({ ...p, mapStations: JSON.stringify(pts), stations: pts.length > 0 ? String(pts.length) : p.stations }))}
+                initialStations={(() => { try { return JSON.parse(f.mapStations || "[]"); } catch { return []; } })()}
                 onApply={(acres, place) => {
                   set("acres", String(acres));
                   if (place && !f.property.trim()) set("property", place.split(",")[0]);

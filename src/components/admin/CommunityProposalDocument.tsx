@@ -37,6 +37,7 @@ export interface ProposalData {
   mapUrl: string | null;    // proxy URL, or null when nothing was traced
   sqftTotal: string;        // "43,000"
   stations: string;         // "2"
+  stationPins?: number;     // how many station markers are on the map
   plans: ProposalPlan[];    // 1–2 plans (page 5 and 6)
   terms: { heading: string; items: string[] }[];
 }
@@ -222,12 +223,15 @@ export function ProposalPdf({ d }: { d: ProposalData }) {
             ? <Image src={d.mapUrl} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             : <Text style={[S.center, { fontSize: 10, color: MUTED }]}>Service map — trace the common areas on the quote map to include it here</Text>}
         </View>
-        <View style={[S.abs, at(0.45, 4.25, 4.6), { flexDirection: "row", alignItems: "center" }]}>
-          <View style={{ width: 20, height: 11, backgroundColor: BLUE, opacity: 0.5, marginRight: 6, borderRadius: 2, borderWidth: 1.5, borderColor: BLUE }} />
-          <Text style={{ fontSize: 9, color: MUTED }}>Shaded areas are cleaned each visit</Text>
+        {/* Legend — matches what is drawn on the map */}
+        <View style={[S.abs, at(0.45, 4.22, 4.6), { flexDirection: "row", alignItems: "center", flexWrap: "wrap" }]}>
+          <View style={{ width: 20, height: 11, backgroundColor: BLUE, opacity: 0.35, marginRight: 6, borderRadius: 2, borderWidth: 1.5, borderColor: BLUE }} />
+          <Text style={{ fontSize: 9, color: MUTED, marginRight: 14 }}>Areas to be cleaned each visit</Text>
+          <Svg width={12} height={11} viewBox="0 0 12 11" style={{ marginRight: 6 }}><Path d="M6 0.5 L11.5 10.5 L0.5 10.5 Z" fill={BLUE} /></Svg>
+          <Text style={{ fontSize: 9, color: MUTED }}>Pet-waste station{d.stationPins ? ` (${d.stationPins} placed)` : ""}</Text>
         </View>
-        <Stat value={`${d.sqftTotal} sq ft`} label="Approximate serviceable area" x={0.45} y={4.55} w={2.2} />
-        <Stat value={`${d.stations}`} label="Pet-waste stations" x={2.85} y={4.55} w={2.2} />
+        <Text style={[S.abs, S.ral, at(0.45, 4.55, 4.6), { fontSize: 15, fontWeight: 800, color: NAVY }]}>Approx. {d.sqftTotal} sq ft</Text>
+        <Text style={[S.abs, at(0.45, 4.85, 4.6), { fontSize: 9, color: MUTED }]}>of common area cleaned on each visit · {d.stations} waste station{d.stations === "1" ? "" : "s"} installed and serviced</Text>
 
         <Image src={img(base, "icon-6.png")} style={[S.abs, at(8.85, 0.25, 0.8, 0.8)]} />
         <Text style={[S.abs, S.eyebrow, at(5.75, 0.45, 3.0), { color: TEAL_DEEP }]}>Notes</Text>

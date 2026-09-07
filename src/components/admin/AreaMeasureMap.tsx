@@ -39,6 +39,8 @@ export function AreaMeasureMap({
   onTotalChange,
   onShapesChange,
   initialShapes,
+  onStationsChange,
+  initialStations,
   impact,
 }: {
   token: string | undefined;
@@ -49,6 +51,9 @@ export function AreaMeasureMap({
   onShapesChange?: (rings: [number, number][][]) => void;
   /** Polygons to restore (e.g. a saved quote), as lng/lat rings. */
   initialShapes?: [number, number][][];
+  /** Fires with every placed pet-waste station (lng/lat) so the caller can save them and draw them on the proposal map. */
+  onStationsChange?: (points: [number, number][]) => void;
+  initialStations?: [number, number][];
   /** Rendered under the tally — what this area does to the quote. */
   impact?: React.ReactNode;
 }) {
@@ -62,7 +67,8 @@ export function AreaMeasureMap({
   );
   const [draft, setDraft] = useState<[number, number][]>([]);
   const [cursor, setCursor] = useState<[number, number] | null>(null);
-  const [mode, setMode] = useState<"idle" | "drawing">("idle");
+  const [mode, setMode] = useState<"idle" | "drawing" | "stations">("idle");
+  const [stations, setStations] = useState<[number, number][]>(() => initialStations || []);
   const modeRef = useRef(mode);
   modeRef.current = mode;
   const draftRef = useRef<[number, number][]>(draft);
@@ -97,6 +103,9 @@ export function AreaMeasureMap({
         map.addLayer({ id: "shapes-fill", type: "fill", source: "shapes", paint: { "fill-color": "#22C55E", "fill-opacity": 0.35 } });
         map.addLayer({ id: "shapes-line", type: "line", source: "shapes", paint: { "line-color": "#16A34A", "line-width": 2.5 } });
 
+        map.addSource("stations", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+        map.addLayer({ id: "stations-pts", type: "circle", source: "stations", paint: { "circle-radius": 7, "circle-color": "#008EFF", "circle-stroke-color": "#fff", "circle-stroke-width": 2 } });
+
         map.addSource("draft", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
         map.addLayer({ id: "draft-fill", type: "fill", source: "draft", paint: { "fill-color": "#FACC15", "fill-opacity": 0.25 } });
         map.addLayer({ id: "draft-line", type: "line", source: "draft", paint: { "line-color": "#FACC15", "line-width": 2, "line-dasharray": [2, 1] } });
@@ -105,6 +114,7 @@ export function AreaMeasureMap({
       });
 
       map.on("click", (e: { lngLat: { lng: number; lat: number }; point: { x: number; y: number } }) => {
+        if (modeRef.current === "stations") { setStations((prev) => [...prev, [e.lngLat.lng, e.lngLat.lat]]); return; }
         if (modeRef.current !== "drawing") return;
         const d = draftRef.current;
         // Clicking back on the first point closes the shape (as well as double-click).
@@ -142,6 +152,14 @@ export function AreaMeasureMap({
       })),
     });
   }, [shapes, ready]);
+
+  // ---- render stations ----------------------------------------------------
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    map.getSource("stations")?.setData({ type: "FeatureCollection", features: stations.map((p, i) => ({ type: "Feature", properties: { i }, geometry: { type: "Point", coordinates: p } })) });
+  }, [stations, ready]);
+  useEffect(() => { onStationsChange?.(stations); }, [stations, onStationsChange]);
 
   // ---- render the in-progress shape --------------------------------------
   useEffect(() => {
@@ -267,6 +285,12 @@ export function AreaMeasureMap({
       {/* Map */}
       <div className="relative">
         <div ref={containerRef} className="w-full h-[460px] rounded-xl overflow-hidden border border-gray-200" />
+        {mode === "stations" && (
+          <div className="absolute top-3 left-3 bg-white/95 backdrop-blur px-3 py-2 rounded-lg shadow text-[12px] text-navy-900 max-w-[300px]">
+            Click where each pet-waste station goes (or will be installed).
+            {stations.length > 0 && <span className="block mt-0.5 font-semibold" style={{ color: "#008EFF" }}>{stations.length} station{stations.length === 1 ? "" : "s"} placed.</span>}
+          </div>
+        )}
         {mode === "drawing" && (
           <div className="absolute top-3 left-3 bg-white/95 backdrop-blur px-3 py-2 rounded-lg shadow text-[12px] text-navy-900 max-w-[300px]">
             Click each corner of a grass area, then <b>double-click</b> (or press <b>Enter</b>) to close it.
@@ -301,10 +325,35 @@ export function AreaMeasureMap({
             </button>
           </>
         )}
-        {shapes.length > 0 && (
+        {mode === "idle" && (
+          <button type="button" onClick={() => { setMode("stations"); mapRef.current?.doubleClickZoom?.disable(); }}
+            className="px-3.5 py-2 rounded-lg text-white text-[13px] font-semibold inline-flex items-center gap-1.5"
+            style={{ background: "#008EFF" }}>
+            <MapPin className="w-4 h-4" /> {stations.length ? "Add stations" : "Place waste stations"}
+          </button>
+        )}
+        {mode === "stations" && (
+          <>
+            <button type="button" onClick={() => setStations((x) => x.slice(0, -1))} disabled={!stations.length}
+              className="px-3 py-2 rounded-lg border border-gray-200 text-[13px] font-semibold text-gray-700 disabled:opacity-40 inline-flex items-center gap-1.5">
+              <Undo2 className="w-4 h-4" /> Undo station
+            </button>
+            <button type="button" onClick={() => { setMode("idle"); mapRef.current?.doubleClickZoom?.enable(); }}
+              className="px-3 py-2 rounded-lg border text-[13px] font-semibold" style={{ borderColor: "#008EFF", color: "#008EFF" }}>
+              Done placing
+            </button>
+          </>
+        )}
+        {shapes.length > 0 && mode === "idle" && (
           <button type="button" onClick={() => { setShapes([]); setApplied(false); }}
             className="px-3 py-2 rounded-lg border border-gray-200 text-[13px] font-semibold text-red-700 inline-flex items-center gap-1.5">
-            <Trash2 className="w-4 h-4" /> Clear all
+            <Trash2 className="w-4 h-4" /> Clear areas
+          </button>
+        )}
+        {stations.length > 0 && mode === "idle" && (
+          <button type="button" onClick={() => setStations([])}
+            className="px-3 py-2 rounded-lg border border-gray-200 text-[13px] font-semibold text-red-700 inline-flex items-center gap-1.5">
+            <Trash2 className="w-4 h-4" /> Clear stations
           </button>
         )}
       </div>
@@ -320,6 +369,7 @@ export function AreaMeasureMap({
             <p className="text-[12px] text-gray-500">
               {Math.round(total * SQFT_PER_ACRE).toLocaleString()} sq ft
               {shapes.length > 0 && ` · ${shapes.length} area${shapes.length === 1 ? "" : "s"}`}
+              {stations.length > 0 && ` · ${stations.length} station${stations.length === 1 ? "" : "s"} placed`}
             </p>
           </div>
           {onApply && (

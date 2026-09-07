@@ -18,7 +18,10 @@ export async function GET(request: NextRequest) {
   let rings: [number, number][][] = [];
   try { rings = JSON.parse(sp.get("shapes") || "[]"); } catch { rings = []; }
   rings = rings.filter((r) => Array.isArray(r) && r.length >= 3);
-  if (rings.length === 0) return NextResponse.json({ error: "No shapes" }, { status: 400 });
+  let pins: [number, number][] = [];
+  try { pins = JSON.parse(sp.get("stations") || "[]"); } catch { pins = []; }
+  pins = pins.filter((p) => Array.isArray(p) && p.length === 2).slice(0, 40);
+  if (rings.length === 0 && pins.length === 0) return NextResponse.json({ error: "No shapes" }, { status: 400 });
   const w = Math.min(1280, Math.max(200, parseInt(sp.get("w") || "934", 10) || 934));
   const h = Math.min(1280, Math.max(200, parseInt(sp.get("h") || "630", 10) || 630));
 
@@ -32,7 +35,11 @@ export async function GET(request: NextRequest) {
       geometry: { type: "Polygon", coordinates: [[...ring.map(([x, y]) => [r6(x), r6(y)]), [r6(ring[0][0]), r6(ring[0][1])]]] },
     })),
   };
-  const overlay = `geojson(${encodeURIComponent(JSON.stringify(fc))})`;
+  // Areas as a GeoJSON overlay; stations as Mapbox's built-in triangle pins in brand blue.
+  const parts: string[] = [];
+  if (rings.length) parts.push(`geojson(${encodeURIComponent(JSON.stringify(fc))})`);
+  for (const [x, y] of pins) parts.push(`pin-s-triangle+008eff(${r6(x)},${r6(y)})`);
+  const overlay = parts.join(",");
   const url = `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/static/${overlay}/auto/${w}x${h}@2x?padding=60&attribution=false&logo=false&access_token=${encodeURIComponent(token)}`;
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) {
