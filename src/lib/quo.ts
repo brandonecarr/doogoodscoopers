@@ -214,11 +214,14 @@ export async function listCallsWith(phone: string, maxResults = 10): Promise<Quo
   const pn = await getQuoPhoneNumberId();
   const to = normalizePhoneNumber(phone);
   if (!pn || !to) return [];
-  const res = await quoFetch(
-    `/calls?phoneNumberId=${encodeURIComponent(pn)}&participants[]=${encodeURIComponent(to)}&maxResults=${maxResults}`
-  );
-  if (!res.ok) return [];
-  return ((res.data as { data?: QuoCall[] })?.data) || [];
+  // Quo's API rejected the `participants[]=` spelling with "Expected array";
+  // try the plain and indexed forms in turn so a format change can't blank the tool.
+  for (const key of ["participants", "participants[0]", "participants[]"]) {
+    const res = await quoFetch(`/calls?phoneNumberId=${encodeURIComponent(pn)}&${key}=${encodeURIComponent(to)}&maxResults=${maxResults}`);
+    if (res.ok) return ((res.data as { data?: QuoCall[] })?.data) || [];
+    if (res.status !== 400) return [];
+  }
+  return [];
 }
 
 // ── Webhook helpers ─────────────────────────────────────────────────────────
