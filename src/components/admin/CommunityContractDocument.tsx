@@ -20,7 +20,7 @@ export type ContractData = {
   governingState: string;
   acres: string;
   units: string;
-  freq: number;
+  frequency: string; // "weekly", "every other week", "once a month", "twice a week"
   visitsMo: string;
   stations: number;
   monthlyTotal: string;
@@ -90,7 +90,7 @@ function ContractPdf({ d }: { d: ContractData }) {
           <Text style={styles.h3}>1.1 Service Details</Text>
           <Text style={styles.p}>
             The Services consist of the systematic inspection and removal of pet waste from approximately {blank(d.acres)}{" "}
-            acre(s) of serviceable common area at the Property, performed {d.freq} time(s) per week (approximately{" "}
+            acre(s) of serviceable common area at the Property, performed {d.frequency} (approximately{" "}
             {d.visitsMo} service visits per month).
             {d.stations > 0
               ? ` Provider shall also service ${d.stations} pet-waste station(s) at the Property, including restocking waste bags and emptying receptacles.`

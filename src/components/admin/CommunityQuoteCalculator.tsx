@@ -1,29 +1,49 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Copy, Check, Info, FileDown, Loader2, Ruler, ChevronDown } from "lucide-react";
+import { Copy, Check, FileDown, Loader2, Ruler, ChevronDown } from "lucide-react";
 import type { ContractData } from "@/components/admin/CommunityContractDocument";
 import { AreaMeasureMap } from "@/components/admin/AreaMeasureMap";
 
-// Community / HOA quote calculator. The price is BUILT from serviceable area ×
-// frequency × a loaded hourly rate (with a per-visit floor), then PRESENTED as a
-// per-unit figure — the number an HOA board actually budgets against.
+// Community / HOA quote calculator — a rate card, not a cost model.
+//
+// Price = serviceable acres × a per-acre-per-visit rate (Easy Clean or Standard)
+// + pet stations × a per-station-per-visit rate (volume-tiered), × 4.33 for a
+// weekly month. Less frequent service is NOT proportionally cheaper: every-other-
+// week is 75% of weekly and monthly is 75% of that, because each visit carries
+// more waste. Station service, hardware and installation carry sales tax.
+// The result is still presented per unit — the number an HOA board budgets on.
+
+export type Condition = "easy" | "standard";
+export type Frequency = "twice" | "weekly" | "biweekly" | "monthly";
 
 export type Fields = {
   property: string;
   units: string;
   acres: string;
-  minutesPerAcre: string;
-  driveMinutes: string;
-  loadedRate: string;
-  visitMinimum: string;
-  freqPerWeek: string;
-  dogPct: string;
-  dogsPerHome: string;
+  condition: Condition;
+  frequency: Frequency;
   stations: string;
-  stationMonthly: string;
-  stationInstall: string;
-  initialCleanup: string;
+  initialCleanup: "yes" | "no";
+  hwBag: string;
+  hwRound: string;
+  hwLocking: string;
+  // Rate card (defaults from the Swoop Scoop commercial calculator)
+  rateEasy: string;
+  rateStandard: string;
+  rateOneTime: string;
+  st1: string;
+  st6: string;
+  st11: string;
+  st15: string;
+  st20: string;
+  biweeklyPct: string;
+  monthlyPct: string;
+  hwBagPrice: string;
+  hwRoundPrice: string;
+  hwLockingPrice: string;
+  installEach: string;
+  taxPct: string;
   // Contract details (for the PDF)
   clientLegalName: string;
   propertyAddress: string;
@@ -42,17 +62,28 @@ const DEFAULTS: Fields = {
   property: "",
   units: "120",
   acres: "2",
-  minutesPerAcre: "45",
-  driveMinutes: "20",
-  loadedRate: "65",
-  visitMinimum: "45",
-  freqPerWeek: "2",
-  dogPct: "30",
-  dogsPerHome: "1.2",
+  condition: "standard",
+  frequency: "weekly",
   stations: "0",
-  stationMonthly: "50",
-  stationInstall: "125",
-  initialCleanup: "0",
+  initialCleanup: "no",
+  hwBag: "0",
+  hwRound: "0",
+  hwLocking: "0",
+  rateEasy: "85",
+  rateStandard: "135",
+  rateOneTime: "380",
+  st1: "17.95",
+  st6: "17.45",
+  st11: "16.95",
+  st15: "16.45",
+  st20: "15.95",
+  biweeklyPct: "75",
+  monthlyPct: "75",
+  hwBagPrice: "199",
+  hwRoundPrice: "299",
+  hwLockingPrice: "499",
+  installEach: "85",
+  taxPct: "9",
   clientLegalName: "",
   propertyAddress: "",
   clientContact: "",
@@ -68,6 +99,14 @@ const DEFAULTS: Fields = {
 
 const PROVIDER_ENTITY = "DooGoodScoopers";
 const PROVIDER_PHONE = "(909) 366-3744";
+const WEEKS_PER_MONTH = 4.3333;
+
+export const FREQUENCIES: { value: Frequency; label: string; visitsMo: number }[] = [
+  { value: "twice", label: "Twice a week", visitsMo: 2 * WEEKS_PER_MONTH },
+  { value: "weekly", label: "Weekly", visitsMo: WEEKS_PER_MONTH },
+  { value: "biweekly", label: "Every other week", visitsMo: WEEKS_PER_MONTH / 2 },
+  { value: "monthly", label: "Once a month", visitsMo: 1 },
+];
 
 const num = (s: string) => {
   const n = parseFloat(s);
@@ -80,6 +119,71 @@ const money2 = (n: number) =>
 
 const inputCls =
   "w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-violet-400 focus:border-transparent bg-white text-ink";
+
+/** Per-station per-visit rate for a station count (volume tiers). */
+function stationRate(count: number, f: Fields): number {
+  if (count <= 0) return 0;
+  if (count <= 5) return num(f.st1);
+  if (count <= 10) return num(f.st6);
+  if (count <= 14) return num(f.st11);
+  if (count <= 19) return num(f.st15);
+  return num(f.st20);
+}
+
+/** Multiplier applied to the weekly monthly figure for a frequency. */
+function freqFactor(freq: Frequency, f: Fields): number {
+  const bi = num(f.biweeklyPct) / 100 || 0.75;
+  const mo = num(f.monthlyPct) / 100 || 0.75;
+  switch (freq) {
+    case "twice": return 2;
+    case "weekly": return 1;
+    case "biweekly": return bi;
+    case "monthly": return bi * mo;
+  }
+}
+
+/** Everything the quote needs, from the fields. Pure, so the map preview can reuse it. */
+function price(f: Fields, acresOverride?: number) {
+  const units = num(f.units);
+  const acres = acresOverride ?? num(f.acres);
+  const ratePerAcre = f.condition === "easy" ? num(f.rateEasy) : num(f.rateStandard);
+  const areaPerVisit = acres * ratePerAcre;
+  const stations = Math.round(num(f.stations));
+  const stRate = stationRate(stations, f);
+  const stationsPerVisit = stations * stRate;
+  const tax = num(f.taxPct) / 100;
+  // Weekly month, then scale by frequency (their model scales the whole total).
+  const weeklyArea = areaPerVisit * WEEKS_PER_MONTH;
+  const weeklyStations = stationsPerVisit * WEEKS_PER_MONTH;
+  const weeklyStationTax = weeklyStations * tax;
+  const weeklyTotal = weeklyArea + weeklyStations + weeklyStationTax;
+  const factor = freqFactor(f.frequency, f);
+  const monthlyArea = weeklyArea * factor;
+  const monthlyStations = weeklyStations * factor;
+  const monthlyStationTax = weeklyStationTax * factor;
+  const monthlyTotal = weeklyTotal * factor;
+  const visitsMo = FREQUENCIES.find((x) => x.value === f.frequency)!.visitsMo;
+  const perVisit = visitsMo > 0 ? monthlyTotal / visitsMo : 0;
+  const perUnitMo = units > 0 ? monthlyTotal / units : NaN;
+  const perUnitYr = perUnitMo * 12;
+  // One-time
+  const cleanup = f.initialCleanup === "yes" ? acres * num(f.rateOneTime) : 0;
+  const hwCount = Math.round(num(f.hwBag)) + Math.round(num(f.hwRound)) + Math.round(num(f.hwLocking));
+  const hardware = Math.round(num(f.hwBag)) * num(f.hwBagPrice) + Math.round(num(f.hwRound)) * num(f.hwRoundPrice) + Math.round(num(f.hwLocking)) * num(f.hwLockingPrice);
+  const install = hwCount * num(f.installEach);
+  const oneTimeTax = (hardware + install) * tax;
+  const oneTime = cleanup + hardware + install + oneTimeTax;
+  const plans = FREQUENCIES.map((p) => {
+    const mTotal = weeklyTotal * freqFactor(p.value, f);
+    return { ...p, mTotal, perUnit: units > 0 ? mTotal / units : NaN };
+  });
+  return {
+    units, acres, ratePerAcre, areaPerVisit, stations, stRate, stationsPerVisit, visitsMo, perVisit,
+    monthlyArea, monthlyStations, monthlyStationTax, monthlyTotal, perUnitMo, perUnitYr,
+    cleanup, hwCount, hardware, install, oneTimeTax, oneTime, plans,
+    frequencyLabel: FREQUENCIES.find((x) => x.value === f.frequency)!.label,
+  };
+}
 
 function Num({
   label, value, onChange, prefix, suffix, hint, step = "1",
@@ -120,48 +224,9 @@ export function CommunityQuoteCalculator({
   const set = (k: keyof Fields, v: string) => setF((p) => ({ ...p, [k]: v }));
   const [copied, setCopied] = useState(false);
 
-  const c = useMemo(() => {
-    const units = num(f.units);
-    const acres = num(f.acres);
-    const onSiteMin = acres * num(f.minutesPerAcre);
-    const laborMin = onSiteMin + num(f.driveMinutes);
-    const laborCost = (laborMin / 60) * num(f.loadedRate);
-    const perVisit = Math.max(laborCost, num(f.visitMinimum));
-    const belowFloor = laborCost > 0 && laborCost < num(f.visitMinimum);
-    const freq = num(f.freqPerWeek);
-    const visitsMo = freq * 4.33;
-    const monthlyCommon = perVisit * visitsMo;
-    const stations = num(f.stations);
-    const monthlyStations = stations * num(f.stationMonthly);
-    const monthlyTotal = monthlyCommon + monthlyStations;
-    const perUnitMo = units > 0 ? monthlyTotal / units : NaN;
-    const perUnitYr = perUnitMo * 12;
-    const installTotal = stations * num(f.stationInstall);
-    const oneTime = num(f.initialCleanup) + installTotal;
-    const estDogs = Math.round(units * (num(f.dogPct) / 100) * num(f.dogsPerHome));
-
-    const tiers = [1, 2, 3].map((fq) => {
-      const mTotal = perVisit * fq * 4.33 + monthlyStations;
-      return { fq, mTotal, perUnit: units > 0 ? mTotal / units : NaN };
-    });
-
-    return {
-      units, acres, onSiteMin, perVisit, belowFloor, freq, visitsMo,
-      monthlyCommon, stations, monthlyStations, monthlyTotal,
-      perUnitMo, perUnitYr, installTotal, oneTime, estDogs, tiers,
-    };
-  }, [f]);
-
-  // What the currently-traced area would do to the quote, at today's settings.
-  const measuredImpact = useMemo(() => {
-    if (measured <= 0) return null;
-    const onSite = measured * num(f.minutesPerAcre);
-    const labor = ((onSite + num(f.driveMinutes)) / 60) * num(f.loadedRate);
-    const perVisit = Math.max(labor, num(f.visitMinimum));
-    const monthly = perVisit * num(f.freqPerWeek) * 4.33 + num(f.stations) * num(f.stationMonthly);
-    const units = num(f.units);
-    return { onSite, perVisit, monthly, perUnit: units > 0 ? monthly / units : NaN, floored: labor > 0 && labor < num(f.visitMinimum) };
-  }, [measured, f]);
+  const c = useMemo(() => price(f), [f]);
+  // What the currently-traced area would price at, at today's settings.
+  const measuredImpact = useMemo(() => (measured > 0 ? price(f, measured) : null), [measured, f]);
 
   const proposal = useMemo(() => {
     const name = f.property.trim() || "Your Community";
@@ -169,12 +234,12 @@ export function CommunityQuoteCalculator({
     L.push(`${name} — Dog Waste Removal Proposal`);
     L.push("");
     L.push(`Service: Common-area pet-waste removal${c.stations > 0 ? " + pet-station servicing" : ""}`);
-    L.push(`Frequency: ${c.freq}× per week (${c.visitsMo.toFixed(1)} visits/month)`);
+    L.push(`Frequency: ${c.frequencyLabel} (${c.visitsMo.toFixed(1)} visits/month)`);
     L.push(`Serviceable area: ${c.acres} acre${c.acres === 1 ? "" : "s"} · ${c.units} units`);
     L.push("");
     L.push(`MONTHLY INVESTMENT: ${money0(c.monthlyTotal)}`);
-    L.push(`  • Common-area service: ${money0(c.monthlyCommon)}`);
-    if (c.stations > 0) L.push(`  • Pet-station service (${c.stations}): ${money0(c.monthlyStations)}`);
+    L.push(`  • Common-area service: ${money0(c.monthlyArea)}`);
+    if (c.stations > 0) L.push(`  • Pet-station service (${c.stations}): ${money0(c.monthlyStations + c.monthlyStationTax)}${c.monthlyStationTax > 0 ? " incl. tax" : ""}`);
     if (isFinite(c.perUnitMo)) {
       L.push("");
       L.push(`That's just ${money2(c.perUnitMo)} per home each month — about ${money0(c.perUnitYr)} per home per year —`);
@@ -183,8 +248,10 @@ export function CommunityQuoteCalculator({
     if (c.oneTime > 0) {
       L.push("");
       L.push(`ONE-TIME START-UP: ${money0(c.oneTime)}`);
-      if (num(f.initialCleanup) > 0) L.push(`  • Initial deep cleanup: ${money0(num(f.initialCleanup))}`);
-      if (c.installTotal > 0) L.push(`  • Station installation (${c.stations}): ${money0(c.installTotal)}`);
+      if (c.cleanup > 0) L.push(`  • Initial deep cleanup (${c.acres} ac): ${money0(c.cleanup)}`);
+      if (c.hardware > 0) L.push(`  • Pet-waste stations (${c.hwCount}): ${money0(c.hardware)}`);
+      if (c.install > 0) L.push(`  • Installation (${c.hwCount}): ${money0(c.install)}`);
+      if (c.oneTimeTax > 0) L.push(`  • Sales tax: ${money0(c.oneTimeTax)}`);
     }
     L.push("");
     L.push(`Includes all labor, bags, waste disposal, and full liability insurance.`);
@@ -215,7 +282,7 @@ export function CommunityQuoteCalculator({
     governingState: f.governingState,
     acres: f.acres,
     units: f.units,
-    freq: c.freq,
+    frequency: c.frequencyLabel.toLowerCase(),
     visitsMo: c.visitsMo.toFixed(1),
     stations: c.stations,
     monthlyTotal: money0(c.monthlyTotal),
@@ -237,6 +304,9 @@ export function CommunityQuoteCalculator({
     }
   };
 
+  const chip = (active: boolean) =>
+    `flex-1 px-3 py-2 rounded-lg border text-[13px] font-semibold text-center transition-colors ${active ? "border-violet-500 bg-violet-50 text-violet-800" : "border-gray-200 text-gray-700 hover:border-gray-300"}`;
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[1fr_minmax(340px,420px)] gap-3.5">
       {/* ── Inputs ─────────────────────────────────────────────── */}
@@ -249,7 +319,7 @@ export function CommunityQuoteCalculator({
               <input value={f.property} onChange={(e) => set("property", e.target.value)} placeholder="e.g. Riverside Condominiums" className={inputCls} />
             </label>
             <Num label="Number of units / homes" value={f.units} onChange={(v) => set("units", v)} suffix="units" />
-            <Num label="Serviceable common area" value={f.acres} onChange={(v) => set("acres", v)} suffix="acres" step="0.1" hint="Only the areas dogs use — trace it on the map below." />
+            <Num label="Serviceable common area" value={f.acres} onChange={(v) => set("acres", v)} suffix="acres" step="0.01" hint="Only the areas dogs use — trace it on the map below." />
           </div>
 
           {/* Satellite measuring: turns "guess the acreage" into tracing the lawns. */}
@@ -273,9 +343,7 @@ export function CommunityQuoteCalculator({
                 onTotalChange={setMeasured}
                 onApply={(acres, place) => {
                   set("acres", String(acres));
-                  // Offer the searched place as the property name if none typed yet.
                   if (place && !f.property.trim()) set("property", place.split(",")[0]);
-                  // Collapse back to the form so the updated acres field is in view.
                   setMeasuring(false);
                 }}
                 impact={
@@ -285,25 +353,18 @@ export function CommunityQuoteCalculator({
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] text-gray-600">
                         <span><b className="text-navy-900">{measured.toFixed(2)}</b> ac</span>
                         <span className="text-gray-300">×</span>
-                        <span>{f.minutesPerAcre} min/ac</span>
+                        <span>${measuredImpact.ratePerAcre}/ac</span>
                         <span className="text-gray-300">=</span>
-                        <span><b className="text-navy-900">{Math.round(measuredImpact.onSite)}</b> min on site</span>
+                        <span><b className="text-navy-900">${measuredImpact.areaPerVisit.toFixed(0)}</b>/visit</span>
                         <span className="text-gray-300">→</span>
-                        <span><b className="text-navy-900">${measuredImpact.perVisit.toFixed(2)}</b>/visit</span>
-                        <span className="text-gray-300">→</span>
-                        <span><b className="text-green-700">${Math.round(measuredImpact.monthly).toLocaleString()}</b>/mo</span>
-                        {Number.isFinite(measuredImpact.perUnit) && (
+                        <span><b className="text-green-700">${Math.round(measuredImpact.monthlyTotal).toLocaleString()}</b>/mo {c.frequencyLabel.toLowerCase()}</span>
+                        {Number.isFinite(measuredImpact.perUnitMo) && (
                           <>
                             <span className="text-gray-300">→</span>
-                            <span><b className="text-navy-900">${measuredImpact.perUnit.toFixed(2)}</b>/unit/mo</span>
+                            <span><b className="text-navy-900">${measuredImpact.perUnitMo.toFixed(2)}</b>/unit/mo</span>
                           </>
                         )}
                       </div>
-                      <p className="text-[11.5px] text-gray-500 mt-1.5">
-                        {measuredImpact.floored
-                          ? "Below your per-visit minimum, so the floor price applies."
-                          : "Tune sweep time per acre, drive time and rate under Service & pricing."}
-                      </p>
                     </div>
                   )
                 }
@@ -313,48 +374,73 @@ export function CommunityQuoteCalculator({
         </div>
 
         <div className="dgs-card p-4">
-          <h3 className="text-[13px] font-bold text-ink mb-3">Service &amp; pricing</h3>
+          <h3 className="text-[13px] font-bold text-ink mb-3">Service</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <span className="block text-[12px] font-semibold text-bodytext mb-1">Grounds condition</span>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => set("condition", "easy")} className={chip(f.condition === "easy")}>Easy clean<span className="block text-[11px] font-normal text-muted">little waste · ${num(f.rateEasy)}/ac</span></button>
+                <button type="button" onClick={() => set("condition", "standard")} className={chip(f.condition === "standard")}>Standard<span className="block text-[11px] font-normal text-muted">${num(f.rateStandard)}/ac</span></button>
+              </div>
+            </div>
             <label className="block">
               <span className="block text-[12px] font-semibold text-bodytext mb-1">Visit frequency</span>
-              <select value={f.freqPerWeek} onChange={(e) => set("freqPerWeek", e.target.value)} className={inputCls}>
-                <option value="1">1× per week</option>
-                <option value="2">2× per week</option>
-                <option value="3">3× per week</option>
-                <option value="5">5× per week</option>
-                <option value="7">Daily (7×)</option>
+              <select value={f.frequency} onChange={(e) => set("frequency", e.target.value)} className={inputCls}>
+                {FREQUENCIES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
               </select>
+              <span className="block text-[11px] text-muted mt-1">Less often isn&apos;t proportionally cheaper: each visit carries more waste.</span>
             </label>
-            <Num label="Your loaded hourly rate" value={f.loadedRate} onChange={(v) => set("loadedRate", v)} prefix="$" suffix="/hr" hint="All-in: wages, fuel, disposal, insurance, profit." />
-            <Num label="Sweep time per acre" value={f.minutesPerAcre} onChange={(v) => set("minutesPerAcre", v)} suffix="min" hint="Raise it for heavy dog traffic / dense landscaping." />
-            <Num label="Drive time (round trip)" value={f.driveMinutes} onChange={(v) => set("driveMinutes", v)} suffix="min" />
-            <Num label="Per-visit minimum" value={f.visitMinimum} onChange={(v) => set("visitMinimum", v)} prefix="$" hint="Price floor — you drive out regardless." />
+            <Num label="Pet-waste stations serviced" value={f.stations} onChange={(v) => set("stations", v)} suffix="stations" hint={c.stations > 0 ? `${money2(c.stRate)} per station per visit at this count` : "Restock bags + empty bin, each visit."} />
           </div>
         </div>
 
         <div className="dgs-card p-4">
-          <h3 className="text-[13px] font-bold text-ink mb-1">Dog load <span className="font-medium text-muted">(optional — helps you judge sweep time)</span></h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
-            <Num label="Homes with a dog" value={f.dogPct} onChange={(v) => set("dogPct", v)} suffix="%" />
-            <Num label="Avg dogs per dog-home" value={f.dogsPerHome} onChange={(v) => set("dogsPerHome", v)} step="0.1" />
-          </div>
-          <p className="text-[12px] text-bodytext mt-2 flex items-center gap-1.5">
-            <Info className="w-3.5 h-3.5 text-violet-500" />
-            Estimated dogs in the community: <b className="text-ink">{c.estDogs.toLocaleString()}</b>
-          </p>
-        </div>
-
-        <div className="dgs-card p-4">
-          <h3 className="text-[13px] font-bold text-ink mb-3">Add-ons &amp; start-up</h3>
+          <h3 className="text-[13px] font-bold text-ink mb-3">One-time start-up <span className="font-medium text-muted">(optional)</span></h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Num label="Pet-waste stations serviced" value={f.stations} onChange={(v) => set("stations", v)} suffix="stations" />
-            <Num label="Per station / month" value={f.stationMonthly} onChange={(v) => set("stationMonthly", v)} prefix="$" hint="Restock bags + empty bin." />
-            <Num label="Station install (one-time, each)" value={f.stationInstall} onChange={(v) => set("stationInstall", v)} prefix="$" />
-            <Num label="Initial deep cleanup (one-time)" value={f.initialCleanup} onChange={(v) => set("initialCleanup", v)} prefix="$" hint="For neglected grounds — charge separately." />
+            <div>
+              <span className="block text-[12px] font-semibold text-bodytext mb-1">Initial deep cleanup</span>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => set("initialCleanup", "no")} className={chip(f.initialCleanup === "no")}>Not needed</button>
+                <button type="button" onClick={() => set("initialCleanup", "yes")} className={chip(f.initialCleanup === "yes")}>Yes<span className="block text-[11px] font-normal text-muted">${num(f.rateOneTime)}/ac · {money0(num(f.acres) * num(f.rateOneTime))}</span></button>
+              </div>
+            </div>
+            <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <Num label={`Bag-only stations ($${num(f.hwBagPrice)})`} value={f.hwBag} onChange={(v) => set("hwBag", v)} />
+              <Num label={`Round-can stations ($${num(f.hwRoundPrice)})`} value={f.hwRound} onChange={(v) => set("hwRound", v)} />
+              <Num label={`Locking-can stations ($${num(f.hwLockingPrice)})`} value={f.hwLocking} onChange={(v) => set("hwLocking", v)} />
+            </div>
+            <p className="sm:col-span-2 text-[11px] text-muted">Installed stations are sold once, plus ${num(f.installEach)} installation each and {num(f.taxPct)}% sales tax. Add them to the serviced count above to bill monthly service on them.</p>
           </div>
         </div>
 
-        <details className="dgs-card p-4" open>
+        <details className="dgs-card p-4">
+          <summary className="text-[13px] font-bold text-ink cursor-pointer select-none">Rate card <span className="font-medium text-muted">(edit to change your pricing)</span></summary>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
+            <Num label="Easy clean, per acre / visit" value={f.rateEasy} onChange={(v) => set("rateEasy", v)} prefix="$" />
+            <Num label="Standard, per acre / visit" value={f.rateStandard} onChange={(v) => set("rateStandard", v)} prefix="$" />
+            <Num label="One-time cleanup, per acre" value={f.rateOneTime} onChange={(v) => set("rateOneTime", v)} prefix="$" />
+            <Num label="Every-other-week, % of weekly" value={f.biweeklyPct} onChange={(v) => set("biweeklyPct", v)} suffix="%" />
+            <Num label="Monthly, % of every-other-week" value={f.monthlyPct} onChange={(v) => set("monthlyPct", v)} suffix="%" />
+            <Num label="Sales tax (stations, hardware)" value={f.taxPct} onChange={(v) => set("taxPct", v)} suffix="%" step="0.25" />
+          </div>
+          <p className="text-[12px] font-semibold text-bodytext mt-4 mb-2">Station service, per station per visit</p>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            <Num label="1–5" value={f.st1} onChange={(v) => set("st1", v)} prefix="$" step="0.05" />
+            <Num label="6–10" value={f.st6} onChange={(v) => set("st6", v)} prefix="$" step="0.05" />
+            <Num label="11–14" value={f.st11} onChange={(v) => set("st11", v)} prefix="$" step="0.05" />
+            <Num label="15–19" value={f.st15} onChange={(v) => set("st15", v)} prefix="$" step="0.05" />
+            <Num label="20+" value={f.st20} onChange={(v) => set("st20", v)} prefix="$" step="0.05" />
+          </div>
+          <p className="text-[12px] font-semibold text-bodytext mt-4 mb-2">Station hardware, each</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <Num label="Bag-only" value={f.hwBagPrice} onChange={(v) => set("hwBagPrice", v)} prefix="$" />
+            <Num label="Round can" value={f.hwRoundPrice} onChange={(v) => set("hwRoundPrice", v)} prefix="$" />
+            <Num label="Locking can" value={f.hwLockingPrice} onChange={(v) => set("hwLockingPrice", v)} prefix="$" />
+            <Num label="Installation" value={f.installEach} onChange={(v) => set("installEach", v)} prefix="$" />
+          </div>
+        </details>
+
+        <details className="dgs-card p-4">
           <summary className="text-[13px] font-bold text-ink cursor-pointer select-none">Contract details <span className="font-medium text-muted">(for the PDF agreement)</span></summary>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
             <label className="block sm:col-span-2">
@@ -411,15 +497,16 @@ export function CommunityQuoteCalculator({
             </div>
           </div>
           <p className="text-[12px] text-[#C9C9D6] mt-3">
-            {c.freq}×/week · {c.visitsMo.toFixed(1)} visits/mo · {money0(c.perVisit)}/visit · {money0(c.perUnitYr)}/unit/yr
+            {c.frequencyLabel} · {c.visitsMo.toFixed(1)} visits/mo · {money0(c.perVisit)}/visit · {money0(c.perUnitYr)}/unit/yr
           </p>
         </div>
 
         <div className="dgs-card p-4">
           <h3 className="text-[13px] font-bold text-ink mb-3">Breakdown</h3>
           <dl className="space-y-2 text-[13px]">
-            <Row k={`Common-area service (${c.visitsMo.toFixed(1)} visits)`} v={money0(c.monthlyCommon)} />
-            {c.stations > 0 && <Row k={`Pet-station service (${c.stations})`} v={money0(c.monthlyStations)} />}
+            <Row k={`Common area · ${c.acres} ac × $${c.ratePerAcre}/ac${f.condition === "easy" ? " (easy)" : ""}`} v={money0(c.monthlyArea)} />
+            {c.stations > 0 && <Row k={`Stations · ${c.stations} × ${money2(c.stRate)}/visit`} v={money0(c.monthlyStations)} />}
+            {c.monthlyStationTax > 0 && <Row k={`— Sales tax on station service (${num(f.taxPct)}%)`} v={money0(c.monthlyStationTax)} sub />}
             <div className="border-t border-hairline my-1" />
             <Row k="Monthly total" v={money0(c.monthlyTotal)} bold />
             <Row k="Per unit / month" v={money2(c.perUnitMo)} accent />
@@ -428,16 +515,13 @@ export function CommunityQuoteCalculator({
               <>
                 <div className="border-t border-hairline my-1" />
                 <Row k="One-time start-up" v={money0(c.oneTime)} bold />
-                {num(f.initialCleanup) > 0 && <Row k="— Initial cleanup" v={money0(num(f.initialCleanup))} sub />}
-                {c.installTotal > 0 && <Row k={`— Station install (${c.stations})`} v={money0(c.installTotal)} sub />}
+                {c.cleanup > 0 && <Row k={`— Initial cleanup (${c.acres} ac × $${num(f.rateOneTime)})`} v={money0(c.cleanup)} sub />}
+                {c.hardware > 0 && <Row k={`— Stations (${c.hwCount})`} v={money0(c.hardware)} sub />}
+                {c.install > 0 && <Row k={`— Installation (${c.hwCount} × $${num(f.installEach)})`} v={money0(c.install)} sub />}
+                {c.oneTimeTax > 0 && <Row k={`— Sales tax (${num(f.taxPct)}%)`} v={money0(c.oneTimeTax)} sub />}
               </>
             )}
           </dl>
-          {c.belowFloor && (
-            <p className="text-[11.5px] text-[#8A6D00] bg-[#FEF6E7] rounded-lg px-2.5 py-1.5 mt-3">
-              Labor for this visit is under your ${num(f.visitMinimum)} minimum — the floor is being applied.
-            </p>
-          )}
         </div>
 
         {/* Frequency comparison — give the board a tier to self-select */}
@@ -452,11 +536,11 @@ export function CommunityQuoteCalculator({
               </tr>
             </thead>
             <tbody>
-              {c.tiers.map((t) => (
-                <tr key={t.fq} className={t.fq === c.freq ? "font-bold text-ink" : "text-bodytext"}>
-                  <td className="py-1">{t.fq}×/week{t.fq === c.freq ? " ←" : ""}</td>
-                  <td className="py-1 text-right">{money0(t.mTotal)}</td>
-                  <td className="py-1 text-right">{money2(t.perUnit)}</td>
+              {c.plans.map((p) => (
+                <tr key={p.value} className={p.value === f.frequency ? "font-bold text-ink" : "text-bodytext"}>
+                  <td className="py-1">{p.label}{p.value === f.frequency ? " ←" : ""}</td>
+                  <td className="py-1 text-right">{money0(p.mTotal)}</td>
+                  <td className="py-1 text-right">{money2(p.perUnit)}</td>
                 </tr>
               ))}
             </tbody>
