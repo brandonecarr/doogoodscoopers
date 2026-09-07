@@ -58,14 +58,13 @@ export async function updateSession(request: NextRequest) {
     office: /^\/app\/office/,
     field: /^\/app\/field/,
     client: /^\/app\/client/,
-    admin: /^\/admin(?!\/login)/,
   };
 
   // Define role-to-route access mapping
   const roleAccess: Record<string, RegExp[]> = {
-    OWNER: [protectedPatterns.office, protectedPatterns.field, protectedPatterns.client, protectedPatterns.admin],
-    MANAGER: [protectedPatterns.office, protectedPatterns.field, protectedPatterns.admin],
-    OFFICE: [protectedPatterns.office, protectedPatterns.admin],
+    OWNER: [protectedPatterns.office, protectedPatterns.field, protectedPatterns.client],
+    MANAGER: [protectedPatterns.office, protectedPatterns.field],
+    OFFICE: [protectedPatterns.office],
     CREW_LEAD: [protectedPatterns.office, protectedPatterns.field],
     FIELD_TECH: [protectedPatterns.field],
     ACCOUNTANT: [protectedPatterns.office],
