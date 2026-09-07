@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Copy, Check, FileDown, Loader2, Ruler, ChevronDown } from "lucide-react";
+import { Copy, Check, FileDown, FileText, Loader2, Ruler, ChevronDown } from "lucide-react";
 import type { ContractData } from "@/components/admin/CommunityContractDocument";
+import type { ProposalData, ProposalPlan, ProposalLine } from "@/components/admin/CommunityProposalDocument";
 import { AreaMeasureMap } from "@/components/admin/AreaMeasureMap";
 
 // Community / HOA quote calculator — a rate card, not a cost model.
@@ -28,6 +29,8 @@ export type Fields = {
   hwBag: string;
   hwRound: string;
   hwLocking: string;
+  /** Traced service areas as JSON lng/lat rings — saved with the quote, drawn on the proposal map. */
+  mapShapes: string;
   // Rate card (defaults from the Swoop Scoop commercial calculator)
   rateEasy: string;
   rateStandard: string;
@@ -69,6 +72,7 @@ const DEFAULTS: Fields = {
   hwBag: "0",
   hwRound: "0",
   hwLocking: "0",
+  mapShapes: "[]",
   rateEasy: "85",
   rateStandard: "135",
   rateOneTime: "380",
@@ -143,7 +147,7 @@ function freqFactor(freq: Frequency, f: Fields): number {
 }
 
 /** Everything the quote needs, from the fields. Pure, so the map preview can reuse it. */
-function price(f: Fields, acresOverride?: number) {
+export function price(f: Fields, acresOverride?: number, freqOverride?: Frequency) {
   const units = num(f.units);
   const acres = acresOverride ?? num(f.acres);
   const ratePerAcre = f.condition === "easy" ? num(f.rateEasy) : num(f.rateStandard);
@@ -157,12 +161,13 @@ function price(f: Fields, acresOverride?: number) {
   const weeklyStations = stationsPerVisit * WEEKS_PER_MONTH;
   const weeklyStationTax = weeklyStations * tax;
   const weeklyTotal = weeklyArea + weeklyStations + weeklyStationTax;
-  const factor = freqFactor(f.frequency, f);
+  const frequency = freqOverride ?? f.frequency;
+  const factor = freqFactor(frequency, f);
   const monthlyArea = weeklyArea * factor;
   const monthlyStations = weeklyStations * factor;
   const monthlyStationTax = weeklyStationTax * factor;
   const monthlyTotal = weeklyTotal * factor;
-  const visitsMo = FREQUENCIES.find((x) => x.value === f.frequency)!.visitsMo;
+  const visitsMo = FREQUENCIES.find((x) => x.value === frequency)!.visitsMo;
   const perVisit = visitsMo > 0 ? monthlyTotal / visitsMo : 0;
   const perUnitMo = units > 0 ? monthlyTotal / units : NaN;
   const perUnitYr = perUnitMo * 12;
@@ -181,8 +186,79 @@ function price(f: Fields, acresOverride?: number) {
     units, acres, ratePerAcre, areaPerVisit, stations, stRate, stationsPerVisit, visitsMo, perVisit,
     monthlyArea, monthlyStations, monthlyStationTax, monthlyTotal, perUnitMo, perUnitYr,
     cleanup, hwCount, hardware, install, oneTimeTax, oneTime, plans,
-    frequencyLabel: FREQUENCIES.find((x) => x.value === f.frequency)!.label,
+    frequencyLabel: FREQUENCIES.find((x) => x.value === frequency)!.label,
+    frequency, factor, weeklyArea, weeklyStations, weeklyStationTax, tax,
   };
+}
+
+/** Proposal page 7. Mirrors the service agreement's terms in plain language. */
+export const PROPOSAL_TERMS: { heading: string; items: string[] }[] = [
+  { heading: "Common Area Cleaning", items: [
+    "Service covers common areas and designated pet-relief areas only. Private patios, yards, balconies and interior spaces are not included unless agreed in writing.",
+    "Does not include micro debris (cigarettes, needles, glass, etc.), large items (bigger than a scoop bucket), or hazmat materials.",
+    "Pet waste covered by leaves, mulch or yard debris may not be fully recoverable.",
+    "Visits are made during daylight hours. Service days may shift for weather, holidays or routing, with reasonable notice.",
+  ] },
+  { heading: "Station Service", items: [
+    "DooGoodScoopers will need keys or codes to locked pet-waste stations before servicing.",
+    "If station installation is delayed by weather or supply issues, the station's area is cleaned at the same cost until it arrives.",
+    "Final station locations must be approved in writing. Locations are subject to change.",
+  ] },
+  { heading: "Billing", items: [
+    "One-time fees (initial cleanup, stations, installation) are due on acceptance of this proposal.",
+    "Recurring service is billed monthly in advance on the 1st. Auto-Pay by card or bank account on file is required.",
+    "Services performed during the first partial month are added to the first invoice.",
+    "A failed payment must be cured within 15 days; balances past that accrue a 1.5% monthly late charge and service may pause until paid.",
+    "Prices shown include applicable sales tax. A 5% discount applies to annual service paid in full up front.",
+  ] },
+  { heading: "Term & Notices", items: [
+    "Service begins on the effective date and renews month to month until cancelled in writing by either party with 30 days' notice.",
+    "The current month is non-refundable; service continues through the end of the paid month.",
+    "DooGoodScoopers gives at least 30 days' written notice of any price change.",
+  ] },
+  { heading: "Extra Visits", items: [
+    "Additional visits for vandalized stations, overflowing cans or excess waste are available on request and added to the next invoice.",
+  ] },
+  { heading: "Insurance & Care", items: [
+    "DooGoodScoopers is licensed, bonded and insured. A certificate of insurance is available on request.",
+    "Please keep dogs restrained during visits and let us know about gate codes, locked areas or hazards.",
+  ] },
+];
+
+const SERVICES_PER_YEAR: Record<Frequency, number> = { twice: 104, weekly: 52, biweekly: 26, monthly: 12 };
+const sqft = (acres: number) => Math.round(acres * 43560).toLocaleString("en-US");
+
+/** One itemization page for a frequency, in the template's table shape. */
+function proposalPlan(f: Fields, freq: Frequency): ProposalPlan {
+  const c = price(f, undefined, freq);
+  const n = SERVICES_PER_YEAR[freq];
+  const label = FREQUENCIES.find((x) => x.value === freq)!.label;
+  const cadence = freq === "twice" ? "Twice-Weekly" : freq === "weekly" ? "Weekly" : freq === "biweekly" ? "Bi-Weekly" : "Monthly";
+  const lines: ProposalLine[] = [];
+  const hw: [string, string, string][] = [[f.hwBag, "Dog Waste Stations (Bag Only)", f.hwBagPrice], [f.hwRound, "Dog Waste Stations (Bag + Can)", f.hwRoundPrice], [f.hwLocking, "Dog Waste Stations (Locking Can)", f.hwLockingPrice]];
+  for (const [q, desc, unit] of hw) {
+    const qty = Math.round(num(q)); if (qty <= 0) continue;
+    lines.push({ qty: String(qty), desc, unit: money2(num(unit)), services: "1", amount: `${money2(qty * num(unit) * (1 + c.tax))} (one time fee)` });
+  }
+  if (c.hwCount > 0) lines.push({ qty: String(c.hwCount), desc: "Station Installation", unit: money2(num(f.installEach)), services: "1", amount: `${money2(c.install * (1 + c.tax))} (one time fee)` });
+  if (c.cleanup > 0) lines.push({ qty: "1", desc: `Initial Cleanup of Property · Approx. ${sqft(c.acres)} Sq Ft.`, unit: money2(c.cleanup), services: "1", amount: `${money2(c.cleanup)} (one time fee)` });
+  if (c.stations > 0) {
+    // Unit price is per station per visit (the rate card figure at this plan's frequency).
+    const unit = (c.monthlyStations * 12) / n / c.stations;
+    lines.push({ qty: String(c.stations), desc: `${cadence} Station Service, Bag Replacement & Waste Disposal`, unit: money2(unit), services: String(n), amount: `${money2(c.monthlyStations + c.monthlyStationTax)}/month` });
+  }
+  lines.push({ qty: "1", desc: `${cadence} Common Area Cleaning · Approx. ${sqft(c.acres)} Sq Ft.`, unit: money2((c.monthlyArea * 12) / n), services: String(n), amount: `${money2(c.monthlyArea)}/month` });
+  const oneTime: { label: string; amount: string }[] = [];
+  if (c.cleanup > 0) oneTime.push({ label: "Initial Cleanup", amount: money2(c.cleanup) });
+  if (c.hardware > 0) oneTime.push({ label: "Dog Waste Stations", amount: money2(c.hardware * (1 + c.tax)) });
+  if (c.install > 0) oneTime.push({ label: "Station Installation", amount: money2(c.install * (1 + c.tax)) });
+  return { title: `${label} Service`, lines, annualTotal: money2(c.monthlyTotal * 12), monthlyTotal: money2(c.monthlyTotal), oneTime, oneTimeTotal: money2(c.oneTime) };
+}
+
+/** The selected plan plus the natural alternative, as the template shows two options. */
+function proposalPlans(f: Fields): ProposalPlan[] {
+  const alt: Record<Frequency, Frequency> = { twice: "weekly", weekly: "biweekly", biweekly: "weekly", monthly: "biweekly" };
+  return [proposalPlan(f, f.frequency), proposalPlan(f, alt[f.frequency])];
 }
 
 function Num({
@@ -291,6 +367,33 @@ export function CommunityQuoteCalculator({
     hasOneTime: c.oneTime > 0,
   }), [f, c]);
 
+  const [proposalBusy, setProposalBusy] = useState(false);
+  const exportProposal = async () => {
+    setProposalBusy(true);
+    try {
+      let rings: unknown[] = [];
+      try { rings = JSON.parse(f.mapShapes || "[]"); } catch { rings = []; }
+      const origin = window.location.origin;
+      const data: ProposalData = {
+        baseUrl: origin,
+        locationName: f.property.trim(),
+        serviceAddress: f.propertyAddress.trim(),
+        date: new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }),
+        mapUrl: rings.length ? `${origin}/api/admin/proposal-map?shapes=${encodeURIComponent(JSON.stringify(rings))}&w=934&h=630` : null,
+        sqftTotal: sqft(c.acres),
+        stations: String(Math.max(c.stations, c.hwCount)),
+        plans: proposalPlans(f),
+        terms: PROPOSAL_TERMS,
+      };
+      const { downloadProposalPdf } = await import("@/components/admin/CommunityProposalDocument");
+      await downloadProposalPdf(data);
+    } catch (e) {
+      console.error("[proposal pdf]", e);
+    } finally {
+      setProposalBusy(false);
+    }
+  };
+
   const [pdfBusy, setPdfBusy] = useState(false);
   const exportPdf = async () => {
     setPdfBusy(true);
@@ -318,6 +421,10 @@ export function CommunityQuoteCalculator({
               <span className="block text-[12px] font-semibold text-bodytext mb-1">Community / property name</span>
               <input value={f.property} onChange={(e) => set("property", e.target.value)} placeholder="e.g. Riverside Condominiums" className={inputCls} />
             </label>
+            <label className="block sm:col-span-2">
+              <span className="block text-[12px] font-semibold text-bodytext mb-1">Service address</span>
+              <input value={f.propertyAddress} onChange={(e) => set("propertyAddress", e.target.value)} placeholder="123 Main St, Fontana, CA 92335" className={inputCls} />
+            </label>
             <Num label="Number of units / homes" value={f.units} onChange={(v) => set("units", v)} suffix="units" />
             <Num label="Serviceable common area" value={f.acres} onChange={(v) => set("acres", v)} suffix="acres" step="0.01" hint="Only the areas dogs use — trace it on the map below." />
           </div>
@@ -341,6 +448,8 @@ export function CommunityQuoteCalculator({
               <AreaMeasureMap
                 token={mapboxToken}
                 onTotalChange={setMeasured}
+                onShapesChange={(rings) => set("mapShapes", JSON.stringify(rings))}
+                initialShapes={(() => { try { return JSON.parse(f.mapShapes || "[]"); } catch { return []; } })()}
                 onApply={(acres, place) => {
                   set("acres", String(acres));
                   if (place && !f.property.trim()) set("property", place.split(",")[0]);
@@ -447,10 +556,6 @@ export function CommunityQuoteCalculator({
               <span className="block text-[12px] font-semibold text-bodytext mb-1">Client legal name (HOA / association)</span>
               <input value={f.clientLegalName} onChange={(e) => set("clientLegalName", e.target.value)} placeholder={f.property || "e.g. Riverside Condominiums HOA"} className={inputCls} />
             </label>
-            <label className="block sm:col-span-2">
-              <span className="block text-[12px] font-semibold text-bodytext mb-1">Property address</span>
-              <input value={f.propertyAddress} onChange={(e) => set("propertyAddress", e.target.value)} placeholder="123 Main St, Fontana, CA 92335" className={inputCls} />
-            </label>
             <label className="block">
               <span className="block text-[12px] font-semibold text-bodytext mb-1">Client contact name</span>
               <input value={f.clientContact} onChange={(e) => set("clientContact", e.target.value)} placeholder="Property manager / board contact" className={inputCls} />
@@ -553,14 +658,23 @@ export function CommunityQuoteCalculator({
             <h3 className="text-[13px] font-bold text-ink">Proposal</h3>
             <div className="flex items-center gap-2">
               <button
-                onClick={exportPdf}
-                disabled={pdfBusy}
+                onClick={exportProposal}
+                disabled={proposalBusy}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] text-[12px] font-semibold text-white transition-colors disabled:opacity-60"
                 style={{ background: "#6D3EF0" }}
+                title="Download the 8-page proposal deck as a PDF"
+              >
+                {proposalBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileDown className="w-3.5 h-3.5" />}
+                {proposalBusy ? "Generating…" : "Export PDF"}
+              </button>
+              <button
+                onClick={exportPdf}
+                disabled={pdfBusy}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] text-[12px] font-semibold border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-60"
                 title="Download the full service agreement as a PDF"
               >
-                {pdfBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileDown className="w-3.5 h-3.5" />}
-                {pdfBusy ? "Generating…" : "Export PDF"}
+                {pdfBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
+                Agreement
               </button>
               <button
                 onClick={copy}
@@ -574,7 +688,7 @@ export function CommunityQuoteCalculator({
           </div>
           <pre className="text-[11.5px] leading-relaxed text-bodytext whitespace-pre-wrap font-sans bg-surface2/60 rounded-lg p-3 max-h-[320px] overflow-auto">{proposal}</pre>
           <p className="text-[11px] text-muted mt-2">
-            <b>Copy</b> grabs the short proposal above. <b>Export PDF</b> downloads the full service agreement — fill in the Contract details for a signature-ready document.
+            <b>Export PDF</b> downloads the 8-page proposal deck (cover, about, property map, two priced options, terms, approval). <b>Agreement</b> downloads the full service agreement — fill in the Contract details for a signature-ready document. <b>Copy</b> grabs the short text above.
           </p>
         </div>
       </div>

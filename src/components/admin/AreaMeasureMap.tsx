@@ -37,12 +37,18 @@ export function AreaMeasureMap({
   token,
   onApply,
   onTotalChange,
+  onShapesChange,
+  initialShapes,
   impact,
 }: {
   token: string | undefined;
   onApply?: (acres: number, note: string) => void;
   /** Fires whenever the measured total changes, so the caller can price it live. */
   onTotalChange?: (acres: number) => void;
+  /** Fires with every drawn polygon (lng/lat rings) so the caller can save them and draw the proposal map. */
+  onShapesChange?: (rings: [number, number][][]) => void;
+  /** Polygons to restore (e.g. a saved quote), as lng/lat rings. */
+  initialShapes?: [number, number][][];
   /** Rendered under the tally — what this area does to the quote. */
   impact?: React.ReactNode;
 }) {
@@ -51,7 +57,9 @@ export function AreaMeasureMap({
   const mapRef = useRef<any>(null);
   const [ready, setReady] = useState(false);
 
-  const [shapes, setShapes] = useState<Shape[]>([]);
+  const [shapes, setShapes] = useState<Shape[]>(() =>
+    (initialShapes || []).filter((r) => r.length >= 3).map((ring, i) => ({ id: `saved-${i}`, ring, acres: acresOf(ring) }))
+  );
   const [draft, setDraft] = useState<[number, number][]>([]);
   const [cursor, setCursor] = useState<[number, number] | null>(null);
   const [mode, setMode] = useState<"idle" | "drawing">("idle");
@@ -185,6 +193,7 @@ export function AreaMeasureMap({
 
   // Report the running total so the caller can price it live.
   useEffect(() => { onTotalChange?.(Math.round(total * 100) / 100); }, [total, onTotalChange]);
+  useEffect(() => { onShapesChange?.(shapes.map((s) => s.ring)); }, [shapes, onShapesChange]);
 
   // ---- search -------------------------------------------------------------
   const search = async (e?: React.FormEvent) => {
