@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Building2, Search, Filter, Archive, Plus, LayoutList, LayoutGrid } from "lucide-react";
-import { CommercialPipelineBoard, quotedMonthlyFrom, type BoardLead } from "@/components/admin/CommercialPipelineBoard";
+import { CommercialPipelineBoard, type BoardLead } from "@/components/admin/CommercialPipelineBoard";
+import { quotedMonthlyFrom } from "@/lib/community-pricing";
 import { LeadsSectionSwitch } from "@/components/admin/LeadsSectionSwitch";
 import prisma from "@/lib/prisma";
 import type { LeadStatus, CommercialLead } from "@/types/leads";

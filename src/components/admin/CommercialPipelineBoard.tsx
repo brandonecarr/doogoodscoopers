@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Building2, Calendar, DollarSign, MoreHorizontal, Phone } from "lucide-react";
-import { price, type Fields } from "@/components/admin/CommunityQuoteCalculator";
+
 
 /**
  * Commercial pipeline. Columns are the lead statuses, named the way a
@@ -48,12 +48,6 @@ const C: Record<string, { header: string; border: string; text: string; bg: stri
 const GRADE: Record<string, string> = { A: "bg-green-100 text-green-800", B: "bg-teal-100 text-teal-800", C: "bg-yellow-100 text-yellow-800", D: "bg-orange-100 text-orange-800", F: "bg-red-100 text-red-800" };
 const money = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const ago = (iso: string) => { const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000); return d <= 0 ? "today" : d === 1 ? "1 day" : `${d} days`; };
-
-/** Monthly figure from a saved quote's field record, or null. */
-export function quotedMonthlyFrom(fields: unknown): number | null {
-  if (!fields || typeof fields !== "object") return null;
-  try { const m = price(fields as Fields).monthlyTotal; return isFinite(m) && m > 0 ? m : null; } catch { return null; }
-}
 
 export function CommercialPipelineBoard({ leads: initial }: { leads: BoardLead[] }) {
   const router = useRouter();
