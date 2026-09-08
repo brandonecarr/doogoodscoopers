@@ -111,6 +111,17 @@ export function AreaMeasureMap({
         map.addLayer({ id: "draft-line", type: "line", source: "draft", paint: { "line-color": "#FACC15", "line-width": 2, "line-dasharray": [2, 1] } });
         map.addLayer({ id: "draft-pts", type: "circle", source: "draft", filter: ["==", "$type", "Point"], paint: { "circle-radius": 4.5, "circle-color": "#fff", "circle-stroke-color": "#CA8A04", "circle-stroke-width": 2 } });
         setReady(true);
+
+        // Reopening the map (it remounts when collapsed) should land on what's
+        // already drawn — every saved area and station, framed — not the region view.
+        const pts: [number, number][] = [...(initialShapes || []).flat(), ...(initialStations || [])];
+        if (pts.length) {
+          const lngs = pts.map((p) => p[0]), lats = pts.map((p) => p[1]);
+          const sw: [number, number] = [Math.min(...lngs), Math.min(...lats)];
+          const ne: [number, number] = [Math.max(...lngs), Math.max(...lats)];
+          if (pts.length === 1) map.jumpTo({ center: pts[0], zoom: 18 });
+          else map.fitBounds([sw, ne], { padding: 60, maxZoom: 18.5, duration: 0 });
+        }
       });
 
       map.on("click", (e: { lngLat: { lng: number; lat: number }; point: { x: number; y: number } }) => {
