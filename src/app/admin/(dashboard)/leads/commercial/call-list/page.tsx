@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { PhoneCall, Search, Filter, Archive, Plus } from "lucide-react";
+import { PhoneCall, Search, Filter, Archive, Plus, LayoutList, LayoutGrid } from "lucide-react";
+import { ProspectPipelineBoard, type BoardProspect } from "@/components/admin/ProspectPipelineBoard";
 import prisma from "@/lib/prisma";
 import { PageHero, heroBtnSecondary, heroBtnPrimary, heroPrimaryStyle } from "@/components/admin/PageHero";
 import { LeadsSectionSwitch } from "@/components/admin/LeadsSectionSwitch";
@@ -8,13 +9,24 @@ import { ProspectCsvUpload } from "@/components/admin/ProspectCsvUpload";
 import { PROSPECT_TYPES, PROSPECT_TYPE_LABEL, PROSPECT_STATUSES, PROSPECT_STATUS_META, type ProspectType, type ProspectStatus } from "@/lib/commercial-prospect-types";
 
 export const dynamic = "force-dynamic";
-interface PageProps { searchParams: Promise<{ status?: string; type?: string; search?: string; page?: string; archived?: string }>; }
+interface PageProps { searchParams: Promise<{ status?: string; type?: string; search?: string; page?: string; archived?: string; view?: string }>; }
 
 const TYPE_BADGE: Record<string, string> = { HOA: "bg-violet-100 text-violet-800", APARTMENTS: "bg-amber-100 text-amber-800", SENIOR_55: "bg-sky-100 text-sky-800", OTHER: "bg-gray-100 text-gray-700" };
 const fmt = (d: Date | null) => d ? new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "—";
 
+async function getBoardProspects(): Promise<BoardProspect[]> {
+  const rows = await prisma.commercialProspect.findMany({ where: { status: { not: "ARCHIVED" } }, orderBy: { updatedAt: "desc" } });
+  return rows.map((r) => ({
+    id: r.id, propertyName: r.propertyName, propertyType: r.propertyType, contactName: r.contactName, phone: r.phone, city: r.city, status: r.status,
+    grade: r.grade, followupDate: r.followupDate ? r.followupDate.toISOString() : null, attempts: r.attempts, lastAttemptAt: r.lastAttemptAt ? r.lastAttemptAt.toISOString() : null,
+    units: r.units, createdAt: r.createdAt.toISOString(), updatedAt: r.updatedAt.toISOString(), convertedLeadId: r.convertedLeadId,
+  }));
+}
+
 export default async function CallListPage({ searchParams }: PageProps) {
   const p = await searchParams; const showArchived = p.archived === "true"; const pageSize = 25; const page = p.page ? parseInt(p.page) : 1;
+  const view = p.view === "board" && !showArchived ? "board" : "list";
+  const boardProspects = view === "board" ? await getBoardProspects() : [];
   const where: Record<string, unknown> = showArchived ? { status: "ARCHIVED" } : (p.status && p.status !== "all" ? { status: p.status } : { status: { not: "ARCHIVED" } });
   if (p.type && p.type !== "all") where.propertyType = p.type;
   if (p.search) where.OR = ["propertyName", "contactName", "email", "phone", "city", "zipCode", "address", "notes"].map((k) => ({ [k]: { contains: p.search, mode: "insensitive" } }));
@@ -34,11 +46,21 @@ export default async function CallListPage({ searchParams }: PageProps) {
         icon={<div className="w-11 h-11 rounded-[13px] flex items-center justify-center" style={{ background: "linear-gradient(150deg,#9BE7C0,#12A150)" }}><PhoneCall className="w-[22px] h-[22px] text-white" /></div>}
         actions={<>
           <LeadsSectionSwitch active="callList" />
+          {!showArchived && (
+            <div className="flex items-center bg-white/10 rounded-[12px] p-1">
+              {([{ v: "list", icon: LayoutList, label: "List", href: "/admin/leads/commercial/call-list" }, { v: "board", icon: LayoutGrid, label: "Board", href: "/admin/leads/commercial/call-list?view=board" }] as const).map(({ v, icon: Icon, label, href }) => (
+                <Link key={v} href={href} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[9px] text-[13px] font-semibold transition-colors ${view === v ? "bg-white text-ink shadow-sm" : "text-white/70 hover:text-white"}`}>
+                  <Icon className="w-4 h-4" /><span className="hidden sm:inline">{label}</span>
+                </Link>
+              ))}
+            </div>
+          )}
           <Link href="/admin/leads/commercial/call-list/new" className={heroBtnPrimary} style={heroPrimaryStyle}><Plus className="w-4 h-4" /><span className="hidden sm:inline">Add prospect</span></Link>
           <ProspectCsvUpload />
           <Link href={showArchived ? "/admin/leads/commercial/call-list" : "/admin/leads/commercial/call-list?archived=true"} className={heroBtnSecondary}><Archive className="w-4 h-4" />{showArchived ? "View Active" : "View Archived"}</Link>
         </>}
       />
+      {view === "board" ? <ProspectPipelineBoard prospects={boardProspects} /> : (<>
       <div className="dgs-card p-4">
         <form className="flex flex-col sm:flex-row gap-4">
           {showArchived && <input type="hidden" name="archived" value="true" />}
@@ -79,6 +101,7 @@ export default async function CallListPage({ searchParams }: PageProps) {
           <span className="flex gap-2">{page > 1 && <Link href={qs({ page: String(page - 1) })} className="px-3 py-1 rounded-lg border border-gray-200 hover:bg-gray-50">Previous</Link>}{page < totalPages && <Link href={qs({ page: String(page + 1) })} className="px-3 py-1 rounded-lg border border-gray-200 hover:bg-gray-50">Next</Link>}</span>
         </div>}
       </div>
+      </>)}
     </div>
   );
 }
