@@ -1,12 +1,13 @@
 import Link from "next/link";
-import { Building2, Search, Filter, Archive, Plus, Users2 } from "lucide-react";
+import { Building2, Search, Filter, Archive, Plus, LayoutList, LayoutGrid } from "lucide-react";
+import { CommercialPipelineBoard, quotedMonthlyFrom, type BoardLead } from "@/components/admin/CommercialPipelineBoard";
 import { LeadsSectionSwitch } from "@/components/admin/LeadsSectionSwitch";
 import prisma from "@/lib/prisma";
 import type { LeadStatus, CommercialLead } from "@/types/leads";
 import { PageHero, heroBtnSecondary, heroBtnPrimary, heroPrimaryStyle } from "@/components/admin/PageHero";
 
 interface PageProps {
-  searchParams: Promise<{ status?: string; search?: string; page?: string; archived?: string }>;
+  searchParams: Promise<{ status?: string; search?: string; page?: string; archived?: string; view?: string }>;
 }
 
 async function getCommercialLeads(status?: string, search?: string, page: number = 1, showArchived: boolean = false) {
@@ -82,9 +83,21 @@ function getStatusBadge(status: LeadStatus) {
   );
 }
 
+/** Every active lead, shaped for the board (no paging — the commercial book is small). */
+async function getBoardLeads(): Promise<BoardLead[]> {
+  const rows = await prisma.commercialLead.findMany({ where: { archived: false }, orderBy: { createdAt: "desc" } });
+  return rows.map((l) => ({
+    id: l.id, propertyName: l.propertyName, contactName: l.contactName, phone: l.phone, email: l.email, city: l.city,
+    status: l.status, grade: l.grade, followupDate: l.followupDate ? l.followupDate.toISOString() : null,
+    createdAt: l.createdAt.toISOString(), updatedAt: l.updatedAt.toISOString(), quotedMonthly: quotedMonthlyFrom(l.communityQuote),
+  }));
+}
+
 export default async function CommercialPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const showArchived = params.archived === "true";
+  const view = params.view === "board" && !showArchived ? "board" : "list";
+  const boardLeads = view === "board" ? await getBoardLeads() : [];
   const { leads, total, pageSize, currentPage } = await getCommercialLeads(
     params.status,
     params.search,
@@ -99,7 +112,7 @@ export default async function CommercialPage({ searchParams }: PageProps) {
       {/* Header */}
       <PageHero
         title={showArchived ? "Archived Commercial Leads" : "Commercial Leads"}
-        subtitle={`${total} ${showArchived ? "archived" : "total"} commercial leads`}
+        subtitle={view === "board" ? `Pipeline · ${boardLeads.length} active lead${boardLeads.length === 1 ? "" : "s"}` : `${total} ${showArchived ? "archived" : "total"} commercial leads`}
         icon={
           <div className="w-11 h-11 rounded-[13px] flex items-center justify-center" style={{ background: "linear-gradient(150deg,#9BE7C0,#12A150)" }}>
             <Building2 className="w-[22px] h-[22px] text-white" />
@@ -107,6 +120,15 @@ export default async function CommercialPage({ searchParams }: PageProps) {
         }
         actions={<>
           <LeadsSectionSwitch active="commercial" />
+          {!showArchived && (
+            <div className="flex items-center bg-white/10 rounded-[12px] p-1">
+              {([{ v: "list", icon: LayoutList, label: "List", href: "/admin/leads/commercial" }, { v: "board", icon: LayoutGrid, label: "Board", href: "/admin/leads/commercial?view=board" }] as const).map(({ v, icon: Icon, label, href }) => (
+                <Link key={v} href={href} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[9px] text-[13px] font-semibold transition-colors ${view === v ? "bg-white text-ink shadow-sm" : "text-white/70 hover:text-white"}`}>
+                  <Icon className="w-4 h-4" /><span className="hidden sm:inline">{label}</span>
+                </Link>
+              ))}
+            </div>
+          )}
           <Link href="/admin/leads/commercial/new" className={heroBtnPrimary} style={heroPrimaryStyle}>
             <Plus className="w-4 h-4" />
             <span className="hidden sm:inline">Add commercial lead</span>
@@ -118,6 +140,7 @@ export default async function CommercialPage({ searchParams }: PageProps) {
         </>}
       />
 
+      {view === "board" ? <CommercialPipelineBoard leads={boardLeads} /> : (<>
       {/* Filters */}
       <div className="dgs-card p-4">
         <form className="flex flex-col sm:flex-row gap-4">
@@ -234,7 +257,7 @@ export default async function CommercialPage({ searchParams }: PageProps) {
             <div className="flex gap-2">
               {currentPage > 1 && (
                 <Link
-                  href={`/admin/commercial?page=${currentPage - 1}${params.status ? `&status=${params.status}` : ""}${params.search ? `&search=${params.search}` : ""}${showArchived ? "&archived=true" : ""}`}
+                  href={`/admin/leads/commercial?page=${currentPage - 1}${params.status ? `&status=${params.status}` : ""}${params.search ? `&search=${params.search}` : ""}${showArchived ? "&archived=true" : ""}`}
                   className="px-3 py-1 border border-gray-200 rounded-lg hover:bg-gray-50"
                 >
                   Previous
@@ -242,7 +265,7 @@ export default async function CommercialPage({ searchParams }: PageProps) {
               )}
               {currentPage < totalPages && (
                 <Link
-                  href={`/admin/commercial?page=${currentPage + 1}${params.status ? `&status=${params.status}` : ""}${params.search ? `&search=${params.search}` : ""}${showArchived ? "&archived=true" : ""}`}
+                  href={`/admin/leads/commercial?page=${currentPage + 1}${params.status ? `&status=${params.status}` : ""}${params.search ? `&search=${params.search}` : ""}${showArchived ? "&archived=true" : ""}`}
                   className="px-3 py-1 border border-gray-200 rounded-lg hover:bg-gray-50"
                 >
                   Next
@@ -252,6 +275,7 @@ export default async function CommercialPage({ searchParams }: PageProps) {
           </div>
         )}
       </div>
+      </>)}
     </div>
   );
 }
