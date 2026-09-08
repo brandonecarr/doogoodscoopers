@@ -23,6 +23,9 @@ Font.registerHyphenationCallback((w) => [w]);
 export interface ProposalLine { qty: string; desc: string; unit: string; services: string; amount: string }
 export interface ProposalPlan {
   title: string;            // "Weekly Service"
+  frequencyLabel: string;   // "Weekly"
+  visitsMo: string;         // "4.3"
+  selected: boolean;        // the plan chosen in the quote (Option 1)
   lines: ProposalLine[];    // itemization rows
   annualTotal: string;      // recurring, incl. tax
   monthlyTotal: string;
@@ -126,11 +129,14 @@ function ItemTable({ lines }: { lines: ProposalLine[] }) {
   );
 }
 
-function PricingPage({ d, plan, page }: { d: ProposalData; plan: ProposalPlan; page: number }) {
+function PricingPage({ d, plan, page, index }: { d: ProposalData; plan: ProposalPlan; page: number; index: number }) {
   return (
     <Page size={[W, H]} style={S.page}>
-      <Text style={[S.abs, S.eyebrow, at(0.75, 0.38, 6)]}>Options & pricing</Text>
+      <Text style={[S.abs, S.eyebrow, at(0.75, 0.38, 6)]}>Options & pricing · Option {index + 1}{plan.selected ? " · recommended" : " · alternative"}</Text>
       <Text style={[S.abs, S.h1, at(0.75, 0.58, 8.5), { fontSize: 26 }]}>{plan.title}</Text>
+      <View style={[S.abs, at(7.35, 0.62, 1.9, 0.34), { backgroundColor: plan.selected ? TEAL_DEEP : TEAL_SOFT, borderRadius: 17, justifyContent: "center" }]}>
+        <Text style={[S.center, { fontSize: 9, fontFamily: "Helvetica-Bold", color: plan.selected ? "#FFFFFF" : TEAL_DEEP }]}>{plan.frequencyLabel} · {plan.visitsMo} visits/mo</Text>
+      </View>
       <View style={[S.abs, at(0.75, 1.2, 8.5)]}><ItemTable lines={plan.lines} /></View>
 
       {/* Summary cards */}
@@ -146,9 +152,9 @@ function PricingPage({ d, plan, page }: { d: ProposalData; plan: ProposalPlan; p
         </View>
       </View>
       <View style={[S.abs, at(5.15, 3.95, 4.1, 1.25), { backgroundColor: TEAL_DEEP, borderRadius: 10, padding: 12 }]}>
-        <Text style={[S.eyebrow, { color: TEAL }]}>Recurring service</Text>
+        <Text style={[S.eyebrow, { color: TEAL }]}>Recurring service · {plan.frequencyLabel}</Text>
         <Text style={[S.ral, { fontSize: 26, fontWeight: 800, color: "#FFFFFF", marginTop: 2 }]}>{plan.monthlyTotal}<Text style={{ fontSize: 11, fontWeight: 700, color: TEAL }}>  / month</Text></Text>
-        <Text style={{ fontSize: 9.5, color: "#D5EEEB", marginTop: 3 }}>Annual service total {plan.annualTotal}</Text>
+        <Text style={{ fontSize: 9.5, color: "#D5EEEB", marginTop: 3 }}>{plan.visitsMo} visits per month · annual service total {plan.annualTotal}</Text>
         <Text style={{ fontSize: 8, color: TEAL, marginTop: 6 }}>5% pay-in-full discount available  ·  totals include sales tax</Text>
       </View>
       <Footer d={d} page={page} />
@@ -247,7 +253,7 @@ export function ProposalPdf({ d }: { d: ProposalData }) {
       </Page>
 
       {/* 5 + 6 · Pricing options */}
-      {d.plans.map((p, i) => <PricingPage key={p.title} d={d} plan={p} page={pricingStart + i} />)}
+      {d.plans.map((p, i) => <PricingPage key={p.title} d={d} plan={p} page={pricingStart + i} index={i} />)}
 
       {/* 7 · Terms — three columns, balanced by estimated length so nothing spills to a 9th page */}
       <Page size={[W, H]} style={S.page}>

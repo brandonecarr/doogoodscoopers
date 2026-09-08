@@ -255,7 +255,7 @@ function proposalPlan(f: Fields, freq: Frequency): ProposalPlan {
   if (c.cleanup > 0) oneTime.push({ label: "Initial Cleanup", amount: money2(c.cleanup) });
   if (c.hardware > 0) oneTime.push({ label: "Dog Waste Stations", amount: money2(c.hardware * (1 + c.tax)) });
   if (c.install > 0) oneTime.push({ label: "Station Installation", amount: money2(c.install * (1 + c.tax)) });
-  return { title: `${label} Service`, lines, annualTotal: money2(c.monthlyTotal * 12), monthlyTotal: money2(c.monthlyTotal), oneTime, oneTimeTotal: money2(c.oneTime) };
+  return { title: `${label} Service`, frequencyLabel: label, visitsMo: c.visitsMo.toFixed(1), selected: freq === f.frequency, lines, annualTotal: money2(c.monthlyTotal * 12), monthlyTotal: money2(c.monthlyTotal), oneTime, oneTimeTotal: money2(c.oneTime) };
 }
 
 /** The selected plan plus the natural alternative, as the template shows two options. */
