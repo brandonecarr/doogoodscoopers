@@ -21,7 +21,8 @@ export type Frequency = "twice" | "weekly" | "biweekly" | "monthly";
 export type Fields = {
   property: string;
   units: string;
-  acres: string;
+  acres: string;            // always stored in acres; areaUnit only changes how it's shown/typed
+  areaUnit: "acres" | "sqft";
   condition: Condition;
   frequency: Frequency;
   stations: string;
@@ -67,6 +68,7 @@ const DEFAULTS: Fields = {
   property: "",
   units: "120",
   acres: "2",
+  areaUnit: "acres",
   condition: "standard",
   frequency: "weekly",
   stations: "0",
@@ -431,7 +433,36 @@ export function CommunityQuoteCalculator({
               <input value={f.propertyAddress} onChange={(e) => set("propertyAddress", e.target.value)} placeholder="123 Main St, Fontana, CA 92335" className={inputCls} />
             </label>
             <Num label="Number of units / homes" value={f.units} onChange={(v) => set("units", v)} suffix="units" />
-            <Num label="Serviceable common area" value={f.acres} onChange={(v) => set("acres", v)} suffix="acres" step="0.01" hint="Only the areas dogs use — trace it on the map below." />
+            <label className="block">
+              <span className="block text-[12px] font-semibold text-bodytext mb-1">Serviceable common area</span>
+              <div className="relative">
+                <input
+                  type="number" inputMode="decimal" min="0"
+                  step={f.areaUnit === "sqft" ? "1" : "0.01"}
+                  value={f.areaUnit === "sqft" ? (f.acres ? String(Math.round(num(f.acres) * 43560)) : "") : f.acres}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (f.areaUnit === "sqft") set("acres", v === "" ? "" : String(Math.round((num(v) / 43560) * 10000) / 10000));
+                    else set("acres", v);
+                  }}
+                  className={`${inputCls} pr-[84px]`}
+                />
+                {/* Unit picker sits where the suffix used to be; the stored value stays in acres. */}
+                <select
+                  value={f.areaUnit}
+                  onChange={(e) => set("areaUnit", e.target.value)}
+                  aria-label="Area unit"
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 h-[28px] pl-2 pr-6 text-[12px] font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 border-0 rounded-md focus:ring-2 focus:ring-violet-400 cursor-pointer appearance-none"
+                  style={{ backgroundImage: "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' fill='none' stroke='%23374151' stroke-width='1.5'/></svg>\")", backgroundRepeat: "no-repeat", backgroundPosition: "right 8px center" }}
+                >
+                  <option value="acres">acres</option>
+                  <option value="sqft">sq ft</option>
+                </select>
+              </div>
+              <span className="block text-[11px] text-muted mt-1">
+                {f.areaUnit === "sqft" ? `${num(f.acres).toFixed(2)} acres` : `${Math.round(num(f.acres) * 43560).toLocaleString()} sq ft`} · only the areas dogs use — trace it on the map below.
+              </span>
+            </label>
           </div>
 
           {/* Satellite measuring: turns "guess the acreage" into tracing the lawns. */}
