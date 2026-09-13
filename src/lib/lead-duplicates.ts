@@ -206,7 +206,7 @@ export async function findDuplicates(wire: WireLeadType, id: string): Promise<Du
 // Fields to fill on the survivor from a source when the survivor's is blank.
 const FILL_FIELDS: Record<ProspectType, string[]> = {
   quote: ["firstName", "lastName", "email", "address", "city", "zipCode", "numberOfDogs", "frequency", "lastCleaned", "gateLocation", "gateCode", "grade", "followupDate", "dogsInfo"],
-  adlead: ["firstName", "lastName", "fullName", "email", "city", "state", "zipCode", "adSource", "campaignName", "adSetName", "adName", "formName", "grade", "followupDate", "customFields"],
+  adlead: ["firstName", "lastName", "fullName", "email", "city", "state", "zipCode", "adSource", "campaignName", "adSetName", "adName", "formName", "grade", "followupDate", "customFields", "messengerPsid", "messengerLastInboundAt", "messengerGreetedAt"],
 };
 
 // Type-specific fields that have no column on the OTHER type → preserved in notes.
@@ -317,7 +317,18 @@ export async function consolidateProspects(
   const survivorCampaigns = new Set(survivorRecips.map((r) => r.campaignId));
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const ops: any[] = [modelFor(survivorType).update({ where: { id: survivorRef.id }, data })];
+  const ops: any[] = [];
+  // messengerPsid is unique: release it from the source before the survivor takes it.
+  if (survivorType === "adlead" && data.messengerPsid) {
+    const holder = loaded.find(({ rec }) => rec.messengerPsid === data.messengerPsid);
+    if (holder) ops.push(prisma.adLead.update({ where: { id: holder.ref.id }, data: { messengerPsid: null } }));
+  }
+  // "Messenger user" is a placeholder name, never a real one — let a source's real name win.
+  if (survivorType === "adlead" && survivor.fullName === "Messenger user") {
+    const named = loaded.find(({ rec }) => !isBlank(rec.fullName) && rec.fullName !== "Messenger user");
+    if (named) { data.fullName = named.rec.fullName; if (isBlank(survivor.firstName)) data.firstName = named.rec.firstName; if (isBlank(survivor.lastName)) data.lastName = named.rec.lastName; }
+  }
+  ops.push(modelFor(survivorType).update({ where: { id: survivorRef.id }, data }));
 
   for (const { ref } of loaded) {
     const srcEnum = sourceEnum[ref.type];

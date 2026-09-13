@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { verifyMessengerSignature, hasMessengerSecret, messengerVerifyToken, getMessengerProfileDetailed, sendMessengerMessage, isMessengerConfigured } from "@/lib/messenger";
 import { notify } from "@/lib/notify";
 import { setSetting, getSetting } from "@/lib/google-business";
+import { phoneVariants } from "@/lib/call-intel";
 
 // Facebook Messenger webhook.
 //  GET  → verification handshake (paste this URL into Messenger API Settings).
@@ -51,17 +52,80 @@ export async function GET(request: NextRequest) {
  *  auto-greet matched leads. */
 const PLACEHOLDER_NAME = "Messenger user";
 
-async function linkOrCreateLead(psid: string): Promise<{ id: string; phone: string | null; matched: boolean; note?: string } | null> {
+/**
+ * A Meta lead ad with a Messenger destination sends the Page a message ON THE
+ * LEAD'S BEHALF that carries the form answers:
+ *   "Hello! I filled out your form and would like to know more about your business.
+ *    Email: …  Last name: …  Phone number: (909) 555-0100  First name: …  Zip code: …"
+ * The same submission also reaches us through the Zapier lead webhook, so this
+ * message must be linked to that lead, never turned into a second one.
+ */
+interface FormFields { firstName?: string; lastName?: string; email?: string; phone?: string; zipCode?: string; dogs?: string }
+function parseMetaFormMessage(text: string): FormFields | null {
+  if (!text) return null;
+  const grab = (re: RegExp) => { const m = text.match(re); return m ? m[1].trim() : undefined; };
+  const f: FormFields = {
+    firstName: grab(/^first name:\s*(.+)$/im),
+    lastName: grab(/^last name:\s*(.+)$/im),
+    email: grab(/^e-?mail(?: address)?:\s*(\S+@\S+)$/im)?.toLowerCase(),
+    phone: grab(/^phone(?: number)?:\s*(.+)$/im),
+    zipCode: grab(/^zip(?: code)?:\s*(\d{5})/im),
+    dogs: grab(/^how many dogs[^:]*:\s*(\d+)/im),
+  };
+  const isForm = /filled out your form/i.test(text) || [f.email, f.phone].filter(Boolean).length >= 1 && [f.firstName, f.lastName, f.zipCode].filter(Boolean).length >= 1;
+  if (!isForm || (!f.phone && !f.email)) return null;
+  return f;
+}
+
+/** The AdLead this form submission belongs to, by phone then email. Newest wins. */
+async function findLeadByForm(f: FormFields) {
+  const or: Record<string, unknown>[] = [];
+  if (f.phone) or.push({ phone: { in: phoneVariants(f.phone) } });
+  if (f.email) or.push({ email: { equals: f.email, mode: "insensitive" } });
+  if (!or.length) return null;
+  return prisma.adLead.findFirst({ where: { OR: or }, orderBy: [{ archived: "asc" }, { createdAt: "desc" }], select: { id: true, phone: true, adSource: true, fullName: true, messengerPsid: true, email: true, zipCode: true } });
+}
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+async function linkOrCreateLead(psid: string, text: string): Promise<{ id: string; phone: string | null; matched: boolean; note?: string } | null> {
   const { profile, error: profileError } = await getMessengerProfileDetailed(psid);
   const name = profile?.name;
+  const form = parseMetaFormMessage(text);
+  const formName = [form?.firstName, form?.lastName].filter(Boolean).join(" ").trim() || undefined;
 
   const existing = await prisma.adLead.findUnique({ where: { messengerPsid: psid }, select: { id: true, phone: true, adSource: true, fullName: true } });
   if (existing) {
-    // A lead captured before their name was readable gets it filled in now.
-    if (name && (!existing.fullName || existing.fullName === PLACEHOLDER_NAME)) {
-      await prisma.adLead.update({ where: { id: existing.id }, data: { fullName: name, firstName: profile?.firstName ?? null, lastName: profile?.lastName ?? null } }).catch(() => {});
+    // A lead captured before their name was readable gets it filled in now — from
+    // the profile if Facebook returns it, otherwise from the form answers.
+    const better = name || formName;
+    if (better && (!existing.fullName || existing.fullName === PLACEHOLDER_NAME)) {
+      await prisma.adLead.update({ where: { id: existing.id }, data: { fullName: better, firstName: profile?.firstName ?? form?.firstName ?? null, lastName: profile?.lastName ?? form?.lastName ?? null, ...(form?.phone && !existing.phone ? { phone: form.phone } : {}) } }).catch(() => {});
     }
-    return { id: existing.id, phone: existing.phone, matched: existing.adSource !== "messenger" };
+    return { id: existing.id, phone: existing.phone ?? form?.phone ?? null, matched: existing.adSource !== "messenger" };
+  }
+
+  // Form message → link to the lead the form created. The Zapier webhook can land
+  // a few seconds after this message, so wait briefly for it before giving up.
+  if (form) {
+    let lead = await findLeadByForm(form);
+    for (let i = 0; !lead && i < 5; i++) { await sleep(4000); lead = await findLeadByForm(form); }
+    if (lead) {
+      const data: Record<string, unknown> = {};
+      if (!lead.messengerPsid) data.messengerPsid = psid;
+      if (!lead.email && form.email) data.email = form.email;
+      if (!lead.zipCode && form.zipCode) data.zipCode = form.zipCode;
+      if (Object.keys(data).length) await prisma.adLead.update({ where: { id: lead.id }, data }).catch(() => {});
+      // Another PSID already on this lead (a second Messenger account) keeps its link; this thread still logs here.
+      return { id: lead.id, phone: lead.phone ?? form.phone ?? null, matched: true, note: "linked by form data" };
+    }
+    // No lead arrived — create one FROM the form so it's a real, named lead, not a placeholder.
+    // If the Zapier lead shows up later, its phone-based consolidation folds the two together.
+    const created = await prisma.adLead.create({
+      data: { adSource: "messenger", messengerPsid: psid, firstName: form.firstName ?? null, lastName: form.lastName ?? null, fullName: formName || name || PLACEHOLDER_NAME, email: form.email ?? null, phone: form.phone ?? null, zipCode: form.zipCode ?? null, status: "NEW",
+        customFields: form.dogs ? { numberOfDogs: form.dogs } : undefined },
+      select: { id: true, phone: true },
+    });
+    return { id: created.id, phone: created.phone, matched: true, note: "created from form data (no Zapier lead found)" };
   }
 
   if (name) {
@@ -131,13 +195,13 @@ export async function POST(request: NextRequest) {
           const inbound = (ev.message && !isEcho) || ev.postback || ev.referral || ev.optin;
           if (!inbound) continue;
 
-          const lead = await linkOrCreateLead(psid);
+          const text: string = ev.message?.text || ev.postback?.title || "";
+          const lead = await linkOrCreateLead(psid, text);
           if (!lead) { done.push("could not resolve lead"); continue; }
           done.push(`${lead.matched ? "matched" : "created"} lead ${lead.id}${lead.note ? ` (${lead.note})` : ""}`);
 
           await prisma.adLead.update({ where: { id: lead.id }, data: { messengerLastInboundAt: new Date() } }).catch(() => {});
 
-          const text: string = ev.message?.text || ev.postback?.title || "";
           if (text) {
             await prisma.leadMessage.create({
               data: { leadType: "AD_LEAD", leadId: lead.id, direction: "INBOUND", body: text, phone: lead.phone ?? "", provider: "messenger", status: "DELIVERED" },
