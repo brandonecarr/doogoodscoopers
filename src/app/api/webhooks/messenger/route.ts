@@ -83,8 +83,11 @@ async function findLeadByForm(f: FormFields) {
   if (f.phone) or.push({ phone: { in: phoneVariants(f.phone) } });
   if (f.email) or.push({ email: { equals: f.email, mode: "insensitive" } });
   if (!or.length) return null;
-  return prisma.adLead.findFirst({ where: { OR: or }, orderBy: [{ archived: "asc" }, { createdAt: "desc" }], select: { id: true, phone: true, adSource: true, fullName: true, messengerPsid: true, email: true, zipCode: true } });
+  return prisma.adLead.findFirst({ where: { OR: or }, orderBy: [{ archived: "asc" }, { createdAt: "desc" }], select: { id: true, phone: true, adSource: true, fullName: true, messengerPsid: true, email: true, zipCode: true, customFields: true } });
 }
+const asObj = (v: unknown): Record<string, unknown> => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
+/** Does the lead already carry a dog count (any key containing "dog", the same rule the lead page uses)? */
+const hasDogs = (v: unknown) => Object.entries(asObj(v)).some(([k, x]) => /dog/i.test(k) && x != null && String(x).trim() !== "");
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 async function linkOrCreateLead(psid: string, text: string): Promise<{ id: string; phone: string | null; matched: boolean; note?: string } | null> {
@@ -93,8 +96,12 @@ async function linkOrCreateLead(psid: string, text: string): Promise<{ id: strin
   const form = parseMetaFormMessage(text);
   const formName = [form?.firstName, form?.lastName].filter(Boolean).join(" ").trim() || undefined;
 
-  const existing = await prisma.adLead.findUnique({ where: { messengerPsid: psid }, select: { id: true, phone: true, adSource: true, fullName: true } });
+  const existing = await prisma.adLead.findUnique({ where: { messengerPsid: psid }, select: { id: true, phone: true, adSource: true, fullName: true, customFields: true } });
   if (existing) {
+    // The form answers ride along in the message — fill dog count the moment it's known.
+    if (form?.dogs && !hasDogs(existing.customFields)) {
+      await prisma.adLead.update({ where: { id: existing.id }, data: { customFields: { ...asObj(existing.customFields), numberOfDogs: form.dogs } } }).catch(() => {});
+    }
     // A lead captured before their name was readable gets it filled in now — from
     // the profile if Facebook returns it, otherwise from the form answers.
     const better = name || formName;
@@ -114,6 +121,8 @@ async function linkOrCreateLead(psid: string, text: string): Promise<{ id: strin
       if (!lead.messengerPsid) data.messengerPsid = psid;
       if (!lead.email && form.email) data.email = form.email;
       if (!lead.zipCode && form.zipCode) data.zipCode = form.zipCode;
+      // Zapier doesn't always pass the dog question through; the Messenger copy of the form always has it.
+      if (form.dogs && !hasDogs(lead.customFields)) data.customFields = { ...asObj(lead.customFields), numberOfDogs: form.dogs };
       if (Object.keys(data).length) await prisma.adLead.update({ where: { id: lead.id }, data }).catch(() => {});
       // Another PSID already on this lead (a second Messenger account) keeps its link; this thread still logs here.
       return { id: lead.id, phone: lead.phone ?? form.phone ?? null, matched: true, note: "linked by form data" };
