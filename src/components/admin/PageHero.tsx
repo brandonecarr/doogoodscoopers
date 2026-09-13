@@ -58,7 +58,7 @@ export function PageHero({
             {subtitle != null && <p className="text-[12.5px] text-[#9C9CB0] mt-2">{subtitle}</p>}
           </div>
         </div>
-        {(actions || icon) && <div className="flex items-center gap-2 flex-shrink-0">{actions}{icon}</div>}
+        {(actions || icon) && <div className="flex items-center gap-2 flex-wrap min-w-0 max-w-full">{actions}{icon}</div>}
       </div>
     </div>
   );

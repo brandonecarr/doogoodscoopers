@@ -515,7 +515,7 @@ export default function LeadsPage() {
               Pipeline · {(view === "map" ? mapMeta?.totalLeads ?? total : total)} total lead{(view === "map" ? mapMeta?.totalLeads ?? total : total) === 1 ? "" : "s"}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap min-w-0 max-w-full">
             {view === "kanban" && (
               <button
                 onClick={() => (selectMode ? exitSelect() : setSelectMode(true))}
