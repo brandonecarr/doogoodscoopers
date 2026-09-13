@@ -65,12 +65,12 @@ function parseMetaFormMessage(text: string): FormFields | null {
   if (!text) return null;
   const grab = (re: RegExp) => { const m = text.match(re); return m ? m[1].trim() : undefined; };
   const f: FormFields = {
-    firstName: grab(/^first name:\s*(.+)$/im),
-    lastName: grab(/^last name:\s*(.+)$/im),
-    email: grab(/^e-?mail(?: address)?:\s*(\S+@\S+)$/im)?.toLowerCase(),
-    phone: grab(/^phone(?: number)?:\s*(.+)$/im),
-    zipCode: grab(/^zip(?: code)?:\s*(\d{5})/im),
-    dogs: grab(/^how many dogs[^:]*:\s*(\d+)/im),
+    firstName: grab(/^first name:[ \t]*(.+)$/im),
+    lastName: grab(/^last name:[ \t]*(.+)$/im),
+    email: grab(/^e-?mail(?: address)?:[ \t]*(\S+@\S+)[ \t]*$/im)?.toLowerCase(),
+    phone: grab(/^phone(?: number)?:[ \t]*(.+)$/im),
+    zipCode: grab(/^zip(?: code)?:[ \t]*(\d{5})/im),
+    dogs: grab(/^how many dogs[^:\n]*:[ \t]*(\d{1,2})[ \t]*$/im),
   };
   const isForm = /filled out your form/i.test(text) || [f.email, f.phone].filter(Boolean).length >= 1 && [f.firstName, f.lastName, f.zipCode].filter(Boolean).length >= 1;
   if (!isForm || (!f.phone && !f.email)) return null;
