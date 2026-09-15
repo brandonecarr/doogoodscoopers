@@ -28,7 +28,7 @@ export default async function ProspectDetailPage({ params }: PageProps) {
   const managed = await prisma.commercialProspect.findMany({ where: { parentId: id }, orderBy: { propertyName: "asc" },
     select: { id: true, propertyName: true, propertyType: true, city: true, address: true, contactName: true, phone: true, email: true, units: true, notes: true, status: true } });
   const parent = p.parentId ? await prisma.commercialProspect.findUnique({ where: { id: p.parentId }, select: { id: true, propertyName: true } }) : null;
-  const showManaged = p.isManagementCompany || managed.length > 0;
+  const showManaged = true; // the card carries the "Merge in a property" control, so every prospect needs it
   const statusMeta = PROSPECT_STATUS_META[p.status as ProspectStatus];
   const statusLabel = statusMeta?.label || p.status; const statusStyle = (statusMeta?.badge || "bg-gray-100 text-gray-800") + " border-transparent";
   const typeLabel = PROSPECT_TYPE_LABEL[p.propertyType as ProspectType] || p.propertyType;

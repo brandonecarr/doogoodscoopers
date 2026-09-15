@@ -61,7 +61,7 @@ export function ProspectManagedProperties({ companyId, companyName, isCompany, c
         <button onClick={() => { setAdding((v) => !v); if (!adding) setTimeout(() => search(), 0); }} className="inline-flex items-center gap-1.5 px-3 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700"><Plus className="w-4 h-4" /> Merge in a property</button>
       </div>
       {error && <div className="p-3 mb-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>}
-      {!isCompany && children.length === 0 && <p className="text-sm text-gray-500 mb-3">This record isn&apos;t a management company yet. Merge a property in and it becomes one.</p>}
+      {!isCompany && children.length === 0 && <p className="text-sm text-gray-500 mb-3">If this is a management company, merge the properties it manages in here. It becomes a company automatically, and each property keeps all of its own information.</p>}
 
       {adding && (
         <div className="mb-4 p-4 rounded-lg border border-gray-200 bg-gray-50">
