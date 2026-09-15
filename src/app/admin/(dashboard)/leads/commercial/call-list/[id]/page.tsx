@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Phone, Mail, MapPin, Building2, Calendar, Clock, PhoneCall, StickyNote, Pencil, ArrowRightCircle, Archive, Link2, Hash } from "lucide-react";
+import { ArrowLeft, Phone, Mail, MapPin, Building2, Calendar, Clock, PhoneCall, StickyNote, Pencil, ArrowRightCircle, Archive, Link2, Hash, Briefcase } from "lucide-react";
 import prisma from "@/lib/prisma";
 import { ArrangeableBoard, type ArrangeableCard } from "@/components/admin/ArrangeableBoard";
 import { ProspectRowActions } from "@/components/admin/ProspectRowActions";
@@ -8,6 +8,7 @@ import { PROSPECT_TYPE_LABEL, PROSPECT_STATUSES, PROSPECT_STATUS_META, type Pros
 import StatusUpdateForm from "@/components/admin/StatusUpdateForm";
 import { FollowupGrade } from "@/components/admin/FollowupGrade";
 import { LeadUpdates } from "@/components/admin/LeadUpdates";
+import { ProspectManagedProperties } from "@/components/admin/ProspectManagedProperties";
 
 interface PageProps { params: Promise<{ id: string }> }
 
@@ -24,6 +25,10 @@ export default async function ProspectDetailPage({ params }: PageProps) {
   if (!p) notFound();
   const convertedLead = p.convertedLeadId ? await prisma.commercialLead.findUnique({ where: { id: p.convertedLeadId }, select: { id: true, propertyName: true, status: true } }) : null;
   const updates = await prisma.leadUpdate.findMany({ where: { leadId: id, leadType: "COMMERCIAL_PROSPECT" }, orderBy: { createdAt: "desc" } });
+  const managed = await prisma.commercialProspect.findMany({ where: { parentId: id }, orderBy: { propertyName: "asc" },
+    select: { id: true, propertyName: true, propertyType: true, city: true, address: true, contactName: true, phone: true, email: true, units: true, notes: true, status: true } });
+  const parent = p.parentId ? await prisma.commercialProspect.findUnique({ where: { id: p.parentId }, select: { id: true, propertyName: true } }) : null;
+  const showManaged = p.isManagementCompany || managed.length > 0;
   const statusMeta = PROSPECT_STATUS_META[p.status as ProspectStatus];
   const statusLabel = statusMeta?.label || p.status; const statusStyle = (statusMeta?.badge || "bg-gray-100 text-gray-800") + " border-transparent";
   const typeLabel = PROSPECT_TYPE_LABEL[p.propertyType as ProspectType] || p.propertyType;
@@ -82,6 +87,10 @@ export default async function ProspectDetailPage({ params }: PageProps) {
           <p className="text-xs text-gray-400 mt-2">Call attempts and archive reasons are appended here as you log them.</p>
         </div>
       ),
+    }] : []),
+    ...(showManaged ? [{
+      id: "managed", zone: "main" as const,
+      node: <ProspectManagedProperties companyId={p.id} companyName={p.propertyName} isCompany={p.isManagementCompany} children={managed} />,
     }] : []),
     {
       id: "updates", zone: "main",
@@ -154,6 +163,12 @@ export default async function ProspectDetailPage({ params }: PageProps) {
 
   return (
     <div className="space-y-6 pb-20 lg:pb-0">
+      {parent && (
+        <div className="flex items-center gap-2 p-3 rounded-xl bg-teal-50 border border-teal-200 text-sm text-teal-800">
+          <Briefcase className="w-4 h-4 flex-shrink-0" />
+          <span>Managed by <Link href={`/admin/leads/commercial/call-list/${parent.id}`} className="font-semibold hover:underline">{parent.propertyName}</Link>. This property was merged in and keeps all its own information.</span>
+        </div>
+      )}
       <div className="dgs-hero p-[22px] sm:p-[26px]">
         <div className="flex items-center gap-4">
           <Link href="/admin/leads/commercial/call-list" className="p-2 rounded-[10px] bg-white/10 hover:bg-white/15 transition-colors flex-shrink-0"><ArrowLeft className="w-5 h-5 text-white" /></Link>
@@ -162,6 +177,7 @@ export default async function ProspectDetailPage({ params }: PageProps) {
             <p className="text-[#9C9CB0] text-[12.5px] mt-2">Call list prospect · {p.city}, {p.state}</p>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
+            {(p.isManagementCompany || managed.length > 0) && <span className="px-3 py-1 text-xs font-semibold rounded-full bg-amber-400/20 text-amber-100 border border-amber-300/30 whitespace-nowrap">Management co · {managed.length}</span>}
             {p.grade && <span className="px-3 py-1 text-sm font-bold rounded-full border border-white/20 bg-white/10 text-white whitespace-nowrap">Grade: {p.grade}</span>}
             <span className={`px-3 py-1 text-xs font-medium rounded-full whitespace-nowrap ${TYPE_BADGE[p.propertyType] || TYPE_BADGE.OTHER}`}>{typeLabel}</span>
             <span className={`px-3 py-1 text-sm font-medium rounded-full border whitespace-nowrap ${statusStyle}`}>{statusLabel}</span>

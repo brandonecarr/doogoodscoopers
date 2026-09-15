@@ -15,7 +15,7 @@ const TYPE_BADGE: Record<string, string> = { HOA: "bg-violet-100 text-violet-800
 const fmt = (d: Date | null) => d ? new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "—";
 
 async function getBoardProspects(): Promise<BoardProspect[]> {
-  const rows = await prisma.commercialProspect.findMany({ where: { status: { not: "ARCHIVED" } }, orderBy: { updatedAt: "desc" } });
+  const rows = await prisma.commercialProspect.findMany({ where: { status: { not: "ARCHIVED" }, parentId: null }, orderBy: { updatedAt: "desc" } });
   return rows.map((r) => ({
     id: r.id, propertyName: r.propertyName, propertyType: r.propertyType, contactName: r.contactName, phone: r.phone, city: r.city, status: r.status,
     grade: r.grade, followupDate: r.followupDate ? r.followupDate.toISOString() : null, attempts: r.attempts, lastAttemptAt: r.lastAttemptAt ? r.lastAttemptAt.toISOString() : null,
@@ -27,13 +27,14 @@ export default async function CallListPage({ searchParams }: PageProps) {
   const p = await searchParams; const showArchived = p.archived === "true"; const pageSize = 25; const page = p.page ? parseInt(p.page) : 1;
   const view = p.view === "board" && !showArchived ? "board" : "list";
   const boardProspects = view === "board" ? await getBoardProspects() : [];
-  const where: Record<string, unknown> = showArchived ? { status: "ARCHIVED" } : (p.status && p.status !== "all" ? { status: p.status } : { status: { not: "ARCHIVED" } });
+  // Managed properties (parentId set) live under their company, not on the top-level list.
+  const where: Record<string, unknown> = showArchived ? { status: "ARCHIVED", parentId: null } : { parentId: null, ...(p.status && p.status !== "all" ? { status: p.status } : { status: { not: "ARCHIVED" } }) };
   if (p.type && p.type !== "all") where.propertyType = p.type;
   if (p.search) where.OR = ["propertyName", "contactName", "email", "phone", "city", "zipCode", "address", "notes"].map((k) => ({ [k]: { contains: p.search, mode: "insensitive" } }));
   const [rows, total, counts] = await Promise.all([
     prisma.commercialProspect.findMany({ where, orderBy: [{ status: "asc" }, { lastAttemptAt: "asc" }, { createdAt: "desc" }], skip: (page - 1) * pageSize, take: pageSize }),
     prisma.commercialProspect.count({ where }),
-    prisma.commercialProspect.groupBy({ by: ["status"], _count: { _all: true } }),
+    prisma.commercialProspect.groupBy({ by: ["status"], where: { parentId: null }, _count: { _all: true } }),
   ]);
   const c = Object.fromEntries(counts.map((x) => [x.status, x._count._all])); const totalPages = Math.ceil(total / pageSize);
   const qs = (over: Record<string, string>) => { const u = new URLSearchParams({ ...(p.status ? { status: p.status } : {}), ...(p.type ? { type: p.type } : {}), ...(p.search ? { search: p.search } : {}), ...(showArchived ? { archived: "true" } : {}), ...over }); return `/admin/leads/commercial/call-list?${u}`; };

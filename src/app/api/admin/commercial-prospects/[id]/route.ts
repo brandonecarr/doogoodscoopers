@@ -3,7 +3,7 @@ import { getSession } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { PROSPECT_TYPES, type ProspectType } from "@/lib/commercial-prospects";
 
-type Body = { action: "attempt" | "archive" | "unarchive" | "edit"; note?: string } & Record<string, unknown>;
+type Body = { action: "attempt" | "archive" | "unarchive" | "edit" | "unmerge" | "setCompany"; note?: string; childId?: string; value?: boolean } & Record<string, unknown>;
 
 /** Call-list actions: log an attempt, archive/unarchive, or edit the fields. */
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -34,6 +34,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         propertyName: s("propertyName")!, propertyType: (PROSPECT_TYPES as readonly string[]).includes(propertyType || "") ? (propertyType as ProspectType) : p.propertyType,
         contactName: s("contactName") || null, phone: s("phone") || null, email: s("email") || null, city: s("city")!, state: (s("state") || "CA").toUpperCase().slice(0, 2),
         zipCode: s("zipCode") || "", address: s("address") || null, units: unitsRaw ? parseInt(unitsRaw, 10) || null : null, notes: s("notes") || null, source: s("source") || null } });
+    } else if (b.action === "unmerge") {
+      // Detach a managed property (or self) back to the top level.
+      const childId = typeof b.childId === "string" ? b.childId : id;
+      const child = await prisma.commercialProspect.findUnique({ where: { id: childId } });
+      if (!child) return NextResponse.json({ success: false, error: "Property not found" }, { status: 404 });
+      await prisma.commercialProspect.update({ where: { id: childId }, data: { parentId: null } });
+    } else if (b.action === "setCompany") {
+      await prisma.commercialProspect.update({ where: { id }, data: { isManagementCompany: b.value !== false } });
     } else return NextResponse.json({ success: false, error: "Unknown action" }, { status: 400 });
     return NextResponse.json({ success: true });
   } catch (e) {

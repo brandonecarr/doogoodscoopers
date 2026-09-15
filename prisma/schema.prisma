@@ -1365,10 +1365,18 @@ model CommercialProspect {
   followupDate    DateTime?
   grade           String?   // A–F, same scale as leads
 
+  // Merge: a management company absorbs properties as child records. Nothing is
+  // copied or lost — each managed property stays a full record, re-parented here.
+  isManagementCompany Boolean @default(false)
+  parentId          String?
+  parent            CommercialProspect?  @relation("ManagedProperties", fields: [parentId], references: [id], onDelete: SetNull)
+  managedProperties CommercialProspect[] @relation("ManagedProperties")
+
   @@index([status])
   @@index([propertyType])
   @@index([city])
   @@index([zipCode])
   @@index([createdAt])
   @@index([followupDate])
+  @@index([parentId])
 }
