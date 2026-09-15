@@ -29,10 +29,11 @@ export default async function CallListPage({ searchParams }: PageProps) {
   const boardProspects = view === "board" ? await getBoardProspects() : [];
   // Managed properties (parentId set) live under their company, not on the top-level list.
   const where: Record<string, unknown> = showArchived ? { status: "ARCHIVED", parentId: null } : { parentId: null, ...(p.status && p.status !== "all" ? { status: p.status } : { status: { not: "ARCHIVED" } }) };
-  if (p.type && p.type !== "all") where.propertyType = p.type;
+  if (p.type === "__company__") where.isManagementCompany = true;
+  else if (p.type && p.type !== "all") where.propertyType = p.type;
   if (p.search) where.OR = ["propertyName", "contactName", "email", "phone", "city", "zipCode", "address", "notes"].map((k) => ({ [k]: { contains: p.search, mode: "insensitive" } }));
   const [rows, total, counts] = await Promise.all([
-    prisma.commercialProspect.findMany({ where, orderBy: [{ status: "asc" }, { lastAttemptAt: "asc" }, { createdAt: "desc" }], skip: (page - 1) * pageSize, take: pageSize }),
+    prisma.commercialProspect.findMany({ where, orderBy: [{ isManagementCompany: "desc" }, { status: "asc" }, { lastAttemptAt: "asc" }, { createdAt: "desc" }], skip: (page - 1) * pageSize, take: pageSize, include: { _count: { select: { managedProperties: true } } } }),
     prisma.commercialProspect.count({ where }),
     prisma.commercialProspect.groupBy({ by: ["status"], where: { parentId: null }, _count: { _all: true } }),
   ]);
@@ -69,7 +70,7 @@ export default async function CallListPage({ searchParams }: PageProps) {
             <input type="text" name="search" defaultValue={p.search} placeholder="Search by property, contact, phone, city, ZIP, or notes..." className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent" /></div>
           <div className="relative"><Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <select name="type" defaultValue={p.type || "all"} className="pl-10 pr-8 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent appearance-none bg-white">
-              <option value="all">All Types</option>{PROSPECT_TYPES.map((t) => <option key={t} value={t}>{PROSPECT_TYPE_LABEL[t]}</option>)}</select></div>
+              <option value="all">All Types</option><option value="__company__">🏢 Management companies</option>{PROSPECT_TYPES.map((t) => <option key={t} value={t}>{PROSPECT_TYPE_LABEL[t]}</option>)}</select></div>
           {!showArchived && <select name="status" defaultValue={p.status || "all"} className="px-3 pr-8 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent appearance-none bg-white">
             <option value="all">Active</option>{PROSPECT_STATUSES.filter((st) => st !== "ARCHIVED").map((st) => <option key={st} value={st}>{PROSPECT_STATUS_META[st].label}</option>)}</select>}
           <button type="submit" className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors">Apply</button>
@@ -84,7 +85,7 @@ export default async function CallListPage({ searchParams }: PageProps) {
             const meta = PROSPECT_STATUS_META[r.status as ProspectStatus]; const sl = meta?.label || r.status, sc = meta?.badge || "bg-gray-100 text-gray-800";
             return (<tr key={r.id} className="hover:bg-gray-50 transition-colors align-top">
               <td className="px-6 py-4"><Link href={`/admin/leads/commercial/call-list/${r.id}`} className="font-semibold text-navy-900 hover:text-teal-700 hover:underline">{r.propertyName}</Link>
-                <p className="mt-1 flex items-center gap-2 flex-wrap"><span className={`px-2 py-0.5 text-[11px] font-medium rounded-full whitespace-nowrap ${TYPE_BADGE[r.propertyType] || TYPE_BADGE.OTHER}`}>{PROSPECT_TYPE_LABEL[r.propertyType as ProspectType] || r.propertyType}</span>{r.units ? <span className="text-xs text-gray-500">{r.units} units</span> : null}{r.grade ? <span className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-gray-100 text-gray-700">Grade {r.grade}</span> : null}</p>
+                <p className="mt-1 flex items-center gap-2 flex-wrap"><span className={`px-2 py-0.5 text-[11px] font-medium rounded-full whitespace-nowrap ${TYPE_BADGE[r.propertyType] || TYPE_BADGE.OTHER}`}>{PROSPECT_TYPE_LABEL[r.propertyType as ProspectType] || r.propertyType}</span>{r.isManagementCompany || r._count.managedProperties > 0 ? <span className="px-1.5 py-0.5 text-[10px] font-semibold rounded-full bg-amber-100 text-amber-800 whitespace-nowrap">🏢 Manages {r._count.managedProperties}</span> : null}{r.units ? <span className="text-xs text-gray-500">{r.units} units</span> : null}{r.grade ? <span className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-gray-100 text-gray-700">Grade {r.grade}</span> : null}</p>
                 {r.notes ? <p className="text-xs text-gray-500 mt-1 whitespace-pre-line line-clamp-3 max-w-md">{r.notes}</p> : null}</td>
               <td className="px-6 py-4 text-sm"><p className="text-navy-900">{r.contactName || <span className="text-gray-400">—</span>}</p>
                 {r.phone && <p><a href={`tel:${r.phone.replace(/\D/g, "")}`} className="text-teal-700 hover:underline">{r.phone}</a></p>}
