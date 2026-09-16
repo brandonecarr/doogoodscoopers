@@ -61,15 +61,6 @@ export function FacebookConnectCard() {
       await load(); router.replace("/admin/messenger");
     } finally { setBusy(null); }
   }
-  async function resubscribe() {
-    setBusy("resub"); setResult(null);
-    try {
-      const r = await fetch("/api/admin/facebook/resubscribe", { method: "POST" });
-      const d = await r.json();
-      setResult(r.ok && d.success ? { kind: "ok", text: `Webhooks re-subscribed: ${d.fields.join(", ")}` } : { kind: "err", text: d.error || "Could not re-subscribe" });
-      await load();
-    } finally { setBusy(null); }
-  }
   async function disconnect() {
     if (!confirm("Disconnect the Facebook Page? Messenger replies and drips stop until you connect again.")) return;
     setBusy("disconnect");
@@ -121,10 +112,7 @@ export function FacebookConnectCard() {
                 <p className="text-xs text-gray-500 break-words">Page ID {s.pageId}{s.userName ? ` · connected by ${s.userName}` : ""}{s.connectedAt ? ` · ${new Date(s.connectedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}` : ""}</p>
                 <p className="text-xs text-gray-500 break-words">{s.webhookFields ? `Webhooks: ${s.webhookFields.split(",").join(", ")}` : "Webhooks: not subscribed"}</p>
               </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <button onClick={resubscribe} disabled={!!busy} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 text-gray-700 hover:bg-white disabled:opacity-50">{busy === "resub" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Re-subscribe</button>
-                <button onClick={disconnect} disabled={!!busy} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 text-gray-700 hover:bg-white disabled:opacity-50"><Unplug className="w-3.5 h-3.5" /> Disconnect</button>
-              </div>
+              <button onClick={disconnect} disabled={!!busy} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 text-gray-700 hover:bg-white disabled:opacity-50 flex-shrink-0"><Unplug className="w-3.5 h-3.5" /> Disconnect</button>
             </div>
           )}
           {!s.connected && s.usingEnvToken && (
