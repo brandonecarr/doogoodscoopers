@@ -9,13 +9,14 @@ import StatusUpdateForm from "@/components/admin/StatusUpdateForm";
 import { FollowupGrade } from "@/components/admin/FollowupGrade";
 import { LeadUpdates } from "@/components/admin/LeadUpdates";
 import { ProspectManagedProperties } from "@/components/admin/ProspectManagedProperties";
+import { BUSINESS_TZ } from "@/lib/datetime";
 
 interface PageProps { params: Promise<{ id: string }> }
 
 const TYPE_BADGE: Record<string, string> = { HOA: "bg-violet-100 text-violet-800", APARTMENTS: "bg-amber-100 text-amber-800", SENIOR_55: "bg-sky-100 text-sky-800", OTHER: "bg-gray-100 text-gray-700" };
 
 function formatDate(date: Date) {
-  return new Date(date).toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" });
+  return new Date(date).toLocaleDateString("en-US", { timeZone: BUSINESS_TZ, weekday: "long", year: "numeric", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
 /** Info page for one researched prospect on the call list. */

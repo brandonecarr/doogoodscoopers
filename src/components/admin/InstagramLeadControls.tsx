@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Save, Archive, ArchiveRestore, Trash2 } from "lucide-react";
+import { toDateInputValue, fromDateInputValue } from "@/lib/datetime";
 
 const STATUSES = ["NEW", "CONTACTED", "NO_ANSWER", "NOT_INTERESTED", "WAITING_FOR_SIGNUP", "CONVERTED"] as const;
 
@@ -16,7 +17,7 @@ export function InstagramLeadControls({
   const router = useRouter();
   const [status, setStatus] = useState(initial.status);
   const [grade, setGrade] = useState(initial.grade || "");
-  const [followupDate, setFollowupDate] = useState(initial.followupDate ? initial.followupDate.slice(0, 10) : "");
+  const [followupDate, setFollowupDate] = useState(toDateInputValue(initial.followupDate));
   const [notes, setNotes] = useState(initial.notes || "");
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -68,7 +69,7 @@ export function InstagramLeadControls({
         </label>
         <label className="block">
           <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Follow-up</span>
-          <input type="date" className={sel + " mt-1"} value={followupDate} onChange={(e) => { setFollowupDate(e.target.value); patch({ followupDate: e.target.value || null }, "followup"); }} />
+          <input type="date" className={sel + " mt-1"} value={followupDate} onChange={(e) => { setFollowupDate(e.target.value); patch({ followupDate: fromDateInputValue(e.target.value) }, "followup"); }} />
         </label>
       </div>
 

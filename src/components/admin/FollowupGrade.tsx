@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarClock, Star, Check, X, Loader2 } from "lucide-react";
+import { toDateTimeLocalValue, fromDateTimeLocalValue, formatDate, formatDateTime } from "@/lib/datetime";
 
 interface FollowupGradeProps {
   leadId: string;
@@ -26,9 +27,8 @@ export function FollowupGrade({
   currentGrade,
 }: FollowupGradeProps) {
   const router = useRouter();
-  const [followupDate, setFollowupDate] = useState(
-    currentFollowupDate ? new Date(currentFollowupDate).toISOString().slice(0, 16) : ""
-  );
+  // datetime-local speaks Pacific wall-clock; convert at the edges only.
+  const [followupDate, setFollowupDate] = useState(toDateTimeLocalValue(currentFollowupDate));
   const [grade, setGrade] = useState(currentGrade || "");
   const [saving, setSaving] = useState<"followup" | "grade" | null>(null);
   const [success, setSuccess] = useState<"followup" | "grade" | null>(null);
@@ -46,7 +46,7 @@ export function FollowupGrade({
         body: JSON.stringify({
           leadId,
           leadType,
-          followupDate: followupDate || null,
+          followupDate: fromDateTimeLocalValue(followupDate),
         }),
       });
 
@@ -130,19 +130,14 @@ export function FollowupGrade({
     const date = new Date(currentFollowupDate);
     const now = new Date();
     const isOverdue = date < now;
-    const isToday = date.toDateString() === now.toDateString();
+    const dayOpts: Intl.DateTimeFormatOptions = { year: "numeric", month: "2-digit", day: "2-digit" };
+    const isToday = formatDate(date, dayOpts) === formatDate(now, dayOpts);
 
     return (
       <div className={`text-sm ${isOverdue ? "text-red-600" : isToday ? "text-amber-600" : "text-gray-600"}`}>
         {isOverdue && "Overdue: "}
         {isToday && "Today: "}
-        {date.toLocaleDateString("en-US", {
-          weekday: "short",
-          month: "short",
-          day: "numeric",
-          hour: "numeric",
-          minute: "2-digit",
-        })}
+        {formatDateTime(date)}
       </div>
     );
   };

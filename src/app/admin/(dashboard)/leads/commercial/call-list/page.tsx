@@ -4,6 +4,7 @@ import { ProspectPipelineBoard, type BoardProspect } from "@/components/admin/Pr
 import prisma from "@/lib/prisma";
 import { PageHero, heroBtnSecondary, heroBtnPrimary, heroPrimaryStyle } from "@/components/admin/PageHero";
 import { LeadsSectionSwitch } from "@/components/admin/LeadsSectionSwitch";
+import { formatDate } from "@/lib/datetime";
 import { ProspectRowActions } from "@/components/admin/ProspectRowActions";
 import { ProspectCsvUpload } from "@/components/admin/ProspectCsvUpload";
 import { PROSPECT_TYPES, PROSPECT_TYPE_LABEL, PROSPECT_STATUSES, PROSPECT_STATUS_META, type ProspectType, type ProspectStatus } from "@/lib/commercial-prospect-types";
@@ -12,7 +13,7 @@ export const dynamic = "force-dynamic";
 interface PageProps { searchParams: Promise<{ status?: string; type?: string; search?: string; page?: string; archived?: string; view?: string }>; }
 
 const TYPE_BADGE: Record<string, string> = { HOA: "bg-violet-100 text-violet-800", APARTMENTS: "bg-amber-100 text-amber-800", SENIOR_55: "bg-sky-100 text-sky-800", OTHER: "bg-gray-100 text-gray-700" };
-const fmt = (d: Date | null) => d ? new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "—";
+const fmt = (d: Date | null) => d ? formatDate(d, { month: "short", day: "numeric" }) : "—";
 
 async function getBoardProspects(): Promise<BoardProspect[]> {
   const rows = await prisma.commercialProspect.findMany({ where: { status: { not: "ARCHIVED" }, parentId: null }, orderBy: { updatedAt: "desc" } });

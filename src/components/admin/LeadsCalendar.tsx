@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { PageHero, heroBtnPrimary, heroPrimaryStyle } from "@/components/admin/PageHero";
 import { LeadsSectionSwitch } from "@/components/admin/LeadsSectionSwitch";
+import { toDateTimeLocalValue, toDateInputValue, fromDateTimeLocalValue, fromDateInputValue, formatTime } from "@/lib/datetime";
 
 // ─── Types (mirrors /api/admin/calendar) ───────────────────────────────────────
 interface CalendarEvent {
@@ -63,17 +64,9 @@ const addMonths = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth()
 const sameDay = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 const dayKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
-// A Date → "YYYY-MM-DDTHH:mm" in local time for <input type="datetime-local">.
-function toLocalInput(d: Date): string {
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
-}
-function toLocalDateInput(d: Date): string {
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-}
-const timeLabel = (iso: string) =>
-  new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }).replace(":00", "");
+// Input round-trips go through the shared, timezone-pinned helpers so a manual
+// entry stores exactly like a lead follow-up.
+const timeLabel = (iso: string) => formatTime(iso);
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -158,7 +151,7 @@ export function LeadsCalendar() {
     setError(null);
     setDraft({
       id: null, title: "", allDay: false,
-      startAt: toLocalInput(base), endAt: "",
+      startAt: toDateTimeLocalValue(base), endAt: "",
       location: "", notes: "", color: "violet",
     });
   };
@@ -170,8 +163,8 @@ export function LeadsCalendar() {
       id: ev.id.replace(/^manual:/, ""),
       title: ev.title,
       allDay: ev.allDay,
-      startAt: ev.allDay ? toLocalDateInput(s) : toLocalInput(s),
-      endAt: ev.end ? (ev.allDay ? toLocalDateInput(new Date(ev.end)) : toLocalInput(new Date(ev.end))) : "",
+      startAt: ev.allDay ? toDateInputValue(s) : toDateTimeLocalValue(s),
+      endAt: ev.end ? (ev.allDay ? toDateInputValue(ev.end) : toDateTimeLocalValue(ev.end)) : "",
       location: ev.location || "",
       notes: ev.notes || "",
       color: ev.color || "violet",
@@ -189,18 +182,14 @@ export function LeadsCalendar() {
     if (!draft.title.trim()) { setError("Give the entry a title."); return; }
     if (!draft.startAt) { setError("Pick a start date."); return; }
     setSaving(true); setError(null);
-    // Build unambiguous ISO from the local input. All-day → noon local to dodge
-    // any midnight/DST date-shift when it's read back.
-    const startLocal = draft.allDay ? new Date(`${draft.startAt}T12:00`) : new Date(draft.startAt);
-    let endISO: string | null = null;
-    if (draft.endAt) {
-      const endLocal = draft.allDay ? new Date(`${draft.endAt}T12:00`) : new Date(draft.endAt);
-      endISO = endLocal.toISOString();
-    }
+    // Convert the Pacific wall-clock input to a UTC instant. All-day anchors at
+    // Pacific noon so it never lands on the wrong day when read back.
+    const startISO = draft.allDay ? fromDateInputValue(draft.startAt) : fromDateTimeLocalValue(draft.startAt);
+    const endISO = draft.endAt ? (draft.allDay ? fromDateInputValue(draft.endAt) : fromDateTimeLocalValue(draft.endAt)) : null;
     const payload = {
       title: draft.title.trim(),
       allDay: draft.allDay,
-      startAt: startLocal.toISOString(),
+      startAt: startISO,
       endAt: endISO,
       location: draft.location.trim() || null,
       notes: draft.notes.trim() || null,
@@ -448,9 +437,10 @@ export function LeadsCalendar() {
               <label className="flex items-center gap-2 text-[13px] font-semibold text-gray-700 cursor-pointer">
                 <input type="checkbox" checked={draft.allDay} onChange={(e) => {
                   const allDay = e.target.checked;
-                  // Convert the start value between date and datetime formats.
-                  const base = draft.startAt ? new Date(draft.startAt.length <= 10 ? `${draft.startAt}T09:00` : draft.startAt) : new Date();
-                  setDraft({ ...draft, allDay, startAt: allDay ? toLocalDateInput(base) : toLocalInput(base), endAt: "" });
+                  // Toggle the input format by trimming/extending the date part —
+                  // pure string work, no timezone reinterpretation.
+                  const datePart = (draft.startAt || toDateInputValue(new Date())).slice(0, 10);
+                  setDraft({ ...draft, allDay, startAt: allDay ? datePart : `${datePart}T09:00`, endAt: "" });
                 }} className="w-4 h-4 rounded accent-violet-600" />
                 All day
               </label>

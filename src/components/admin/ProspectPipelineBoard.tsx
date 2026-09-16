@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Calendar, MoreHorizontal, Phone, PhoneCall, ArrowRightCircle } from "lucide-react";
 import { PROSPECT_STATUSES, PROSPECT_STATUS_META, PROSPECT_TYPE_LABEL, type ProspectStatus, type ProspectType } from "@/lib/commercial-prospect-types";
+import { formatDate, formatDateTime } from "@/lib/datetime";
 
 /**
  * Call-list pipeline: one column per prospect status (archived stays off the
@@ -36,7 +37,7 @@ const C: Record<string, { header: string; border: string; text: string; bg: stri
 const TYPE_BADGE: Record<string, string> = { HOA: "bg-violet-100 text-violet-800", APARTMENTS: "bg-amber-100 text-amber-800", SENIOR_55: "bg-sky-100 text-sky-800", OTHER: "bg-gray-100 text-gray-700" };
 const GRADE: Record<string, string> = { A: "bg-green-100 text-green-800", B: "bg-teal-100 text-teal-800", C: "bg-yellow-100 text-yellow-800", D: "bg-orange-100 text-orange-800", F: "bg-red-100 text-red-800" };
 const ago = (iso: string) => { const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000); return d <= 0 ? "today" : d === 1 ? "1 day" : `${d} days`; };
-const short = (iso: string) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+const short = (iso: string) => formatDate(iso, { month: "short", day: "numeric" });
 
 export function ProspectPipelineBoard({ prospects: initial }: { prospects: BoardProspect[] }) {
   const router = useRouter();
@@ -124,7 +125,7 @@ export function ProspectPipelineBoard({ prospects: initial }: { prospects: Board
                         </div>
                         <div className="flex items-center justify-between mt-2 text-[10px] text-gray-400">
                           <span className="inline-flex items-center gap-1 truncate">{p.phone ? <><Phone className="w-3 h-3" />{p.phone}</> : "No phone"}</span>
-                          <span className="inline-flex items-center gap-1" title={p.lastAttemptAt ? `Last call ${new Date(p.lastAttemptAt).toLocaleString()}` : "No calls logged"}><PhoneCall className="w-3 h-3" />{p.attempts} · {ago(p.updatedAt)}</span>
+                          <span className="inline-flex items-center gap-1" title={p.lastAttemptAt ? `Last call ${formatDateTime(p.lastAttemptAt, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : "No calls logged"}><PhoneCall className="w-3 h-3" />{p.attempts} · {ago(p.updatedAt)}</span>
                         </div>
                       </div>
                     );

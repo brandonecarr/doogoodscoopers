@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Building2, Calendar, DollarSign, MoreHorizontal, Phone } from "lucide-react";
+import { formatDate } from "@/lib/datetime";
 
 
 /**
@@ -138,7 +139,7 @@ export function CommercialPipelineBoard({ leads: initial }: { leads: BoardLead[]
                         <div className="flex items-center gap-1.5 mt-2 flex-wrap">
                           {lead.grade && <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded ${GRADE[lead.grade] || "bg-gray-100 text-gray-700"}`}>{lead.grade}</span>}
                           {lead.quotedMonthly != null && <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-semibold rounded bg-violet-50 text-violet-800"><DollarSign className="w-3 h-3" />{money(lead.quotedMonthly)}/mo</span>}
-                          {lead.followupDate && <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-semibold rounded ${overdue ? "bg-red-100 text-red-800" : "bg-teal-50 text-teal-800"}`}><Calendar className="w-3 h-3" />{new Date(lead.followupDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>}
+                          {lead.followupDate && <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-semibold rounded ${overdue ? "bg-red-100 text-red-800" : "bg-teal-50 text-teal-800"}`}><Calendar className="w-3 h-3" />{formatDate(lead.followupDate, { month: "short", day: "numeric" })}</span>}
                         </div>
                         <div className="flex items-center justify-between mt-2 text-[10px] text-gray-400">
                           <span className="inline-flex items-center gap-1 truncate">{lead.phone ? <><Phone className="w-3 h-3" />{lead.phone}</> : <><Building2 className="w-3 h-3" />No phone</>}</span>

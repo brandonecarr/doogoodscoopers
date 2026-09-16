@@ -6,6 +6,7 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { ArrowLeft, Loader2, Send, Users, Eye, Paintbrush, LayoutTemplate, X } from "lucide-react";
 import type { EmailBuilderHandle } from "@/components/admin/EmailBuilder";
+import { fromDateTimeLocalValue } from "@/lib/datetime";
 
 const EmailBuilder = dynamic(() => import("@/components/admin/EmailBuilder"), {
   ssr: false,
@@ -136,7 +137,7 @@ export default function NewEmailPage() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action, name, subject, fromName, fromEmail: fromEmail || undefined, replyTo: replyTo || undefined,
-          html, designJson: designJson || undefined, testEmail, scheduledAt: scheduledAt || undefined,
+          html, designJson: designJson || undefined, testEmail, scheduledAt: fromDateTimeLocalValue(scheduledAt) || undefined,
           audienceFilter: audienceFilter(),
         }),
       });

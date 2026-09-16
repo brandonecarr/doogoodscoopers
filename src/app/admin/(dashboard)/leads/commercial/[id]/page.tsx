@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowLeft, Phone, Mail, MapPin, Building2, Calendar, Clock, MessageSquare, Archive, Pencil } from "lucide-react";
 import prisma from "@/lib/prisma";
 import type { LeadStatus } from "@/types/leads";
+import { BUSINESS_TZ } from "@/lib/datetime";
 import StatusUpdateForm from "@/components/admin/StatusUpdateForm";
 import { LeadQuickActions } from "@/components/admin/LeadQuickActions";
 import { LeadUpdates } from "@/components/admin/LeadUpdates";
@@ -37,6 +38,7 @@ async function getLeadUpdates(leadId: string) {
 
 function formatDate(date: Date) {
   return new Date(date).toLocaleDateString("en-US", {
+    timeZone: BUSINESS_TZ,
     weekday: "long",
     year: "numeric",
     month: "long",

@@ -26,6 +26,7 @@ import {
   X,
 } from "lucide-react";
 import type { LeadStatus } from "@/types/leads";
+import { BUSINESS_TZ } from "@/lib/datetime";
 import { CallIntelCard } from "@/components/admin/CallIntelCard";
 import { LeadsSectionSwitch } from "@/components/admin/LeadsSectionSwitch";
 import type { MapPoint } from "@/components/admin/LeadsMap";
@@ -167,12 +168,12 @@ function timeAgo(dateStr: string) {
   if (mins < 60) return `${mins}m ago`;
   if (hrs < 24) return `${hrs}h ago`;
   if (days < 7) return `${days}d ago`;
-  return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return new Date(dateStr).toLocaleDateString("en-US", { timeZone: BUSINESS_TZ, month: "short", day: "numeric" });
 }
 
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString("en-US", {
-    month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit",
+    timeZone: BUSINESS_TZ, month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit",
   });
 }
 
