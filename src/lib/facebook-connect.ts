@@ -118,7 +118,7 @@ export async function fbGranularPages(userToken: string): Promise<{ scope: strin
 
 /** Subscribe the app to the Page's Messenger webhooks (pages_manage_metadata). */
 export async function subscribePageWebhooks(pageId: string, pageToken: string): Promise<string[]> {
-  const fields = ["messages", "messaging_postbacks", "messaging_optins", "messaging_referrals"];
+  const fields = ["messages", "messaging_postbacks", "messaging_optins", "messaging_referrals", "leadgen"];
   await graph(`${pageId}/subscribed_apps?subscribed_fields=${fields.join(",")}&access_token=${encodeURIComponent(pageToken)}`, { method: "POST" });
   return fields;
 }

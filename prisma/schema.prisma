@@ -429,6 +429,7 @@ model AdLead {
 
   // Privyr specific fields
   privyrLeadId    String?     @unique  // Privyr's internal lead ID
+  metaLeadId      String?     @unique  // Meta Lead Ads leadgen id (direct webhook idempotency)
 
   // Messenger link (for the Messenger-first drip). Set when we match this lead to
   // a Facebook Messenger thread; lastInboundAt tracks the 24h/7d send window.

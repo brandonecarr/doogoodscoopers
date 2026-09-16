@@ -4,6 +4,8 @@ import { verifyMessengerSignature, hasMessengerSecret, messengerVerifyToken, get
 import { notify } from "@/lib/notify";
 import { setSetting, getSetting } from "@/lib/google-business";
 import { phoneVariants } from "@/lib/call-intel";
+import { fetchLeadgen } from "@/lib/meta-leadgen";
+import { createAdLeadFromMeta, mapFlatLead } from "@/lib/ad-lead-intake";
 
 // Facebook Messenger webhook.
 //  GET  → verification handshake (paste this URL into Messenger API Settings).
@@ -197,6 +199,21 @@ export async function POST(request: NextRequest) {
     const done: string[] = [];
     try {
       for (const entry of body.entry ?? []) {
+        // Lead Ads: an instant-form submission arrives as a "leadgen" change with
+        // only the leadgen id. Fetch the answers and create the lead directly —
+        // same path Zapier used, no middleman.
+        for (const ch of entry.changes ?? []) {
+          if (ch?.field !== "leadgen") continue;
+          const leadgenId: string | undefined = ch.value?.leadgen_id;
+          if (!leadgenId) continue;
+          try {
+            const fields = await fetchLeadgen(leadgenId);
+            if (!fields) { done.push(`leadgen ${leadgenId}: could not fetch`); continue; }
+            const res = await createAdLeadFromMeta(mapFlatLead(fields, { metaLeadId: leadgenId, sourceLabel: "Lead Ads webhook" }));
+            done.push(`leadgen → ${res.duplicate ? "already have" : res.finalType} ${res.finalId}`);
+          } catch (e) { done.push(`leadgen ${leadgenId}: ${e instanceof Error ? e.message : "error"}`); }
+        }
+
         for (const ev of entry.messaging ?? []) {
           const psid: string | undefined = ev?.sender?.id;
           if (!psid) continue;
