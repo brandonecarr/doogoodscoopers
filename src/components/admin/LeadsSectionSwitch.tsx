@@ -1,13 +1,15 @@
 import Link from "next/link";
-import { Building2, Home, PhoneCall } from "lucide-react";
+import { Building2, Home, PhoneCall, CalendarDays } from "lucide-react";
+
+type SectionKey = "residential" | "commercial" | "callList" | "calendar";
 
 /**
- * Residential | Commercial, at the top of the Leads section. Two lists that
- * share a status model but never merge — a commercial inquiry is never folded
- * into a residential quote — so they live side by side rather than as one feed.
+ * Residential | Commercial | Call List | Calendar, at the top of the Leads
+ * section. The lead lists share a status model but never merge; the calendar is
+ * a cross-cutting view of every list's follow-ups plus manual entries.
  */
-export function LeadsSectionSwitch({ active }: { active: "residential" | "commercial" | "callList" }) {
-  const item = (key: "residential" | "commercial" | "callList", href: string, label: string, Icon: typeof Home) => (
+export function LeadsSectionSwitch({ active }: { active: SectionKey }) {
+  const item = (key: SectionKey, href: string, label: string, Icon: typeof Home) => (
     <Link
       key={key}
       href={href}
@@ -26,6 +28,7 @@ export function LeadsSectionSwitch({ active }: { active: "residential" | "commer
       {item("residential", "/admin/leads", "Residential", Home)}
       {item("commercial", "/admin/leads/commercial", "Commercial", Building2)}
       {item("callList", "/admin/leads/commercial/call-list", "Call List", PhoneCall)}
+      {item("calendar", "/admin/leads/calendar", "Calendar", CalendarDays)}
     </div>
   );
 }
