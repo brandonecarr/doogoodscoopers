@@ -726,6 +726,7 @@ model LeadMessage {
   status       String?    // QUEUED | SENT | DELIVERED | FAILED
   adminEmail   String?    // null for inbound / system
   campaignId   String?    // set when sent as part of a campaign
+  automated    Boolean    @default(false) // machine-generated inbound (e.g. Meta form-forward) — never counts as a human reply
 
   @@index([leadType, leadId])
   @@index([createdAt])

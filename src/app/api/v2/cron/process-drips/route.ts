@@ -85,8 +85,10 @@ export async function GET(request: NextRequest) {
       if (optedOut.has(optOutKey(r.phone) ?? "")) { await stop(r.id, "opted out"); stopped++; continue; }
       if (await isLeadArchived(r.leadType, r.leadId)) { await stop(r.id, "lead archived"); stopped++; continue; }
       if (campaign.stopOnReply) {
+        // Only a genuine human reply stops the drip. Machine-generated inbound
+        // (the Meta lead-ad form-forward) is flagged automated and ignored here.
         const replied = await prisma.leadMessage.findFirst({
-          where: { leadType: r.leadType, leadId: r.leadId, direction: "INBOUND", createdAt: { gt: r.createdAt } },
+          where: { leadType: r.leadType, leadId: r.leadId, direction: "INBOUND", automated: false, createdAt: { gt: r.createdAt } },
           select: { id: true },
         });
         if (replied) { await stop(r.id, "lead replied"); stopped++; continue; }

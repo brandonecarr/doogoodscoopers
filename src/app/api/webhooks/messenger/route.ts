@@ -205,19 +205,24 @@ export async function POST(request: NextRequest) {
           if (!inbound) continue;
 
           const text: string = ev.message?.text || ev.postback?.title || "";
+          // The Meta lead-ad form summary is auto-sent FROM the lead's account on
+          // submission — it is not a human reply. It must open the messaging
+          // window (so the drip can send) but must never stop a stop-on-reply drip.
+          const isFormMessage = !!parseMetaFormMessage(text);
           const lead = await linkOrCreateLead(psid, text);
           if (!lead) { done.push("could not resolve lead"); continue; }
-          done.push(`${lead.matched ? "matched" : "created"} lead ${lead.id}${lead.note ? ` (${lead.note})` : ""}`);
+          done.push(`${lead.matched ? "matched" : "created"} lead ${lead.id}${lead.note ? ` (${lead.note})` : ""}${isFormMessage ? " [form-forward]" : ""}`);
 
           await prisma.adLead.update({ where: { id: lead.id }, data: { messengerLastInboundAt: new Date() } }).catch(() => {});
 
           if (text) {
             await prisma.leadMessage.create({
-              data: { leadType: "AD_LEAD", leadId: lead.id, direction: "INBOUND", body: text, phone: lead.phone ?? "", provider: "messenger", status: "DELIVERED" },
+              data: { leadType: "AD_LEAD", leadId: lead.id, direction: "INBOUND", body: text, phone: lead.phone ?? "", provider: "messenger", status: "DELIVERED", automated: isFormMessage },
             }).catch(() => {});
 
-            // Stop any stop-on-reply drip for this lead (mirrors the Quo webhook).
-            const active = await prisma.campaignRecipient.findMany({
+            // Stop any stop-on-reply drip — but only on a genuine human reply, never
+            // on the automated form-forward (that would kill the drip before it starts).
+            const active = isFormMessage ? [] : await prisma.campaignRecipient.findMany({
               where: { leadType: "AD_LEAD", leadId: lead.id, status: "ACTIVE" },
               select: { id: true, campaignId: true },
             });
