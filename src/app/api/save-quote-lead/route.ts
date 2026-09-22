@@ -78,7 +78,9 @@ export async function POST(request: NextRequest) {
     let leadId: string;
     let message: string;
     if (existingQuote) {
-      await prisma.quoteLead.update({ where: { id: existingQuote.id }, data: quoteFields });
+      // Include zipCode on the update too — it was previously omitted, so a
+      // returning quote (matched by phone) never refreshed a missing/changed zip.
+      await prisma.quoteLead.update({ where: { id: existingQuote.id }, data: { ...quoteFields, zipCode: data.zipCode } });
       leadId = existingQuote.id;
       message = "Lead updated";
     } else {

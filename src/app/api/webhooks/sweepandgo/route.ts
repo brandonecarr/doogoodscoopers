@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { sendAdminPush } from "@/lib/web-push";
 import { syncContactToQuo } from "@/lib/quo";
 import { linkInstagramConversion } from "@/lib/instagram-leads";
+import { phoneVariants } from "@/lib/call-intel";
 
 // Sweep&Go Webhook — receives quote and lead events
 //
@@ -266,13 +267,35 @@ export async function POST(request: NextRequest) {
       // ~10-min batches). If we already have a recent, non-archived lead with
       // this phone, update it instead of creating another row — and only send a
       // push notification when it's genuinely new, so one quote = one alert.
+      // Match on ALL phone formats (the fast cron stores the raw Sweep&Go phone;
+      // an exact-string match missed leads whose phone was stored differently,
+      // leaving them permanently without a zip).
       const hasPhone = (phone || "").replace(/\D/g, "").length >= 10;
+      const phoneMatch = hasPhone ? phoneVariants(phone as string) : [];
+      const recentCutoff = new Date(Date.now() - 30 * 24 * 3600 * 1000);
+
+      // The free_quotes API the cron polls omits the zip entirely, so the lead is
+      // created without one; the zip only ever arrives on this webhook. Whenever
+      // it carries a zip, stamp it onto EVERY recent same-phone lead still missing
+      // one — so a zip is never lost even if the dedup below picks a different row
+      // or Sweep&Go re-delivers the quote after the lead already exists.
+      if (zipCode && phoneMatch.length) {
+        await prisma.quoteLead.updateMany({
+          where: {
+            phone: { in: phoneMatch },
+            createdAt: { gte: recentCutoff },
+            zipCode: "",
+          },
+          data: { zipCode },
+        }).catch(() => {});
+      }
+
       const existingLead = hasPhone
         ? await prisma.quoteLead.findFirst({
             where: {
-              phone: phone as string,
+              phone: { in: phoneMatch },
               archived: false,
-              createdAt: { gte: new Date(Date.now() - 30 * 24 * 3600 * 1000) },
+              createdAt: { gte: recentCutoff },
             },
             orderBy: { createdAt: "desc" },
           })
