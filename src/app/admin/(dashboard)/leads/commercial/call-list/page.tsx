@@ -45,7 +45,7 @@ export default async function CallListPage({ searchParams }: PageProps) {
     <div className="space-y-3.5 pb-20 lg:pb-0">
       <PageHero
         title={showArchived ? "Archived Prospects" : "Call List"}
-        subtitle={showArchived ? `${total} archived` : `${c.TO_CALL || 0} to call · ${(c.ATTEMPTED || 0) + (c.CONTACTED || 0)} in progress · ${c.INTERESTED || 0} interested · ${c.CONVERTED || 0} converted`}
+        subtitle={showArchived ? `${total} archived` : `${c.TO_CALL || 0} to call · ${(c.ATTEMPTED || 0) + (c.LEFT_VOICEMAIL || 0) + (c.CONTACTED || 0)} in progress · ${c.INTERESTED || 0} interested · ${c.CONVERTED || 0} converted`}
         icon={<div className="w-11 h-11 rounded-[13px] flex items-center justify-center" style={{ background: "linear-gradient(150deg,#9BE7C0,#12A150)" }}><PhoneCall className="w-[22px] h-[22px] text-white" /></div>}
         actions={<>
           <LeadsSectionSwitch active="callList" />

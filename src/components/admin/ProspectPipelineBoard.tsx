@@ -21,6 +21,7 @@ export interface BoardProspect {
 const COLUMNS: { status: ProspectStatus; hint: string; color: string }[] = [
   { status: "TO_CALL", hint: "Not reached yet", color: "teal" },
   { status: "ATTEMPTED", hint: "Called, no answer", color: "orange" },
+  { status: "LEFT_VOICEMAIL", hint: "Left a voicemail", color: "yellow" },
   { status: "CONTACTED", hint: "Spoke with someone", color: "blue" },
   { status: "INTERESTED", hint: "Wants a proposal or visit", color: "purple" },
   { status: "CONVERTED", hint: "Now a commercial lead", color: "green" },
@@ -30,6 +31,7 @@ const C: Record<string, { header: string; border: string; text: string; bg: stri
   teal:   { header: "bg-teal-100",   border: "border-teal-200",   text: "text-teal-800",   bg: "bg-teal-50" },
   blue:   { header: "bg-blue-100",   border: "border-blue-200",   text: "text-blue-800",   bg: "bg-blue-50" },
   orange: { header: "bg-orange-100", border: "border-orange-200", text: "text-orange-800", bg: "bg-orange-50" },
+  yellow: { header: "bg-yellow-100", border: "border-yellow-200", text: "text-yellow-800", bg: "bg-yellow-50" },
   gray:   { header: "bg-gray-100",   border: "border-gray-200",   text: "text-gray-700",   bg: "bg-gray-50" },
   purple: { header: "bg-purple-100", border: "border-purple-200", text: "text-purple-800", bg: "bg-purple-50" },
   green:  { header: "bg-green-100",  border: "border-green-200",  text: "text-green-800",  bg: "bg-green-50" },
