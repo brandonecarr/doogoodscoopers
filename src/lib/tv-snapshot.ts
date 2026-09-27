@@ -93,7 +93,7 @@ export async function buildTvSnapshot(now = new Date()): Promise<TvSnapshot> {
       where: { OR: [{ status: { in: ["TODO", "DOING"] } }, { status: "DONE", doneAt: { gte: weekStartAt } }] },
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
     }),
-    prisma.calendarEntry.findMany({ where: { startAt: { gte: todayStart, lt: dayStart(addDays(today, 15)) } }, orderBy: { startAt: "asc" }, take: 10 }),
+    prisma.calendarEntry.findMany({ where: { startAt: { gte: todayStart, lt: dayStart(addDays(today, 30)) } }, orderBy: { startAt: "asc" }, take: 10 }),
     prisma.tvMetricDaily.findMany({ where: { metric: "active_customers" }, orderBy: { date: "asc" }, take: 400 }),
     followUpsToday(todayStart, tomorrowStart),
     prisma.kanbanBoard.findMany({
@@ -110,7 +110,7 @@ export async function buildTvSnapshot(now = new Date()): Promise<TvSnapshot> {
   const cards: Record<string, TvCard[]> = {};
   for (const l of [...recent].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())) {
     const list = (cards[l.status] ||= []);
-    if (list.length < 3) list.push({ title: l.title, meta: l.meta, commercial: l.commercial });
+    if (list.length < 8) list.push({ title: l.title, meta: l.meta, commercial: l.commercial }); // 8 fill a full-screen section
   }
 
   // Funnel: this week's leads by current status, and conversions this week.
@@ -149,7 +149,7 @@ export async function buildTvSnapshot(now = new Date()): Promise<TvSnapshot> {
     ...[...todo, ...doing].filter((t) => t.dueOn && t.dueOn >= todayStart).map((t) => ({ day: businessDay(t.dueOn!), title: t.title })),
   ]
     .sort((a, b) => a.day.localeCompare(b.day))
-    .slice(0, 6)
+    .slice(0, 10)
     .map((u) => ({ ...u, label: u.day === today ? "Today" : shortDayLabel(u.day) }));
 
   return {
@@ -182,7 +182,7 @@ export async function buildTvSnapshot(now = new Date()): Promise<TvSnapshot> {
         const cards = b.cards.filter((c) => c.columnId === col.id);
         return {
           id: col.id, name: col.name, isDone: col.isDone, count: cards.length,
-          cards: cards.slice(0, 5).map((c) => {
+          cards: cards.slice(0, 8).map((c) => {
             const overdue = !col.isDone && !!c.dueOn && c.dueOn < todayStart;
             const parts = [c.tag, c.owner].filter(Boolean) as string[];
             if (!col.isDone && c.dueOn) {

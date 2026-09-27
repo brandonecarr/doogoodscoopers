@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Plus, Trash2, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, RotateCcw } from "lucide-react";
 import {
-  CATALOG, MAX_TV_KANBAN_COLUMNS, SIZE_CELLS, SIZE_LABEL, catalogItem, defaultConfig, newSection, packGrid,
-  type SectionSize, type TvBoard, type TvBoardConfig, type TvSection,
+  ALL_SIZES, CATALOG, SIZE_CELLS, SIZE_LABEL, catalogItem, defaultConfig, maxKanbanColumns, newSection, packGrid,
+  type TvBoard, type TvBoardConfig, type TvSection,
 } from "@/lib/tv-config";
 
 const input = "w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent";
@@ -177,8 +177,8 @@ export function BoardsTab({ config, onChange }: { config: TvBoardConfig; onChang
               </div>
               <div>
                 <label className={label}>Size</label>
-                <div className="grid grid-cols-4 gap-1.5">
-                  {(["S", "M", "L", "XL"] as SectionSize[]).map((size) => {
+                <div className="grid grid-cols-3 gap-1.5">
+                  {ALL_SIZES.map((size) => {
                     const ok = currentItem.sizes.includes(size);
                     return (
                       <button key={size} disabled={!ok} onClick={() => setSection(current.id, { size })}
@@ -188,6 +188,9 @@ export function BoardsTab({ config, onChange }: { config: TvBoardConfig; onChang
                     );
                   })}
                 </div>
+                {current.size === "FULL" && board.sections.length > 1 && (
+                  <p className="text-xs text-amber-700 mt-1.5">Full screen takes the whole board. Move the other sections to another board (or remove them) before saving.</p>
+                )}
               </div>
               {currentItem.displays && currentItem.displays.length > 1 && (
                 <div>
@@ -231,13 +234,14 @@ export function BoardsTab({ config, onChange }: { config: TvBoardConfig; onChang
                         <label className={label}>Columns on the TV</label>
                         <div className="space-y-1">
                           {kb.columns.map((col, i) => {
-                            const on = chosen.length ? chosen.includes(col.id) : i < MAX_TV_KANBAN_COLUMNS;
-                            const full = !on && (chosen.length || Math.min(kb.columns.length, MAX_TV_KANBAN_COLUMNS)) >= MAX_TV_KANBAN_COLUMNS;
+                            const max = maxKanbanColumns(current.size);
+                            const on = chosen.length ? chosen.includes(col.id) : i < max;
+                            const full = !on && (chosen.length || Math.min(kb.columns.length, max)) >= max;
                             return (
                               <label key={col.id} className={`flex items-center gap-2 text-sm ${full ? "text-gray-300" : "text-gray-700"}`}>
                                 <input type="checkbox" checked={on} disabled={full} className="rounded border-gray-300 text-teal-600"
                                   onChange={() => {
-                                    const base = chosen.length ? chosen : kb.columns.slice(0, MAX_TV_KANBAN_COLUMNS).map((c) => c.id);
+                                    const base = chosen.length ? chosen : kb.columns.slice(0, max).map((c) => c.id);
                                     const next = on ? base.filter((id) => id !== col.id) : [...base, col.id];
                                     // Keep board order; an empty choice means "the first columns".
                                     setCfg({ columnIDs: kb.columns.map((c) => c.id).filter((id) => next.includes(id)) });
@@ -247,12 +251,29 @@ export function BoardsTab({ config, onChange }: { config: TvBoardConfig; onChang
                             );
                           })}
                         </div>
-                        <p className="text-xs text-gray-400 mt-1">Up to {MAX_TV_KANBAN_COLUMNS} columns fit on the TV.</p>
+                        <p className="text-xs text-gray-400 mt-1">Up to {maxKanbanColumns(current.size)} columns fit at this size{current.size !== "FULL" ? " (8 at Full screen)" : ""}.</p>
                       </div>
                     )}
                   </>
                 );
               })()}
+              {config.boards.length > 1 && (
+                <div>
+                  <label className={label}>Move to board</label>
+                  <select value="" onChange={(e) => {
+                    const to = Number(e.target.value);
+                    if (Number.isNaN(to)) return;
+                    setBoards(config.boards.map((b, i) =>
+                      i === bi ? { ...b, sections: b.sections.filter((s) => s.id !== current.id) }
+                        : i === to ? { ...b, sections: [...b.sections, current] }
+                          : b));
+                    setBoardIndex(to);
+                  }} className={input}>
+                    <option value="">Choose a board…</option>
+                    {config.boards.map((b, i) => i !== bi && <option key={b.id} value={i}>{b.title || "Untitled"}</option>)}
+                  </select>
+                </div>
+              )}
               <button onClick={() => { setBoard({ ...board, sections: board.sections.filter((s) => s.id !== current.id) }); setSelected(null); }}
                 className="inline-flex items-center gap-1.5 text-sm text-red-600 font-medium"><Trash2 className="w-4 h-4" /> Remove section</button>
             </>

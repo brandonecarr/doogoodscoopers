@@ -3,7 +3,7 @@
 // Keep in sync with OfficeTV/Packages/BoardKit/Sources/BoardKit/Models/Board.swift.
 // The TV knows how to draw every metric in CATALOG; anything else is rejected on save.
 
-export type SectionSize = "S" | "M" | "L" | "XL";
+export type SectionSize = "S" | "M" | "L" | "XL" | "FULL";
 export type SectionSource = "crm" | "pm" | "goal";
 export type ElementType =
   | "goalProgress" | "countdown" | "metric" | "kanban" | "funnel" | "customerMix"
@@ -36,9 +36,10 @@ export interface TvBoardConfig {
 }
 
 export const SIZE_CELLS: Record<SectionSize, { cols: number; rows: number }> = {
-  S: { cols: 1, rows: 1 }, M: { cols: 2, rows: 1 }, L: { cols: 2, rows: 2 }, XL: { cols: 4, rows: 1 },
+  S: { cols: 1, rows: 1 }, M: { cols: 2, rows: 1 }, L: { cols: 2, rows: 2 }, XL: { cols: 4, rows: 1 }, FULL: { cols: 4, rows: 3 },
 };
-export const SIZE_LABEL: Record<SectionSize, string> = { S: "S · 1×1", M: "M · 2×1", L: "L · 2×2", XL: "XL · 4×1" };
+export const SIZE_LABEL: Record<SectionSize, string> = { S: "S · 1×1", M: "M · 2×1", L: "L · 2×2", XL: "XL · 4×1", FULL: "Full screen" };
+export const ALL_SIZES: SectionSize[] = ["S", "M", "L", "XL", "FULL"];
 
 /** Everything the TV can show. `displays` are the visual variants the TV understands. */
 export interface CatalogItem {
@@ -56,11 +57,11 @@ export interface CatalogItem {
   usesKanbanBoard?: boolean;
 }
 
-/** The TV shows at most this many columns of a Kanban board. */
-export const MAX_TV_KANBAN_COLUMNS = 5;
+/** How many columns of a Kanban board fit on the TV at a given size. */
+export const maxKanbanColumns = (size: SectionSize) => (size === "FULL" ? 8 : 5);
 
 export const CATALOG: CatalogItem[] = [
-  { metric: "goal.hero", label: "Goal progress", hint: "Ring, days left, pace and milestone banner", group: "Goals", type: "goalProgress", source: "goal", sizes: ["L"], defaultTitle: "Goal" },
+  { metric: "goal.hero", label: "Goal progress", hint: "Ring, days left, pace and milestone banner", group: "Goals", type: "goalProgress", source: "goal", sizes: ["L", "FULL"], defaultTitle: "Goal" },
   { metric: "sng.active.residential", label: "Residential customers", hint: "Active count and this week's change", group: "Sweep&Go", type: "metric", source: "crm", sizes: ["S"], defaultTitle: "Residential" },
   { metric: "sng.active.commercial", label: "Commercial customers", hint: "Active count", group: "Sweep&Go", type: "metric", source: "crm", sizes: ["S"], defaultTitle: "Commercial" },
   { metric: "sng.routes.today", label: "Today's routes", hint: "Yards done of scheduled, per tech", group: "Sweep&Go", type: "routeProgress", source: "pm", sizes: ["M", "XL"], defaultTitle: "Today's routes",
@@ -70,14 +71,14 @@ export const CATALOG: CatalogItem[] = [
   { metric: "sng.visits.byCrew.week", label: "Visits by crew", hint: "Completed visits per tech this week", group: "Sweep&Go", type: "barChart", source: "pm", sizes: ["M", "L"], defaultTitle: "Visits this week by crew" },
   { metric: "sng.avgQuote.30d", label: "Average visit price", hint: "Completed visits, last 30 days", group: "Sweep&Go", type: "metric", source: "crm", sizes: ["S"], defaultTitle: "Avg visit · 30 days" },
   { metric: "crm.funnel.week", label: "This week's funnel", hint: "Leads → second stage → won", group: "Admin", type: "funnel", source: "crm", sizes: ["M", "L", "XL"], defaultTitle: "This week's funnel", usesPipeline: true },
-  { metric: "crm.pipeline", label: "Sales pipeline", hint: "M/XL: count per stage · L: cards per stage", group: "Admin", type: "kanban", source: "crm", sizes: ["M", "L", "XL"], defaultTitle: "Sales pipeline", usesPipeline: true },
+  { metric: "crm.pipeline", label: "Sales pipeline", hint: "M/XL: count per stage · L/Full: cards per stage", group: "Admin", type: "kanban", source: "crm", sizes: ["M", "L", "XL", "FULL"], defaultTitle: "Sales pipeline", usesPipeline: true },
   { metric: "crm.leads.week", label: "New leads this week", hint: "Count, change and 8-week chart", group: "Admin", type: "barChart", source: "crm", sizes: ["M", "XL"], defaultTitle: "New leads this week", displays: [{ value: "trend", label: "Trend" }] },
   { metric: "crm.winrate.30d", label: "Win rate", hint: "Converted ÷ leads, last 30 days", group: "Admin", type: "metric", source: "crm", sizes: ["S"], defaultTitle: "Win rate · 30 days" },
   { metric: "crm.leadSources.30d", label: "Lead sources", hint: "Top four sources, last 30 days", group: "Admin", type: "barChart", source: "crm", sizes: ["M"], defaultTitle: "Lead sources · 30 days", displays: [{ value: "sources", label: "Sources grid" }] },
-  { metric: "crm.followups.today", label: "Follow up today", hint: "Leads and call-list prospects due today", group: "Admin", type: "list", source: "crm", sizes: ["M", "L"], defaultTitle: "Follow up today", displays: [{ value: "detail", label: "Name + detail" }] },
-  { metric: "pm.tasks", label: "Task board", hint: "To do · In progress · Done this week", group: "Admin", type: "taskBoard", source: "pm", sizes: ["M", "L"], defaultTitle: "Task board" },
-  { metric: "pm.kanban", label: "Kanban board", hint: "One of your custom boards (Kanban page). L: cards · M/XL: counts", group: "Admin", type: "kanban", source: "pm", sizes: ["L", "M", "XL"], defaultTitle: "Board", usesKanbanBoard: true },
-  { metric: "pm.calendar.upcoming", label: "Coming up", hint: "Calendar entries and task due dates", group: "Admin", type: "list", source: "pm", sizes: ["M", "L"], defaultTitle: "Coming up", displays: [{ value: "dated", label: "Date + event" }] },
+  { metric: "crm.followups.today", label: "Follow up today", hint: "Leads and call-list prospects due today", group: "Admin", type: "list", source: "crm", sizes: ["M", "L", "FULL"], defaultTitle: "Follow up today", displays: [{ value: "detail", label: "Name + detail" }] },
+  { metric: "pm.tasks", label: "Task board", hint: "To do · In progress · Done this week", group: "Admin", type: "taskBoard", source: "pm", sizes: ["M", "L", "FULL"], defaultTitle: "Task board" },
+  { metric: "pm.kanban", label: "Kanban board", hint: "One of your custom boards (Kanban page). L/Full: cards · M/XL: counts", group: "Admin", type: "kanban", source: "pm", sizes: ["L", "M", "XL", "FULL"], defaultTitle: "Board", usesKanbanBoard: true },
+  { metric: "pm.calendar.upcoming", label: "Coming up", hint: "Calendar entries and task due dates", group: "Admin", type: "list", source: "pm", sizes: ["M", "L", "FULL"], defaultTitle: "Coming up", displays: [{ value: "dated", label: "Date + event" }] },
 ];
 
 export const catalogItem = (metric?: string) => CATALOG.find((c) => c.metric === metric);
@@ -170,7 +171,8 @@ export function validateConfig(cfg: TvBoardConfig, kanbanBoardIds?: Set<string>)
       if (item.usesKanbanBoard) {
         if (!el?.config.boardID) errors.push(`${name}: pick which Kanban board "${s.title}" shows.`);
         else if (kanbanBoardIds && !kanbanBoardIds.has(el.config.boardID)) errors.push(`${name}: "${s.title}" shows a Kanban board that was deleted.`);
-        if ((el?.config.columnIDs?.length ?? 0) > MAX_TV_KANBAN_COLUMNS) errors.push(`${name}: "${s.title}" can show at most ${MAX_TV_KANBAN_COLUMNS} columns.`);
+        const max = maxKanbanColumns(s.size);
+        if ((el?.config.columnIDs?.length ?? 0) > max) errors.push(`${name}: "${s.title}" can show at most ${max} columns at this size.`);
       }
     }
   }
