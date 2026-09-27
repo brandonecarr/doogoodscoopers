@@ -1,15 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Plus, Trash2, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, RotateCcw } from "lucide-react";
 import {
-  CATALOG, SIZE_CELLS, SIZE_LABEL, catalogItem, defaultConfig, newSection, packGrid,
+  CATALOG, MAX_TV_KANBAN_COLUMNS, SIZE_CELLS, SIZE_LABEL, catalogItem, defaultConfig, newSection, packGrid,
   type SectionSize, type TvBoard, type TvBoardConfig, type TvSection,
 } from "@/lib/tv-config";
 
 const input = "w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent";
 const label = "block text-sm font-medium text-gray-700 mb-1";
 const GROUPS = ["Goals", "Sweep&Go", "Admin"] as const;
+interface KanbanSummary { id: string; name: string; columns: { id: string; name: string; isDone: boolean }[] }
 const SOURCE_TINT: Record<string, string> = { goal: "bg-blue-50 border-blue-200", crm: "bg-white border-gray-200", pm: "bg-white border-gray-200" };
 
 /** Boards, sections and a live 4×3 preview laid out exactly like the TV. */
@@ -17,6 +19,8 @@ export function BoardsTab({ config, onChange }: { config: TvBoardConfig; onChang
   const [boardIndex, setBoardIndex] = useState(0);
   const [selected, setSelected] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [kanbanBoards, setKanbanBoards] = useState<KanbanSummary[]>([]);
+  useEffect(() => { fetch("/api/admin/kanban").then((r) => r.json()).then((d) => setKanbanBoards(d.boards || [])).catch(() => {}); }, []);
 
   const bi = Math.min(boardIndex, config.boards.length - 1);
   const board = config.boards[bi];
@@ -60,7 +64,7 @@ export function BoardsTab({ config, onChange }: { config: TvBoardConfig; onChang
   function addSection(metric: string) {
     const item = catalogItem(metric);
     if (!item) return;
-    const section = newSection(item, pipelineID);
+    const section = newSection(item, pipelineID, kanbanBoards[0]);
     setBoard({ ...board, sections: [...board.sections, section] });
     setSelected(section.id);
     setAdding(false);
@@ -164,7 +168,7 @@ export function BoardsTab({ config, onChange }: { config: TvBoardConfig; onChang
                 <label className={label}>Shows</label>
                 <select value={currentItem.metric} onChange={(e) => {
                   const item = catalogItem(e.target.value)!;
-                  const fresh = newSection(item, pipelineID);
+                  const fresh = newSection(item, pipelineID, kanbanBoards[0]);
                   setSection(current.id, { elements: fresh.elements, source: item.source, size: item.sizes.includes(current.size) ? current.size : item.sizes[0], title: current.title === currentItem.defaultTitle ? item.defaultTitle : current.title });
                 }} className={input}>
                   {GROUPS.map((g) => <optgroup key={g} label={g}>{CATALOG.filter((c) => c.group === g).map((c) => <option key={c.metric} value={c.metric}>{c.label}</option>)}</optgroup>)}
@@ -201,6 +205,54 @@ export function BoardsTab({ config, onChange }: { config: TvBoardConfig; onChang
                   </select>
                 </div>
               )}
+              {currentItem.usesKanbanBoard && (() => {
+                const cfg = current.elements[0].config;
+                const kb = kanbanBoards.find((b) => b.id === cfg.boardID);
+                const setCfg = (patch: Partial<typeof cfg>) => setSection(current.id, { elements: [{ ...current.elements[0], config: { ...cfg, ...patch } }] });
+                const chosen = cfg.columnIDs ?? [];
+                return (
+                  <>
+                    <div>
+                      <label className={label}>Kanban board</label>
+                      {kanbanBoards.length === 0 ? (
+                        <p className="text-sm text-gray-500">No boards yet. <Link href="/admin/kanban" className="text-teal-700 font-semibold">Create one on the Kanban page</Link>.</p>
+                      ) : (
+                        <select value={cfg.boardID ?? ""} onChange={(e) => {
+                          const next = kanbanBoards.find((b) => b.id === e.target.value);
+                          setSection(current.id, { title: kb && current.title === kb.name && next ? next.name : current.title, elements: [{ ...current.elements[0], config: { ...cfg, boardID: e.target.value, columnIDs: undefined } }] });
+                        }} className={input}>
+                          {!kb && <option value="">Choose a board…</option>}
+                          {kanbanBoards.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                        </select>
+                      )}
+                    </div>
+                    {kb && (
+                      <div>
+                        <label className={label}>Columns on the TV</label>
+                        <div className="space-y-1">
+                          {kb.columns.map((col, i) => {
+                            const on = chosen.length ? chosen.includes(col.id) : i < MAX_TV_KANBAN_COLUMNS;
+                            const full = !on && (chosen.length || Math.min(kb.columns.length, MAX_TV_KANBAN_COLUMNS)) >= MAX_TV_KANBAN_COLUMNS;
+                            return (
+                              <label key={col.id} className={`flex items-center gap-2 text-sm ${full ? "text-gray-300" : "text-gray-700"}`}>
+                                <input type="checkbox" checked={on} disabled={full} className="rounded border-gray-300 text-teal-600"
+                                  onChange={() => {
+                                    const base = chosen.length ? chosen : kb.columns.slice(0, MAX_TV_KANBAN_COLUMNS).map((c) => c.id);
+                                    const next = on ? base.filter((id) => id !== col.id) : [...base, col.id];
+                                    // Keep board order; an empty choice means "the first columns".
+                                    setCfg({ columnIDs: kb.columns.map((c) => c.id).filter((id) => next.includes(id)) });
+                                  }} />
+                                {col.name}{col.isDone && <span className="text-[10px] text-blue-700 font-semibold">DONE</span>}
+                              </label>
+                            );
+                          })}
+                        </div>
+                        <p className="text-xs text-gray-400 mt-1">Up to {MAX_TV_KANBAN_COLUMNS} columns fit on the TV.</p>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
               <button onClick={() => { setBoard({ ...board, sections: board.sections.filter((s) => s.id !== current.id) }); setSelected(null); }}
                 className="inline-flex items-center gap-1.5 text-sm text-red-600 font-medium"><Trash2 className="w-4 h-4" /> Remove section</button>
             </>

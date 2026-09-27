@@ -1454,3 +1454,50 @@ model TvConnectorKey {
   lastUsedAt DateTime?
   revokedAt  DateTime?
 }
+
+// ─── Kanban boards (/admin/kanban) ─────────────────────────────────────────────
+// Any number of boards, columns and cards. A board can be shown on the office TV.
+
+model KanbanBoard {
+  id        String         @id @default(cuid())
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  name      String
+  sortOrder Int            @default(0)
+  columns   KanbanColumn[]
+  cards     KanbanCard[]
+}
+
+model KanbanColumn {
+  id        String       @id @default(cuid())
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  boardId   String
+  board     KanbanBoard  @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  name      String
+  color     String?      // gray | blue | green | amber | red | violet | teal
+  isDone    Boolean      @default(false) // highlighted like "Done" on the TV
+  sortOrder Int          @default(0)
+  cards     KanbanCard[]
+
+  @@index([boardId, sortOrder])
+}
+
+model KanbanCard {
+  id        String       @id @default(cuid())
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  boardId   String
+  board     KanbanBoard  @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  columnId  String
+  column    KanbanColumn @relation(fields: [columnId], references: [id], onDelete: Cascade)
+  title     String
+  notes     String?      @db.Text
+  tag       String?
+  owner     String?
+  dueOn     DateTime?
+  sortOrder Int          @default(0)
+
+  @@index([columnId, sortOrder])
+  @@index([boardId])
+}

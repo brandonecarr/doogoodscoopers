@@ -43,7 +43,8 @@ export async function PUT(request: Request) {
   const config = body?.config as TvBoardConfig | undefined;
   if (!config || typeof config !== "object") return NextResponse.json({ error: "config is required" }, { status: 400 });
 
-  const errors = validateConfig(config);
+  const boards = await prisma.kanbanBoard.findMany({ select: { id: true } });
+  const errors = validateConfig(config, new Set(boards.map((b) => b.id)));
   if (errors.length) return NextResponse.json({ error: errors[0], errors }, { status: 422 });
 
   const current = await prisma.tvConfig.findUnique({ where: { id: CONFIG_ID } });

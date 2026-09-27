@@ -11,7 +11,7 @@ export type ElementType =
 
 export interface TvElement {
   type: ElementType;
-  config: { metric?: string; display?: string; pipelineID?: string };
+  config: { metric?: string; display?: string; pipelineID?: string; boardID?: string; columnIDs?: string[] };
 }
 export interface TvSection { id: string; title: string; size: SectionSize; source: SectionSource; elements: TvElement[] }
 export interface TvBoard { id: string; title: string; sections: TvSection[] }
@@ -52,7 +52,12 @@ export interface CatalogItem {
   defaultTitle: string;
   displays?: { value: string; label: string }[];
   usesPipeline?: boolean;
+  /** Shows one of the custom Kanban boards (/admin/kanban). */
+  usesKanbanBoard?: boolean;
 }
+
+/** The TV shows at most this many columns of a Kanban board. */
+export const MAX_TV_KANBAN_COLUMNS = 5;
 
 export const CATALOG: CatalogItem[] = [
   { metric: "goal.hero", label: "Goal progress", hint: "Ring, days left, pace and milestone banner", group: "Goals", type: "goalProgress", source: "goal", sizes: ["L"], defaultTitle: "Goal" },
@@ -71,6 +76,7 @@ export const CATALOG: CatalogItem[] = [
   { metric: "crm.leadSources.30d", label: "Lead sources", hint: "Top four sources, last 30 days", group: "Admin", type: "barChart", source: "crm", sizes: ["M"], defaultTitle: "Lead sources · 30 days", displays: [{ value: "sources", label: "Sources grid" }] },
   { metric: "crm.followups.today", label: "Follow up today", hint: "Leads and call-list prospects due today", group: "Admin", type: "list", source: "crm", sizes: ["M", "L"], defaultTitle: "Follow up today", displays: [{ value: "detail", label: "Name + detail" }] },
   { metric: "pm.tasks", label: "Task board", hint: "To do · In progress · Done this week", group: "Admin", type: "taskBoard", source: "pm", sizes: ["M", "L"], defaultTitle: "Task board" },
+  { metric: "pm.kanban", label: "Kanban board", hint: "One of your custom boards (Kanban page). L: cards · M/XL: counts", group: "Admin", type: "kanban", source: "pm", sizes: ["L", "M", "XL"], defaultTitle: "Board", usesKanbanBoard: true },
   { metric: "pm.calendar.upcoming", label: "Coming up", hint: "Calendar entries and task due dates", group: "Admin", type: "list", source: "pm", sizes: ["M", "L"], defaultTitle: "Coming up", displays: [{ value: "dated", label: "Date + event" }] },
 ];
 
@@ -87,13 +93,18 @@ export const LEAD_STATUSES: { value: string; label: string }[] = [
   { value: "NOT_INTERESTED", label: "Not interested" },
 ];
 
-export function newSection(item: CatalogItem, pipelineID?: string): TvSection {
+export function newSection(item: CatalogItem, pipelineID?: string, board?: { id: string; name: string }): TvSection {
   return {
     id: `s-${Math.random().toString(36).slice(2, 9)}`,
-    title: item.defaultTitle,
+    title: item.usesKanbanBoard && board ? board.name : item.defaultTitle,
     size: item.sizes[0],
     source: item.source,
-    elements: [{ type: item.type, config: { metric: item.metric, display: item.displays?.[0]?.value, pipelineID: item.usesPipeline ? pipelineID : undefined } }],
+    elements: [{ type: item.type, config: {
+      metric: item.metric,
+      display: item.displays?.[0]?.value,
+      pipelineID: item.usesPipeline ? pipelineID : undefined,
+      boardID: item.usesKanbanBoard ? board?.id : undefined,
+    } }],
   };
 }
 
@@ -134,8 +145,11 @@ export function packGrid(sizes: SectionSize[]): ({ col: number; row: number } | 
 
 // ─── Validation ───────────────────────────────────────────────────────────────
 
-/** Problems that would stop the TV from drawing this config; empty when it's good to save. */
-export function validateConfig(cfg: TvBoardConfig): string[] {
+/**
+ * Problems that would stop the TV from drawing this config; empty when it's good to save.
+ * Pass `kanbanBoardIds` (server side) to also check that chosen Kanban boards still exist.
+ */
+export function validateConfig(cfg: TvBoardConfig, kanbanBoardIds?: Set<string>): string[] {
   const errors: string[] = [];
   if (!Array.isArray(cfg.boards) || cfg.boards.length === 0) errors.push("Add at least one board.");
   const pipelineIds = new Set((cfg.pipelines || []).map((p) => p.id));
@@ -153,6 +167,11 @@ export function validateConfig(cfg: TvBoardConfig): string[] {
       if (!item.sizes.includes(s.size)) errors.push(`${name}: "${s.title}" can't be size ${s.size} (use ${item.sizes.join(" or ")}).`);
       if (!s.title?.trim()) errors.push(`${name}: a section is missing its title.`);
       if (item.usesPipeline && el?.config.pipelineID && !pipelineIds.has(el.config.pipelineID)) errors.push(`${name}: "${s.title}" uses a pipeline that no longer exists.`);
+      if (item.usesKanbanBoard) {
+        if (!el?.config.boardID) errors.push(`${name}: pick which Kanban board "${s.title}" shows.`);
+        else if (kanbanBoardIds && !kanbanBoardIds.has(el.config.boardID)) errors.push(`${name}: "${s.title}" shows a Kanban board that was deleted.`);
+        if ((el?.config.columnIDs?.length ?? 0) > MAX_TV_KANBAN_COLUMNS) errors.push(`${name}: "${s.title}" can show at most ${MAX_TV_KANBAN_COLUMNS} columns.`);
+      }
     }
   }
 

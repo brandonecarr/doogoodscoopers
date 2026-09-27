@@ -32,6 +32,8 @@ export interface TvSnapshot {
   tasks: { todo: TvTask[]; doing: TvTask[]; done: TvTask[]; counts: { todo: number; doing: number; doneThisWeek: number } };
   upcoming: { day: string; label: string; title: string }[];
   activeHistory: { date: string; value: number }[];
+  /** Custom Kanban boards; each column has its full count and the first few cards. */
+  kanbanBoards: { id: string; name: string; columns: { id: string; name: string; isDone: boolean; count: number; cards: TvTask[] }[] }[];
 }
 
 type Lead = { createdAt: Date; updatedAt: Date; status: string; archived: boolean; title: string; meta: string; source: string; commercial: boolean };
@@ -85,7 +87,7 @@ export async function buildTvSnapshot(now = new Date()): Promise<TvSnapshot> {
   const thirtyAgo = dayStart(addDays(today, -30));
   const eightWeeksAgo = dayStart(addDays(weekStart, -7 * 7));
 
-  const [leads, tasks, calendar, history, followUps] = await Promise.all([
+  const [leads, tasks, calendar, history, followUps, kanban] = await Promise.all([
     leadsSince(eightWeeksAgo < thirtyAgo ? eightWeeksAgo : thirtyAgo),
     prisma.task.findMany({
       where: { OR: [{ status: { in: ["TODO", "DOING"] } }, { status: "DONE", doneAt: { gte: weekStartAt } }] },
@@ -94,6 +96,13 @@ export async function buildTvSnapshot(now = new Date()): Promise<TvSnapshot> {
     prisma.calendarEntry.findMany({ where: { startAt: { gte: todayStart, lt: dayStart(addDays(today, 15)) } }, orderBy: { startAt: "asc" }, take: 10 }),
     prisma.tvMetricDaily.findMany({ where: { metric: "active_customers" }, orderBy: { date: "asc" }, take: 400 }),
     followUpsToday(todayStart, tomorrowStart),
+    prisma.kanbanBoard.findMany({
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      include: {
+        columns: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
+        cards: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
+      },
+    }),
   ]);
 
   // Pipeline: last 30 days. Converted leads usually get archived, so keep those for the Won stage.
@@ -166,6 +175,25 @@ export async function buildTvSnapshot(now = new Date()): Promise<TvSnapshot> {
     },
     upcoming,
     activeHistory: history.map((h) => ({ date: h.date, value: h.value })),
+    kanbanBoards: kanban.map((b) => ({
+      id: b.id,
+      name: b.name,
+      columns: b.columns.map((col) => {
+        const cards = b.cards.filter((c) => c.columnId === col.id);
+        return {
+          id: col.id, name: col.name, isDone: col.isDone, count: cards.length,
+          cards: cards.slice(0, 5).map((c) => {
+            const overdue = !col.isDone && !!c.dueOn && c.dueOn < todayStart;
+            const parts = [c.tag, c.owner].filter(Boolean) as string[];
+            if (!col.isDone && c.dueOn) {
+              const due = businessDay(c.dueOn);
+              parts.push(overdue ? "overdue" : due === today ? "today" : due <= addDays(today, 6) ? shortDayLabel(due).split(" ")[0] : shortDayLabel(due));
+            }
+            return { id: c.id, title: c.title, meta: parts.join(" · "), overdue, commercial: (c.tag || "").toLowerCase() === "commercial" };
+          }),
+        };
+      }),
+    })),
   };
 }
 
