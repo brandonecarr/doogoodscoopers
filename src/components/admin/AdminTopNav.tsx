@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   ListTodo,
-  Columns3,
   Tv,
   LayoutDashboard,
   TrendingUp,
@@ -42,7 +41,6 @@ const primaryNav: NavItem[] = [
   { name: "Leads",     short: "Leads",     href: "/admin/leads",     icon: Users2 },
   { name: "Customers", short: "Customers", href: "/admin/customers", icon: Dog },
   { name: "Tasks",     short: "Tasks",     href: "/admin/tasks",     icon: ListTodo },
-  { name: "Kanban",    short: "Kanban",    href: "/admin/kanban",    icon: Columns3 },
   { name: "Reviews",   short: "Reviews",   href: "/admin/reviews",   icon: Star },
   { name: "Campaigns", short: "Campaigns", href: "/admin/campaigns", icon: Megaphone },
   { name: "Marketing", short: "Marketing", href: "/admin/marketing", icon: Rocket },

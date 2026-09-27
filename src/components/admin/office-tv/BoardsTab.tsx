@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { Plus, Trash2, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, RotateCcw } from "lucide-react";
 import {
   ALL_SIZES, CATALOG, SIZE_CELLS, SIZE_LABEL, catalogItem, defaultConfig, maxKanbanColumns, newSection, packGrid,
@@ -15,7 +14,7 @@ interface KanbanSummary { id: string; name: string; columns: { id: string; name:
 const SOURCE_TINT: Record<string, string> = { goal: "bg-blue-50 border-blue-200", crm: "bg-white border-gray-200", pm: "bg-white border-gray-200" };
 
 /** Boards, sections and a live 4×3 preview laid out exactly like the TV. */
-export function BoardsTab({ config, onChange }: { config: TvBoardConfig; onChange: (c: TvBoardConfig) => void }) {
+export function BoardsTab({ config, onChange, onOpenKanban }: { config: TvBoardConfig; onChange: (c: TvBoardConfig) => void; onOpenKanban: () => void }) {
   const [boardIndex, setBoardIndex] = useState(0);
   const [selected, setSelected] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
@@ -218,7 +217,7 @@ export function BoardsTab({ config, onChange }: { config: TvBoardConfig; onChang
                     <div>
                       <label className={label}>Kanban board</label>
                       {kanbanBoards.length === 0 ? (
-                        <p className="text-sm text-gray-500">No boards yet. <Link href="/admin/kanban" className="text-teal-700 font-semibold">Create one on the Kanban page</Link>.</p>
+                        <p className="text-sm text-gray-500">No boards yet. <button type="button" onClick={onOpenKanban} className="text-teal-700 font-semibold">Create one in the Kanban tab</button>.</p>
                       ) : (
                         <select value={cfg.boardID ?? ""} onChange={(e) => {
                           const next = kanbanBoards.find((b) => b.id === e.target.value);

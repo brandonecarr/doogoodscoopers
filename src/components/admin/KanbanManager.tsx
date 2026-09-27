@@ -234,7 +234,7 @@ export function KanbanManager() {
         </div>
       )}
 
-      {shown && <p className="text-[11px] text-gray-400 inline-flex items-center gap-1">Drag cards to move or reorder them. Click a column name to rename, recolor, or mark it as the &quot;done&quot; column. <Tv className="w-3 h-3" /> Show a board on the office TV from Office TV → Boards → Add section → Kanban board.</p>}
+      {shown && <p className="text-[11px] text-gray-400 inline-flex items-center gap-1">Drag cards to move or reorder them. Click a column name to rename, recolor, or mark it as the &quot;done&quot; column. <Tv className="w-3 h-3" /> To show a board on the TV: Boards tab → Add section → Kanban board.</p>}
 
       {openCard && shown && (
         <CardEditor card={openCard} columns={columns} onClose={() => setOpenCard(null)}

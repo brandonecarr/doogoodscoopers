@@ -1,26 +1,29 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Save, Target, LayoutGrid, GitBranch, KeyRound, AlertTriangle, Check } from "lucide-react";
+import { Loader2, Save, Target, LayoutGrid, GitBranch, KeyRound, AlertTriangle, Check, Columns3 } from "lucide-react";
 import { validateConfig, type TvBoardConfig } from "@/lib/tv-config";
 import { OfficeTvCard } from "@/components/admin/settings/OfficeTvCard";
+import { KanbanManager } from "@/components/admin/KanbanManager";
 import { GoalTab } from "./GoalTab";
 import { BoardsTab } from "./BoardsTab";
 import { PipelineTab } from "./PipelineTab";
 
 export interface GoalContext { activeCustomers: number; weeklyPace: number }
-type Tab = "goal" | "boards" | "pipeline" | "connection";
+export type OfficeTvTab = "goal" | "boards" | "pipeline" | "kanban" | "connection";
+type Tab = OfficeTvTab;
 
 const TABS: { id: Tab; label: string; icon: typeof Target }[] = [
   { id: "goal", label: "Goal", icon: Target },
   { id: "boards", label: "Boards", icon: LayoutGrid },
   { id: "pipeline", label: "Pipeline", icon: GitBranch },
+  { id: "kanban", label: "Kanban", icon: Columns3 },
   { id: "connection", label: "Connection", icon: KeyRound },
 ];
 
 /** Edits what the office TV shows. Saves to TvConfig; the TV picks changes up within a minute. */
-export function OfficeTvEditor() {
-  const [tab, setTab] = useState<Tab>("goal");
+export function OfficeTvEditor({ initialTab = "goal" }: { initialTab?: Tab }) {
+  const [tab, setTab] = useState<Tab>(initialTab);
   const [config, setConfig] = useState<TvBoardConfig | null>(null);
   const [saved, setSaved] = useState<string>("");
   const [version, setVersion] = useState(0);
@@ -68,6 +71,8 @@ export function OfficeTvEditor() {
   }
 
   const update = (next: TvBoardConfig) => setConfig(next);
+  // Kanban and Connection save each change immediately; the rest use "Save to TV".
+  const savesAsYouGo = tab === "kanban" || tab === "connection";
 
   return (
     <div className="space-y-3.5">
@@ -81,7 +86,7 @@ export function OfficeTvEditor() {
             </button>
           ))}
         </div>
-        {tab !== "connection" && (
+        {!savesAsYouGo && (
           <div className="flex items-center gap-3">
             <span className="text-xs text-gray-500">
               {dirty ? "Unsaved changes" : isDefault ? "Design default · not saved yet" : `Saved · version ${version}`}
@@ -97,7 +102,7 @@ export function OfficeTvEditor() {
       </div>
 
       {error && <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-start justify-between gap-3"><span>{error}</span>{error.includes("Reload") && <button onClick={load} className="text-red-800 font-semibold underline whitespace-nowrap">Reload</button>}</div>}
-      {problems.length > 0 && tab !== "connection" && (
+      {problems.length > 0 && !savesAsYouGo && (
         <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-900">
           <p className="font-semibold inline-flex items-center gap-1.5"><AlertTriangle className="w-4 h-4" /> Fix before saving</p>
           <ul className="mt-1 list-disc pl-5 space-y-0.5">{problems.map((p) => <li key={p}>{p}</li>)}</ul>
@@ -105,11 +110,12 @@ export function OfficeTvEditor() {
       )}
 
       {tab === "goal" && <GoalTab config={config} onChange={update} context={context} />}
-      {tab === "boards" && <BoardsTab config={config} onChange={update} />}
+      {tab === "boards" && <BoardsTab config={config} onChange={update} onOpenKanban={() => setTab("kanban")} />}
       {tab === "pipeline" && <PipelineTab config={config} onChange={update} />}
+      {tab === "kanban" && <KanbanManager />}
       {tab === "connection" && <OfficeTvCard />}
 
-      {tab !== "connection" && <p className="text-[11px] text-gray-400">The TV checks for changes every minute. Rotation speed is set on each TV (Settings on the TV).</p>}
+      {!savesAsYouGo && <p className="text-[11px] text-gray-400">The TV checks for changes every minute. Rotation speed is set on each TV (Settings on the TV).</p>}
     </div>
   );
 }
