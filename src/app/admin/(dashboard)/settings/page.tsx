@@ -1,12 +1,11 @@
 import Link from "next/link";
-import { Settings, Check, AlertCircle, ExternalLink } from "lucide-react";
+import { Settings, Check, AlertCircle, ExternalLink, ArrowRight } from "lucide-react";
 import { PageHero, heroBtnSecondary } from "@/components/admin/PageHero";
 import { getIntegrationStatus, getSystemCounts } from "@/lib/system-status";
 import { AdminUsersCard } from "@/components/admin/settings/AdminUsersCard";
 import { CanvasserUsersCard } from "@/components/admin/settings/CanvasserUsersCard";
 import { SettingsGroupCard, type GroupDef } from "@/components/admin/settings/SettingsGroupCard";
 import { AllSettingsCard } from "@/components/admin/settings/AllSettingsCard";
-import { OfficeTvCard } from "@/components/admin/settings/OfficeTvCard";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +31,7 @@ const AREAS: { name: string; href: string; what: string }[] = [
   { name: "Leads", href: "/admin/leads", what: "Residential, Commercial, Call List, pipeline board, map" },
   { name: "Customers", href: "/admin/customers", what: "Sweep&Go customers, route planner, growth dashboard" },
   { name: "Tasks", href: "/admin/tasks", what: "Team to-do board, also shown on the office TV" },
+  { name: "Office TV", href: "/admin/office-tv", what: "Growth Board goal, layout, pipeline stages and TV keys" },
   { name: "Campaigns", href: "/admin/campaigns", what: "Blasts, drips, sending hours, failed-payment texts" },
   { name: "Templates", href: "/admin/templates", what: "Message templates" },
   { name: "Email", href: "/admin/email", what: "Email sending and unsubscribes" },
@@ -79,7 +79,10 @@ export default async function SettingsPage() {
 
       <AdminUsersCard />
       <CanvasserUsersCard />
-      <OfficeTvCard />
+      <div className="dgs-card p-6 flex flex-wrap items-center justify-between gap-3" id="office-tv">
+        <div><h2 className="text-lg font-semibold text-navy-900">Office TV</h2><p className="text-sm text-gray-500">The Growth Board&apos;s goal, boards, pipeline stages and connection keys now live on their own page.</p></div>
+        <Link href="/admin/office-tv" className="inline-flex items-center gap-1.5 px-4 py-2 bg-teal-600 text-white text-sm font-semibold rounded-lg hover:bg-teal-700">Open Office TV <ArrowRight className="w-4 h-4" /></Link>
+      </div>
 
       {/* Integrations */}
       <div className="dgs-card p-6" id="integrations">

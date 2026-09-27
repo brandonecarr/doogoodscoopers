@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   ListTodo,
+  Tv,
   LayoutDashboard,
   TrendingUp,
   Grid3x3,
@@ -57,6 +58,7 @@ const moreNav: NavItem[] = [
   { name: "Canvassers",           short: "Canvassers", href: "/admin/canvassers",   icon: Footprints },
   { name: "Out of Area",          short: "Out of Area", href: "/admin/out-of-area", icon: MapPinOff },
   { name: "Career Applications",  short: "Careers",    href: "/admin/careers",     icon: Briefcase },
+  { name: "Office TV",            short: "Office TV",  href: "/admin/office-tv",   icon: Tv },
   { name: "Settings",             short: "Settings",   href: "/admin/settings",    icon: Settings },
 ];
 
