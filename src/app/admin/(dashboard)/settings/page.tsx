@@ -6,6 +6,7 @@ import { AdminUsersCard } from "@/components/admin/settings/AdminUsersCard";
 import { CanvasserUsersCard } from "@/components/admin/settings/CanvasserUsersCard";
 import { SettingsGroupCard, type GroupDef } from "@/components/admin/settings/SettingsGroupCard";
 import { AllSettingsCard } from "@/components/admin/settings/AllSettingsCard";
+import { OfficeTvCard } from "@/components/admin/settings/OfficeTvCard";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,7 @@ const AREAS: { name: string; href: string; what: string }[] = [
   { name: "Dashboard", href: "/admin", what: "Today at a glance" },
   { name: "Leads", href: "/admin/leads", what: "Residential, Commercial, Call List, pipeline board, map" },
   { name: "Customers", href: "/admin/customers", what: "Sweep&Go customers, route planner, growth dashboard" },
+  { name: "Tasks", href: "/admin/tasks", what: "Team to-do board, also shown on the office TV" },
   { name: "Campaigns", href: "/admin/campaigns", what: "Blasts, drips, sending hours, failed-payment texts" },
   { name: "Templates", href: "/admin/templates", what: "Message templates" },
   { name: "Email", href: "/admin/email", what: "Email sending and unsubscribes" },
@@ -48,12 +50,16 @@ const AREAS: { name: string; href: string; what: string }[] = [
   { name: "Career Applications", href: "/admin/careers", what: "Hiring pipeline" },
 ];
 
+/** Jump link to a section of this page, styled for the hero banner. */
+function NavLink({ id, label }: { id: string; label: string }) {
+  return <a href={`#${id}`} className={heroBtnSecondary}>{label}</a>;
+}
+
 export default async function SettingsPage() {
   const [integrations, counts] = await Promise.all([getIntegrationStatus(), getSystemCounts()]);
   const groups = [...new Set(integrations.map((i) => i.group))];
   const okCount = integrations.filter((i) => i.ok).length;
   const version = (process.env.VERCEL_GIT_COMMIT_SHA || "").slice(0, 7);
-  const NavLink = ({ id, label }: { id: string; label: string }) => <a href={`#${id}`} className={heroBtnSecondary}>{label}</a>;
 
   return (
     <div className="space-y-3.5 pb-20 lg:pb-0">
@@ -61,7 +67,7 @@ export default async function SettingsPage() {
         title="Settings"
         subtitle={`${counts.admins} admin${counts.admins === 1 ? "" : "s"} · ${counts.canvassers} canvasser${counts.canvassers === 1 ? "" : "s"} · ${okCount} of ${integrations.length} integrations ready${version ? ` · build ${version}` : ""}`}
         icon={<div className="w-11 h-11 rounded-[13px] flex items-center justify-center" style={{ background: "linear-gradient(150deg,#C4B5FD,#6D3EF0)" }}><Settings className="w-[22px] h-[22px] text-white" /></div>}
-        actions={<><NavLink id="users" label="Users" /><NavLink id="integrations" label="Integrations" /><NavLink id="features" label="Features" /><NavLink id="areas" label="All areas" /></>}
+        actions={<><NavLink id="users" label="Users" /><NavLink id="office-tv" label="Office TV" /><NavLink id="integrations" label="Integrations" /><NavLink id="features" label="Features" /><NavLink id="areas" label="All areas" /></>}
       />
 
       {/* System at a glance */}
@@ -73,6 +79,7 @@ export default async function SettingsPage() {
 
       <AdminUsersCard />
       <CanvasserUsersCard />
+      <OfficeTvCard />
 
       {/* Integrations */}
       <div className="dgs-card p-6" id="integrations">

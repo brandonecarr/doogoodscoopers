@@ -75,6 +75,10 @@
     {
       "path": "/api/v2/cron/canvasser-daily",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/v2/cron/tv-daily-metrics",
+      "schedule": "55 * * * *"
     }
   ]
 }

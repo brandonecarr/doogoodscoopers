@@ -1403,3 +1403,54 @@ model CalendarEntry {
 
   @@index([startAt])
 }
+
+// ─── OfficeTV (Apple TV Growth Board) ──────────────────────────────────────────
+// The TV reads the admin through /api/tv/* with a connector key. See 0053_officetv.sql.
+
+// Team task board (/admin/tasks); the TV's Operations board shows it.
+model Task {
+  id        String    @id @default(cuid())
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  title     String
+  notes     String?   @db.Text
+  tag       String?   // e.g. Supplies, Fleet, Commercial
+  status    String    @default("TODO") // TODO | DOING | DONE
+  owner     String?
+  dueOn     DateTime?
+  doneAt    DateTime?
+  sortOrder Int       @default(0)
+
+  @@index([status, sortOrder])
+  @@index([doneAt])
+}
+
+// The TV's boards, hero goal and pipeline stages (one row, id "default").
+model TvConfig {
+  id        String   @id
+  config    Json
+  version   Int      @default(1)
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
+// One value per metric per business day, for pace and "you passed N on Tuesday".
+model TvMetricDaily {
+  date      String   // YYYY-MM-DD, America/Los_Angeles
+  metric    String   // active_customers
+  value     Float
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@id([date, metric])
+}
+
+// Keys that let a TV call /api/tv/*. Only the sha256 hash is stored.
+model TvConnectorKey {
+  id         String    @id @default(cuid())
+  createdAt  DateTime  @default(now())
+  label      String
+  keyHash    String    @unique
+  keyPreview String
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+}

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  ListTodo,
   LayoutDashboard,
   TrendingUp,
   Grid3x3,
@@ -38,6 +39,7 @@ const primaryNav: NavItem[] = [
   { name: "Dashboard", short: "Dashboard", href: "/admin",           icon: LayoutDashboard },
   { name: "Leads",     short: "Leads",     href: "/admin/leads",     icon: Users2 },
   { name: "Customers", short: "Customers", href: "/admin/customers", icon: Dog },
+  { name: "Tasks",     short: "Tasks",     href: "/admin/tasks",     icon: ListTodo },
   { name: "Reviews",   short: "Reviews",   href: "/admin/reviews",   icon: Star },
   { name: "Campaigns", short: "Campaigns", href: "/admin/campaigns", icon: Megaphone },
   { name: "Marketing", short: "Marketing", href: "/admin/marketing", icon: Rocket },
