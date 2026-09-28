@@ -10,12 +10,32 @@
 //   GOOGLE_ADS_REFRESH_TOKEN       — OAuth2 refresh token for your Ads login
 //   GOOGLE_ADS_CUSTOMER_ID         — the ad account id (digits only, no dashes)
 //   GOOGLE_ADS_LOGIN_CUSTOMER_ID   — (optional) MCC id if the above is under a manager
-//   GOOGLE_ADS_API_VERSION         — (optional) defaults to v21
+//   GOOGLE_ADS_API_VERSION         — (optional) pin the API version; auto-detected otherwise
 //   GOOGLE_ADS_GEO_TARGETS         — (optional) geoTargetConstant ids, comma-separated
 //                                     (default 21137 = California). US = 2840.
 
-const V = process.env.GOOGLE_ADS_API_VERSION || "v21";
-const BASE = `https://googleads.googleapis.com/${V}`;
+// The Google Ads API is versioned in the URL (e.g. /v21/) and Google retires old
+// versions on a rolling basis, so a hardcoded version eventually 404s. We detect
+// the newest version this account accepts once and cache it. GOOGLE_ADS_API_VERSION
+// pins it explicitly if ever needed.
+const CANDIDATE_VERSIONS = ["v24", "v23", "v22", "v21", "v20", "v19", "v18", "v17"];
+const HOST = "https://googleads.googleapis.com";
+let resolvedVersion: string | null = null;
+
+/** Resolve the API base URL, probing for a live version (cached) when not pinned. */
+async function resolveBase(token: string, customerId: string): Promise<string> {
+  const pinned = process.env.GOOGLE_ADS_API_VERSION;
+  if (pinned) return `${HOST}/${pinned}`;
+  if (resolvedVersion) return `${HOST}/${resolvedVersion}`;
+  const body = JSON.stringify({ keywordSeed: { keywords: ["dog waste removal"] }, keywordPlanNetwork: "GOOGLE_SEARCH", language: "languageConstants/1000" });
+  for (const v of CANDIDATE_VERSIONS) {
+    try {
+      const res = await fetch(`${HOST}/${v}/customers/${customerId}:generateKeywordIdeas`, { method: "POST", headers: headers(token), body, cache: "no-store" });
+      if (res.status !== 404) { resolvedVersion = v; return `${HOST}/${v}`; }
+    } catch { /* try next */ }
+  }
+  return `${HOST}/${CANDIDATE_VERSIONS[CANDIDATE_VERSIONS.length - 1]}`;
+}
 
 export interface KeywordMetric {
   text: string;
@@ -97,8 +117,9 @@ export async function googleAdsDiagnostic(): Promise<Record<string, unknown>> {
   if (!token) return { configured: true, tokenOk: false, error: "OAuth token exchange failed — check CLIENT_ID / CLIENT_SECRET / REFRESH_TOKEN." };
   const customerId = digits(process.env.GOOGLE_ADS_CUSTOMER_ID);
   const geos = (process.env.GOOGLE_ADS_GEO_TARGETS || "21137").split(",").map((s) => s.trim()).filter(Boolean).map((id) => `geoTargetConstants/${id}`);
+  const base = await resolveBase(token, customerId);
   try {
-    const res = await fetch(`${BASE}/customers/${customerId}:generateKeywordIdeas`, {
+    const res = await fetch(`${base}/customers/${customerId}:generateKeywordIdeas`, {
       method: "POST",
       headers: headers(token),
       body: JSON.stringify({ keywordSeed: { keywords: ["pooper scooper service"] }, geoTargetConstants: geos, language: "languageConstants/1000", keywordPlanNetwork: "GOOGLE_SEARCH" }),
@@ -108,14 +129,14 @@ export async function googleAdsDiagnostic(): Promise<Record<string, unknown>> {
     let ideaCount = 0;
     try { ideaCount = (JSON.parse(bodyText).results || []).length; } catch { /* ignore */ }
     return {
-      configured: true, tokenOk: true, apiVersion: V, customerId,
+      configured: true, tokenOk: true, apiVersion: resolvedVersion || process.env.GOOGLE_ADS_API_VERSION || "auto", customerId,
       loginCustomerId: digits(process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID) || null,
       hasDeveloperToken: !!process.env.GOOGLE_ADS_DEVELOPER_TOKEN,
       status: res.status, ok: res.ok, ideaCount,
       error: res.ok ? null : bodyText.slice(0, 1200),
     };
   } catch (e) {
-    return { configured: true, tokenOk: true, apiVersion: V, error: e instanceof Error ? e.message : String(e) };
+    return { configured: true, tokenOk: true, apiVersion: resolvedVersion || "auto", error: e instanceof Error ? e.message : String(e) };
   }
 }
 
@@ -128,9 +149,10 @@ export async function generateKeywordIdeas(seeds: string[]): Promise<KeywordMetr
   const geos = (process.env.GOOGLE_ADS_GEO_TARGETS || "21137")
     .split(",").map((s) => s.trim()).filter(Boolean)
     .map((id) => `geoTargetConstants/${id}`);
+  const base = await resolveBase(token, customerId);
 
   try {
-    const res = await fetch(`${BASE}/customers/${customerId}:generateKeywordIdeas`, {
+    const res = await fetch(`${base}/customers/${customerId}:generateKeywordIdeas`, {
       method: "POST",
       headers: headers(token),
       body: JSON.stringify({
@@ -173,8 +195,9 @@ export async function getSearchTerms(days = 30): Promise<SearchTermRow[]> {
     WHERE segments.date DURING LAST_${days === 7 ? "7" : "30"}_DAYS
     ORDER BY metrics.impressions DESC
     LIMIT 100`;
+  const base = await resolveBase(token, customerId);
   try {
-    const res = await fetch(`${BASE}/customers/${customerId}/googleAds:searchStream`, {
+    const res = await fetch(`${base}/customers/${customerId}/googleAds:searchStream`, {
       method: "POST",
       headers: headers(token),
       body: JSON.stringify({ query }),
