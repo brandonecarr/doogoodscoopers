@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Radar, Loader2, Play, Copy, Check, Flame, TrendingUp, Sparkle, Ban, ChevronDown,
-  Building2, Plus, X, Trash2, Search, AlertTriangle, Info,
+  Building2, Plus, X, Trash2, Search, AlertTriangle, Info, ClipboardList, FileDown,
 } from "lucide-react";
 import { PageHero, heroBtnPrimary, heroPrimaryStyle, heroBtnSecondary } from "@/components/admin/PageHero";
 import { formatDate, formatDateTime } from "@/lib/datetime";
@@ -221,6 +221,9 @@ export function KeywordRadar({ report, history, competitors, googleAdsConfigured
             <p className="text-[14px] text-bodytext leading-relaxed">{report.summary}</p>
           </div>
 
+          {/* Best terms — copy-ready list for the Ads builder */}
+          <BestTermsList positives={positives} negatives={negatives} weekOf={report.weekOf} />
+
           {/* Buckets */}
           {(["HOT", "TRENDING", "NEW"] as const).map((bucket) => {
             const list = byBucket(bucket);
@@ -299,6 +302,115 @@ function ItemCard({ it, onStatus }: { it: RadarItem; onStatus: (id: string, stat
           {dismissed ? <><Plus className="w-3.5 h-3.5" />Restore</> : <><Trash2 className="w-3.5 h-3.5" />Dismiss</>}
         </button>
       </div>
+    </div>
+  );
+}
+
+// ─── Best terms: the copy-ready deliverable ─────────────────────────────────────
+const BUCKET_RANK: Record<string, number> = { HOT: 0, TRENDING: 1, NEW: 2 };
+/** Google Ads match-type syntax: exact [term], phrase "term", broad term. */
+function adFormat(term: string, matchType: string | null): string {
+  if (matchType === "exact") return `[${term}]`;
+  if (matchType === "phrase") return `"${term}"`;
+  return term;
+}
+function sortedPositives(items: RadarItem[]): RadarItem[] {
+  return [...items].sort(
+    (a, b) => (BUCKET_RANK[a.bucket] ?? 3) - (BUCKET_RANK[b.bucket] ?? 3) || (b.monthlySearches ?? 0) - (a.monthlySearches ?? 0),
+  );
+}
+function groupByAdGroup(items: RadarItem[]): [string, RadarItem[]][] {
+  const groups = new Map<string, RadarItem[]>();
+  for (const it of items) {
+    const g = it.adGroup?.trim() || "General";
+    const arr = groups.get(g);
+    if (arr) arr.push(it); else groups.set(g, [it]);
+  }
+  return [...groups.entries()];
+}
+function buildTermsText(positives: RadarItem[], negatives: RadarItem[], weekLabel: string): string {
+  const lines: string[] = [`Best Google Ads keywords — week of ${weekLabel}`, ""];
+  for (const [group, its] of groupByAdGroup(sortedPositives(positives))) {
+    lines.push(`# ${group}`);
+    for (const it of its) lines.push(adFormat(it.term, it.matchType));
+    lines.push("");
+  }
+  if (negatives.length) {
+    lines.push("# Negative keywords");
+    lines.push(negatives.map((n) => n.term).join(", "));
+  }
+  return lines.join("\n").trim();
+}
+function buildCsv(positives: RadarItem[]): string {
+  const rows: (string | number)[][] = [["keyword", "match_type", "ad_group", "bucket", "monthly_searches", "competition"]];
+  for (const it of sortedPositives(positives)) {
+    rows.push([it.term, it.matchType || "broad", it.adGroup || "General", it.bucket, it.monthlySearches ?? "", it.competition || ""]);
+  }
+  return rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+}
+
+function CopyTextButton({ text, label, icon: Icon, primary }: { text: string; label: string; icon: typeof Copy; primary?: boolean }) {
+  const [done, setDone] = useState(false);
+  return (
+    <button
+      onClick={() => { navigator.clipboard?.writeText(text).then(() => { setDone(true); setTimeout(() => setDone(false), 1400); }).catch(() => {}); }}
+      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] text-[12.5px] font-bold transition-colors ${primary ? "text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+      style={primary ? heroPrimaryStyle : undefined}
+    >
+      {done ? <Check className="w-4 h-4" /> : <Icon className="w-4 h-4" />}{done ? "Copied!" : label}
+    </button>
+  );
+}
+
+function BestTermsList({ positives, negatives, weekOf }: { positives: RadarItem[]; negatives: RadarItem[]; weekOf: string }) {
+  if (!positives.length && !negatives.length) return null;
+  const weekLabel = formatDate(weekOf, { month: "long", day: "numeric", year: "numeric" });
+  const groups = groupByAdGroup(sortedPositives(positives));
+  return (
+    <div className="dgs-card p-4 sm:p-5 border border-iris-link/20">
+      <div className="flex items-center justify-between gap-3 flex-wrap mb-1">
+        <h3 className="text-[15px] font-extrabold text-ink flex items-center gap-2"><ClipboardList className="w-[18px] h-[18px] text-iris-link" /> Best terms to add this week <span className="text-gray-400 font-semibold">· {positives.length}</span></h3>
+        <div className="flex items-center gap-2">
+          <CopyTextButton text={buildTermsText(positives, negatives, weekLabel)} label="Copy list" icon={Copy} primary />
+          <CopyTextButton text={buildCsv(positives)} label="CSV" icon={FileDown} />
+        </div>
+      </div>
+      <p className="text-[11.5px] text-gray-400 mb-3">Ready to paste into Google Ads or hand to your Ads builder — grouped by ad group, in match-type syntax (<span className="font-mono">[exact]</span>, <span className="font-mono">&quot;phrase&quot;</span>, broad).</p>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-4">
+        {groups.map(([group, its]) => (
+          <div key={group}>
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <span className="text-[12px] font-bold text-gray-500 uppercase tracking-wide">{group}</span>
+              <span className="text-[10px] text-gray-400">· {its.length}</span>
+              <CopyTextButton text={its.map((it) => adFormat(it.term, it.matchType)).join("\n")} label="" icon={Copy} />
+            </div>
+            <ul className="space-y-0.5">
+              {its.map((it) => {
+                const meta = BUCKET_META[it.bucket];
+                return (
+                  <li key={it.id} className="flex items-center gap-2 group">
+                    <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${meta?.dot || "bg-gray-400"}`} />
+                    <code className="text-[13px] text-ink font-mono">{adFormat(it.term, it.matchType)}</code>
+                    {it.monthlySearches != null && <span className="text-[10.5px] text-gray-400">{it.monthlySearches.toLocaleString()}/mo</span>}
+                    <span className="opacity-0 group-hover:opacity-100 transition-opacity"><CopyBtn text={adFormat(it.term, it.matchType)} /></span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
+      </div>
+
+      {negatives.length > 0 && (
+        <div className="mt-4 pt-3 border-t border-gray-100">
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className="text-[12px] font-bold text-gray-500 uppercase tracking-wide flex items-center gap-1"><Ban className="w-3.5 h-3.5" /> Negatives</span>
+            <CopyTextButton text={negatives.map((n) => n.term).join("\n")} label="Copy negatives" icon={Copy} />
+          </div>
+          <p className="text-[13px] text-gray-600 font-mono leading-relaxed">{negatives.map((n) => n.term).join(", ")}</p>
+        </div>
+      )}
     </div>
   );
 }

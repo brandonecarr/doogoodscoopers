@@ -86,6 +86,39 @@ function headers(token: string): Record<string, string> {
   return h;
 }
 
+/**
+ * Live diagnostic — surfaces the exact HTTP status / error body from a real
+ * Keyword Planner call so we can see WHY enrichment is (or isn't) working
+ * (wrong access level, wrong API version, geo, etc.). Session-gated route only.
+ */
+export async function googleAdsDiagnostic(): Promise<Record<string, unknown>> {
+  if (!isGoogleAdsConfigured()) return { configured: false, hint: "OAuth env vars missing (CLIENT_ID / CLIENT_SECRET / REFRESH_TOKEN / CUSTOMER_ID)." };
+  const token = await accessToken();
+  if (!token) return { configured: true, tokenOk: false, error: "OAuth token exchange failed — check CLIENT_ID / CLIENT_SECRET / REFRESH_TOKEN." };
+  const customerId = digits(process.env.GOOGLE_ADS_CUSTOMER_ID);
+  const geos = (process.env.GOOGLE_ADS_GEO_TARGETS || "21137").split(",").map((s) => s.trim()).filter(Boolean).map((id) => `geoTargetConstants/${id}`);
+  try {
+    const res = await fetch(`${BASE}/customers/${customerId}:generateKeywordIdeas`, {
+      method: "POST",
+      headers: headers(token),
+      body: JSON.stringify({ keywordSeed: { keywords: ["pooper scooper service"] }, geoTargetConstants: geos, language: "languageConstants/1000", keywordPlanNetwork: "GOOGLE_SEARCH" }),
+      cache: "no-store",
+    });
+    const bodyText = await res.text().catch(() => "");
+    let ideaCount = 0;
+    try { ideaCount = (JSON.parse(bodyText).results || []).length; } catch { /* ignore */ }
+    return {
+      configured: true, tokenOk: true, apiVersion: V, customerId,
+      loginCustomerId: digits(process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID) || null,
+      hasDeveloperToken: !!process.env.GOOGLE_ADS_DEVELOPER_TOKEN,
+      status: res.status, ok: res.ok, ideaCount,
+      error: res.ok ? null : bodyText.slice(0, 1200),
+    };
+  } catch (e) {
+    return { configured: true, tokenOk: true, apiVersion: V, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
 /** Keyword Planner ideas + metrics for a set of seed keywords. */
 export async function generateKeywordIdeas(seeds: string[]): Promise<KeywordMetric[]> {
   if (!isGoogleAdsConfigured() || !seeds.length) return [];
