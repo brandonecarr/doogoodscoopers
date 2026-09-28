@@ -5,6 +5,7 @@
 
 import prisma from "@/lib/prisma";
 import { addDays, businessDay, dayStart, privateName, shortDayLabel, weekStartDay } from "@/lib/tv-connector";
+import { buildTvBusiness, type TvBusiness } from "@/lib/tv-business";
 
 export interface TvCard { title: string; meta: string; commercial: boolean }
 export interface TvTask { id: string; title: string; meta: string; overdue: boolean; commercial: boolean }
@@ -32,6 +33,8 @@ export interface TvSnapshot {
   tasks: { todo: TvTask[]; doing: TvTask[]; done: TvTask[]; counts: { todo: number; doing: number; doneThisWeek: number } };
   upcoming: { day: string; label: string; title: string }[];
   activeHistory: { date: string; value: number }[];
+  /** Revenue, margin, MRR, reviews, cancellation reasons and recent wins. */
+  business: TvBusiness;
   /** Custom Kanban boards; each column has its full count and the first few cards. */
   kanbanBoards: { id: string; name: string; columns: { id: string; name: string; isDone: boolean; count: number; cards: TvTask[] }[] }[];
 }
@@ -87,7 +90,7 @@ export async function buildTvSnapshot(now = new Date()): Promise<TvSnapshot> {
   const thirtyAgo = dayStart(addDays(today, -30));
   const eightWeeksAgo = dayStart(addDays(weekStart, -7 * 7));
 
-  const [leads, tasks, calendar, history, followUps, kanban] = await Promise.all([
+  const [leads, tasks, calendar, history, followUps, kanban, business] = await Promise.all([
     leadsSince(eightWeeksAgo < thirtyAgo ? eightWeeksAgo : thirtyAgo),
     prisma.task.findMany({
       where: { OR: [{ status: { in: ["TODO", "DOING"] } }, { status: "DONE", doneAt: { gte: weekStartAt } }] },
@@ -103,6 +106,7 @@ export async function buildTvSnapshot(now = new Date()): Promise<TvSnapshot> {
         cards: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
       },
     }),
+    buildTvBusiness(now),
   ]);
 
   // Pipeline: last 30 days. Converted leads usually get archived, so keep those for the Won stage.
@@ -175,6 +179,7 @@ export async function buildTvSnapshot(now = new Date()): Promise<TvSnapshot> {
     },
     upcoming,
     activeHistory: history.map((h) => ({ date: h.date, value: h.value })),
+    business,
     kanbanBoards: kanban.map((b) => ({
       id: b.id,
       name: b.name,

@@ -7,11 +7,22 @@ export type SectionSize = "S" | "M" | "L" | "XL" | "FULL";
 export type SectionSource = "crm" | "pm" | "goal";
 export type ElementType =
   | "goalProgress" | "countdown" | "metric" | "kanban" | "funnel" | "customerMix"
-  | "taskBoard" | "routeProgress" | "barChart" | "list";
+  | "taskBoard" | "routeProgress" | "barChart" | "list"
+  | "reviews" | "wins" | "progress" | "weather" | "announcement";
 
 export interface TvElement {
   type: ElementType;
-  config: { metric?: string; display?: string; pipelineID?: string; boardID?: string; columnIDs?: string[] };
+  config: {
+    metric?: string; display?: string; pipelineID?: string; boardID?: string; columnIDs?: string[];
+    /** Hire trigger: the MRR (dollars) or customer count that pays for a tech. */
+    target?: number;
+    /** Field share: whose share to highlight (first name as in Sweep&Go). */
+    person?: string;
+    /** Weather: where (from the ZIP lookup). */
+    latitude?: number; longitude?: number; place?: string;
+    /** Announcement text. */
+    text?: string;
+  };
 }
 export interface TvSection { id: string; title: string; size: SectionSize; source: SectionSource; elements: TvElement[] }
 export interface TvBoard { id: string; title: string; sections: TvSection[] }
@@ -46,7 +57,7 @@ export interface CatalogItem {
   metric: string;
   label: string;
   hint: string;
-  group: "Goals" | "Sweep&Go" | "Admin";
+  group: "Goals" | "Sweep&Go" | "Admin" | "Other";
   type: ElementType;
   source: SectionSource;
   sizes: SectionSize[];
@@ -55,6 +66,8 @@ export interface CatalogItem {
   usesPipeline?: boolean;
   /** Shows one of the custom Kanban boards (/admin/kanban). */
   usesKanbanBoard?: boolean;
+  /** Extra settings this section needs in the editor. */
+  fields?: ("target" | "person" | "place" | "text")[];
 }
 
 /** How many columns of a Kanban board fit on the TV at a given size. */
@@ -67,6 +80,7 @@ export const CATALOG: CatalogItem[] = [
   { metric: "sng.happy.families", label: "Happy families", hint: "All-time happy clients (Sweep&Go)", group: "Sweep&Go", type: "metric", source: "crm", sizes: ["S", "M"], defaultTitle: "Happy families" },
   { metric: "sng.happy.dogs", label: "Happy dogs", hint: "Dogs across all happy clients (Sweep&Go)", group: "Sweep&Go", type: "metric", source: "crm", sizes: ["S", "M"], defaultTitle: "Happy dogs" },
   { metric: "sng.completed.yards", label: "Completed yards", hint: "All-time completed cleanups (Sweep&Go)", group: "Sweep&Go", type: "metric", source: "crm", sizes: ["S", "M"], defaultTitle: "Completed yards" },
+  { metric: "sng.fieldShare.week", label: "Field share", hint: "Share of this week's completed visits per tech", group: "Sweep&Go", type: "barChart", source: "pm", sizes: ["M", "L"], defaultTitle: "Field share · this week", fields: ["person"] },
   { metric: "sng.routes.today", label: "Today's routes", hint: "Yards done of scheduled, per tech", group: "Sweep&Go", type: "routeProgress", source: "pm", sizes: ["M", "XL"], defaultTitle: "Today's routes",
     displays: [{ value: "crews", label: "A bar per tech" }, { value: "bar", label: "One overall bar" }] },
   { metric: "sng.visits.ontime.week", label: "On-time visits", hint: "Completed ÷ scheduled this week", group: "Sweep&Go", type: "metric", source: "pm", sizes: ["S"], defaultTitle: "On-time visits" },
@@ -81,7 +95,16 @@ export const CATALOG: CatalogItem[] = [
   { metric: "crm.followups.today", label: "Follow up today", hint: "Leads and call-list prospects due today", group: "Admin", type: "list", source: "crm", sizes: ["M", "L", "FULL"], defaultTitle: "Follow up today", displays: [{ value: "detail", label: "Name + detail" }] },
   { metric: "pm.tasks", label: "Task board", hint: "To do · In progress · Done this week", group: "Admin", type: "taskBoard", source: "pm", sizes: ["M", "L", "FULL"], defaultTitle: "Task board" },
   { metric: "pm.kanban", label: "Kanban board", hint: "One of your custom boards (Kanban page). L/Full: cards · M/XL: counts", group: "Admin", type: "kanban", source: "pm", sizes: ["L", "M", "XL", "FULL"], defaultTitle: "Board", usesKanbanBoard: true },
+  { metric: "crm.reviews", label: "Reviews", hint: "Google star rating, reviews this month and the latest 5-star quote", group: "Admin", type: "reviews", source: "crm", sizes: ["S", "M", "L"], defaultTitle: "Google reviews" },
+  { metric: "crm.wins", label: "Wins", hint: "New signups and 5-star reviews from the last two weeks, plus milestones", group: "Admin", type: "wins", source: "crm", sizes: ["M", "L", "FULL"], defaultTitle: "Wins" },
+  { metric: "crm.revenue.month", label: "Revenue this month", hint: "Collected so far this month, with last month for comparison", group: "Admin", type: "metric", source: "crm", sizes: ["S", "M"], defaultTitle: "Revenue this month" },
+  { metric: "crm.margin.month", label: "Margin this month", hint: "Revenue minus costs (from the Profitability page)", group: "Admin", type: "metric", source: "crm", sizes: ["S", "M"], defaultTitle: "Margin this month" },
+  { metric: "crm.hireTrigger", label: "Hire trigger", hint: "Progress toward the number that pays for a tech", group: "Admin", type: "progress", source: "crm", sizes: ["M", "XL"], defaultTitle: "Hire a tech",
+    displays: [{ value: "mrr", label: "Monthly recurring revenue" }, { value: "customers", label: "Active customers" }], fields: ["target"] },
+  { metric: "crm.cancelReasons.90d", label: "Why customers leave", hint: "Cancellation reasons, last 90 days", group: "Admin", type: "barChart", source: "crm", sizes: ["M", "L"], defaultTitle: "Why customers leave · 90 days" },
   { metric: "pm.calendar.upcoming", label: "Coming up", hint: "Calendar entries and task due dates", group: "Admin", type: "list", source: "pm", sizes: ["M", "L", "FULL"], defaultTitle: "Coming up", displays: [{ value: "dated", label: "Date + event" }] },
+  { metric: "ext.weather", label: "Weather", hint: "Today and the next 3 days (U.S. National Weather Service)", group: "Other", type: "weather", source: "pm", sizes: ["S", "M", "XL"], defaultTitle: "Weather", fields: ["place"] },
+  { metric: "ext.announcement", label: "Announcement", hint: "A message you type, e.g. \"Welcome Sam!\"", group: "Other", type: "announcement", source: "pm", sizes: ["S", "M", "L", "XL", "FULL"], defaultTitle: "Announcement", fields: ["text"] },
 ];
 
 export const catalogItem = (metric?: string) => CATALOG.find((c) => c.metric === metric);
@@ -171,6 +194,9 @@ export function validateConfig(cfg: TvBoardConfig, kanbanBoardIds?: Set<string>)
       if (!item.sizes.includes(s.size)) errors.push(`${name}: "${s.title}" can't be size ${s.size} (use ${item.sizes.join(" or ")}).`);
       if (!s.title?.trim()) errors.push(`${name}: a section is missing its title.`);
       if (item.usesPipeline && el?.config.pipelineID && !pipelineIds.has(el.config.pipelineID)) errors.push(`${name}: "${s.title}" uses a pipeline that no longer exists.`);
+      if (item.fields?.includes("target") && !((el?.config.target ?? 0) > 0)) errors.push(`${name}: set the target for "${s.title}".`);
+      if (item.fields?.includes("place") && (el?.config.latitude == null || el?.config.longitude == null)) errors.push(`${name}: look up a ZIP code for "${s.title}".`);
+      if (item.fields?.includes("text") && !el?.config.text?.trim()) errors.push(`${name}: type the message for "${s.title}".`);
       if (item.usesKanbanBoard) {
         if (!el?.config.boardID) errors.push(`${name}: pick which Kanban board "${s.title}" shows.`);
         else if (kanbanBoardIds && !kanbanBoardIds.has(el.config.boardID)) errors.push(`${name}: "${s.title}" shows a Kanban board that was deleted.`);

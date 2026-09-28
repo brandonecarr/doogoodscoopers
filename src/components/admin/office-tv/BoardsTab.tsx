@@ -9,7 +9,7 @@ import {
 
 const input = "w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent";
 const label = "block text-sm font-medium text-gray-700 mb-1";
-const GROUPS = ["Goals", "Sweep&Go", "Admin"] as const;
+const GROUPS = ["Goals", "Sweep&Go", "Admin", "Other"] as const;
 interface KanbanSummary { id: string; name: string; columns: { id: string; name: string; isDone: boolean }[] }
 const SOURCE_TINT: Record<string, string> = { goal: "bg-blue-50 border-blue-200", crm: "bg-white border-gray-200", pm: "bg-white border-gray-200" };
 
@@ -207,6 +207,9 @@ export function BoardsTab({ config, onChange, onOpenKanban }: { config: TvBoardC
                   </select>
                 </div>
               )}
+              {currentItem.fields && <SectionFields key={current.id} fields={currentItem.fields} hireOnCustomers={current.elements[0].config.display === "customers"}
+                config={current.elements[0].config}
+                onChange={(patch) => setSection(current.id, { elements: [{ ...current.elements[0], config: { ...current.elements[0].config, ...patch } }] })} />}
               {currentItem.usesKanbanBoard && (() => {
                 const cfg = current.elements[0].config;
                 const kb = kanbanBoards.find((b) => b.id === cfg.boardID);
@@ -282,5 +285,68 @@ export function BoardsTab({ config, onChange, onOpenKanban }: { config: TvBoardC
         </div>
       </div>
     </div>
+  );
+}
+
+type ElementConfigPatch = Partial<TvSection["elements"][number]["config"]>;
+
+/** Extra settings some sections need: a target, a person, a place or a message. */
+function SectionFields({ fields, config, onChange, hireOnCustomers }: {
+  fields: NonNullable<ReturnType<typeof catalogItem>>["fields"];
+  config: TvSection["elements"][number]["config"];
+  onChange: (patch: ElementConfigPatch) => void;
+  hireOnCustomers: boolean;
+}) {
+  const [zip, setZip] = useState("");
+  const [zipError, setZipError] = useState<string | null>(null);
+  const [looking, setLooking] = useState(false);
+
+  async function lookUp() {
+    setLooking(true); setZipError(null);
+    try {
+      const r = await fetch(`/api/admin/tv-config/zip?zip=${encodeURIComponent(zip)}`);
+      const d = await r.json();
+      if (!r.ok) { setZipError(d.error || "Couldn't find that ZIP"); return; }
+      onChange({ latitude: d.latitude, longitude: d.longitude, place: d.place });
+      setZip("");
+    } finally { setLooking(false); }
+  }
+
+  return (
+    <>
+      {fields?.includes("target") && (
+        <div>
+          <label className={label}>{hireOnCustomers ? "Hire when active customers reach" : "Hire when monthly recurring revenue reaches ($)"}</label>
+          <input type="number" min={1} value={config.target ?? ""} placeholder={hireOnCustomers ? "e.g. 120" : "e.g. 12000"}
+            onChange={(e) => onChange({ target: e.target.value ? Math.max(0, Number(e.target.value)) : undefined })} className={input} />
+        </div>
+      )}
+      {fields?.includes("person") && (
+        <div>
+          <label className={label}>Highlight whose share</label>
+          <input value={config.person ?? ""} placeholder="e.g. Brandon" onChange={(e) => onChange({ person: e.target.value || undefined })} className={input} />
+          <p className="text-xs text-gray-400 mt-1">First name, as it appears in Sweep&amp;Go. Leave blank to highlight nobody.</p>
+        </div>
+      )}
+      {fields?.includes("place") && (
+        <div>
+          <label className={label}>Location</label>
+          {config.place && <p className="text-sm text-navy-900 mb-1.5">{config.place}</p>}
+          <div className="flex gap-2">
+            <input value={zip} onChange={(e) => setZip(e.target.value.replace(/\D/g, "").slice(0, 5))} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void lookUp(); } }}
+              placeholder={config.place ? "Change ZIP" : "ZIP code, e.g. 92392"} className={input} inputMode="numeric" />
+            <button type="button" onClick={lookUp} disabled={zip.length !== 5 || looking} className="px-3 rounded-lg border border-gray-200 bg-white text-sm font-medium disabled:opacity-40">{looking ? "…" : "Look up"}</button>
+          </div>
+          {zipError && <p className="text-xs text-red-600 mt-1">{zipError}</p>}
+        </div>
+      )}
+      {fields?.includes("text") && (
+        <div>
+          <label className={label}>Message</label>
+          <textarea rows={3} maxLength={200} value={config.text ?? ""} placeholder="e.g. Welcome to the team, Sam!" onChange={(e) => onChange({ text: e.target.value })} className={input} />
+          <p className="text-xs text-gray-400 mt-1">Up to 200 characters. Shown large, so shorter reads better.</p>
+        </div>
+      )}
+    </>
   );
 }
