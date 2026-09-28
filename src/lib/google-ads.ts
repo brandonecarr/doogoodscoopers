@@ -32,8 +32,11 @@ export interface SearchTermRow {
 }
 
 export function isGoogleAdsConfigured(): boolean {
+  // Google is migrating off developer tokens (sunset 2026-09-09) to project-based
+  // access, so the developer token is OPTIONAL here — we require only the OAuth
+  // credentials + the ad account id, and send the developer-token header if it's
+  // still set. If Google rejects a call for a missing token, the error says so.
   return !!(
-    process.env.GOOGLE_ADS_DEVELOPER_TOKEN &&
     process.env.GOOGLE_ADS_CLIENT_ID &&
     process.env.GOOGLE_ADS_CLIENT_SECRET &&
     process.env.GOOGLE_ADS_REFRESH_TOKEN &&
@@ -73,9 +76,11 @@ async function accessToken(): Promise<string | null> {
 function headers(token: string): Record<string, string> {
   const h: Record<string, string> = {
     Authorization: `Bearer ${token}`,
-    "developer-token": process.env.GOOGLE_ADS_DEVELOPER_TOKEN!,
     "Content-Type": "application/json",
   };
+  // Developer token is optional under the new project-based access model.
+  const devToken = process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
+  if (devToken) h["developer-token"] = devToken;
   const login = digits(process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID);
   if (login) h["login-customer-id"] = login;
   return h;
