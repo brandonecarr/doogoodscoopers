@@ -918,6 +918,58 @@ model MarketingTask {
   @@index([planId])
 }
 
+// ── Keyword Radar ──────────────────────────────────────────────────────────────
+// Weekly AI (+ optional Google Ads) report of new/trending/hot keywords to feed
+// into Google Ads. One report per week, with actionable child items.
+model KeywordReport {
+  id            String        @id @default(cuid())
+  weekOf        DateTime      @unique // Monday (UTC) of the report's week
+  generatedAt   DateTime      @default(now())
+  model         String?
+  summary       String        @db.Text // the agent's briefing for the week
+  usedGoogleAds Boolean       @default(false) // true when real Keyword Planner data enriched it
+  createdAt     DateTime      @default(now())
+  items         KeywordItem[]
+
+  @@index([weekOf])
+}
+
+model KeywordItem {
+  id              String        @id @default(cuid())
+  reportId        String
+  report          KeywordReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  weekOf          DateTime // denormalized for quick "this week" queries
+  term            String
+  bucket          String // NEW | TRENDING | HOT
+  intent          String? // commercial | local | informational | branded
+  matchType       String? // exact | phrase | broad
+  rationale       String?       @db.Text
+  adGroup         String?
+  competitor      String? // competitor this term is associated with, if any
+  monthlySearches Int? // from Google Ads Keyword Planner, when available
+  competition     String? // LOW | MEDIUM | HIGH
+  topBidLow       Float?
+  topBidHigh      Float?
+  source          String        @default("ai") // ai | google_ads
+  isNegative      Boolean       @default(false) // suggested negative keyword
+  status          String        @default("NEW") // NEW | IMPLEMENTED | DISMISSED
+  sortOrder       Int           @default(0)
+  createdAt       DateTime      @default(now())
+
+  @@index([reportId])
+  @@index([weekOf])
+  @@index([status])
+}
+
+model KeywordCompetitor {
+  id        String   @id @default(cuid())
+  name      String
+  website   String?
+  active    Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
 // Customer-lifecycle events powering the Customers → Dashboard growth chart.
 // SIGNUP / CANCELLATION drive the net-active curve; QUOTE is the top-of-funnel
 // (web quote submissions). Seeded retroactively from historical CSVs and kept

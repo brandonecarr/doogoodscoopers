@@ -69,6 +69,10 @@
       "schedule": "0 14 * * 1"
     },
     {
+      "path": "/api/v2/cron/keyword-weekly",
+      "schedule": "30 15 * * 1"
+    },
+    {
       "path": "/api/v2/cron/anomaly-watch",
       "schedule": "0 13 * * *"
     },
