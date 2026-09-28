@@ -93,7 +93,7 @@ async function accessToken(): Promise<string | null> {
   }
 }
 
-function headers(token: string): Record<string, string> {
+function headers(token: string, opts?: { omitLogin?: boolean }): Record<string, string> {
   const h: Record<string, string> = {
     Authorization: `Bearer ${token}`,
     "Content-Type": "application/json",
@@ -101,9 +101,25 @@ function headers(token: string): Record<string, string> {
   // Developer token is optional under the new project-based access model.
   const devToken = process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
   if (devToken) h["developer-token"] = devToken;
-  const login = digits(process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID);
-  if (login) h["login-customer-id"] = login;
+  if (!opts?.omitLogin) {
+    const login = digits(process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID);
+    if (login) h["login-customer-id"] = login;
+  }
   return h;
+}
+
+// The ad account may be reachable directly (owner access) rather than through the
+// manager. If a call is denied with the manager's login-customer-id set, retry
+// once without it (direct access). Caches which mode works.
+let omitLoginPreferred = false;
+async function fetchAds(url: string, token: string, body: string): Promise<Response> {
+  const hasLogin = !!digits(process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID);
+  const first = await fetch(url, { method: "POST", headers: headers(token, { omitLogin: omitLoginPreferred }), body, cache: "no-store" });
+  if (first.status === 403 && hasLogin && !omitLoginPreferred) {
+    const second = await fetch(url, { method: "POST", headers: headers(token, { omitLogin: true }), body, cache: "no-store" });
+    if (second.status !== 403) { omitLoginPreferred = true; return second; }
+  }
+  return first;
 }
 
 /**
@@ -118,26 +134,29 @@ export async function googleAdsDiagnostic(): Promise<Record<string, unknown>> {
   const customerId = digits(process.env.GOOGLE_ADS_CUSTOMER_ID);
   const geos = (process.env.GOOGLE_ADS_GEO_TARGETS || "21137").split(",").map((s) => s.trim()).filter(Boolean).map((id) => `geoTargetConstants/${id}`);
   const base = await resolveBase(token, customerId);
-  try {
-    const res = await fetch(`${base}/customers/${customerId}:generateKeywordIdeas`, {
-      method: "POST",
-      headers: headers(token),
-      body: JSON.stringify({ keywordSeed: { keywords: ["pooper scooper service"] }, geoTargetConstants: geos, language: "languageConstants/1000", keywordPlanNetwork: "GOOGLE_SEARCH" }),
-      cache: "no-store",
-    });
-    const bodyText = await res.text().catch(() => "");
-    let ideaCount = 0;
-    try { ideaCount = (JSON.parse(bodyText).results || []).length; } catch { /* ignore */ }
-    return {
-      configured: true, tokenOk: true, apiVersion: resolvedVersion || process.env.GOOGLE_ADS_API_VERSION || "auto", customerId,
-      loginCustomerId: digits(process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID) || null,
-      hasDeveloperToken: !!process.env.GOOGLE_ADS_DEVELOPER_TOKEN,
-      status: res.status, ok: res.ok, ideaCount,
-      error: res.ok ? null : bodyText.slice(0, 1200),
-    };
-  } catch (e) {
-    return { configured: true, tokenOk: true, apiVersion: resolvedVersion || "auto", error: e instanceof Error ? e.message : String(e) };
-  }
+  const url = `${base}/customers/${customerId}:generateKeywordIdeas`;
+  const body = JSON.stringify({ keywordSeed: { keywords: ["pooper scooper service"] }, geoTargetConstants: geos, language: "languageConstants/1000", keywordPlanNetwork: "GOOGLE_SEARCH" });
+  const attempt = async (omitLogin: boolean) => {
+    try {
+      const res = await fetch(url, { method: "POST", headers: headers(token, { omitLogin }), body, cache: "no-store" });
+      const txt = await res.text().catch(() => "");
+      let ideaCount = 0;
+      try { ideaCount = (JSON.parse(txt).results || []).length; } catch { /* ignore */ }
+      return { status: res.status, ok: res.ok, ideaCount, error: res.ok ? null : txt.slice(0, 600) };
+    } catch (e) {
+      return { status: 0, ok: false, ideaCount: 0, error: e instanceof Error ? e.message : String(e) };
+    }
+  };
+  const withManager = await attempt(false);
+  const direct = digits(process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID) ? await attempt(true) : null;
+  const working = withManager.ok ? "with login-customer-id" : direct?.ok ? "direct (no login-customer-id)" : "neither";
+  return {
+    configured: true, tokenOk: true,
+    apiVersion: resolvedVersion || process.env.GOOGLE_ADS_API_VERSION || "auto",
+    customerId, loginCustomerId: digits(process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID) || null,
+    hasDeveloperToken: !!process.env.GOOGLE_ADS_DEVELOPER_TOKEN,
+    working, withManager, direct,
+  };
 }
 
 /** Keyword Planner ideas + metrics for a set of seed keywords. */
@@ -152,18 +171,13 @@ export async function generateKeywordIdeas(seeds: string[]): Promise<KeywordMetr
   const base = await resolveBase(token, customerId);
 
   try {
-    const res = await fetch(`${base}/customers/${customerId}:generateKeywordIdeas`, {
-      method: "POST",
-      headers: headers(token),
-      body: JSON.stringify({
-        keywordSeed: { keywords: seeds.slice(0, 20) },
-        geoTargetConstants: geos,
-        language: "languageConstants/1000", // English
-        keywordPlanNetwork: "GOOGLE_SEARCH",
-        includeAdultKeywords: false,
-      }),
-      cache: "no-store",
-    });
+    const res = await fetchAds(`${base}/customers/${customerId}:generateKeywordIdeas`, token, JSON.stringify({
+      keywordSeed: { keywords: seeds.slice(0, 20) },
+      geoTargetConstants: geos,
+      language: "languageConstants/1000", // English
+      keywordPlanNetwork: "GOOGLE_SEARCH",
+      includeAdultKeywords: false,
+    }));
     if (!res.ok) {
       console.error("[google-ads] generateKeywordIdeas failed:", res.status, (await res.text().catch(() => "")).slice(0, 300));
       return [];
@@ -197,12 +211,7 @@ export async function getSearchTerms(days = 30): Promise<SearchTermRow[]> {
     LIMIT 100`;
   const base = await resolveBase(token, customerId);
   try {
-    const res = await fetch(`${base}/customers/${customerId}/googleAds:searchStream`, {
-      method: "POST",
-      headers: headers(token),
-      body: JSON.stringify({ query }),
-      cache: "no-store",
-    });
+    const res = await fetchAds(`${base}/customers/${customerId}/googleAds:searchStream`, token, JSON.stringify({ query }));
     if (!res.ok) {
       console.error("[google-ads] searchStream failed:", res.status, (await res.text().catch(() => "")).slice(0, 300));
       return [];
