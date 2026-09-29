@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, MapPin, Mail, Phone, Calendar, User, Sparkles } from "lucide-react";
+import { ArrowLeft, MapPin, Building2, Mail, Phone, Calendar, User, Sparkles } from "lucide-react";
 import prisma from "@/lib/prisma";
+import { cityFromZip } from "@/lib/geo/zipCity";
 import StatusUpdateForm from "@/components/admin/StatusUpdateForm";
 import { LeadUpdates } from "@/components/admin/LeadUpdates";
 import { LeadMessages } from "@/components/admin/LeadMessages";
@@ -64,6 +65,7 @@ export default async function CanvasserLeadDetailPage({ params }: PageProps) {
               <Field icon={<Phone className="w-5 h-5 text-gray-600" />} label="Phone" value={lead.phone ? <a href={`tel:${lead.phone}`} className="hover:text-teal-600">{lead.phone}</a> : null} />
               <Field icon={<Mail className="w-5 h-5 text-gray-600" />} label="Email" value={lead.email ? <a href={`mailto:${lead.email}`} className="hover:text-teal-600">{lead.email}</a> : null} />
               <Field icon={<MapPin className="w-5 h-5 text-gray-600" />} label="Address" value={[lead.address, lead.city, lead.zipCode].filter(Boolean).join(", ") || null} />
+              <Field icon={<Building2 className="w-5 h-5 text-gray-600" />} label="City" value={cityFromZip(lead.zipCode)} />
               <Field icon={<User className="w-5 h-5 text-gray-600" />} label="Canvasser" value={lead.canvasserName || null} />
               <Field icon={<Calendar className="w-5 h-5 text-gray-600" />} label="Added" value={formatDate(lead.createdAt)} />
             </div>

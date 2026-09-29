@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Phone, Mail, MapPin, Calendar, Clock } from "lucide-react";
+import { ArrowLeft, Phone, Mail, MapPin, Building2, Calendar, Clock } from "lucide-react";
 import prisma from "@/lib/prisma";
+import { cityFromZip } from "@/lib/geo/zipCity";
 import type { LeadStatus } from "@/types/leads";
 import StatusUpdateForm from "@/components/admin/StatusUpdateForm";
 import { LeadQuickActions } from "@/components/admin/LeadQuickActions";
@@ -151,6 +152,17 @@ export default async function OutOfAreaDetailPage({ params }: PageProps) {
               <p className="text-xl font-semibold text-navy-900">{lead.zipCode}</p>
             </div>
           </div>
+          {cityFromZip(lead.zipCode) && (
+            <div className="flex items-center gap-3 mt-4">
+              <div className="w-10 h-10 rounded-lg bg-teal-50 flex items-center justify-center">
+                <Building2 className="w-5 h-5 text-teal-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">City</p>
+                <p className="text-xl font-semibold text-navy-900">{cityFromZip(lead.zipCode)}</p>
+              </div>
+            </div>
+          )}
           <div className="mt-4 p-4 bg-amber-50 rounded-lg">
             <p className="text-sm text-amber-800">
               This lead is outside our current service area. Consider reaching out to discuss

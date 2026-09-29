@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Phone, Mail, MapPin, Dog, Calendar, Clock, Pencil, Archive, Instagram } from "lucide-react";
+import { ArrowLeft, Phone, Mail, MapPin, Building2, Dog, Calendar, Clock, Pencil, Archive, Instagram } from "lucide-react";
 import prisma from "@/lib/prisma";
+import { cityFromZip } from "@/lib/geo/zipCity";
 import type { LeadStatus } from "@/types/leads";
 import StatusUpdateForm from "@/components/admin/StatusUpdateForm";
 import { LeadQuickActions } from "@/components/admin/LeadQuickActions";
@@ -238,6 +239,18 @@ export default async function QuoteLeadDetailPage({ params }: PageProps) {
                 </p>
               </div>
             </div>
+
+            {cityFromZip(lead.zipCode) && (
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-teal-50 flex items-center justify-center">
+                  <Building2 className="w-5 h-5 text-teal-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">City</p>
+                  <p className="text-navy-900">{cityFromZip(lead.zipCode)}</p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       ),

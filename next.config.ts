@@ -127,6 +127,9 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  // `zipcodes` ships a large offline dataset used only on the server (zip → city
+  // on lead detail cards); keep it out of the bundle and require it at runtime.
+  serverExternalPackages: ["zipcodes"],
 };
 
 export default nextConfig;

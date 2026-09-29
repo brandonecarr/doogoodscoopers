@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Megaphone, Mail, Phone, MapPin, Calendar, Clock, Tag, Dog } from "lucide-react";
+import { ArrowLeft, Megaphone, Mail, Phone, MapPin, Building2, Calendar, Clock, Tag, Dog } from "lucide-react";
 import { LeadQuickActions } from "@/components/admin/LeadQuickActions";
 import prisma from "@/lib/prisma";
+import { cityFromZip } from "@/lib/geo/zipCity";
 import StatusUpdateForm from "@/components/admin/StatusUpdateForm";
 import { LeadUpdates } from "@/components/admin/LeadUpdates";
 import { LeadMessages } from "@/components/admin/LeadMessages";
@@ -135,6 +136,18 @@ export default async function AdLeadDetailPage({ params }: PageProps) {
                 </p>
               </div>
             </div>
+
+            {cityFromZip(typedLead.zipCode) && (
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+                  <Building2 className="w-5 h-5 text-gray-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">City</p>
+                  <p className="font-medium text-navy-900">{cityFromZip(typedLead.zipCode)}</p>
+                </div>
+              </div>
+            )}
 
             {!!(typedLead.city || typedLead.state || typedLead.zipCode) && (
               <div className="flex items-start gap-3">
