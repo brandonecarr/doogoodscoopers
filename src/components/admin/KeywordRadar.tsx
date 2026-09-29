@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Radar, Loader2, Play, Copy, Check, Flame, TrendingUp, Sparkle, Ban, ChevronDown,
-  Building2, Plus, X, Trash2, Search, AlertTriangle, Info, ClipboardList, FileDown,
+  Building2, Plus, X, Trash2, Search, AlertTriangle, ClipboardList, FileDown, Upload, BarChart3,
 } from "lucide-react";
 import { PageHero, heroBtnPrimary, heroPrimaryStyle, heroBtnSecondary } from "@/components/admin/PageHero";
 import { formatDate, formatDateTime } from "@/lib/datetime";
@@ -13,13 +13,18 @@ import { formatDate, formatDateTime } from "@/lib/datetime";
 export interface RadarItem {
   id: string; term: string; bucket: string; intent: string | null; matchType: string | null;
   rationale: string | null; adGroup: string | null; competitor: string | null;
-  monthlySearches: number | null; competition: string | null; topBidLow: number | null; topBidHigh: number | null;
+  monthlySearches: number | null; volumeLabel: string | null; competition: string | null; topBidLow: number | null; topBidHigh: number | null;
   source: string; isNegative: boolean; status: string;
 }
 export interface RadarReport {
   id: string; weekOf: string; generatedAt: string; model: string | null; summary: string; usedGoogleAds: boolean; items: RadarItem[];
 }
 export interface RadarCompetitor { id: string; name: string; website: string | null; active: boolean }
+export interface PlannerStats { count: number; lastUploadedAt: string | null; lastFile: string | null }
+
+/** "1,300" or a Keyword Planner range like "1K–10K". */
+const volumeText = (it: { volumeLabel: string | null; monthlySearches: number | null }) =>
+  it.volumeLabel ?? (it.monthlySearches != null ? it.monthlySearches.toLocaleString() : null);
 
 const BUCKET_META: Record<string, { label: string; icon: typeof Flame; tint: string; dot: string }> = {
   HOT:      { label: "Hot — bid now",   icon: Flame,      tint: "text-red-700",    dot: "bg-red-500" },
@@ -42,18 +47,17 @@ function CopyBtn({ text }: { text: string }) {
   );
 }
 
-export function KeywordRadar({ report, history, competitors, googleAdsConfigured, anthropicConfigured }: {
+export function KeywordRadar({ report, history, competitors, plannerStats, anthropicConfigured }: {
   report: RadarReport | null;
   history: string[];
   competitors: RadarCompetitor[];
-  googleAdsConfigured: boolean;
+  plannerStats: PlannerStats;
   anthropicConfigured: boolean;
 }) {
   const router = useRouter();
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showConfig, setShowConfig] = useState(false);
-  const [showGaHelp, setShowGaHelp] = useState(false);
   const [showDismissed, setShowDismissed] = useState(false);
   const [items, setItems] = useState<RadarItem[]>(report?.items ?? []);
   const [comps, setComps] = useState<RadarCompetitor[]>(competitors);
@@ -126,38 +130,11 @@ export function KeywordRadar({ report, history, competitors, googleAdsConfigured
         </div>
       )}
 
-      {/* Google Ads connection status */}
-      <div className={`dgs-card p-3 text-sm ${googleAdsConfigured ? "border border-green-200 bg-green-50" : "border border-blue-200 bg-blue-50"}`}>
-        <div className="flex items-start gap-2">
-          <Info className={`w-4 h-4 flex-shrink-0 mt-0.5 ${googleAdsConfigured ? "text-green-700" : "text-blue-700"}`} />
-          <div className="flex-1 min-w-0">
-            {googleAdsConfigured ? (
-              <span className="text-green-800"><b>Google Ads connected.</b> Reports include real search volume, competition, bid ranges, and your own search-terms report.</span>
-            ) : (
-              <>
-                <span className="text-blue-800"><b>Running on AI research.</b> Connect Google Ads to add real search-volume numbers, competition, bids, and your account&apos;s search terms.</span>
-                <button onClick={() => setShowGaHelp((v) => !v)} className="ml-2 font-semibold text-blue-700 underline inline-flex items-center gap-0.5">
-                  How to connect <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showGaHelp ? "rotate-180" : ""}`} />
-                </button>
-                {showGaHelp && (
-                  <div className="mt-2 text-[12.5px] text-blue-900/80 space-y-1">
-                    <p>Add these environment variables in Vercel, then redeploy — the next report will use them automatically:</p>
-                    <ul className="list-disc ml-5 space-y-0.5 font-mono text-[11.5px]">
-                      <li>GOOGLE_ADS_DEVELOPER_TOKEN</li>
-                      <li>GOOGLE_ADS_CLIENT_ID</li>
-                      <li>GOOGLE_ADS_CLIENT_SECRET</li>
-                      <li>GOOGLE_ADS_REFRESH_TOKEN</li>
-                      <li>GOOGLE_ADS_CUSTOMER_ID <span className="font-sans">(your ad account, digits only)</span></li>
-                      <li>GOOGLE_ADS_LOGIN_CUSTOMER_ID <span className="font-sans">(optional — your MCC id)</span></li>
-                    </ul>
-                    <p className="font-sans">The developer token comes from a Google Ads manager (MCC) account (Tools → API Center). Tell me when the keys are in and I&apos;ll verify the connection.</p>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-      </div>
+      <PlannerCard
+        stats={plannerStats}
+        reportId={report?.id ?? null}
+        terms={positives.filter((it) => it.status !== "DISMISSED").map((it) => it.term)}
+      />
 
       {/* Competitors config */}
       {showConfig && (
@@ -214,7 +191,8 @@ export function KeywordRadar({ report, history, competitors, googleAdsConfigured
               <h2 className="text-[16px] font-extrabold text-ink">Week of {formatDate(report.weekOf, { month: "long", day: "numeric", year: "numeric" })}</h2>
               <div className="flex items-center gap-2 text-[11.5px] text-gray-400">
                 <span>Generated {formatDateTime(report.generatedAt, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span>
-                {report.usedGoogleAds && <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-800 font-semibold">+ Google Ads data</span>}
+                {items.some((it) => it.source === "google_ads") && <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-800 font-semibold">+ Google Ads data</span>}
+                {items.some((it) => volumeText(it) != null) && <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-semibold">+ search volume</span>}
                 <label className="flex items-center gap-1 cursor-pointer"><input type="checkbox" checked={showDismissed} onChange={(e) => setShowDismissed(e.target.checked)} className="accent-violet-600" /> show dismissed</label>
               </div>
             </div>
@@ -279,13 +257,14 @@ function ItemCard({ it, onStatus }: { it: RadarItem; onStatus: (id: string, stat
             {it.intent && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-violet-100 text-violet-800">{it.intent}</span>}
             {it.competitor && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-orange-100 text-orange-800">{it.competitor}</span>}
             {it.source === "google_ads" && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-green-100 text-green-800">Google Ads</span>}
+            {it.source === "keyword_planner" && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-100 text-blue-800">Keyword Planner</span>}
           </div>
         </div>
       </div>
 
-      {(it.monthlySearches != null || it.competition || it.topBidLow != null) && (
+      {(volumeText(it) != null || it.competition || it.topBidLow != null) && (
         <div className="flex items-center gap-3 mt-2 text-[11.5px] text-gray-600">
-          {it.monthlySearches != null && <span><b className="text-ink">{it.monthlySearches.toLocaleString()}</b>/mo searches</span>}
+          {volumeText(it) != null && <span><b className="text-ink">{volumeText(it)}</b>/mo searches</span>}
           {it.competition && <span className={`px-1.5 py-0.5 rounded font-semibold ${COMP_BADGE[it.competition] || "bg-gray-100 text-gray-700"}`}>{it.competition.toLowerCase()} comp</span>}
           {it.topBidLow != null && <span>bid ${it.topBidLow.toFixed(2)}{it.topBidHigh != null ? `–$${it.topBidHigh.toFixed(2)}` : ""}</span>}
         </div>
@@ -344,7 +323,7 @@ function buildTermsText(positives: RadarItem[], negatives: RadarItem[], weekLabe
 function buildCsv(positives: RadarItem[]): string {
   const rows: (string | number)[][] = [["keyword", "match_type", "ad_group", "bucket", "monthly_searches", "competition"]];
   for (const it of sortedPositives(positives)) {
-    rows.push([it.term, it.matchType || "broad", it.adGroup || "General", it.bucket, it.monthlySearches ?? "", it.competition || ""]);
+    rows.push([it.term, it.matchType || "broad", it.adGroup || "General", it.bucket, volumeText(it) ?? "", it.competition || ""]);
   }
   return rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
 }
@@ -392,7 +371,7 @@ function BestTermsList({ positives, negatives, weekOf }: { positives: RadarItem[
                   <li key={it.id} className="flex items-center gap-2 group">
                     <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${meta?.dot || "bg-gray-400"}`} />
                     <code className="text-[13px] text-ink font-mono">{adFormat(it.term, it.matchType)}</code>
-                    {it.monthlySearches != null && <span className="text-[10.5px] text-gray-400">{it.monthlySearches.toLocaleString()}/mo</span>}
+                    {volumeText(it) != null && <span className="text-[10.5px] text-gray-400">{volumeText(it)}/mo</span>}
                     <span className="opacity-0 group-hover:opacity-100 transition-opacity"><CopyBtn text={adFormat(it.term, it.matchType)} /></span>
                   </li>
                 );
@@ -410,6 +389,94 @@ function BestTermsList({ positives, negatives, weekOf }: { positives: RadarItem[
           </div>
           <p className="text-[13px] text-gray-600 font-mono leading-relaxed">{negatives.map((n) => n.term).join(", ")}</p>
         </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Keyword Planner uploads: real search volume without API access ────────────
+const FLASH_KEY = "keyword-radar-upload-msg";
+
+function PlannerCard({ stats, reportId, terms }: { stats: PlannerStats; reportId: string | null; terms: string[] }) {
+  const router = useRouter();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [showHow, setShowHow] = useState(stats.count === 0);
+  // The page remounts after an upload (fresh numbers), so the result is handed across via sessionStorage.
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(() => {
+    try {
+      const text = sessionStorage.getItem(FLASH_KEY);
+      if (text) { sessionStorage.removeItem(FLASH_KEY); return { ok: true, text }; }
+    } catch {}
+    return null;
+  });
+
+  const upload = async (file: File) => {
+    setBusy(true); setMsg(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      if (reportId) fd.append("reportId", reportId);
+      const res = await fetch("/api/admin/keyword-radar/planner-upload", { method: "POST", body: fd });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.error || "Upload failed");
+      const text = `Imported ${Number(d.imported).toLocaleString()} keywords from ${file.name}` +
+        (reportId ? ` — filled real numbers on ${d.matched} of this week's keywords.` : ".") +
+        (d.ranges ? " Google shows ranges (e.g. 1K–10K) until an account spends more; that's normal." : "");
+      try { sessionStorage.setItem(FLASH_KEY, text); } catch {}
+      setMsg({ ok: true, text });
+      router.refresh();
+    } catch (e) {
+      setMsg({ ok: false, text: e instanceof Error ? e.message : "Upload failed" });
+    } finally {
+      setBusy(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  };
+
+  return (
+    <div className="dgs-card p-4">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div className="flex items-start gap-2.5 min-w-0">
+          <div className="w-9 h-9 rounded-[10px] bg-blue-50 flex items-center justify-center flex-shrink-0"><BarChart3 className="w-[18px] h-[18px] text-blue-600" /></div>
+          <div className="min-w-0">
+            <h3 className="text-[14px] font-bold text-ink">Search volume · Google Keyword Planner</h3>
+            <p className="text-[12.5px] text-gray-500">
+              {stats.count
+                ? <>{stats.count.toLocaleString()} keywords on file · last upload {formatDate(stats.lastUploadedAt!, { month: "short", day: "numeric", year: "numeric" })}{stats.lastFile ? <span className="text-gray-400"> ({stats.lastFile})</span> : null}</>
+                : "No data yet. Export from Keyword Planner and upload the CSV to add real monthly searches, competition, and bids."}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {terms.length > 0 && <CopyTextButton text={terms.join("\n")} label="Copy keywords for Planner" icon={Copy} />}
+          <input ref={inputRef} type="file" accept=".csv,text/csv,text/plain,text/tab-separated-values" className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); }} />
+          <button onClick={() => inputRef.current?.click()} disabled={busy}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] text-[12.5px] font-bold text-white disabled:opacity-60" style={heroPrimaryStyle}>
+            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}{busy ? "Importing…" : "Upload CSV"}
+          </button>
+        </div>
+      </div>
+
+      {msg && (
+        <div className={`mt-3 px-3 py-2 rounded-lg text-[12.5px] flex items-start gap-2 ${msg.ok ? "bg-green-50 text-green-800 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
+          {msg.ok ? <Check className="w-4 h-4 flex-shrink-0 mt-0.5" /> : <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />}{msg.text}
+        </div>
+      )}
+
+      <button onClick={() => setShowHow((v) => !v)} className="mt-2.5 text-[12px] font-semibold text-blue-700 inline-flex items-center gap-0.5">
+        How to export from Keyword Planner <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showHow ? "rotate-180" : ""}`} />
+      </button>
+      {showHow && (
+        <ol className="mt-2 ml-5 list-decimal space-y-1 text-[12.5px] text-gray-600">
+          <li>Click <b>Copy keywords for Planner</b> above to copy this week&apos;s keywords.</li>
+          <li>In Google Ads, open <b>Tools → Planning → Keyword Planner</b> and choose <b>Get search volume and forecasts</b>.</li>
+          <li>Paste the keywords and click <b>Get started</b>.</li>
+          <li>Set <b>Locations</b> to your service area (e.g. San Bernardino and Riverside counties) so the numbers are local, not national.</li>
+          <li>Open the <b>Historical metrics</b> tab, click the download icon, and choose <b>.csv</b>. (A &ldquo;Keyword ideas&rdquo; download from <b>Discover new keywords</b> works too.)</li>
+          <li>Click <b>Upload CSV</b> here. Numbers fill in on this week&apos;s report now and on every future Monday report automatically.</li>
+        </ol>
       )}
     </div>
   );

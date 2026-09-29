@@ -947,10 +947,11 @@ model KeywordItem {
   adGroup         String?
   competitor      String? // competitor this term is associated with, if any
   monthlySearches Int? // from Google Ads Keyword Planner, when available
+  volumeLabel     String? // Keyword Planner display: "1,300" or a range like "1K–10K"
   competition     String? // LOW | MEDIUM | HIGH
   topBidLow       Float?
   topBidHigh      Float?
-  source          String        @default("ai") // ai | google_ads
+  source          String        @default("ai") // ai | google_ads | keyword_planner
   isNegative      Boolean       @default(false) // suggested negative keyword
   status          String        @default("NEW") // NEW | IMPLEMENTED | DISMISSED
   sortOrder       Int           @default(0)
@@ -959,6 +960,28 @@ model KeywordItem {
   @@index([reportId])
   @@index([weekOf])
   @@index([status])
+}
+
+// Real search volume / competition / bids imported from Google Ads Keyword
+// Planner CSV exports (no API access needed). One row per normalized keyword;
+// a newer upload overwrites older numbers. Enriches Keyword Radar reports.
+model KeywordVolume {
+  term             String   @id // normalized: lowercase, single-spaced
+  displayTerm      String
+  monthlySearches  Int? // exact average, or the low end of a range
+  searchesLow      Int?
+  searchesHigh     Int?
+  volumeLabel      String? // as Keyword Planner shows it: "1,300" or "1K–10K"
+  competition      String? // LOW | MEDIUM | HIGH
+  competitionIndex Int? // 0-100
+  topBidLow        Float?
+  topBidHigh       Float?
+  threeMonthChange String?
+  yoyChange        String?
+  sourceFile       String?
+  uploadedAt       DateTime @default(now())
+
+  @@index([uploadedAt])
 }
 
 model KeywordCompetitor {

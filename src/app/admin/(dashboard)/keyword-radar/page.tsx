@@ -1,6 +1,6 @@
 import prisma from "@/lib/prisma";
-import { isGoogleAdsConfigured } from "@/lib/google-ads";
 import { isKeywordRadarConfigured } from "@/lib/keyword-radar";
+import { keywordVolumeStats } from "@/lib/keyword-planner";
 import { KeywordRadar, type RadarReport, type RadarItem, type RadarCompetitor } from "@/components/admin/KeywordRadar";
 
 export const dynamic = "force-dynamic";
@@ -24,7 +24,10 @@ export default async function KeywordRadarPage({ searchParams }: PageProps) {
       })
     : null;
 
-  const competitors = await prisma.keywordCompetitor.findMany({ orderBy: [{ active: "desc" }, { sortOrder: "asc" }] });
+  const [competitors, plannerStats] = await Promise.all([
+    prisma.keywordCompetitor.findMany({ orderBy: [{ active: "desc" }, { sortOrder: "asc" }] }),
+    keywordVolumeStats(),
+  ]);
 
   const report: RadarReport | null = full
     ? {
@@ -37,7 +40,7 @@ export default async function KeywordRadarPage({ searchParams }: PageProps) {
         items: full.items.map((i): RadarItem => ({
           id: i.id, term: i.term, bucket: i.bucket, intent: i.intent, matchType: i.matchType,
           rationale: i.rationale, adGroup: i.adGroup, competitor: i.competitor,
-          monthlySearches: i.monthlySearches, competition: i.competition,
+          monthlySearches: i.monthlySearches, volumeLabel: i.volumeLabel, competition: i.competition,
           topBidLow: i.topBidLow, topBidHigh: i.topBidHigh, source: i.source,
           isNegative: i.isNegative, status: i.status,
         })),
@@ -49,10 +52,12 @@ export default async function KeywordRadarPage({ searchParams }: PageProps) {
 
   return (
     <KeywordRadar
+      // Remount when the report or uploaded volumes change so client state isn't stale after a refresh.
+      key={`${report?.id ?? "none"}-${report?.generatedAt ?? ""}-${plannerStats.lastUploadedAt ?? ""}`}
       report={report}
       history={historyWeeks}
       competitors={comps}
-      googleAdsConfigured={isGoogleAdsConfigured()}
+      plannerStats={plannerStats}
       anthropicConfigured={isKeywordRadarConfigured()}
     />
   );

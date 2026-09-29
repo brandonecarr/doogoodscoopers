@@ -2,13 +2,16 @@ import Anthropic from "@anthropic-ai/sdk";
 import prisma from "@/lib/prisma";
 import { weekOfMonday } from "@/lib/marketing-director";
 import { isGoogleAdsConfigured, generateKeywordIdeas, getSearchTerms, type KeywordMetric } from "@/lib/google-ads";
+import { keywordVolumesFor, topLibraryTerms } from "@/lib/keyword-planner";
 
 // ── Keyword Radar ────────────────────────────────────────────────────────────
 // A weekly PPC strategist agent. It researches (via live web search) the trending
 // keywords in the dog-waste-removal industry and what competitors rank/bid on,
 // buckets them into New / Trending / Hot, and — when Google Ads is connected —
 // enriches each with real search volume, competition and top-of-page bids, plus
-// pulls the account's own search-terms report. Modeled on the Marketing Director
+// pulls the account's own search-terms report. Without API production access,
+// real numbers come from Keyword Planner CSV uploads (lib/keyword-planner.ts).
+// Modeled on the Marketing Director
 // (weekly cron, structured output) and Content Studio trends (web-search tool).
 
 const MODEL = "claude-opus-5";
@@ -70,18 +73,23 @@ Return ONLY valid JSON, no prose, in exactly this shape:
 Aim for 18-28 keywords total across the buckets, concrete and specific to this business, region, and season. Include a few negatives. Do NOT invent search-volume numbers — leave those to the data layer.`;
 }
 
-function userPrompt(competitors: { name: string; website: string | null }[], zips: string[]): string {
+interface PlannerHint { displayTerm: string; volumeLabel: string | null; competition: string | null }
+
+function userPrompt(competitors: { name: string; website: string | null }[], zips: string[], planner: PlannerHint[]): string {
   const comp = competitors.length
     ? competitors.map((c) => `- ${c.name}${c.website ? ` (${c.website})` : ""}`).join("\n")
     : "- (none specified; research the main national + local pooper-scooper competitors)";
   const today = new Date().toISOString().slice(0, 10);
+  const plannerBlock = planner.length
+    ? `\nReal Google Keyword Planner data the owner uploaded (avg monthly searches · competition). Use it to prioritize — favor terms with real volume, and don't contradict these numbers:\n${planner.map((p) => `- ${p.displayTerm}: ${p.volumeLabel ?? "?"}/mo${p.competition ? ` · ${p.competition.toLowerCase()} competition` : ""}`).join("\n")}\n`
+    : "";
   return `Today is ${today}. Research and produce this week's keyword report.
 
 Competitors to study:
 ${comp}
 
 Our busiest customer ZIP codes (bias local/long-tail suggestions toward these areas): ${zips.length ? zips.join(", ") : "Inland Empire, CA"}
-
+${plannerBlock}
 Return the JSON exactly as specified. Use web_search to ground it in what people are actually searching and what these competitors are doing right now.`;
 }
 
@@ -135,16 +143,17 @@ async function researchKeywords(): Promise<AiOutput | null> {
   if (!apiKey) return null;
   const anthropic = new Anthropic({ apiKey });
 
-  const [competitors, zipRows] = await Promise.all([
+  const [competitors, zipRows, planner] = await Promise.all([
     prisma.keywordCompetitor.findMany({ where: { active: true }, orderBy: { sortOrder: "asc" } }),
     prisma.sweepandgoCustomer.groupBy({ by: ["zipCode"], where: { active: true, zipCode: { not: null } }, _count: { _all: true } }),
+    topLibraryTerms(40),
   ]);
   const zips = zipRows
     .map((z) => ({ zip: z.zipCode as string, n: z._count._all }))
     .sort((a, b) => b.n - a.n).slice(0, 8).map((z) => z.zip);
 
   const sys = systemPrompt();
-  const prompt = userPrompt(competitors, zips);
+  const prompt = userPrompt(competitors, zips, planner);
 
   let text = "";
   try {
@@ -194,23 +203,34 @@ export async function generateAndSaveWeeklyReport(opts: { force?: boolean } = {}
     searchTerms = terms;
   }
 
+  // Keyword Planner uploads fill in real numbers wherever the API didn't.
+  const planner = await keywordVolumesFor(ai.keywords.map((k) => k.term));
+
   interface ItemDraft {
     term: string; bucket: string; intent: string | null; matchType: string | null; rationale: string | null;
-    adGroup: string | null; competitor: string | null; monthlySearches: number | null; competition: string | null;
-    topBidLow: number | null; topBidHigh: number | null; source: string; isNegative: boolean;
+    adGroup: string | null; competitor: string | null; monthlySearches: number | null; volumeLabel: string | null;
+    competition: string | null; topBidLow: number | null; topBidHigh: number | null; source: string; isNegative: boolean;
   }
   const drafts: ItemDraft[] = [];
   const included = new Set<string>();
 
   for (const k of ai.keywords) {
     const m = metricByTerm.get(norm(k.term));
+    const p = planner.get(norm(k.term));
     included.add(norm(k.term));
     drafts.push({
       term: k.term, bucket: k.bucket, intent: k.intent, matchType: k.matchType, rationale: k.rationale,
       adGroup: k.adGroup, competitor: k.competitor,
-      monthlySearches: m?.avgMonthlySearches ?? null,
-      competition: compBucket(m?.competition ?? null),
-      topBidLow: m?.lowTopBid ?? null, topBidHigh: m?.highTopBid ?? null,
+      ...(m
+        ? {
+            monthlySearches: m.avgMonthlySearches,
+            volumeLabel: m.avgMonthlySearches != null ? m.avgMonthlySearches.toLocaleString("en-US") : null,
+            competition: compBucket(m.competition), topBidLow: m.lowTopBid, topBidHigh: m.highTopBid,
+          }
+        : {
+            monthlySearches: p?.monthlySearches ?? null, volumeLabel: p?.volumeLabel ?? null,
+            competition: p?.competition ?? null, topBidLow: p?.topBidLow ?? null, topBidHigh: p?.topBidHigh ?? null,
+          }),
       source: "ai", isNegative: k.isNegative,
     });
   }
@@ -227,7 +247,9 @@ export async function generateAndSaveWeeklyReport(opts: { force?: boolean } = {}
         term: m.text, bucket: "NEW", intent: null, matchType: "phrase",
         rationale: "Keyword Planner idea with real search volume the AI didn't surface.",
         adGroup: null, competitor: null,
-        monthlySearches: m.avgMonthlySearches, competition: compBucket(m.competition),
+        monthlySearches: m.avgMonthlySearches,
+        volumeLabel: m.avgMonthlySearches != null ? m.avgMonthlySearches.toLocaleString("en-US") : null,
+        competition: compBucket(m.competition),
         topBidLow: m.lowTopBid, topBidHigh: m.highTopBid, source: "google_ads", isNegative: false,
       });
     }
@@ -241,10 +263,26 @@ export async function generateAndSaveWeeklyReport(opts: { force?: boolean } = {}
         term: t.term, bucket: "HOT", intent: "commercial", matchType: "exact",
         rationale: `Already triggered your ads: ${t.impressions} impressions, ${t.clicks} clicks, ${t.conversions} conv. (30d).`,
         adGroup: "From your search terms", competitor: null,
-        monthlySearches: null, competition: null, topBidLow: null, topBidHigh: null,
+        monthlySearches: null, volumeLabel: null, competition: null, topBidLow: null, topBidHigh: null,
         source: "google_ads", isNegative: false,
       });
     }
+  }
+
+  // High-volume terms from Keyword Planner uploads that the agent didn't surface.
+  const negatives = new Set(ai.keywords.filter((k) => k.isNegative).map((k) => norm(k.term)));
+  const libraryIdeas = (await topLibraryTerms(20))
+    .filter((v) => !included.has(v.term) && !negatives.has(v.term) && (v.monthlySearches ?? 0) >= 30)
+    .slice(0, 10);
+  for (const v of libraryIdeas) {
+    included.add(v.term);
+    drafts.push({
+      term: v.displayTerm, bucket: "NEW", intent: null, matchType: "phrase",
+      rationale: "From your Keyword Planner upload: real search volume the agent didn't surface this week.",
+      adGroup: null, competitor: null,
+      monthlySearches: v.monthlySearches, volumeLabel: v.volumeLabel, competition: v.competition,
+      topBidLow: v.topBidLow, topBidHigh: v.topBidHigh, source: "keyword_planner", isNegative: false,
+    });
   }
 
   if (existing) {
