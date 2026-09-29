@@ -3,13 +3,18 @@ import prisma from "@/lib/prisma";
 import { sendAdminPush } from "@/lib/web-push";
 import { syncContactToQuo } from "@/lib/quo";
 import { optedOutKeys } from "@/lib/sms-optout";
+import { recordSngCall } from "@/lib/sweepandgo-usage";
 
 // Poll the Sweep&Go API for new free quotes and insert them into QuoteLead.
 //
 // Why this exists: Sweep&Go's WEBHOOK delivers on a ~10-minute batch and sends
 // each quote several times. The Sweep&Go API reflects a new quote within ~90s.
-// This cron pulls from the API every couple of minutes so leads appear fast and
-// deduped, instead of waiting on the slow/duplicating webhook.
+// This cron pulls from the API every 5 minutes so leads appear fast and deduped,
+// instead of waiting on the slow/duplicating webhook.
+//
+// ⚠️ Schedule is in vercel.json. It ran EVERY MINUTE until 2026-09-29, which was
+// ~45k Sweep&Go API requests/month and got flagged by Sweep&Go support. Keep it
+// at */5 or slower; every Sweep&Go call is counted (lib/sweepandgo-usage.ts).
 //
 // Auth to Sweep&Go: Bearer token from the developer portal. We reuse the token
 // already stored for the webhook unless a dedicated one is provided.
@@ -65,6 +70,7 @@ export async function GET(request: NextRequest) {
   // ── Pull from Sweep&Go ──────────────────────────────────────────────────────
   let quotes: FreeQuote[] = [];
   try {
+    await recordSngCall(SNG_FREE_QUOTES_URL);
     const res = await fetch(SNG_FREE_QUOTES_URL, {
       headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
       cache: "no-store",

@@ -1,3 +1,4 @@
+import { recordSngCall } from "@/lib/sweepandgo-usage";
 // Sweep&Go is the source of truth for the service area. This calls their official
 // REST API (openapi.sweepandgo.com) directly with the account token — the same
 // token the customer sync uses. Returns null on any error so callers can fall
@@ -29,6 +30,7 @@ export async function sngCheckZip(zip: string, includeRaw = false): Promise<SngZ
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 8000);
+    await recordSngCall(url);
     const res = await fetch(url, {
       headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
       cache: "no-store",
@@ -96,6 +98,7 @@ export async function sngPrice(opts: {
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 8000);
+    await recordSngCall(url);
     const res = await fetch(url, {
       headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
       cache: "no-store",

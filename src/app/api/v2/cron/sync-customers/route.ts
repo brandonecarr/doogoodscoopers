@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { archiveConvertedLeads } from "@/lib/lead-duplicates";
 import { estimateMonthlyRevenue } from "@/lib/plan-pricing";
+import { recordSngCall } from "@/lib/sweepandgo-usage";
 
 // One-way mirror of ACTIVE Sweep&Go residential customers.
 //
@@ -59,6 +60,7 @@ export async function GET(request: NextRequest) {
   let totalPages = 1;
   try {
     do {
+      await recordSngCall(SNG_ACTIVE_CLIENTS_URL);
       const res = await fetch(`${SNG_ACTIVE_CLIENTS_URL}?page=${page}`, {
         headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
         cache: "no-store",

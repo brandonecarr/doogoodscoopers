@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma";
 import { getSetting, setSetting } from "@/lib/google-business";
+import { recordSngCall } from "@/lib/sweepandgo-usage";
 
 /**
  * Sweep&Go billing mirror — invoices + payments.
@@ -125,6 +126,7 @@ async function getPage(path: string): Promise<Record<string, unknown>> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), PAGE_TIMEOUT_MS);
     try {
+      await recordSngCall(`${SNG_BASE}${path}`);
       const res = await fetch(`${SNG_BASE}${path}`, {
         headers: { Authorization: `Bearer ${t}`, Accept: "application/json" },
         cache: "no-store",
@@ -136,6 +138,8 @@ async function getPage(path: string): Promise<Record<string, unknown>> {
       // and the next tick resumes — no point burning the function's clock here.
       if (res.status === 429) throw new RateLimited(`${path}: rate limited`);
     } catch (e) {
+      // A 429 must end the run now — the catch would otherwise swallow it and retry.
+      if (e instanceof RateLimited) throw e;
       lastErr = e instanceof Error ? e.message : "fetch failed";
     } finally {
       clearTimeout(timer);

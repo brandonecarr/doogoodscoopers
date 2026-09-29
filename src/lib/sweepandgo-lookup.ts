@@ -1,3 +1,4 @@
+import { recordSngCall } from "@/lib/sweepandgo-usage";
 /**
  * Live "has this prospect signed up yet?" lookup against Sweep&Go, for a quick
  * pre-send check in the drip / campaign engines.
@@ -55,6 +56,7 @@ async function loadIndex(): Promise<ActiveIndex | null> {
     let page = 1;
     let totalPages = 1;
     do {
+      await recordSngCall(SNG_ACTIVE_CLIENTS_URL);
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), PAGE_TIMEOUT_MS);
       let res: Response;

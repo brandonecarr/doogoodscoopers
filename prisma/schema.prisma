@@ -826,6 +826,17 @@ model CampaignRecipient {
 // the sync-customers cron. This is a ONE-WAY copy: the app only ever GETs from
 // Sweep&Go and never writes back, so nothing done here can affect the Sweep&Go
 // customer list. Cancellations are archived (active=false), not deleted.
+// Every outbound Sweep&Go API request, counted per Pacific day per endpoint
+// (lib/sweepandgo-usage.ts). Guards against polling bugs like the every-minute
+// free-quotes cron that hit ~70k requests/month. "__alert__" marks an alerted day.
+model SngApiUsage {
+  day      DateTime @db.Date
+  endpoint String
+  count    Int      @default(0)
+
+  @@id([day, endpoint])
+}
+
 model SweepandgoCustomer {
   id                String    @id @default(cuid())
   sngId             String    @unique // Sweep&Go client id, e.g. "rcl_2YYGKO9GRVII"

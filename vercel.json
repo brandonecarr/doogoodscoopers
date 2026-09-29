@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/v2/cron/sync-sweepandgo",
-      "schedule": "* * * * *"
+      "schedule": "*/5 * * * *"
     },
     {
       "path": "/api/v2/cron/process-campaigns",
@@ -34,7 +34,7 @@
     },
     {
       "path": "/api/v2/cron/sync-billing",
-      "schedule": "*/10 * * * *"
+      "schedule": "20 * * * *"
     },
     {
       "path": "/api/v2/cron/process-email-campaigns",

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { recordSngCall } from "@/lib/sweepandgo-usage";
 
 // One-time (re-runnable) backfill of DISABLED / inactive Sweep&Go residential
 // customers into the "Former customers" archive. Like the active-customer sync
@@ -46,11 +47,13 @@ export async function POST() {
     return NextResponse.json({ error: "Missing SWEEPANDGO_API_TOKEN" }, { status: 500 });
   }
 
-  const fetchPage = (path: string, p: number) =>
-    fetch(`${SNG_BASE}/${path}?page=${p}`, {
+  const fetchPage = async (path: string, p: number) => {
+    await recordSngCall(`${SNG_BASE}/${path}`);
+    return fetch(`${SNG_BASE}/${path}?page=${p}`, {
       headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
       cache: "no-store",
     });
+  };
 
   // Find the working path by trying page 1 of each candidate.
   let activePath: string | null = null;
