@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/v2/cron/sync-sweepandgo",
-      "schedule": "0 * * * *"
+      "schedule": "15 13 * * *"
     },
     {
       "path": "/api/v2/cron/process-campaigns",

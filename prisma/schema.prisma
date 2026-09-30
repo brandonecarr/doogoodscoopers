@@ -844,6 +844,25 @@ model SngApiUsageHour {
   alerted Boolean  @default(false)
 }
 
+// Every Sweep&Go webhook delivery as received (lib/sweepandgo-webhook-log.ts).
+// Observation only: which events arrive, real payloads, latency, duplicates.
+model SngWebhookEvent {
+  id            String    @id @default(dbgenerated("gen_random_uuid()::text"))
+  receivedAt    DateTime  @default(now()) @db.Timestamptz(3)
+  type          String
+  sngEventId    String?
+  sngCreatedAt  DateTime? @db.Timestamptz(3)
+  clientId      String?
+  dedupKey      String
+  secretMatched Boolean?
+  authSeen      Json?
+  payload       Json
+
+  @@index([receivedAt])
+  @@index([type])
+  @@index([dedupKey])
+}
+
 model SweepandgoCustomer {
   id                String    @id @default(cuid())
   sngId             String    @unique // Sweep&Go client id, e.g. "rcl_2YYGKO9GRVII"

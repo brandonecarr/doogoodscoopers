@@ -4,6 +4,7 @@ import { sendAdminPush } from "@/lib/web-push";
 import { syncContactToQuo } from "@/lib/quo";
 import { linkInstagramConversion } from "@/lib/instagram-leads";
 import { phoneVariants } from "@/lib/call-intel";
+import { recordWebhookEvent } from "@/lib/sweepandgo-webhook-log";
 
 // Sweep&Go Webhook — receives quote and lead events
 //
@@ -156,6 +157,16 @@ export async function POST(request: NextRequest) {
 
     // Log the full raw payload so we can see exactly what Sweep&Go sends
     console.log(`[SweepAndGo] Event: ${event}`, JSON.stringify(body, null, 2));
+
+    // Record every delivery (all event types, including ones we ignore below) so we
+    // can see what Sweep&Go sends and how fast before replacing any polling with it.
+    await recordWebhookEvent({
+      body,
+      type: event,
+      data,
+      secretMatched: WEBHOOK_SECRET ? secretCandidates.includes(WEBHOOK_SECRET) : null,
+      authSeen: authLocations,
+    });
 
     const { firstName, lastName, fullName } = parseName(data);
     const phone = extractPhone(data);

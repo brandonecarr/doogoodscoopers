@@ -5,17 +5,20 @@ import { syncContactToQuo } from "@/lib/quo";
 import { optedOutKeys } from "@/lib/sms-optout";
 import { recordSngCall } from "@/lib/sweepandgo-usage";
 
-// Poll the Sweep&Go API for new free quotes and insert them into QuoteLead.
+// Daily safety net for Sweep&Go free quotes.
 //
-// Why this exists: Sweep&Go's WEBHOOK delivers on a ~10-minute batch and sends
-// each quote several times. The Sweep&Go API reflects a new quote within ~90s.
-// This cron pulls from the API every 5 minutes so leads appear fast and deduped,
-// instead of waiting on the slow/duplicating webhook.
+// Quotes arrive ON DEMAND through Sweep&Go's free:quote WEBHOOK
+// (api/webhooks/sweepandgo): when someone submits a quote on the website,
+// Sweep&Go pushes it to us and the webhook creates the QuoteLead, zip included.
+// This cron does NOT poll for new quotes during the day. Once a day it reads the
+// free-quotes list and back-fills anything from the last 26 hours the webhook
+// missed (outage, dropped delivery), deduped by phone against existing leads.
 //
-// ⚠️ Schedule is in vercel.json. It ran EVERY MINUTE until 2026-09-29 (~45k requests a
-// month) and got flagged by Sweep&Go support, whose limit is 100/hour and 500/day for
-// the whole account. It now runs hourly; the free:quote webhook delivers quotes within
-// ~10 minutes anyway. Every Sweep&Go call is counted (lib/sweepandgo-usage.ts).
+// ⚠️ Schedule is in vercel.json. History: every minute (~45k requests/month,
+// flagged by Sweep&Go), then every 5 min, then hourly, now once a day. Sweep&Go's
+// account limit is 100 requests/hour and 500/day. Don't speed this back up; if
+// leads arrive slowly, fix the webhook instead. Every Sweep&Go call is counted
+// (lib/sweepandgo-usage.ts).
 //
 // Auth to Sweep&Go: Bearer token from the developer portal. We reuse the token
 // already stored for the webhook unless a dedicated one is provided.
@@ -27,8 +30,8 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const SNG_FREE_QUOTES_URL = "https://openapi.sweepandgo.com/api/v2/free_quotes";
-// Look back further than the poll interval so a missed run can't drop a lead.
-const LOOKBACK_MINUTES = 30;
+// Look back further than the once-a-day run interval so a missed run can't drop a lead.
+const LOOKBACK_MINUTES = 26 * 60;
 
 interface FreeQuote {
   first_name: string | null;
