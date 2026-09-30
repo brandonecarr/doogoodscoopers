@@ -5,6 +5,7 @@ import { syncContactToQuo } from "@/lib/quo";
 import { linkInstagramConversion } from "@/lib/instagram-leads";
 import { phoneVariants } from "@/lib/call-intel";
 import { recordWebhookEvent } from "@/lib/sweepandgo-webhook-log";
+import { applyJobWebhook } from "@/lib/tv-sweepandgo";
 
 // Sweep&Go Webhook — receives quote and lead events
 //
@@ -167,6 +168,10 @@ export async function POST(request: NextRequest) {
       secretMatched: WEBHOOK_SECRET ? secretCandidates.includes(WEBHOOK_SECRET) : null,
       authSeen: authLocations,
     });
+
+    // Job events keep the Office TV's route live (stop done/skipped/started) without polling.
+    const sentAt = typeof body.created === "number" ? new Date(body.created * 1000) : null;
+    await applyJobWebhook(event, data, sentAt);
 
     const { firstName, lastName, fullName } = parseName(data);
     const phone = extractPhone(data);

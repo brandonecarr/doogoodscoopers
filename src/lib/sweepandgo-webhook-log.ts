@@ -10,9 +10,11 @@ import prisma from "@/lib/prisma";
 
 const RETENTION_DAYS = 90;
 
+/** Sweep&Go sends `created` as Unix seconds (e.g. 1790805463); accept ISO strings too. */
 function parseDate(v: unknown): Date | null {
-  if (typeof v !== "string" && typeof v !== "number") return null;
-  const d = new Date(v);
+  if (typeof v === "number") return new Date(v < 1e12 ? v * 1000 : v);
+  if (typeof v !== "string" || !v) return null;
+  const d = /^\d+$/.test(v) ? new Date(Number(v) * (v.length <= 10 ? 1000 : 1)) : new Date(v);
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
@@ -30,7 +32,7 @@ export async function recordWebhookEvent(input: {
       data: {
         type,
         sngEventId: typeof body.id === "string" || typeof body.id === "number" ? String(body.id) : null,
-        sngCreatedAt: parseDate(body.created_at),
+        sngCreatedAt: parseDate(body.created ?? body.created_at),
         clientId: typeof data?.client === "string" ? data.client : null,
         dedupKey,
         secretMatched: input.secretMatched,
