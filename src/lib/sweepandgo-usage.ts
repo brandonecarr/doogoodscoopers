@@ -3,13 +3,17 @@ import { BUSINESS_TZ } from "@/lib/datetime";
 import { sendAdminPush } from "@/lib/web-push";
 
 // ── Sweep&Go API usage guard ─────────────────────────────────────────────────
-// Every outbound Sweep&Go request is counted per Pacific day per endpoint. In
-// Sept 2026 Sweep&Go support flagged ~70k requests/month from us — a free-quotes
-// poll running every minute plus a 10-minute invoice sync. Normal volume after
-// that fix is roughly 500–600/day; crossing DAILY_ALERT sends one admin push so a
-// runaway loop or over-eager cron is caught the same day, not by Sweep&Go.
+// Every outbound Sweep&Go request is counted per Pacific day per endpoint, and
+// per clock hour. In Sept 2026 Sweep&Go support flagged ~70k requests/month from
+// us (a free-quotes poll running every minute). Their account limit is 100
+// requests/hour and 500/day; normal volume is now ~150/day and under 10/hour.
+// Crossing either alert (80% of the limit) sends one admin push, so a runaway
+// loop or over-eager cron is caught before Sweep&Go cuts us off.
 
-const DAILY_ALERT = 1500;
+const DAILY_LIMIT = 500;
+const HOURLY_LIMIT = 100;
+const DAILY_ALERT = 400;
+const HOURLY_ALERT = 80;
 const ALERT_MARKER = "__alert__";
 
 function pacificDay(): string {
@@ -35,6 +39,26 @@ export async function recordSngCall(url: string, method = "GET"): Promise<void> 
       INSERT INTO "SngApiUsage" ("day", "endpoint", "count") VALUES (${day}::date, ${endpoint}, 1)
       ON CONFLICT ("day", "endpoint") DO UPDATE SET "count" = "SngApiUsage"."count" + 1`;
 
+    // Hourly total — the tighter of Sweep&Go's two limits.
+    const [{ hourCount }] = await prisma.$queryRaw<{ hourCount: number }[]>`
+      INSERT INTO "SngApiUsageHour" ("hour", "count") VALUES (date_trunc('hour', now()), 1)
+      ON CONFLICT ("hour") DO UPDATE SET "count" = "SngApiUsageHour"."count" + 1
+      RETURNING "count"::int AS "hourCount"`;
+    if (hourCount >= HOURLY_ALERT) {
+      // Only the first caller past the threshold flips the flag, so this fires once an hour.
+      const flagged = await prisma.$executeRaw`
+        UPDATE "SngApiUsageHour" SET "alerted" = true
+        WHERE "hour" = date_trunc('hour', now()) AND "alerted" = false`;
+      if (flagged > 0) {
+        await sendAdminPush({
+          title: "⚠️ Sweep&Go hourly limit close",
+          body: `${hourCount} Sweep&Go requests this hour (limit ${HOURLY_LIMIT}/hour). Something may be polling too fast.`,
+          url: "/admin",
+          tag: `sng-usage-hour`,
+        });
+      }
+    }
+
     const [{ total }] = await prisma.$queryRaw<{ total: number }[]>`
       SELECT COALESCE(SUM("count"), 0)::int AS total FROM "SngApiUsage"
       WHERE "day" = ${day}::date AND "endpoint" <> ${ALERT_MARKER}`;
@@ -51,8 +75,8 @@ export async function recordSngCall(url: string, method = "GET"): Promise<void> 
       WHERE "day" = ${day}::date AND "endpoint" <> ${ALERT_MARKER}
       ORDER BY "count" DESC LIMIT 3`;
     await sendAdminPush({
-      title: "⚠️ Sweep&Go API usage spike",
-      body: `${total.toLocaleString()} requests today (alert at ${DAILY_ALERT.toLocaleString()}). Top: ${top.map((t) => `${t.endpoint} ${t.count}`).join(" · ")}`,
+      title: "⚠️ Sweep&Go daily limit close",
+      body: `${total.toLocaleString()} Sweep&Go requests today (limit ${DAILY_LIMIT}/day). Top: ${top.map((t) => `${t.endpoint} ${t.count}`).join(" · ")}`,
       url: "/admin",
       tag: `sng-usage-${day}`,
     });

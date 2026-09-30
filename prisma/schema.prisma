@@ -837,6 +837,13 @@ model SngApiUsage {
   @@id([day, endpoint])
 }
 
+// Sweep&Go requests per clock hour (limit is 100/hour); "alerted" = hourly push already sent.
+model SngApiUsageHour {
+  hour    DateTime @id @db.Timestamptz(3)
+  count   Int      @default(0)
+  alerted Boolean  @default(false)
+}
+
 model SweepandgoCustomer {
   id                String    @id @default(cuid())
   sngId             String    @unique // Sweep&Go client id, e.g. "rcl_2YYGKO9GRVII"
