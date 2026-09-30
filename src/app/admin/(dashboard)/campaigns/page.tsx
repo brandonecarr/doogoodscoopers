@@ -5,7 +5,6 @@ import { CampaignPauseToggle } from "@/components/admin/CampaignPauseToggle";
 import { BlastApproval } from "@/components/admin/BlastApproval";
 import { SendingHoursCard } from "@/components/admin/SendingHoursCard";
 import { MessengerAutoReplyCard } from "@/components/admin/MessengerAutoReplyCard";
-import { FailedPaymentCard } from "@/components/admin/FailedPaymentCard";
 import { PageHero, heroBtnPrimary, heroBtnSecondary, heroPrimaryStyle } from "@/components/admin/PageHero";
 
 export const dynamic = "force-dynamic";
@@ -62,7 +61,6 @@ export default async function CampaignsPage() {
 
       <SendingHoursCard />
       <MessengerAutoReplyCard />
-      <FailedPaymentCard />
 
       {campaigns.length === 0 ? (
         <div className="dgs-card p-12 text-center">

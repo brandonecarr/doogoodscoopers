@@ -2,9 +2,11 @@
 // instead of by each TV. The TV asks /api/tv/snapshot every minute; Sweep&Go is only
 // called when a cached value is older than its schedule, so an idle office costs nothing.
 //
-// Budget (one or many TVs): routes every 5 min in business hours / 30 min after,
-// this week's visits every 15 / 30 min, the 30-day report every 2 h, commercial count
-// hourly, all-time totals every 6 h and only when a board shows them. About 250/day.
+// Sweep&Go allows 100 requests/hour and 500/day for the whole account, shared with the
+// admin's own syncs. Budget (one or many TVs): routes every 15 min in business hours /
+// hourly after, this week's visits every 30 min / 2 h, the 30-day report and all-time
+// totals daily (totals only when a board shows them), commercial count every 6 h.
+// About 100/day, at most 6 in any hour.
 import prisma from "@/lib/prisma";
 import { recordSngCall } from "@/lib/sweepandgo-usage";
 import { addDays, businessDay, dayStart, weekStartDay } from "@/lib/tv-connector";
@@ -128,10 +130,10 @@ export async function buildTvSweepAndGo(now = new Date()): Promise<TvSweepAndGo 
 
   const [residential, commercial, todayJobs, weekJobs, last30, events] = await Promise.all([
     prisma.sweepandgoCustomer.count({ where: { active: true } }),
-    cached<number>("commercial", 60 * MIN, async () => Number(((await get("/api/v2/commercial_clients/active")) as { paginate?: { total?: number } }).paginate?.total ?? 0)),
-    cached<TvJob[]>(`routes:${today}`, (busy ? 5 : 30) * MIN, async () => trim(((await get(`/api/v1/dispatch_board/jobs_for_date?date=${today}`)) as { data?: unknown }).data)),
-    cached<TvJob[]>(`week:${monday}:${today}`, (busy ? 15 : 30) * MIN, async () => trim(((await get(`/api/v2/report/completed_jobs_report?date_from=${monday}&date_to=${today}`)) as { job_list?: unknown }).job_list)),
-    cached<number | null>(`avg30:${today}`, 120 * MIN, async () => {
+    cached<number>("commercial", 6 * 60 * MIN, async () => Number(((await get("/api/v2/commercial_clients/active")) as { paginate?: { total?: number } }).paginate?.total ?? 0)),
+    cached<TvJob[]>(`routes:${today}`, (busy ? 15 : 60) * MIN, async () => trim(((await get(`/api/v1/dispatch_board/jobs_for_date?date=${today}`)) as { data?: unknown }).data)),
+    cached<TvJob[]>(`week:${monday}:${today}`, (busy ? 30 : 120) * MIN, async () => trim(((await get(`/api/v2/report/completed_jobs_report?date_from=${monday}&date_to=${today}`)) as { job_list?: unknown }).job_list)),
+    cached<number | null>(`avg30:${today}`, 24 * 60 * MIN, async () => {
       const jobs = trim(((await get(`/api/v2/report/completed_jobs_report?date_from=${monthAgo}&date_to=${today}`)) as { job_list?: unknown }).job_list);
       const prices = jobs.filter((j) => j.status_id === 2 && (j.price ?? 0) > 0).map((j) => j.price!);
       return prices.length ? Math.round((prices.reduce((a, b) => a + b, 0) / prices.length) * 100) : null;
@@ -151,7 +153,7 @@ export async function buildTvSweepAndGo(now = new Date()): Promise<TvSweepAndGo 
   ];
   for (const [field, metric, path] of wanted) {
     if (!used.has(metric)) continue;
-    const r = await cached<number>(`total:${field}`, 360 * MIN, async () => Number(((await get(path)) as { data?: unknown }).data ?? 0));
+    const r = await cached<number>(`total:${field}`, 24 * 60 * MIN, async () => Number(((await get(path)) as { data?: unknown }).data ?? 0));
     note(r);
     if (r.data != null) totals[field] = r.data;
   }

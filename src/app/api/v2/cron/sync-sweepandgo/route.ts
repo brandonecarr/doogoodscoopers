@@ -12,9 +12,10 @@ import { recordSngCall } from "@/lib/sweepandgo-usage";
 // This cron pulls from the API every 5 minutes so leads appear fast and deduped,
 // instead of waiting on the slow/duplicating webhook.
 //
-// ⚠️ Schedule is in vercel.json. It ran EVERY MINUTE until 2026-09-29, which was
-// ~45k Sweep&Go API requests/month and got flagged by Sweep&Go support. Keep it
-// at */5 or slower; every Sweep&Go call is counted (lib/sweepandgo-usage.ts).
+// ⚠️ Schedule is in vercel.json. It ran EVERY MINUTE until 2026-09-29 (~45k requests a
+// month) and got flagged by Sweep&Go support, whose limit is 100/hour and 500/day for
+// the whole account. It now runs hourly; the free:quote webhook delivers quotes within
+// ~10 minutes anyway. Every Sweep&Go call is counted (lib/sweepandgo-usage.ts).
 //
 // Auth to Sweep&Go: Bearer token from the developer portal. We reuse the token
 // already stored for the webhook unless a dedicated one is provided.
