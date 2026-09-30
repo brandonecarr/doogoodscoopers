@@ -36,13 +36,38 @@ export const sweepAndGoConfigured = () => token().length > 0;
 
 class RateLimited extends Error {}
 
+// When Sweep&Go says stop, every TV poll must not keep knocking: remember when to try again
+// (its Retry-After, else 15 minutes) in AppSetting so all server instances honour it.
+const PAUSE_KEY = "tv.sng.pausedUntil";
+const DEFAULT_PAUSE_MS = 15 * MIN;
+
+async function pausedUntil(): Promise<Date | null> {
+  const row = await prisma.appSetting.findUnique({ where: { key: PAUSE_KEY } });
+  const until = row ? new Date(row.value) : null;
+  return until && until.getTime() > Date.now() ? until : null;
+}
+
+async function pause(retryAfterHeader: string | null): Promise<Date> {
+  const seconds = Number(retryAfterHeader);
+  const until = new Date(Date.now() + (Number.isFinite(seconds) && seconds > 0 ? Math.max(30_000, seconds * 1000) : DEFAULT_PAUSE_MS));
+  await prisma.appSetting.upsert({ where: { key: PAUSE_KEY }, create: { key: PAUSE_KEY, value: until.toISOString() }, update: { value: until.toISOString() } });
+  return until;
+}
+
+const untilText = (d: Date) => d.toLocaleTimeString("en-US", { timeZone: "America/Los_Angeles", hour: "numeric", minute: "2-digit" });
+
 async function get(path: string): Promise<unknown> {
+  const paused = await pausedUntil();
+  if (paused) throw new RateLimited(`Sweep&Go is limiting requests; trying again at ${untilText(paused)}`);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
     await recordSngCall(`${SNG}${path}`);
     const res = await fetch(`${SNG}${path}`, { headers: { Authorization: `Bearer ${token()}`, Accept: "application/json" }, cache: "no-store", signal: controller.signal });
-    if (res.status === 429) throw new RateLimited("Sweep&Go is limiting requests");
+    if (res.status === 429) {
+      const until = await pause(res.headers.get("retry-after"));
+      throw new RateLimited(`Sweep&Go is limiting requests; trying again at ${untilText(until)}`);
+    }
     if (!res.ok) throw new Error(`Sweep&Go HTTP ${res.status}`);
     return await res.json();
   } finally {
