@@ -9,7 +9,7 @@ import { recordSngCall } from "@/lib/sweepandgo-usage";
  *
  * 1. RATE LIMITS ARE THE BINDING CONSTRAINT. Sweep&Go returns HTTP 429 well
  *    before a full dataset can be pulled in one invocation — even at ~24
- *    requests with `per_page=100` and backoff. So the sync is RESUMABLE: it
+ *    requests and backoff (the account limit is 100/hour, 500/day). So the sync is RESUMABLE: it
  *    walks the feeds page by page, writes as it goes, and on a rate-limit stop
  *    it saves its position and continues on the next cron tick.
  * 2. WRITES ARE CUMULATIVE (upsert), never wipe-and-replace. A run that stops
@@ -25,7 +25,9 @@ import { recordSngCall } from "@/lib/sweepandgo-usage";
  */
 
 const SNG_BASE = "https://openapi.sweepandgo.com/api/v2";
-const PER_PAGE = 100;          // honoured by the API: 1,391 payments → 14 pages
+// Sweep&Go's page-size parameter is `length` (1–50, default 10); `per_page` is ignored.
+// At 50: 915 recurring invoices = 19 pages (it was 92 at the default 10).
+const PER_PAGE = 50;
 const SPACING_MS = 2_000;      // deliberate pacing between pages
 const PAGE_TIMEOUT_MS = 20_000;
 const RETRIES = 2;             // for transient errors only — NEVER for 429s
@@ -33,7 +35,8 @@ const RETRIES = 2;             // for transient errors only — NEVER for 429s
 // through a 429 just deepens the hole (one run burned 5 minutes on backoff and
 // was killed at the 300s function limit). So: take a small bite each run, and
 // the instant we see a 429, save our place and leave the API alone.
-const MAX_PAGES_PER_RUN = 12;
+// A full walk at 50/page is ~22 pages, so one daily run can finish it.
+const MAX_PAGES_PER_RUN = 25;
 const BUDGET_MS = 120_000;
 // Once the history is fully imported, only the newest pages need re-reading.
 const REFRESH_PAGES = 2;
@@ -48,6 +51,13 @@ const FULL_MAX_AGE_MS = 30 * 60 * 60 * 1000;
 class RateLimited extends Error {}
 
 const STATE_KEY = "billing.syncState";
+// Webhook-driven refresh: Sweep&Go billing webhooks set REFRESH_REQUESTED_KEY; the
+// sync-billing-events cron (every 15 min) runs a refresh only when one is pending,
+// settled, and the last run was at least an hour ago. Zero API calls when idle.
+const REFRESH_REQUESTED_KEY = "billing.refreshRequestedAt";
+const LAST_RUN_KEY = "billing.lastRunStartedAt";
+const REFRESH_SETTLE_MS = 2 * 60 * 1000;
+const REFRESH_MIN_GAP_MS = 60 * 60 * 1000;
 const COMPLETE_KEY = "billing.complete";
 const FULL_KEY = "billing.lastFullSync";
 
@@ -74,8 +84,8 @@ interface Feed {
 // hours of backfill) to compute a number invoices already contain. The payments
 // feed adds only per-charge detail (card retries, methods) that nothing here uses.
 const FEEDS: Feed[] = [
-  { key: "recurring", envelope: "invoices", path: (p) => `/invoices?type=recurring&page=${p}&per_page=${PER_PAGE}` },
-  { key: "one_time", envelope: "invoices", path: (p) => `/invoices?type=one_time&page=${p}&per_page=${PER_PAGE}` },
+  { key: "recurring", envelope: "invoices", path: (p) => `/invoices?type=recurring&page=${p}&length=${PER_PAGE}` },
+  { key: "one_time", envelope: "invoices", path: (p) => `/invoices?type=one_time&page=${p}&length=${PER_PAGE}` },
 ];
 
 function token(): string | undefined {
@@ -201,12 +211,20 @@ export interface BillingSyncResult {
  * runs until the data is exhausted, the time budget is spent, or the API rate
  * limit stops us — whichever comes first. Progress is always preserved.
  */
-export async function syncSngBilling(): Promise<BillingSyncResult> {
+export async function syncSngBilling(opts: { refreshOnly?: boolean } = {}): Promise<BillingSyncResult> {
   if (!token()) return { ok: false, complete: false, rows: 0, error: "SWEEPANDGO_API_TOKEN not set" };
+  await setSetting(LAST_RUN_KEY, new Date().toISOString());
+  const refreshOnly = Boolean(opts.refreshOnly);
 
   const raw = await getSetting(STATE_KEY).catch(() => null);
-  let state: { feed?: string; page?: number } = {};
+  let state: { feed?: string; page?: number; length?: number } = {};
   try { state = raw ? JSON.parse(raw) : {}; } catch { state = {}; }
+  // A walk saved at a different page size can't resume by page number (page 14 at 10/page
+  // is not page 14 at 50/page), so restart it from the top as a full walk.
+  let restartWalk = false;
+  if (state.feed && state.length !== PER_PAGE) { state = {}; restartWalk = true; }
+  // Refresh-only runs (webhook-triggered) read the newest pages and leave any walk's progress alone.
+  const saveState = async (v: object) => { if (!refreshOnly) await setSetting(STATE_KEY, JSON.stringify({ ...v, length: PER_PAGE })); };
 
   const deadline = Date.now() + BUDGET_MS;
   const unknown = new Set<string>();
@@ -219,22 +237,22 @@ export async function syncSngBilling(): Promise<BillingSyncResult> {
     getSetting(COMPLETE_KEY).catch(() => null),
     getSetting(FULL_KEY).catch(() => null),
   ]);
-  const refreshing = Boolean(completedAt) && !state.feed && !fullSyncDue(lastFull);
+  const refreshing = refreshOnly || (Boolean(completedAt) && !state.feed && !restartWalk && !fullSyncDue(lastFull));
 
-  const startIndex = Math.max(0, FEEDS.findIndex((f) => f.key === state.feed));
+  const startIndex = refreshOnly ? 0 : Math.max(0, FEEDS.findIndex((f) => f.key === state.feed));
   for (let fi = startIndex; fi < FEEDS.length; fi++) {
     const feed = FEEDS[fi];
-    let page = feed.key === state.feed && state.page ? state.page : 1;
+    let page = !refreshOnly && feed.key === state.feed && state.page ? state.page : 1;
     let lastPage = Number.POSITIVE_INFINITY;
 
     while (page <= lastPage) {
       if (refreshing && page > REFRESH_PAGES) break;
       if (!refreshing && pagesThisRun >= MAX_PAGES_PER_RUN) {
-        await setSetting(STATE_KEY, JSON.stringify({ feed: feed.key, page }));
+        await saveState({ feed: feed.key, page });
         return { ok: true, complete: false, rows, resumeAt: `${feed.key}:${page}`, ...(unknown.size ? { unknownStatuses: [...unknown] } : {}) };
       }
       if (Date.now() > deadline) {
-        await setSetting(STATE_KEY, JSON.stringify({ feed: feed.key, page }));
+        await saveState({ feed: feed.key, page });
         return { ok: true, complete: false, rows, resumeAt: `${feed.key}:${page}`, ...(unknown.size ? { unknownStatuses: [...unknown] } : {}) };
       }
 
@@ -243,7 +261,7 @@ export async function syncSngBilling(): Promise<BillingSyncResult> {
         res = await getPage(feed.path(page));
       } catch (e) {
         // Rate limited / unreachable: keep the ground already covered and stop.
-        await setSetting(STATE_KEY, JSON.stringify({ feed: feed.key, page }));
+        await saveState({ feed: feed.key, page });
         const limited = e instanceof RateLimited;
         return {
           ok: limited, // being throttled is expected pacing, not a failure
@@ -255,14 +273,12 @@ export async function syncSngBilling(): Promise<BillingSyncResult> {
 
       const env = res[feed.envelope] as { data?: unknown[]; last_page?: number } | undefined;
       const data = (env?.data as Record<string, unknown>[]) || [];
-      // ⚠️ The two feeds paginate DIFFERENTLY and neither self-describes cleanly:
-      //   /invoices honours per_page=100 → 9 real pages, but still reports
-      //             last_page=86 (computed for the default size).
-      //   /payments IGNORES per_page → 10 rows a page, last_page=140 (correct).
-      // So neither `last_page` alone nor a short-page heuristic is safe. Judging
-      // "short page" against our requested per_page ended the payments feed after
-      // ONE 10-row page and falsely declared the whole import complete.
-      // Terminate only on hard evidence: an empty page, or last_page reached.
+      // ⚠️ Page size is `length` (max 50). `per_page` is silently ignored, which is why
+      // earlier notes here disagreed about page counts: requests with per_page=100 were
+      // really getting the default 10 rows. With `length`, last_page is accurate
+      // (915 recurring invoices → last_page 19 at 50/page). Still terminate only on hard
+      // evidence, an empty page or last_page reached; a short-page heuristic once ended
+      // a feed after one page and falsely declared the import complete.
       lastPage = Number(env?.last_page) || 1;
 
       if (data.length === 0) break;
@@ -278,12 +294,50 @@ export async function syncSngBilling(): Promise<BillingSyncResult> {
     }
   }
 
+  // A refresh-only run just updated the newest invoices; the walk bookkeeping is untouched.
+  if (refreshOnly) return { ok: true, complete: true, full: false, rows, ...(unknown.size ? { unknownStatuses: [...unknown] } : {}) };
+
   // Every feed walked to its last page — the mirror is whole.
   await setSetting(STATE_KEY, JSON.stringify({}));
   await setSetting(COMPLETE_KEY, new Date().toISOString());
   // Only a FULL walk re-verifies old invoices, so only that resets the clock.
   if (!refreshing) await setSetting(FULL_KEY, new Date().toISOString());
   return { ok: true, complete: true, full: !refreshing, rows, ...(unknown.size ? { unknownStatuses: [...unknown] } : {}) };
+}
+
+/** Record a sync outcome where the admin can see it (Settings). */
+export async function recordBillingSyncResult(result: BillingSyncResult): Promise<void> {
+  await setSetting(
+    "billing.lastSync",
+    `${new Date().toISOString()} ok=${result.ok} complete=${result.complete}${result.full ? " full=true" : ""} rows=${result.rows}` +
+      `${result.resumeAt ? ` resumeAt=${result.resumeAt}` : ""}` +
+      `${result.unknownStatuses?.length ? ` unknownStatuses=${result.unknownStatuses.join(",")}` : ""}` +
+      `${result.error ? ` error=${result.error}` : ""}`
+  ).catch(() => {});
+}
+
+// ── Webhook-driven refresh ─────────────────────────────────────────────────────
+
+/** A Sweep&Go billing webhook arrived: flag the mirror for a refresh (no API call). */
+export async function requestBillingRefresh(at = new Date()): Promise<void> {
+  await setSetting(REFRESH_REQUESTED_KEY, at.toISOString()).catch((e) =>
+    console.error("[billing] could not flag refresh:", e instanceof Error ? e.message : e));
+}
+
+/** Is a webhook-requested refresh due now? (Full walks are left to the daily run.) */
+export async function billingRefreshDue(now = new Date()): Promise<{ due: boolean; reason: string }> {
+  const [requested, lastRun] = await Promise.all([
+    getSetting(REFRESH_REQUESTED_KEY).catch(() => null),
+    getSetting(LAST_RUN_KEY).catch(() => null),
+  ]);
+  const t = (v: string | null) => (v ? Date.parse(v) : NaN);
+  const req = t(requested), last = t(lastRun);
+  const sinceLast = Number.isFinite(last) ? now.getTime() - last : Infinity;
+  if (sinceLast < REFRESH_MIN_GAP_MS) return { due: false, reason: "ran within the last hour" };
+  if (!Number.isFinite(req)) return { due: false, reason: "no billing webhooks" };
+  if (Number.isFinite(last) && req <= last) return { due: false, reason: "already covered by the last run" };
+  if (now.getTime() - req < REFRESH_SETTLE_MS) return { due: false, reason: "letting a burst of billing events settle" };
+  return { due: true, reason: "billing webhook since the last run" };
 }
 
 // ---------------------------------------------------------------------------

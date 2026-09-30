@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { syncSngBilling } from "@/lib/sweepandgo-billing";
-import { setSetting } from "@/lib/google-business";
+import { syncSngBilling, recordBillingSyncResult } from "@/lib/sweepandgo-billing";
 
-// Refreshes the Sweep&Go billing mirror (invoices + payments) that powers the
-// lifetime-value header and invoice list on each customer profile.
+// Daily reconciliation of the Sweep&Go billing mirror (invoices + payments) that powers
+// the lifetime-value header and invoice list on each customer profile. Between these,
+// billing webhooks trigger hourly-at-most refreshes via /api/v2/cron/sync-billing-events.
 export const dynamic = "force-dynamic";
 export const maxDuration = 150;
 
@@ -16,13 +16,7 @@ export async function GET(request: NextRequest) {
 
   const started = Date.now();
   const result = await syncSngBilling();
-  await setSetting(
-    "billing.lastSync",
-    `${new Date().toISOString()} ok=${result.ok} complete=${result.complete}${result.full ? " full=true" : ""} rows=${result.rows}` +
-      `${result.resumeAt ? ` resumeAt=${result.resumeAt}` : ""}` +
-      `${result.unknownStatuses?.length ? ` unknownStatuses=${result.unknownStatuses.join(",")}` : ""}` +
-      `${result.error ? ` error=${result.error}` : ""}`
-  ).catch(() => {});
+  await recordBillingSyncResult(result);
 
   return NextResponse.json({ ...result, ms: Date.now() - started });
 }

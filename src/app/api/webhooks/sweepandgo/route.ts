@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import prisma from "@/lib/prisma";
 import { sendAdminPush } from "@/lib/web-push";
 import { syncContactToQuo } from "@/lib/quo";
@@ -6,6 +6,34 @@ import { linkInstagramConversion } from "@/lib/instagram-leads";
 import { phoneVariants } from "@/lib/call-intel";
 import { recordWebhookEvent } from "@/lib/sweepandgo-webhook-log";
 import { applyJobWebhook } from "@/lib/tv-sweepandgo";
+import { syncCustomersForEvent } from "@/lib/sweepandgo-customer-sync";
+import { requestBillingRefresh } from "@/lib/sweepandgo-billing";
+
+// Room for a webhook-triggered customer sync (20s settle + ~2 API pages) after responding.
+export const maxDuration = 60;
+
+// Client events that can change who is an active customer. Each one triggers a customer
+// mirror sync from the API (webhooks are unauthenticated, so they're only a trigger).
+const CUSTOMER_SYNC_EVENTS = new Set([
+  "client:client_onboarding_recurring",
+  "client:client_onboarding_onetime",
+  "client:subscription_created",
+  "client:subscription_canceled",
+  "client:subscription_paused",
+  "client:subscription_unpaused",
+  "client:changed_status",
+]);
+
+// Billing events: flag the invoice mirror for a refresh (run by the sync-billing-events
+// cron at most hourly, since billing days fire dozens of these in a burst).
+const BILLING_EVENTS = new Set([
+  "client:invoice_finalized",
+  "client:client_payment_accepted",
+  "client:client_payment_declined",
+  "commercial:invoice_finalized",
+  "commercial:client_payment_accepted",
+  "commercial:client_payment_declined",
+]);
 
 // Sweep&Go Webhook — receives quote and lead events
 //
@@ -172,6 +200,18 @@ export async function POST(request: NextRequest) {
     // Job events keep the Office TV's route live (stop done/skipped/started) without polling.
     const sentAt = typeof body.created === "number" ? new Date(body.created * 1000) : null;
     await applyJobWebhook(event, data, sentAt);
+
+    if (BILLING_EVENTS.has(event)) await requestBillingRefresh();
+
+    // Signups/cancellations reach the customer mirror (and archive converted leads, which
+    // stops their drips) within ~30s instead of waiting for the daily sync.
+    if (CUSTOMER_SYNC_EVENTS.has(event)) {
+      const eventAt = sentAt ?? new Date();
+      after(() => syncCustomersForEvent(eventAt).then(
+        (r) => console.log(`[SweepAndGo] customer sync for ${event}:`, typeof r === "string" ? r : JSON.stringify(r)),
+        (e) => console.error("[SweepAndGo] customer sync failed:", e),
+      ));
+    }
 
     const { firstName, lastName, fullName } = parseName(data);
     const phone = extractPhone(data);

@@ -33,6 +33,10 @@
       "schedule": "30 13 * * *"
     },
     {
+      "path": "/api/v2/cron/sync-billing-events",
+      "schedule": "5,20,35,50 * * * *"
+    },
+    {
       "path": "/api/v2/cron/process-email-campaigns",
       "schedule": "* * * * *"
     },

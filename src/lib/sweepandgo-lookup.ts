@@ -1,21 +1,22 @@
 import { recordSngCall } from "@/lib/sweepandgo-usage";
-/**
- * Live "has this prospect signed up yet?" lookup against Sweep&Go, for a quick
- * pre-send check in the drip / campaign engines.
- *
- * The customer mirror (SweepandgoCustomer) is only refreshed hourly by the
- * sync-customers cron, so a lead who signs up can still get a message in the gap
- * before the next sync. This pulls the LIVE active-client list from Sweep&Go (the
- * same endpoint the sync uses) and caches it for 60s, so a burst of sends in one
- * run shares a single pull and freshness is ~1 minute, not an hour. It indexes
- * both phone numbers (for SMS) and emails (for email campaigns).
- *
- * Returns null when Sweep&Go can't be reached (no token / network / API error /
- * timeout) so callers fall back to the local mirror instead of blocking sends.
- */
+import prisma from "@/lib/prisma";
+import { lastCustomerSyncAt } from "@/lib/sweepandgo-customer-sync";
 
+/**
+ * "Has this prospect signed up yet?" check, for a quick pre-send guard in the drip /
+ * campaign engines (indexes phones for SMS and emails for email campaigns).
+ *
+ * Reads the local customer mirror (SweepandgoCustomer). Sweep&Go client webhooks trigger
+ * a mirror sync within ~30s of a signup (lib/sweepandgo-customer-sync.ts), plus a daily
+ * reconciliation, so the mirror is current without calling Sweep&Go on every send. Only
+ * if the mirror hasn't synced in 30 hours does this fall back to the live API.
+ *
+ * Returns null when neither source is available so callers can decide what to do.
+ */
 const SNG_ACTIVE_CLIENTS_URL = "https://openapi.sweepandgo.com/api/v1/clients/active";
 const MAX_PAGES = 20;
+const PAGE_LENGTH = 50; // the API's max page size (default 15)
+const MIRROR_FRESH_MS = 30 * 60 * 60 * 1000;
 const TTL_MS = 60_000;
 const PAGE_TIMEOUT_MS = 5_000;
 
@@ -43,9 +44,32 @@ function normEmail(raw: string | null | undefined): string {
   return (raw || "").trim().toLowerCase();
 }
 
+/** Build the index from the local mirror, if it has synced recently. */
+async function mirrorIndex(): Promise<ActiveIndex | null> {
+  const last = await lastCustomerSyncAt();
+  const synced = last ?? (await prisma.sweepandgoCustomer.aggregate({ where: { active: true }, _max: { lastSyncedAt: true } }))._max.lastSyncedAt;
+  if (!synced || Date.now() - synced.getTime() > MIRROR_FRESH_MS) return null;
+  const rows = await prisma.sweepandgoCustomer.findMany({ where: { active: true }, select: { homePhone: true, cellPhone: true, email: true } });
+  const phones = new Set<string>();
+  const emails = new Set<string>();
+  for (const r of rows) {
+    for (const ph of [r.homePhone, r.cellPhone]) { const t = last10(ph); if (t) phones.add(t); }
+    const e = normEmail(r.email);
+    if (e) emails.add(e);
+  }
+  return { phones, emails };
+}
+
 /** Pull (and cache) the active-client phone + email index. Null if unreachable. */
 async function loadIndex(): Promise<ActiveIndex | null> {
   if (cache && Date.now() - cache.at < TTL_MS) return cache.index;
+
+  try {
+    const local = await mirrorIndex();
+    if (local) { cache = { at: Date.now(), index: local }; return local; }
+  } catch (e) {
+    console.error("[sng-lookup] mirror read failed, trying the API:", e instanceof Error ? e.message : e);
+  }
 
   const token = process.env.SWEEPANDGO_API_TOKEN || process.env.SWEEPANDGO_WEBHOOK_SECRET;
   if (!token) return null;
@@ -61,7 +85,7 @@ async function loadIndex(): Promise<ActiveIndex | null> {
       const timer = setTimeout(() => controller.abort(), PAGE_TIMEOUT_MS);
       let res: Response;
       try {
-        res = await fetch(`${SNG_ACTIVE_CLIENTS_URL}?page=${page}`, {
+        res = await fetch(`${SNG_ACTIVE_CLIENTS_URL}?page=${page}&length=${PAGE_LENGTH}`, {
           headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
           cache: "no-store",
           signal: controller.signal,
