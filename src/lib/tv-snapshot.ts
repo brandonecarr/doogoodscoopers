@@ -6,6 +6,7 @@
 import prisma from "@/lib/prisma";
 import { addDays, businessDay, dayStart, privateName, shortDayLabel, weekStartDay } from "@/lib/tv-connector";
 import { buildTvBusiness, type TvBusiness } from "@/lib/tv-business";
+import { buildTvSweepAndGo, type TvSweepAndGo } from "@/lib/tv-sweepandgo";
 
 export interface TvCard { title: string; meta: string; commercial: boolean }
 export interface TvTask { id: string; title: string; meta: string; overdue: boolean; commercial: boolean }
@@ -35,6 +36,8 @@ export interface TvSnapshot {
   activeHistory: { date: string; value: number }[];
   /** Revenue, margin, MRR, reviews, cancellation reasons and recent wins. */
   business: TvBusiness;
+  /** Sweep&Go numbers fetched by the admin (null when no Sweep&Go token is configured). */
+  sweepAndGo: TvSweepAndGo | null;
   /** Custom Kanban boards; each column has its full count and the first few cards. */
   kanbanBoards: { id: string; name: string; columns: { id: string; name: string; isDone: boolean; count: number; cards: TvTask[] }[] }[];
 }
@@ -90,7 +93,7 @@ export async function buildTvSnapshot(now = new Date()): Promise<TvSnapshot> {
   const thirtyAgo = dayStart(addDays(today, -30));
   const eightWeeksAgo = dayStart(addDays(weekStart, -7 * 7));
 
-  const [leads, tasks, calendar, history, followUps, kanban, business] = await Promise.all([
+  const [leads, tasks, calendar, history, followUps, kanban, business, sweepAndGo] = await Promise.all([
     leadsSince(eightWeeksAgo < thirtyAgo ? eightWeeksAgo : thirtyAgo),
     prisma.task.findMany({
       where: { OR: [{ status: { in: ["TODO", "DOING"] } }, { status: "DONE", doneAt: { gte: weekStartAt } }] },
@@ -107,6 +110,7 @@ export async function buildTvSnapshot(now = new Date()): Promise<TvSnapshot> {
       },
     }),
     buildTvBusiness(now),
+    buildTvSweepAndGo(now),
   ]);
 
   // Pipeline: last 30 days. Converted leads usually get archived, so keep those for the Won stage.
@@ -180,6 +184,7 @@ export async function buildTvSnapshot(now = new Date()): Promise<TvSnapshot> {
     upcoming,
     activeHistory: history.map((h) => ({ date: h.date, value: h.value })),
     business,
+    sweepAndGo,
     kanbanBoards: kanban.map((b) => ({
       id: b.id,
       name: b.name,
