@@ -892,7 +892,7 @@ model SweepandgoCustomer {
   cleanupFrequency  String?
   // From the owner's cancelled-client export (win-back campaigns); the sync never sets these.
   city              String?
-  smsConsent        Boolean? // true = SMS messaging consent on record; null = none
+  smsConsent        Boolean? // false = declined texts; true/null = opted in (signing up opts customers in)
   referralSource    String?
   referralDetail    String?
 

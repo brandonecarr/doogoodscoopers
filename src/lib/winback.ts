@@ -7,8 +7,9 @@ import { normalizeZip5 } from "@/lib/geo/zipCity";
 import { WINBACK_FROM, fmtDeadline, winbackMessages } from "@/lib/winback-messages";
 
 // ── Win-back campaign ─────────────────────────────────────────────────────────
-// One-time sequence to former customers: 3 emails (everyone eligible) + 2 texts (only
-// those with SMS consent on record), 25% off the first month, with a deadline. Built on
+// One-time sequence to former customers: 3 emails + 2 texts, 25% off the first month,
+// with a deadline. Customers opt in to SMS when they sign up, so everyone with a phone is
+// texted unless they explicitly declined (smsConsent=false) or texted STOP. Built on
 // the existing engines: an EmailAutomation (process-email-automations) and an SMS DRIP
 // Campaign (process-drips) with audience "former_customers". Recipients are enrolled
 // once at launch (a snapshot); both engines stop a person as soon as their own customer
@@ -31,7 +32,7 @@ export interface WinbackConfig {
 export interface WinbackCandidate {
   id: string; name: string; city: string | null; zip: string | null;
   email: string | null; phone: string | null;
-  smsConsent: boolean; unsubscribed: boolean; optedOut: boolean;
+  smsDeclined: boolean; unsubscribed: boolean; optedOut: boolean;
   milesToNearestCustomer: number | null; farAway: boolean;
   emailEligible: boolean; smsEligible: boolean; defaultInclude: boolean;
 }
@@ -60,11 +61,13 @@ export async function winbackCandidates(): Promise<WinbackCandidate[]> {
     const unsubscribed = !!c.email && unsub.has(normalizeEmail(c.email));
     const optedOutPhone = !!phone && optedOut.has(optOutKey(phone) ?? "");
     const emailEligible = !!c.email && !unsubscribed;
-    const smsEligible = c.smsConsent === true && !!phone && !optedOutPhone;
+    // Signing up opts a customer in to SMS; only an explicit "no" (false) or a STOP excludes them.
+    const smsDeclined = c.smsConsent === false;
+    const smsEligible = !smsDeclined && !!phone && !optedOutPhone;
     const farAway = miles != null && miles > FAR_MILES;
     return {
       id: c.id, name: [c.firstName, c.lastName].filter(Boolean).join(" ") || "(no name)", city: c.city, zip,
-      email: c.email, phone, smsConsent: c.smsConsent === true, unsubscribed, optedOut: optedOutPhone,
+      email: c.email, phone, smsDeclined, unsubscribed, optedOut: optedOutPhone,
       milesToNearestCustomer: miles == null ? null : Math.round(miles), farAway,
       emailEligible, smsEligible, defaultInclude: (emailEligible || smsEligible) && !farAway,
     };

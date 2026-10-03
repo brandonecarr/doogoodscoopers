@@ -29,7 +29,7 @@ function Hero({ actions }: { actions?: React.ReactNode }) {
   return (
     <PageHero
       title="Win-back"
-      subtitle="Invite former customers back with 25% off their first month: 3 emails plus 2 texts for those with SMS consent."
+      subtitle="Invite former customers back with 25% off their first month: 3 emails plus 2 texts."
       icon={<div className="w-11 h-11 rounded-[13px] flex items-center justify-center" style={{ background: "linear-gradient(150deg,#8B6BFF,#6D3EF0)" }}><RotateCcw className="w-[22px] h-[22px] text-white" /></div>}
       actions={actions}
     />
@@ -124,7 +124,7 @@ function Setup({ candidates }: { candidates: WinbackCandidate[] }) {
                   </td>
                   <td className="p-2 text-[12px] text-gray-500">
                     {[c.farAway && `~${c.milesToNearestCustomer} mi from your nearest customer`, c.unsubscribed && "unsubscribed from email", c.optedOut && "texted STOP",
-                      !c.smsConsent && !c.optedOut && "no SMS consent"].filter(Boolean).join(" · ")}
+                      c.smsDeclined && "declined texts", !c.phone && "no phone number"].filter(Boolean).join(" · ")}
                   </td>
                 </tr>
               ))}
