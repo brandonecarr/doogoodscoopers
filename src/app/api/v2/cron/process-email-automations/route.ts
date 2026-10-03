@@ -74,6 +74,16 @@ export async function GET(request: NextRequest) {
           continue;
         }
       }
+      // A former customer who came back (their own record is active again) is done
+      // with win-back emails. Each one keeps its Sweep&Go id, so this is exact.
+      if (r.contactType === "former_customer") {
+        const back = await prisma.sweepandgoCustomer.findUnique({ where: { id: r.contactId }, select: { active: true } });
+        if (!back || back.active) {
+          await prisma.emailAutomationRecipient.update({ where: { id: r.id }, data: { status: "STOPPED", error: back ? "came back — active customer again" : "customer record removed", nextSendAt: null } });
+          stopped++;
+          continue;
+        }
+      }
       const step = steps[r.currentStep];
       if (!step) { await prisma.emailAutomationRecipient.update({ where: { id: r.id }, data: { status: "COMPLETED", nextSendAt: null } }); continue; }
 
@@ -85,7 +95,7 @@ export async function GET(request: NextRequest) {
         continue;
       }
 
-      const [res] = await sendCampaignBatch({ subject: step.subject, html, from: {}, recipients: [{ id: r.id, email: r.email, name: r.name }] });
+      const [res] = await sendCampaignBatch({ subject: step.subject, html, from: { fromName: a.fromName }, recipients: [{ id: r.id, email: r.email, name: r.name }] });
       const next = steps[r.currentStep + 1];
       await prisma.emailAutomationRecipient.update({
         where: { id: r.id },

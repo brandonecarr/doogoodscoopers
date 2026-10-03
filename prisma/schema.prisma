@@ -1240,6 +1240,7 @@ model EmailRecipient {
 model EmailAutomation {
   id         String   @id @default(cuid())
   name       String
+  fromName   String? // sender display name, e.g. "Brandon at DooGoodScoopers" (default address)
   trigger    Json // { types: ["new_subscribers","new_customers","former_customers","quote","ad"] }
   active     Boolean  @default(true)
   sentCount  Int      @default(0)

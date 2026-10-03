@@ -90,6 +90,10 @@ export async function syncActiveCustomers(): Promise<CustomerSyncResult> {
 
   const now = new Date();
   const seenIds: string[] = [];
+  // Former customers who reappear on the active list came back (e.g. a win-back).
+  const wasInactive = new Set(
+    (await prisma.sweepandgoCustomer.findMany({ where: { active: false }, select: { sngId: true } })).map((r) => r.sngId),
+  );
   let created = 0;
   let updated = 0;
   let leadsArchived = 0;
@@ -151,7 +155,26 @@ export async function syncActiveCustomers(): Promise<CustomerSyncResult> {
       } catch (e) {
         console.error("[sync-customers] lead archive failed:", e);
       }
-    } else updated++;
+    } else {
+      updated++;
+      if (wasInactive.has(result.sngId)) {
+        // A returning customer re-activates their own record, so the create path above
+        // never logs it. Record the return as a SIGNUP (keeps the growth dashboard's net
+        // in step with the active count) and archive any prospect lead they left.
+        await prisma.subscriptionEvent.upsert({
+          where: { dedupeKey: `sng-return:${result.sngId}:${now.toISOString().slice(0, 10)}` },
+          create: {
+            kind: "SIGNUP", occurredAt: now,
+            clientName: [result.firstName, result.lastName].filter(Boolean).join(" ") || null,
+            email: result.email, zipCode: result.zipCode, plan: result.subscriptionNames,
+            revenue: estimateMonthlyRevenue(result.subscriptionNames), reason: "returning customer",
+            source: "sync-customers", dedupeKey: `sng-return:${result.sngId}:${now.toISOString().slice(0, 10)}`,
+          },
+          update: {},
+        }).catch((e) => console.error("[sync-customers] return event failed:", e));
+        try { leadsArchived += await archiveConvertedLeads([c.cell_phone, c.home_phone]); } catch (e) { console.error("[sync-customers] lead archive failed:", e); }
+      }
+    }
   }
 
   // ── Archive customers that fell off the active list ─────────────────────────

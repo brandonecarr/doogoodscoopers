@@ -57,7 +57,7 @@ function prepare(opts: { subject: string; html: string; from: CampaignFrom; reci
   const oneClick = `${SITE}/api/email/unsubscribe?token=${unsubToken(r.email)}`;
   const body = renderTemplate(opts.html, { firstName, name: r.name || "" });
   return {
-    subject: opts.subject,
+    subject: renderTemplate(opts.subject, { firstName, name: r.name || "" }),
     html: wrapNewsletter(body, unsubUrl),
     headers: {
       "List-Unsubscribe": `<${oneClick}>`,
@@ -77,7 +77,11 @@ export async function sendCampaignBatch(opts: {
   from: CampaignFrom;
   recipients: OutRecipient[];
 }): Promise<SendResult[]> {
-  const fromStr = opts.from.fromEmail ? `${opts.from.fromName || "DooGoodScoopers"} <${opts.from.fromEmail}>` : FROM_DEFAULT;
+  // A display name alone (e.g. "Brandon at DooGoodScoopers") rides on the default verified address.
+  const defaultAddr = parseAddr(FROM_DEFAULT);
+  const fromStr = opts.from.fromEmail
+    ? `${opts.from.fromName || "DooGoodScoopers"} <${opts.from.fromEmail}>`
+    : opts.from.fromName ? `${opts.from.fromName} <${defaultAddr.email}>` : FROM_DEFAULT;
 
   // --- Brevo (preferred) ---
   if (isBrevoConfigured()) {

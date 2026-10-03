@@ -28,7 +28,7 @@ import {
   ChevronDown,
   LogOut,
   Settings,
-  ArrowUpRight,
+  ArrowUpRight, RotateCcw,
 } from "lucide-react";
 import { NotificationBell } from "@/components/admin/NotificationBell";
 import { SmsBalanceChip } from "@/components/admin/SmsBalanceChip";
@@ -56,6 +56,7 @@ const moreNav: NavItem[] = [
   { name: "Keyword Radar",        short: "Keywords",   href: "/admin/keyword-radar", icon: Radar },
   { name: "Funnels",              short: "Funnels",    href: "/admin/funnels",     icon: Split },
   { name: "Email",                short: "Email",      href: "/admin/email",       icon: Mail },
+  { name: "Win-back",             short: "Win-back",   href: "/admin/winback",     icon: RotateCcw },
   { name: "Community Quote",      short: "Quote Calc", href: "/admin/community-quote", icon: Calculator },
   { name: "Canvassers",           short: "Canvassers", href: "/admin/canvassers",   icon: Footprints },
   { name: "Out of Area",          short: "Out of Area", href: "/admin/out-of-area", icon: MapPinOff },

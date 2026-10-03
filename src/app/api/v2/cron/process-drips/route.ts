@@ -4,7 +4,7 @@ import { sendSms, isQuoConfigured } from "@/lib/quo";
 import { renderTemplate, sendEmail, wrapEmailHtml } from "@/lib/resend";
 import { sendMessengerMessage, isMessengerConfigured } from "@/lib/messenger";
 import { optedOutKeys, optOutKey } from "@/lib/sms-optout";
-import { findDripCandidates, isLeadArchived, markLeadContactedIfNew } from "@/lib/drip";
+import { findDripCandidates, isLeadArchived, isWinbackCampaign, markLeadContactedIfNew } from "@/lib/drip";
 import { getLeadPersonalization } from "@/lib/personalization";
 import { loadSendWindow, clampToSendWindow, isWithinSendWindow } from "@/lib/send-window";
 import { notify } from "@/lib/notify";
@@ -83,7 +83,9 @@ export async function GET(request: NextRequest) {
     for (const r of due) {
       // Stop conditions.
       if (optedOut.has(optOutKey(r.phone) ?? "")) { await stop(r.id, "opted out"); stopped++; continue; }
-      if (await isLeadArchived(r.leadType, r.leadId)) { await stop(r.id, "lead archived"); stopped++; continue; }
+      if (await isLeadArchived(r.leadType, r.leadId, { winback: isWinbackCampaign(campaign.audienceFilter) })) {
+        await stop(r.id, isWinbackCampaign(campaign.audienceFilter) ? "came back — active customer again" : "lead archived"); stopped++; continue;
+      }
       if (campaign.stopOnReply) {
         // Only a genuine human reply stops the drip. Machine-generated inbound
         // (the Meta lead-ad form-forward) is flagged automated and ignored here.

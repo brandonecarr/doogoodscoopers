@@ -41,6 +41,11 @@ const RETURNING_TOKENS = ["returning", "returning-meta", "returning-quote"];
  * receive the returning sequence (and both sequences at once, since they're
  * enrolled in the regular quote drip in the same pass).
  */
+/** Win-back drips (audience "former_customers") enroll at launch and stop when someone comes back. */
+export function isWinbackCampaign(audienceFilter: unknown): boolean {
+  return (((audienceFilter || {}) as { leadTypes?: string[] }).leadTypes || []).includes("former_customers");
+}
+
 export function isReturningCampaign(audienceFilter: unknown): boolean {
   const f = (audienceFilter || {}) as { leadTypes?: string[] };
   const types = f.leadTypes || [];
@@ -136,11 +141,13 @@ export async function markLeadContactedIfNew(leadType: LeadSource, leadId: strin
 }
 
 /** Whether a lead has been archived (drip should stop). */
-export async function isLeadArchived(leadType: LeadSource, leadId: string): Promise<boolean> {
+export async function isLeadArchived(leadType: LeadSource, leadId: string, opts: { winback?: boolean } = {}): Promise<boolean> {
   if (leadType === "CUSTOMER") {
-    // A customer that cancelled (active=false) or vanished from the mirror stops the drip.
     const row = await prisma.sweepandgoCustomer.findUnique({ where: { id: leadId }, select: { active: true } });
-    return row ? !row.active : true;
+    if (!row) return true; // vanished from the mirror
+    // Win-back drips target FORMER customers, so they stop when the customer comes back.
+    // Every other customer drip (e.g. review requests) stops when the customer cancels.
+    return opts.winback ? row.active : !row.active;
   }
   const sel = { select: { archived: true } };
   let row: { archived: boolean } | null = null;
