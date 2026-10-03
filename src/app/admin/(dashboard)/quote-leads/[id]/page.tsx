@@ -3,6 +3,9 @@ import Link from "next/link";
 import { ArrowLeft, Phone, Mail, MapPin, Building2, Dog, Calendar, Clock, Pencil, Archive, Instagram } from "lucide-react";
 import prisma from "@/lib/prisma";
 import { cityFromZip } from "@/lib/geo/zipCity";
+import { nearbyRouteDay } from "@/lib/route-day";
+import { SITE_CONFIG } from "@/lib/constants";
+import { VoicemailScriptCard } from "@/components/admin/VoicemailScriptCard";
 import type { LeadStatus } from "@/types/leads";
 import StatusUpdateForm from "@/components/admin/StatusUpdateForm";
 import { LeadQuickActions } from "@/components/admin/LeadQuickActions";
@@ -192,6 +195,9 @@ export default async function QuoteLeadDetailPage({ params }: PageProps) {
     comments?: string;
   }> | null;
 
+  // For the voicemail script: the day a tech already services this ZIP (or city).
+  const routeDay = await nearbyRouteDay(lead.zipCode);
+
   const cards: ArrangeableCard[] = [
     {
       id: "contact",
@@ -369,6 +375,19 @@ export default async function QuoteLeadDetailPage({ params }: PageProps) {
             communicationType: u.communicationType || "",
             adminEmail: u.adminEmail || "",
           }))}
+        />
+      ),
+    },
+    {
+      id: "voicemail-script",
+      zone: "side",
+      node: (
+        <VoicemailScriptCard
+          firstName={lead.firstName}
+          city={cityFromZip(lead.zipCode) ?? lead.city ?? null}
+          dogs={lead.numberOfDogs}
+          routeDay={routeDay?.day ?? null}
+          phone={SITE_CONFIG.phone}
         />
       ),
     },

@@ -27,8 +27,9 @@ function defaultLayout(cards: ArrangeableCard[]): Layout {
   };
 }
 
-// Keep a saved layout valid as cards appear/disappear: drop unknown ids, append
-// any new card to its default zone.
+// Keep a saved layout valid as cards appear/disappear: drop unknown ids, and slot any
+// new card into its default zone just before the card that follows it on the page's
+// default layout (else at the end), so a newly added card lands where it was designed to.
 function reconcile(saved: Layout | null, cards: ArrangeableCard[]): Layout {
   const def = defaultLayout(cards);
   if (!saved || !Array.isArray(saved.main) || !Array.isArray(saved.side)) return def;
@@ -36,7 +37,15 @@ function reconcile(saved: Layout | null, cards: ArrangeableCard[]): Layout {
   const main = saved.main.filter((id) => known.has(id));
   const side = saved.side.filter((id) => known.has(id));
   const placed = new Set([...main, ...side]);
-  for (const c of cards) if (!placed.has(c.id)) (c.zone === "side" ? side : main).push(c.id);
+  for (const c of cards) {
+    if (placed.has(c.id)) continue;
+    const list = c.zone === "side" ? side : main;
+    const order = c.zone === "side" ? def.side : def.main;
+    const next = order.slice(order.indexOf(c.id) + 1).find((id) => list.includes(id));
+    if (next) list.splice(list.indexOf(next), 0, c.id);
+    else list.push(c.id);
+    placed.add(c.id);
+  }
   return { main, side };
 }
 
