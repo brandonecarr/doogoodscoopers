@@ -752,6 +752,7 @@ model Campaign {
   channel         String   @default("sms") // DRIP send channel: sms | messenger (messenger-first, SMS/email fallback)
   audienceFilter  Json?    // BLAST: segment criteria. DRIP: trigger { leadTypes: [...] }
   adminEmail      String
+  emailFromName   String?  // DRIP: display name on email steps (rides on the default verified address)
 
   totalRecipients Int      @default(0)
   sentCount       Int      @default(0)
@@ -775,6 +776,8 @@ model CampaignStep {
   stepOrder    Int
   body         String   @db.Text
   delayMinutes Int      @default(0) // wait before this step, relative to the previous (step 0 = 0)
+  channel      String   @default("sms") // sms (the campaign's text channel) | email
+  subject      String?  // email steps only
 
   @@index([campaignId])
 }
@@ -793,6 +796,20 @@ model SmsOptOut {
   @@index([createdAt])
 }
 
+// People the owner never wants contacted or re-imported (e.g. problem former customers).
+// Their phones/emails are also in SmsOptOut / EmailUnsubscribe so every sender skips them.
+model DoNotContact {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  name      String
+  email     String?
+  phone     String? // last 10 digits
+  sngId     String?
+  reason    String?
+
+  @@index([sngId])
+}
+
 // Per-lead send queue for a campaign (drained by the process-campaigns cron).
 model CampaignRecipient {
   id           String     @id @default(cuid())
@@ -801,7 +818,8 @@ model CampaignRecipient {
   campaignId   String
   leadType     LeadSource
   leadId       String
-  phone        String
+  phone        String     // "" when the person only gets email steps
+  email        String?    // set when the campaign has email steps and the person can be emailed
   name         String?
 
   status       String     @default("PENDING") // BLAST: PENDING|SENT|FAILED|SKIPPED. DRIP: ACTIVE|COMPLETED|STOPPED

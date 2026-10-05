@@ -2,6 +2,7 @@ import prisma from "@/lib/prisma";
 import { optedOutKeys, optOutKey } from "@/lib/sms-optout";
 import { loadSendWindow, clampToSendWindow } from "@/lib/send-window";
 import { LeadStatus, type LeadSource } from "@prisma/client";
+import { formerCustomers } from "@/lib/former-customers";
 
 /**
  * Drip-campaign enrollment. A drip auto-enrolls NEW leads (created after the
@@ -18,7 +19,8 @@ export const PHONE_CALL_STEP = "Phone Call";
 export interface DripCandidate {
   leadType: LeadSource;
   leadId: string;
-  phone: string;
+  phone: string; // "" when the person only gets email steps
+  email?: string | null;
   name: string | null;
 }
 
@@ -26,6 +28,7 @@ interface DripCampaign {
   id: string;
   createdAt: Date;
   audienceFilter: unknown;
+  steps?: Array<{ channel: string }>;
 }
 
 /** Audience tokens that mark a campaign as "returning leads only". */
@@ -41,7 +44,7 @@ const RETURNING_TOKENS = ["returning", "returning-meta", "returning-quote"];
  * receive the returning sequence (and both sequences at once, since they're
  * enrolled in the regular quote drip in the same pass).
  */
-/** Win-back drips (audience "former_customers") enroll at launch and stop when someone comes back. */
+/** Win-back drips (audience "former_customers") enroll former customers and stop when someone comes back. */
 export function isWinbackCampaign(audienceFilter: unknown): boolean {
   return (((audienceFilter || {}) as { leadTypes?: string[] }).leadTypes || []).includes("former_customers");
 }
@@ -114,12 +117,33 @@ export async function findDripCandidates(campaign: DripCampaign): Promise<DripCa
     });
   }
 
-  // Exclude already-enrolled, phone-less, and opted-out.
+  // Former customers (win-back). Everyone already cancelled when the campaign went live,
+  // plus later cancellations when the campaign opts in. A person is enrolled if at least
+  // one of the campaign's channels can reach them; a channel that can't is left blank
+  // so its steps are skipped.
+  if (types.has("former_customers")) {
+    const f = filter as { excludeIds?: string[]; includeNew?: boolean };
+    const exclude = new Set(f.excludeIds || []);
+    const steps = campaign.steps || [];
+    const hasEmail = steps.some((s) => s.channel === "email");
+    const hasText = steps.some((s) => s.channel !== "email");
+    for (const p of await formerCustomers()) {
+      if (exclude.has(p.id)) continue;
+      if (!f.includeNew && p.removedAt && p.removedAt > since) continue;
+      const phone = hasText && p.smsEligible ? p.phone || "" : "";
+      const email = hasEmail && p.emailEligible ? p.email : null;
+      if (!phone && !email) continue;
+      out.push({ leadType: "CUSTOMER", leadId: p.id, phone, email, name: p.name });
+    }
+  }
+
+  // Exclude already-enrolled, unreachable, and opted-out.
   const enrolled = await prisma.campaignRecipient.findMany({ where: { campaignId: campaign.id }, select: { leadType: true, leadId: true } });
   const enrolledSet = new Set(enrolled.map((e) => `${e.leadType}:${e.leadId}`));
   const optedOut = await optedOutKeys();
   return out.filter((c) => {
-    if (!c.phone || enrolledSet.has(`${c.leadType}:${c.leadId}`)) return false;
+    if ((!c.phone && !c.email) || enrolledSet.has(`${c.leadType}:${c.leadId}`)) return false;
+    if (!c.phone) return true; // email-only (already checked against unsubscribes)
     const k = optOutKey(c.phone);
     return !k || !optedOut.has(k);
   });

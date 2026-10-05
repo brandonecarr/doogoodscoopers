@@ -18,14 +18,23 @@ export default async function EditCampaignPage({ params }: { params: Promise<{ i
   if (!campaign) notFound();
 
   if (campaign.type === "DRIP") {
-    const leadTypes = ((campaign.audienceFilter as { leadTypes?: string[] } | null)?.leadTypes) || [];
-    const steps = campaign.steps.map((s) => ({ body: s.body, ...minutesToStep(s.delayMinutes) }));
-    if (steps.length === 0) steps.push({ body: "", delayValue: 0, delayUnit: "days" });
+    const filter = (campaign.audienceFilter || {}) as { leadTypes?: string[]; excludeIds?: string[]; includeNew?: boolean };
+    const leadTypes = filter.leadTypes || [];
+    const steps = campaign.steps.map((s) => ({
+      channel: s.channel === "email" ? ("email" as const) : ("sms" as const),
+      subject: s.subject || "",
+      body: s.body,
+      ...minutesToStep(s.delayMinutes),
+    }));
+    if (steps.length === 0) steps.push({ channel: "sms", subject: "", body: "", delayValue: 0, delayUnit: "days" });
     return (
       <DripForm
         mode="edit"
         campaignId={campaign.id}
-        initial={{ name: campaign.name, leadTypes, stopOnReply: campaign.stopOnReply, steps, channel: campaign.channel }}
+        initial={{
+          name: campaign.name, leadTypes, stopOnReply: campaign.stopOnReply, steps, channel: campaign.channel,
+          excludeIds: filter.excludeIds, includeNew: filter.includeNew, emailFromName: campaign.emailFromName,
+        }}
       />
     );
   }

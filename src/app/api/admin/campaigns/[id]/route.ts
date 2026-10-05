@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { rescheduleActiveRecipients } from "@/lib/drip-schedule";
+import { parseDripInput, stepsProblem } from "@/lib/drip-input";
 
 // GET → campaign detail + recipient status breakdown
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -54,6 +55,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   // Activate a draft: go live now. Reset createdAt so trigger-based auto-enroll
   // starts from activation time (not draft-creation) and doesn't backfill.
   if (body.activate === true) {
+    const steps = await prisma.campaignStep.findMany({ where: { campaignId: id }, orderBy: { stepOrder: "asc" } });
+    const problem = steps.length === 0 ? "Add at least one message before activating." : stepsProblem(steps);
+    if (problem) return NextResponse.json({ error: problem }, { status: 400 });
     const campaign = await prisma.campaign.update({
       where: { id },
       data: { active: true, status: "ACTIVE", createdAt: new Date() },
@@ -83,9 +87,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   if (!b.name?.trim()) return NextResponse.json({ error: "Name is required" }, { status: 400 });
 
   if (existing.type === "DRIP") {
-    if (!b.leadTypes?.length) return NextResponse.json({ error: "Pick at least one trigger lead type" }, { status: 400 });
-    const steps = (b.steps || []).filter((s: { body?: string }) => s.body?.trim());
-    if (steps.length === 0) return NextResponse.json({ error: "Add at least one message" }, { status: 400 });
+    // A draft stays a draft (and may stay incomplete) until it's activated.
+    const { steps, audienceFilter, emailFromName, error } = parseDripInput(b, { draft: existing.status === "DRAFT" });
+    if (error) return NextResponse.json({ error }, { status: 400 });
 
     await prisma.$transaction([
       prisma.campaignStep.deleteMany({ where: { campaignId: id } }),
@@ -93,17 +97,12 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         where: { id },
         data: {
           name: b.name.trim(),
-          body: steps[0].body.trim(),
+          body: steps[0]?.body || "",
           stopOnReply: b.stopOnReply !== false,
           ...(b.channel ? { channel: b.channel === "messenger" ? "messenger" : "sms" } : {}),
-          audienceFilter: { leadTypes: b.leadTypes },
-          steps: {
-            create: steps.map((s: { body: string; delayMinutes?: number }, i: number) => ({
-              stepOrder: i,
-              body: s.body.trim(),
-              delayMinutes: Math.max(0, Math.round(s.delayMinutes || 0)),
-            })),
-          },
+          audienceFilter,
+          emailFromName,
+          steps: { create: steps },
         },
       }),
     ]);

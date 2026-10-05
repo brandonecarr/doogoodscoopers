@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import type { LeadSource } from "@prisma/client";
+import { parseDripInput } from "@/lib/drip-input";
 
 // GET → list campaigns (newest first)
 export async function GET() {
@@ -21,10 +22,13 @@ interface CreateBody {
   recipients?: Array<{ leadType: LeadSource; leadId: string; phone: string; name?: string | null }>;
   // drip
   leadTypes?: string[];
-  steps?: Array<{ body: string; delayMinutes?: number }>;
+  steps?: Array<{ body: string; delayMinutes?: number; channel?: string; subject?: string }>;
   stopOnReply?: boolean;
   channel?: string;
   draft?: boolean;
+  excludeIds?: string[];
+  includeNew?: boolean;
+  emailFromName?: string;
 }
 
 // POST → create a blast (queued recipients) or a drip (trigger + steps; the
@@ -39,33 +43,25 @@ export async function POST(request: Request) {
   // ── Drip ──────────────────────────────────────────────────────────────────
   if (b.type === "drip") {
     const isDraft = b.draft === true;
-    const steps = (b.steps || []).filter((s) => s.body?.trim());
     // A draft can be saved incomplete; a live drip needs a trigger + a message.
-    if (!isDraft) {
-      if (!b.leadTypes?.length) return NextResponse.json({ error: "Pick at least one trigger lead type" }, { status: 400 });
-      if (steps.length === 0) return NextResponse.json({ error: "Add at least one message" }, { status: 400 });
-    }
+    const { steps, audienceFilter, emailFromName, error } = parseDripInput(b, { draft: isDraft });
+    if (error) return NextResponse.json({ error }, { status: 400 });
 
     const campaign = await prisma.campaign.create({
       data: {
         name: b.name.trim(),
-        body: steps[0]?.body.trim() || "", // first message, for list display
+        body: steps[0]?.body || "", // first message, for list display
         type: "DRIP",
         // Draft = parked and inert (the process-drips cron only runs active drips).
         status: isDraft ? "DRAFT" : "ACTIVE",
         active: !isDraft,
         stopOnReply: b.stopOnReply !== false,
         channel: b.channel === "messenger" ? "messenger" : "sms",
-        audienceFilter: { leadTypes: b.leadTypes || [] },
+        audienceFilter,
+        emailFromName,
         adminEmail: session.email,
         totalRecipients: 0,
-        steps: {
-          create: steps.map((s, i) => ({
-            stepOrder: i,
-            body: s.body.trim(),
-            delayMinutes: Math.max(0, Math.round(s.delayMinutes || 0)),
-          })),
-        },
+        steps: { create: steps },
       },
     });
     return NextResponse.json({ success: true, campaign });

@@ -10,9 +10,14 @@ import { loadSendWindow, clampToSendWindow, isWithinSendWindow } from "@/lib/sen
 import { notify } from "@/lib/notify";
 import { archiveConvertedLeads, isActiveCustomerByPhone } from "@/lib/lead-duplicates";
 import { activeClientPhones, phoneInActiveSet } from "@/lib/sweepandgo-lookup";
+import { sendCampaignBatch } from "@/lib/email-send";
+import { emailTextToHtml } from "@/lib/campaign-email";
+import { unsubscribedSet, normalizeEmail } from "@/lib/email-unsubscribe";
 
 // Drives DRIP campaigns: enrolls new matching leads and sends each recipient's
-// next step when due. Stops a recipient on reply / opt-out / archive.
+// next step when due. Stops a recipient on reply / opt-out / archive. A step is a text
+// (the campaign's text channel) or an email; a step the person can't receive (no phone,
+// texted STOP, no email, unsubscribed) is skipped and the sequence moves on.
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -36,6 +41,7 @@ export async function GET(request: NextRequest) {
   });
 
   const optedOut = await optedOutKeys();
+  let unsubscribed: Set<string> | null = null; // loaded on the first email step
   const sendWindow = await loadSendWindow();
   // Global {{reviewLink}} token for review-request drips (the Google "leave a review" link).
   const reviewLink = (await prisma.appSetting.findUnique({ where: { key: "reviews.google.writeUrl" } }))?.value || "";
@@ -60,6 +66,7 @@ export async function GET(request: NextRequest) {
             leadType: c.leadType,
             leadId: c.leadId,
             phone: c.phone,
+            email: c.email ?? null,
             name: c.name,
             status: "ACTIVE",
             currentStep: 0,
@@ -82,7 +89,10 @@ export async function GET(request: NextRequest) {
 
     for (const r of due) {
       // Stop conditions.
-      if (optedOut.has(optOutKey(r.phone) ?? "")) { await stop(r.id, "opted out"); stopped++; continue; }
+      // A STOP ends the sequence, unless there are still emails this person can get.
+      const textOptedOut = optedOut.has(optOutKey(r.phone) ?? "");
+      const hasEmailLeft = !!r.email && steps.slice(r.currentStep).some((s) => s.channel === "email");
+      if (textOptedOut && !hasEmailLeft) { await stop(r.id, "opted out"); stopped++; continue; }
       if (await isLeadArchived(r.leadType, r.leadId, { winback: isWinbackCampaign(campaign.audienceFilter) })) {
         await stop(r.id, isWinbackCampaign(campaign.audienceFilter) ? "came back — active customer again" : "lead archived"); stopped++; continue;
       }
@@ -135,6 +145,21 @@ export async function GET(request: NextRequest) {
         continue;
       }
 
+      // Move past a step this person can't receive, keeping the rest of the schedule.
+      const next = steps[r.currentStep + 1];
+      const nextAt = next ? clampToSendWindow(new Date(Date.now() + (next.delayMinutes || 0) * MINUTE), sendWindow) : null;
+      const isEmail = step.channel === "email";
+      if (isEmail && !unsubscribed) unsubscribed = await unsubscribedSet();
+      // (A phone-less Messenger lead still gets text steps through Messenger.)
+      const noText = textOptedOut || (!r.phone && campaign.channel !== "messenger");
+      if (isEmail ? !r.email || unsubscribed!.has(normalizeEmail(r.email)) : noText) {
+        await prisma.campaignRecipient.update({
+          where: { id: r.id },
+          data: { currentStep: r.currentStep + 1, status: next ? "ACTIVE" : "COMPLETED", nextSendAt: nextAt },
+        });
+        continue;
+      }
+
       const vars = await getLeadPersonalization(r.leadType, r.leadId);
       // Fall back to the recipient's stored name if the lead record is gone.
       if (!vars.name && r.name) {
@@ -149,7 +174,16 @@ export async function GET(request: NextRequest) {
       // email. Every other campaign sends SMS exactly as before.
       let provider = "quo";
       let result: { success: boolean; messageId?: string | null; status?: string; error?: string } | null = null;
-      if (campaign.channel === "messenger" && r.leadType === "AD_LEAD") {
+      if (isEmail) {
+        provider = "email";
+        const [e] = await sendCampaignBatch({
+          subject: renderTemplate(step.subject || "", { ...vars, reviewLink }),
+          html: emailTextToHtml(body),
+          from: { fromName: campaign.emailFromName },
+          recipients: [{ id: r.id, email: r.email!, name: r.name }],
+        });
+        result = { success: !e.error, messageId: e.resendId, status: "SENT", error: e.error ?? undefined };
+      } else if (campaign.channel === "messenger" && r.leadType === "AD_LEAD") {
         const ad = await prisma.adLead.findUnique({
           where: { id: r.leadId },
           select: { messengerPsid: true, messengerLastInboundAt: true, email: true },
@@ -191,8 +225,8 @@ export async function GET(request: NextRequest) {
           leadType: r.leadType,
           leadId: r.leadId,
           direction: "OUTBOUND",
-          body,
-          phone: r.phone,
+          body: isEmail ? `✉️ ${renderTemplate(step.subject || "", { ...vars, reviewLink })}\n\n${body}` : body,
+          phone: isEmail ? r.email! : r.phone,
           provider,
           quoMessageId: provider === "quo" ? (result.messageId ?? null) : null,
           status: result.success ? result.status || "SENT" : "FAILED",
@@ -201,13 +235,12 @@ export async function GET(request: NextRequest) {
         },
       });
 
-      const next = steps[r.currentStep + 1];
       await prisma.campaignRecipient.update({
         where: { id: r.id },
         data: {
           currentStep: r.currentStep + 1,
           status: next ? "ACTIVE" : "COMPLETED",
-          nextSendAt: next ? clampToSendWindow(new Date(Date.now() + (next.delayMinutes || 0) * MINUTE), sendWindow) : null,
+          nextSendAt: nextAt,
           quoMessageId: result.messageId ?? null,
           sentAt: new Date(),
           error: result.success ? null : result.error ?? "send failed",
@@ -223,14 +256,14 @@ export async function GET(request: NextRequest) {
       // fails every message silently, so it dedupes to a single standing alert.
       if (!result.success) {
         const err = result.error || "unknown error";
-        const outOfCredits = /credit/i.test(err);
+        const outOfCredits = !isEmail && /credit/i.test(err);
         await notify({
           type: outOfCredits ? "credits" : "delivery_failed",
           severity: "error",
-          title: outOfCredits ? "Quo is out of messaging credits" : `Couldn't send a text to ${r.name || r.phone}`,
+          title: outOfCredits ? "Quo is out of messaging credits" : `Couldn't send ${isEmail ? "an email" : "a text"} to ${r.name || r.phone || r.email}`,
           body: outOfCredits
             ? "Drip messages are failing to send. Add credits in Quo to resume."
-            : `${r.phone}: ${err}`,
+            : `${isEmail ? r.email : r.phone}: ${err}`,
           link: `/admin/campaigns/${campaign.id}`,
           dedupeKey: outOfCredits ? "quo:no-credits" : undefined,
           push: outOfCredits,

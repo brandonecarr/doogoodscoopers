@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Zap, Users, CheckCircle2, StopCircle, Clock, Pencil } from "lucide-react";
+import { ArrowLeft, Zap, Users, CheckCircle2, StopCircle, Clock, Pencil, Mail, MessageSquare, RotateCcw } from "lucide-react";
+import { isWinbackCampaign } from "@/lib/drip";
+import { winbackResults } from "@/lib/former-customers";
 import prisma from "@/lib/prisma";
 import type { LeadSource } from "@prisma/client";
 import { CampaignPauseToggle } from "@/components/admin/CampaignPauseToggle";
@@ -41,6 +43,12 @@ function humanDelay(min: number) {
   return `${min}m`;
 }
 
+const audienceLabel: Record<string, string> = {
+  quote: "Quote Form", manual: "Manual", meta: "Meta Ads", outofarea: "Out of Area", commercial: "Commercial",
+  customers: "Customers", former_customers: "Former customers (win-back)",
+  returning: "Returning leads", "returning-meta": "Returning Meta lead", "returning-quote": "Returning quote-form lead",
+};
+
 const recStatusStyle: Record<string, string> = {
   ACTIVE: "bg-blue-100 text-blue-800",
   COMPLETED: "bg-green-100 text-green-800",
@@ -78,6 +86,10 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
   const totalSteps = campaign.steps.length;
   const counts = recipients.reduce<Record<string, number>>((a, r) => ((a[r.status] = (a[r.status] || 0) + 1), a), {});
   const trigger = ((campaign.audienceFilter as { leadTypes?: string[] } | null)?.leadTypes) || [];
+  const isWinback = isDrip && isWinbackCampaign(campaign.audienceFilter);
+  const cameBack = isWinback ? await winbackResults(id, campaign.createdAt) : [];
+  const wonBack = cameBack.reduce((n, p) => n + p.monthlyRevenue, 0);
+  const money = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 
   const stat = (label: string, value: number | string, Icon: typeof Users) => (
     <div className="dgs-card p-4 flex items-center gap-3">
@@ -117,11 +129,17 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
             </div>
             {isDrip && (
               <p className="text-[#9C9CB0] text-[12.5px] mt-2">
-                Trigger: {trigger.join(", ") || "—"} · stops on reply: {campaign.stopOnReply ? "yes" : "no"}
+                Audience: {trigger.map((t) => audienceLabel[t] || t).join(", ") || "—"} · stops on reply: {campaign.stopOnReply ? "yes" : "no"}
+                {isWinback ? " · stops when they sign back up" : ""}
               </p>
             )}
           </div>
-          {isDrip && (isDraft ? <CampaignActivateButton campaignId={campaign.id} /> : <CampaignPauseToggle campaignId={campaign.id} active={campaign.active} size="md" />)}
+          {isDrip && (isDraft ? (
+            <CampaignActivateButton
+              campaignId={campaign.id}
+              confirmText={isWinback ? "Activate this win-back campaign? Every former customer in its audience is enrolled and the first message starts going out right away (within sending hours)." : undefined}
+            />
+          ) : <CampaignPauseToggle campaignId={campaign.id} active={campaign.active} size="md" />)}
           <Link
             href={`/admin/campaigns/${campaign.id}/edit`}
             className="flex items-center gap-1.5 px-4 py-2 bg-white/10 text-white rounded-[12px] hover:bg-white/15 transition-colors text-sm font-semibold flex-shrink-0"
@@ -142,6 +160,39 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
         {stat(isDrip ? "Stopped" : "Skipped", (isDrip ? counts.STOPPED : counts.SKIPPED) || 0, StopCircle)}
       </div>
 
+      {/* Win-back results */}
+      {isWinback && (
+        <div className="dgs-card p-6">
+          <h2 className="text-lg font-semibold text-navy-900 mb-3 flex items-center gap-2">
+            <RotateCcw className="w-4 h-4 text-teal-600" />
+            Results
+          </h2>
+          <div className="grid grid-cols-2 gap-3 sm:max-w-md">
+            <div className="rounded-lg bg-teal-50 p-4">
+              <p className="text-2xl font-bold text-navy-900 leading-none">{cameBack.length}</p>
+              <p className="text-xs text-gray-600 mt-1.5">came back{recipients.length ? ` (of ${recipients.length} enrolled)` : ""}</p>
+            </div>
+            <div className="rounded-lg bg-teal-50 p-4">
+              <p className="text-2xl font-bold text-navy-900 leading-none">{money(wonBack)}</p>
+              <p className="text-xs text-gray-600 mt-1.5">monthly revenue won back (est.)</p>
+            </div>
+          </div>
+          {cameBack.length === 0 ? (
+            <p className="text-sm text-gray-500 mt-4">No one has signed back up yet. Anyone who does shows up here and stops getting messages.</p>
+          ) : (
+            <ul className="mt-4 divide-y divide-gray-50 text-sm">
+              {cameBack.map((p) => (
+                <li key={p.id} className="py-2 flex items-center gap-3">
+                  <span className="text-navy-900 flex-1 min-w-0 truncate">{p.name}{p.city ? <span className="text-gray-400"> · {p.city}</span> : null}</span>
+                  <span className="text-gray-500 text-xs" suppressHydrationWarning>{p.cameBackAt ? `back ${fmt(new Date(p.cameBackAt), timeZone)}` : "active again"}</span>
+                  <span className="text-navy-900 font-medium tabular-nums">{money(p.monthlyRevenue)}/mo</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
       {/* Sequence (drip) */}
       {isDrip && (
         <div className="dgs-card p-6">
@@ -151,7 +202,11 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
               <li key={s.id} className="flex gap-3 text-sm">
                 <span className="flex-shrink-0 w-6 h-6 rounded-full bg-teal-50 text-teal-700 text-xs flex items-center justify-center font-medium">{i + 1}</span>
                 <div className="flex-1 min-w-0">
-                  <span className="text-xs text-gray-500">{i === 0 ? "immediately" : `+${humanDelay(s.delayMinutes)} after previous`}</span>
+                  <span className="text-xs text-gray-500 flex items-center gap-1.5">
+                    {s.channel === "email" ? <Mail className="w-3.5 h-3.5" /> : <MessageSquare className="w-3.5 h-3.5" />}
+                    {s.channel === "email" ? "Email" : "Text"} · {i === 0 ? (s.delayMinutes > 0 ? `${humanDelay(s.delayMinutes)} after enrollment` : "immediately") : `+${humanDelay(s.delayMinutes)} after previous`}
+                  </span>
+                  {s.channel === "email" && <p className="text-navy-900 font-medium">{s.subject}</p>}
                   <p className="text-gray-800 whitespace-pre-wrap">{s.body}</p>
                 </div>
               </li>
@@ -164,11 +219,13 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
       <div className="dgs-card p-6">
         <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
           <h2 className="text-lg font-semibold text-navy-900">Recipients ({recipients.length})</h2>
-          {isDrip && <AddCustomersButton campaignId={campaign.id} />}
+          {isDrip && !isWinback && <AddCustomersButton campaignId={campaign.id} />}
         </div>
         {recipients.length === 0 ? (
           <p className="text-sm text-gray-500 text-center py-4">
-            {isDrip ? "No one enrolled yet — new matching leads will appear here." : "No recipients."}
+            {isWinback
+              ? isDraft ? "No one is enrolled until you activate this campaign." : "Enrolling former customers now. Refresh in a minute."
+              : isDrip ? "No one enrolled yet — new matching leads will appear here." : "No recipients."}
           </p>
         ) : (
           <div className="overflow-x-auto">
@@ -176,7 +233,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
               <thead>
                 <tr className="text-left text-xs text-gray-500 border-b border-gray-100">
                   <th className="pb-2 pr-4 font-medium">Name</th>
-                  <th className="pb-2 pr-4 font-medium">Phone</th>
+                  <th className="pb-2 pr-4 font-medium">{isWinback ? "Contact" : "Phone"}</th>
                   <th className="pb-2 pr-4 font-medium">Status</th>
                   {isDrip ? (
                     <>
@@ -203,7 +260,10 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
                           </Link>
                         )}
                       </td>
-                      <td className="py-2 pr-4 text-gray-600">{r.phone}</td>
+                      <td className="py-2 pr-4 text-gray-600">
+                        {r.phone}
+                        {r.email ? <span className="block text-xs text-gray-400">{r.email}</span> : null}
+                      </td>
                       <td className="py-2 pr-4">
                         <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${recStatusStyle[r.status] || "bg-gray-100 text-gray-600"}`}>
                           {r.status}

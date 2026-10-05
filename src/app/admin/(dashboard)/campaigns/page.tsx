@@ -38,7 +38,7 @@ export default async function CampaignsPage() {
     <div className="space-y-3.5 pb-20 lg:pb-0">
       <PageHero
         title="Campaigns"
-        subtitle="Bulk text a segment of your leads."
+        subtitle="Text and email sequences for leads, customers and former customers."
         actions={
           <>
             <Link href="/admin/messenger" className={heroBtnSecondary}>

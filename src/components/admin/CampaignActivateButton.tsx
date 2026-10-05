@@ -5,12 +5,12 @@ import { useRouter } from "next/navigation";
 import { Rocket, Loader2 } from "lucide-react";
 
 // Launch a draft drip: flips it to active so the cron starts enrolling + sending.
-export function CampaignActivateButton({ campaignId }: { campaignId: string }) {
+export function CampaignActivateButton({ campaignId, confirmText }: { campaignId: string; confirmText?: string }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
 
   const activate = async () => {
-    if (!confirm("Activate this drip? It will start enrolling and messaging from now on.")) return;
+    if (!confirm(confirmText || "Activate this drip? It will start enrolling and messaging from now on.")) return;
     setBusy(true);
     try {
       const res = await fetch(`/api/admin/campaigns/${campaignId}`, {
@@ -19,6 +19,7 @@ export function CampaignActivateButton({ campaignId }: { campaignId: string }) {
         body: JSON.stringify({ activate: true }),
       });
       if (res.ok) router.refresh();
+      else alert((await res.json().catch(() => ({}))).error || "Couldn't activate this campaign.");
     } finally {
       setBusy(false);
     }

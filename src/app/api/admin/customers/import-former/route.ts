@@ -92,8 +92,20 @@ export async function POST() {
   let created = 0;
   let updated = 0;
 
+  // Never bring back people the owner has marked do-not-contact.
+  const dnc = await prisma.doNotContact.findMany({ select: { sngId: true, email: true, phone: true } });
+  const dncIds = new Set(dnc.map((d) => d.sngId).filter(Boolean));
+  const dncEmails = new Set(dnc.map((d) => d.email?.toLowerCase()).filter(Boolean));
+  const dncPhones = new Set(dnc.map((d) => d.phone).filter(Boolean));
+  const last10 = (p: string | null) => (p || "").replace(/\D/g, "").slice(-10);
+  let skipped = 0;
+
   for (const c of clients) {
     if (!c.client) continue;
+    if (dncIds.has(c.client) || dncEmails.has((c.email || "").trim().toLowerCase()) || dncPhones.has(last10(c.cell_phone)) || dncPhones.has(last10(c.home_phone))) {
+      skipped++;
+      continue;
+    }
     const fields = {
       type: c.type ?? null,
       sngStatus: c.status ?? null,
@@ -124,5 +136,5 @@ export async function POST() {
     else updated++;
   }
 
-  return NextResponse.json({ success: true, pulled: clients.length, created, updated });
+  return NextResponse.json({ success: true, pulled: clients.length, created, updated, skipped });
 }
