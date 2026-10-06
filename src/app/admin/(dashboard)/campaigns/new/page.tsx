@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Send, Users, Loader2 } from "lucide-react";
-import { TokenChips, appendSnippet } from "@/components/admin/TokenChips";
 
 interface Recipient {
   leadType: string;
@@ -277,10 +276,9 @@ export default function NewCampaignPage() {
           value={body}
           onChange={(e) => setBody(e.target.value)}
           rows={4}
-          placeholder="Your message…  Use {{firstName}}, {{zipCode}}, {{dogs}} or {{resumeLink}} to personalize."
+          placeholder="Your message…  Use {{firstName}}, {{zipCode}} or {{dogs}} to personalize."
           className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg resize-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
         />
-        <TokenChips onInsert={(t) => setBody((b) => appendSnippet(b, t))} />
         {error && <p className="text-sm text-red-600">{error}</p>}
         <button
           onClick={handleSend}

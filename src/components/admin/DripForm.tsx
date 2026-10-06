@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Plus, Trash2, Clock, Zap, Loader2, ArrowUp, ArrowDown, Mail, MessageSquare, Eye } from "lucide-react";
 import { emailTextToHtml } from "@/lib/campaign-email";
-import { TokenChips, appendSnippet } from "@/components/admin/TokenChips";
 import { winbackTemplate, WINBACK_CODE, WINBACK_FROM, LINK_PLACEHOLDER } from "@/lib/campaign-templates";
 
 interface Template {
@@ -446,10 +445,9 @@ export function DripForm({ mode, campaignId, initial }: DripFormProps) {
               value={step.body}
               onChange={(e) => updateStep(i, { body: e.target.value })}
               rows={step.channel === "email" ? 10 : 3}
-              placeholder={step.channel === "email" ? "Email text…  Leave a blank line between paragraphs." : "Message…  Use {{firstName}}, {{zipCode}}, {{dogs}}, {{resumeLink}} or {{reviewLink}} to personalize."}
+              placeholder={step.channel === "email" ? "Email text…  Leave a blank line between paragraphs." : "Message…  Use {{firstName}}, {{zipCode}}, {{dogs}} or {{reviewLink}} to personalize."}
               className={`w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent ${step.channel === "email" ? "resize-y" : "resize-none"}`}
             />
-            <TokenChips email={step.channel === "email"} onInsert={(t) => updateStep(i, { body: appendSnippet(step.body, t) })} />
             {step.channel === "email" && (
               <p className="text-xs text-gray-500">
                 Use <code className="bg-gray-100 px-1 rounded">{"{{firstName}}"}</code> to personalize, <code className="bg-gray-100 px-1 rounded">**bold**</code> for bold, and put{" "}

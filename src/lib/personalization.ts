@@ -1,6 +1,5 @@
 import prisma from "@/lib/prisma";
 import type { LeadSource } from "@prisma/client";
-import { resumeLinkFor } from "@/lib/quote-resume";
 
 /**
  * Personalization tokens available to SMS templates ({{firstName}}, {{zipCode}},
@@ -28,8 +27,7 @@ export interface LeadVars {
   dogs: string;
   /** Just the pluralized noun, "dog" / "dogs". Empty when unknown. */
   dogWord: string;
-  // {{reviewLink}} (Google review link, for review drips) and {{resumeLink}} (opens
-  // the quote wizard with the lead's answers filled in) are also provided at
+  // {{reviewLink}} (Google review link, for review drips) is also provided at
   // runtime via the index signature below — see getLeadPersonalization.
   [key: string]: string;
 }
@@ -43,7 +41,6 @@ export const EMPTY_LEAD_VARS: LeadVars = {
   dogs: "",
   dogWord: "",
   reviewLink: "",
-  resumeLink: "",
 };
 
 /**
@@ -95,7 +92,6 @@ async function getReviewLink(): Promise<string> {
 export async function getLeadPersonalization(leadType: LeadSource, leadId: string): Promise<LeadVars> {
   const [base, reviewLink] = await Promise.all([baseLeadVars(leadType, leadId), getReviewLink()]);
   base.reviewLink = reviewLink;
-  base.resumeLink = resumeLinkFor(leadType, leadId);
   return base;
 }
 

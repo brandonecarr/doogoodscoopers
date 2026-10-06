@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { Plus, Pencil, Trash2, MessageSquare } from "lucide-react";
 import { PageHero, heroBtnPrimary, heroPrimaryStyle } from "@/components/admin/PageHero";
-import { TokenChips, appendSnippet } from "@/components/admin/TokenChips";
 
 interface Template {
   id: string;
@@ -95,10 +94,9 @@ export default function TemplatesPage() {
             value={body}
             onChange={(e) => setBody(e.target.value)}
             rows={4}
-            placeholder="Message…  Use {{firstName}}, {{zipCode}}, {{dogs}} or {{resumeLink}} to personalize."
+            placeholder="Message…  Use {{firstName}}, {{zipCode}} or {{dogs}} to personalize."
             className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg resize-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
           />
-          <TokenChips onInsert={(t) => setBody((b) => appendSnippet(b, t))} />
           <div className="flex gap-2">
             <button
               onClick={save}
