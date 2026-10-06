@@ -5,10 +5,15 @@ import { unsubscribedSet, normalizeEmail } from "@/lib/email-unsubscribe";
 import { findAutomationCandidates } from "@/lib/email-automation";
 import { isActiveCustomerByEmail } from "@/lib/lead-duplicates";
 import { activeClientEmails, emailInActiveSet } from "@/lib/sweepandgo-lookup";
+import { renderTemplate } from "@/lib/resend";
+import { resumeLinkFor } from "@/lib/quote-resume";
+import type { LeadSource } from "@prisma/client";
 
 // Contact types that are PROSPECTS — subject to the "already signed up?" check.
 // customer / former_customer / subscriber are intentionally targeted and exempt.
 const PROSPECT_EMAIL_TYPES = new Set(["quote", "ad", "outofarea", "commercial", "career"]);
+// Contact types with a lead record the quote wizard can prefill ({{resumeLink}}).
+const RESUME_SOURCE: Record<string, LeadSource> = { quote: "QUOTE_FORM", ad: "AD_LEAD" };
 
 // Drives email automations: enrolls new matching contacts and sends each
 // recipient's next step when due. Stops on unsubscribe.
@@ -95,6 +100,9 @@ export async function GET(request: NextRequest) {
         continue;
       }
 
+      // {{resumeLink}} → pick-up-where-you-left-off link for this lead (other tokens render per recipient in the sender).
+      const src = RESUME_SOURCE[r.contactType];
+      html = renderTemplate(html, { resumeLink: src ? resumeLinkFor(src, r.contactId) : "" });
       const [res] = await sendCampaignBatch({ subject: step.subject, html, from: { fromName: a.fromName }, recipients: [{ id: r.id, email: r.email, name: r.name }] });
       const next = steps[r.currentStep + 1];
       await prisma.emailAutomationRecipient.update({

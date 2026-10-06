@@ -307,6 +307,13 @@ function QuoteFormInner() {
   }, []);
 
   const [step, setStep] = useState<Step>("zip");
+  // "Pick up where you left off" (?resume=<token> from a campaign message): the
+  // lead's earlier answers are filled in and the wizard opens at the right step.
+  const [resuming, setResuming] = useState<"loading" | "done" | null>(null);
+  useEffect(() => {
+    // Set after mount (not in the initializer) so the server and client render the same first frame.
+    try { if (new URLSearchParams(window.location.search).get("resume")) setResuming("loading"); } catch { /* no resume */ }
+  }, []);
   const [zipCode, setZipCode] = useState("");
   const [inServiceArea, setInServiceArea] = useState(false);
   const [serviceData, setServiceData] = useState<ServiceFormData | null>(null);
@@ -351,6 +358,59 @@ function QuoteFormInner() {
     updateSession,
     logEvent,
   } = useOnboardingSession();
+
+  // Resume from a campaign link: load what they told us, re-check the ZIP, fetch
+  // the quote again and land them on the quote (or the first step still missing).
+  const resumeStartedRef = useRef(false);
+  useEffect(() => {
+    if (resuming !== "loading" || resumeStartedRef.current) return;
+    resumeStartedRef.current = true;
+    (async () => {
+      try {
+        const token = new URLSearchParams(window.location.search).get("resume") || "";
+        const res = await fetch(`/api/v2/quote-resume?token=${encodeURIComponent(token)}`);
+        const data = await res.json();
+        if (!res.ok || !data.prefill) throw new Error(data.error || "invalid");
+        const p = data.prefill as Record<string, string>;
+        const phone = p.phone ? formatPhoneNumber(p.phone) : "";
+        const service: ServiceFormData = {
+          firstName: p.firstName || "", lastName: p.lastName || "", phone, email: p.email || "",
+          numberOfDogs: p.numberOfDogs || "", frequency: p.frequency || "", lastCleaned: p.lastCleaned || "one_week", couponCode: "",
+        };
+        serviceForm.reset(service);
+        contactForm.reset({
+          firstName: p.firstName || "", lastName: p.lastName || "", email: p.email || "", phone,
+          address: p.address || "", city: p.city || "", gateLocation: p.gateLocation || "", gateCode: p.gateCode || "",
+        });
+
+        let inArea = false;
+        if (/^\d{5}$/.test(p.zipCode || "")) {
+          const z = await fetch("/api/v2/check-zip", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ zipCode: p.zipCode }) });
+          inArea = !!(await z.json()).inServiceArea;
+          setZipCode(p.zipCode);
+          setInServiceArea(inArea);
+        }
+        await startSession({
+          currentStep: "resume", zip: p.zipCode || undefined, inServiceArea: inArea,
+          contactName: [p.firstName, p.lastName].filter(Boolean).join(" ") || undefined,
+          contactPhone: p.phone || undefined, contactEmail: p.email || undefined,
+        });
+
+        if (!p.zipCode) setStep("zip");
+        else if (!inArea) setStep("out-of-area");
+        else if (service.numberOfDogs && service.frequency) {
+          setServiceData(service);
+          setStep((await fetchPricing(service, p.zipCode)) ? "quote" : "service");
+        } else setStep("service");
+      } catch {
+        // Bad or stale link: a normal, empty quote form.
+        setStep("zip");
+      } finally {
+        setResuming("done");
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resuming]);
 
   // Fetch form options on mount (use v2 API if enabled)
   useEffect(() => {
@@ -599,12 +659,12 @@ function QuoteFormInner() {
   };
 
   // Fetch pricing when service details are submitted
-  const fetchPricing = async (data: ServiceFormData) => {
+  const fetchPricing = async (data: ServiceFormData, zip: string = zipCode) => {
     setIsLoadingPricing(true);
     setError(null);
     try {
       const params = new URLSearchParams({
-        zipCode,
+        zipCode: zip,
         numberOfDogs: data.numberOfDogs,
         frequency: data.frequency,
         lastCleaned: data.lastCleaned,
@@ -946,8 +1006,27 @@ function QuoteFormInner() {
   const currentStepIndex = steps.findIndex((s) => s.id === step);
   const progressPercent = ((currentStepIndex + 1) / steps.length) * 100;
 
+  if (resuming === "loading") {
+    return (
+      <div ref={formRef} className="w-full flex flex-col items-center justify-center py-16 text-center">
+        <Loader2 className="w-8 h-8 text-teal-600 animate-spin" />
+        <p className="mt-4 text-navy-900 font-medium">Picking up where you left off…</p>
+        <p className="text-sm text-navy-600 mt-1">Filling in what you already told us.</p>
+      </div>
+    );
+  }
+
   return (
     <div ref={formRef} className="w-full">
+      {resuming === "done" && step !== "success" && (
+        <div className="mb-6 flex items-start gap-3 rounded-xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-900">
+          <Sparkles className="w-4 h-4 mt-0.5 flex-shrink-0 text-teal-600" />
+          <p>
+            <span className="font-semibold">Welcome back{serviceData?.firstName ? `, ${serviceData.firstName}` : ""}!</span>{" "}
+            We filled in what you already told us, so you can pick up right where you left off.
+          </p>
+        </div>
+      )}
       {/* Progress Indicator */}
       {step !== "out-of-area" && step !== "success" && (
         <div className="mb-8">
