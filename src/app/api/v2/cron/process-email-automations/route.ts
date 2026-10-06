@@ -5,6 +5,8 @@ import { unsubscribedSet, normalizeEmail } from "@/lib/email-unsubscribe";
 import { findAutomationCandidates } from "@/lib/email-automation";
 import { isActiveCustomerByEmail } from "@/lib/lead-duplicates";
 import { activeClientEmails, emailInActiveSet } from "@/lib/sweepandgo-lookup";
+import { renderTemplate } from "@/lib/resend";
+import { resumeLinkForLead, recoverySettings } from "@/lib/quote-recovery";
 
 // Contact types that are PROSPECTS — subject to the "already signed up?" check.
 // customer / former_customer / subscriber are intentionally targeted and exempt.
@@ -95,6 +97,9 @@ export async function GET(request: NextRequest) {
         continue;
       }
 
+      // {{resumeLink}} / {{coupon}}: quote-recovery tokens (other tokens render per recipient in the sender).
+      const recovery = await recoverySettings();
+      html = renderTemplate(html, { coupon: recovery.coupon, resumeLink: r.contactType === "quote" ? await resumeLinkForLead(r.contactId, "email", recovery) : recovery.quoteUrl });
       const [res] = await sendCampaignBatch({ subject: step.subject, html, from: { fromName: a.fromName }, recipients: [{ id: r.id, email: r.email, name: r.name }] });
       const next = steps[r.currentStep + 1];
       await prisma.emailAutomationRecipient.update({

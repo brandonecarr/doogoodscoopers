@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Plus, Trash2, Clock, Zap, Loader2, ArrowUp, ArrowDown, Mail, MessageSquare, Eye } from "lucide-react";
 import { emailTextToHtml } from "@/lib/campaign-email";
-import { winbackTemplate, WINBACK_CODE, WINBACK_FROM, LINK_PLACEHOLDER } from "@/lib/campaign-templates";
+import { winbackTemplate, quoteRecoveryTemplate, WINBACK_CODE, WINBACK_FROM, LINK_PLACEHOLDER } from "@/lib/campaign-templates";
+import { TokenChips, appendSnippet } from "@/components/admin/TokenChips";
 
 interface Template {
   id: string;
@@ -31,6 +32,7 @@ export function minutesToStepDelay(min: number): { delayValue: number; delayUnit
 
 const LEAD_TYPES = [
   { value: "quote", label: "Quote Form" },
+  { value: "abandoned_quotes", label: "Abandoned quotes (quote, no signup)" },
   { value: "manual", label: "Manual" },
   { value: "meta", label: "Meta Ads" },
   { value: "outofarea", label: "Out of Area" },
@@ -112,6 +114,13 @@ export function DripForm({ mode, campaignId, initial }: DripFormProps) {
       [next[i], next[j]] = [next[j], next[i]];
       return next;
     });
+  const isAbandoned = leadTypes.includes("abandoned_quotes");
+  const loadRecovery = () => {
+    if (steps.some((s) => s.body.trim()) && !confirm("Replace the current messages with the quote-recovery sequence?")) return;
+    setSteps(quoteRecoveryTemplate().map((t) => ({ channel: t.channel, subject: t.subject, body: t.body, ...minutesToStepDelay(t.delayMinutes) })));
+    if (!fromName.trim()) setFromName(WINBACK_FROM);
+    if (!name.trim()) setName("Quote recovery");
+  };
   const loadWinback = () => {
     if (steps.some((s) => s.body.trim()) && !confirm("Replace the current messages with the 25%-off win-back sequence?")) return;
     setSteps(winbackTemplate(offerEnds, signupLink).map((t) => ({ channel: t.channel, subject: t.subject, body: t.body, delayValue: t.delayDays, delayUnit: "days" as DelayUnit })));
@@ -286,6 +295,22 @@ export function DripForm({ mode, campaignId, initial }: DripFormProps) {
             </div>
           )}
 
+          {isAbandoned && (
+            <div className="mt-3 border border-teal-100 bg-teal-50/50 rounded-lg p-4 space-y-3">
+              <p className="text-sm text-navy-900">
+                Enrolls each Sweep&amp;Go quote that still has <b>no signup after the recovery window</b> (set under Quote recovery; default 30 minutes).
+                Delays below count from that moment. Messages stop on their own once the person signs up. Use the <b>Resume-signup link</b> so they land on the schedule page with everything filled in.
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <button type="button" onClick={loadRecovery} className="px-3 py-1.5 text-sm font-medium rounded-lg bg-teal-600 text-white hover:bg-teal-700">
+                  Load the quote-recovery sequence
+                </button>
+                <span className="text-xs text-gray-500">Email after 1 hour, text after 1 day. Edit anything afterwards.</span>
+                <Link href="/admin/quote-recovery" className="text-xs text-teal-700 hover:underline">Quote recovery settings →</Link>
+              </div>
+            </div>
+          )}
+
           {!isFormer && (
           <div className="mt-3 pt-3 border-t border-gray-100">
             <p className="text-sm text-gray-500 mb-2">…or enroll on re-engagement — pick either, or both</p>
@@ -445,9 +470,10 @@ export function DripForm({ mode, campaignId, initial }: DripFormProps) {
               value={step.body}
               onChange={(e) => updateStep(i, { body: e.target.value })}
               rows={step.channel === "email" ? 10 : 3}
-              placeholder={step.channel === "email" ? "Email text…  Leave a blank line between paragraphs." : "Message…  Use {{firstName}}, {{zipCode}}, {{dogs}} or {{reviewLink}} to personalize."}
+              placeholder={step.channel === "email" ? "Email text…  Leave a blank line between paragraphs." : "Message…  Use {{firstName}}, {{zipCode}}, {{dogs}}, {{resumeLink}}, {{coupon}} or {{reviewLink}} to personalize."}
               className={`w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent ${step.channel === "email" ? "resize-y" : "resize-none"}`}
             />
+            <TokenChips email={step.channel === "email"} onInsert={(t) => updateStep(i, { body: appendSnippet(step.body, t) })} />
             {step.channel === "email" && (
               <p className="text-xs text-gray-500">
                 Use <code className="bg-gray-100 px-1 rounded">{"{{firstName}}"}</code> to personalize, <code className="bg-gray-100 px-1 rounded">**bold**</code> for bold, and put{" "}

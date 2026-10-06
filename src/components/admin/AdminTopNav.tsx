@@ -28,7 +28,7 @@ import {
   ChevronDown,
   LogOut,
   Settings,
-  ArrowUpRight,
+  ArrowUpRight, Link2,
 } from "lucide-react";
 import { NotificationBell } from "@/components/admin/NotificationBell";
 import { SmsBalanceChip } from "@/components/admin/SmsBalanceChip";
@@ -51,6 +51,7 @@ const primaryNav: NavItem[] = [
 ];
 
 const moreNav: NavItem[] = [
+  { name: "Quote recovery",       short: "Recovery",   href: "/admin/quote-recovery", icon: Link2 },
   { name: "Instagram Auto-DM",    short: "Instagram",  href: "/admin/instagram",   icon: Instagram },
   { name: "Content Studio",       short: "Studio",     href: "/admin/studio",      icon: Sparkles },
   { name: "Keyword Radar",        short: "Keywords",   href: "/admin/keyword-radar", icon: Radar },

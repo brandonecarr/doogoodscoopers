@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma";
 import type { LeadSource } from "@prisma/client";
+import { resumeLinkForLead, recoverySettings, type ResumeChannel } from "@/lib/quote-recovery";
 
 /**
  * Personalization tokens available to SMS templates ({{firstName}}, {{zipCode}},
@@ -27,8 +28,10 @@ export interface LeadVars {
   dogs: string;
   /** Just the pluralized noun, "dog" / "dogs". Empty when unknown. */
   dogWord: string;
-  // {{reviewLink}} (Google review link, for review drips) is also provided at
-  // runtime via the index signature below — see getLeadPersonalization.
+  // {{reviewLink}} (Google review link, for review drips), {{resumeLink}} (the
+  // lead's pick-up-where-you-left-off link on the website) and {{coupon}} (the
+  // quote-recovery coupon) are also provided at runtime via the index signature
+  // below — see getLeadPersonalization.
   [key: string]: string;
 }
 
@@ -41,6 +44,8 @@ export const EMPTY_LEAD_VARS: LeadVars = {
   dogs: "",
   dogWord: "",
   reviewLink: "",
+  resumeLink: "",
+  coupon: "",
 };
 
 /**
@@ -89,9 +94,12 @@ async function getReviewLink(): Promise<string> {
  * Load the personalization tokens for a single lead, including {{reviewLink}}
  * for review drips. Missing lead → all blank.
  */
-export async function getLeadPersonalization(leadType: LeadSource, leadId: string): Promise<LeadVars> {
-  const [base, reviewLink] = await Promise.all([baseLeadVars(leadType, leadId), getReviewLink()]);
+export async function getLeadPersonalization(leadType: LeadSource, leadId: string, opts: { channel?: ResumeChannel } = {}): Promise<LeadVars> {
+  const [base, reviewLink, recovery] = await Promise.all([baseLeadVars(leadType, leadId), getReviewLink(), recoverySettings()]);
   base.reviewLink = reviewLink;
+  base.coupon = recovery.coupon;
+  // Only quote leads have a Sweep&Go quote to resume; everyone else gets the plain quote page.
+  base.resumeLink = leadType === "QUOTE_FORM" ? await resumeLinkForLead(leadId, opts.channel, recovery) : recovery.quoteUrl;
   return base;
 }
 

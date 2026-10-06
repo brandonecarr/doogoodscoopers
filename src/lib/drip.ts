@@ -3,6 +3,7 @@ import { optedOutKeys, optOutKey } from "@/lib/sms-optout";
 import { loadSendWindow, clampToSendWindow } from "@/lib/send-window";
 import { LeadStatus, type LeadSource } from "@prisma/client";
 import { formerCustomers } from "@/lib/former-customers";
+import { recoverySettings, SNG_QUOTE_WHERE } from "@/lib/quote-recovery";
 
 /**
  * Drip-campaign enrollment. A drip auto-enrolls NEW leads (created after the
@@ -88,6 +89,21 @@ export async function findDripCandidates(campaign: DripCampaign): Promise<DripCa
       select: { id: true, phone: true, firstName: true, lastName: true },
     });
     for (const r of rows) out.push({ leadType: "QUOTE_FORM", leadId: r.id, phone: r.phone, name: [r.firstName, r.lastName].filter(Boolean).join(" ") || null });
+  }
+  // Abandoned Sweep&Go quotes: got a price, no signup after the recovery window.
+  // Enrolls at the moment the quote turns "abandoned", so step delays count from then.
+  if (types.has("abandoned_quotes")) {
+    const { abandonMinutes } = await recoverySettings();
+    const rows = await prisma.quoteLead.findMany({
+      where: {
+        ...prospectBase,
+        status: { not: "CONVERTED" },
+        ...SNG_QUOTE_WHERE,
+        createdAt: { gt: since, lte: new Date(Date.now() - abandonMinutes * 60_000) },
+      },
+      select: { id: true, phone: true, email: true, firstName: true, lastName: true },
+    });
+    for (const r of rows) out.push({ leadType: "QUOTE_FORM", leadId: r.id, phone: r.phone, email: r.email, name: [r.firstName, r.lastName].filter(Boolean).join(" ") || null });
   }
   if (types.has("meta")) {
     const rows = await prisma.adLead.findMany({ where: prospectBase, select: { id: true, phone: true, firstName: true, lastName: true, fullName: true } });

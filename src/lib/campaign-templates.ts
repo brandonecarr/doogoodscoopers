@@ -73,3 +73,26 @@ export function winbackTemplate(deadline: string, signupLink: string): TemplateS
     },
   ];
 }
+
+/** Quote recovery: an email an hour after a quote is abandoned, then a text a day after. */
+export function quoteRecoveryTemplate(): Array<TemplateStep & { delayMinutes: number }> {
+  const sign = "Thanks,\nBrandon\nDooGoodScoopers · (909) 366-3744";
+  return [
+    {
+      channel: "email", delayDays: 0, delayMinutes: 60,
+      subject: "{{firstName}}, your DooGoodScoopers quote is saved",
+      body: [
+        "Hi {{firstName}},",
+        "Thanks for checking our pricing! I saved your quote, so you can finish signing up in about two minutes. Everything you already entered is filled in.",
+        "Use code **{{coupon}}** for 25% off your first month.",
+        "[Finish signing up]({{resumeLink}})",
+        "Questions about the service, scheduling or your yard? Just reply to this email or call/text (909) 366-3744.",
+        sign,
+      ].join("\n\n"),
+    },
+    {
+      channel: "sms", delayDays: 0, delayMinutes: 23 * 60, subject: "",
+      body: "Hi {{firstName}}, it's Brandon from DooGoodScoopers. Your quote is saved. Finish signing up in 2 minutes here: {{resumeLink}} Use code {{coupon}} for 25% off your first month. Reply STOP to opt out.",
+    },
+  ];
+}

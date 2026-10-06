@@ -31,6 +31,7 @@ const AREAS: { name: string; href: string; what: string }[] = [
   { name: "Tasks", href: "/admin/tasks", what: "Team to-do board, also shown on the office TV" },
   { name: "Office TV", href: "/admin/office-tv", what: "Growth Board goal, layout, pipeline stages, Kanban boards and TV keys" },
   { name: "Campaigns", href: "/admin/campaigns", what: "Blasts, drips, sending hours, failed-payment texts" },
+  { name: "Quote recovery", href: "/admin/quote-recovery", what: "Abandoned Sweep&Go quotes, resume links, coupon and timing" },
   { name: "Templates", href: "/admin/templates", what: "Message templates" },
   { name: "Email", href: "/admin/email", what: "Email sending and unsubscribes" },
   { name: "Reviews", href: "/admin/reviews", what: "Google Business Profile connection and review requests" },

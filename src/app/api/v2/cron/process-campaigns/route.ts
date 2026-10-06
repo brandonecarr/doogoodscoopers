@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const vars = await getLeadPersonalization(r.leadType, r.leadId);
+    const vars = await getLeadPersonalization(r.leadType, r.leadId, { channel: "sms" });
     // Fall back to the recipient's stored name if the lead record is gone.
     if (!vars.name && r.name) {
       vars.name = r.name;

@@ -91,6 +91,17 @@ model QuoteLead {
   // campaign only, never in the cold-lead drip.
   returnedAt      DateTime?
 
+  // Quote recovery (Sweep&Go quote leads who never finished signing up).
+  sngEntryId         String?   // Sweep&Go free-quote entry id from the free:quote webhook; the resume link hands it back so signup continues the same entry
+  marketingAllowed   Boolean?  // the SMS-consent box on the quote form (null = unknown)
+  resumeCode         String?   @unique // 6-char personal resume code, e.g. "A7K29P"
+  resumeDisabled     Boolean   @default(false)
+  resumeOpenedAt     DateTime? // first open
+  resumeLastOpenedAt DateTime?
+  resumeOpenCount    Int       @default(0)
+  resumeChannel      String?   // channel of the message whose link was opened last: sms | email | other
+  convertedAt        DateTime? // when the lead became a Sweep&Go customer (set by archiveConvertedLeads)
+
   @@index([status])
   @@index([archived])
   @@index([createdAt])
@@ -98,6 +109,7 @@ model QuoteLead {
   @@index([followupDate])
   @@index([instagramLeadId])
   @@index([lastActivityAt])
+  @@index([sngEntryId])
   @@index([returnedAt])
 }
 

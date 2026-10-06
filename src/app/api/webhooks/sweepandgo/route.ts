@@ -317,6 +317,10 @@ export async function POST(request: NextRequest) {
           null,
         notes,
         lastStep: "Sweep&Go Quote Form",
+        // Quote recovery: the entry id lets a resume link finish THIS quote; the
+        // consent flag is the "text me" box on the quote form.
+        ...((data.id as string) ? { sngEntryId: String(data.id) } : {}),
+        ...(data.marketing_allowed != null ? { marketingAllowed: String(data.marketing_allowed) === "1" || data.marketing_allowed === true } : {}),
       };
 
       // Dedup: Sweep&Go delivers the SAME quote several times (and retries in

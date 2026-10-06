@@ -18,6 +18,8 @@ import { FollowupGrade } from "@/components/admin/FollowupGrade";
 import { ArrangeableBoard, type ArrangeableCard } from "@/components/admin/ArrangeableBoard";
 import { suggestInstagramLeadsForQuote } from "@/lib/instagram-leads";
 import { InstagramMatchButton } from "@/components/admin/InstagramMatchButton";
+import { QuoteRecoveryCard } from "@/components/admin/QuoteRecoveryCard";
+import { recoverySettings, recoveryStatus, RECOVERY_LABEL, linkExpiresAt, isSngQuoteLead, wizardSubmissionFor } from "@/lib/quote-recovery";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -197,6 +199,9 @@ export default async function QuoteLeadDetailPage({ params }: PageProps) {
 
   // For the voicemail script: the day a tech already services this ZIP (or city).
   const routeDay = await nearbyRouteDay(lead.zipCode);
+  const recovery = await recoverySettings();
+  const recStatus = recoveryStatus(lead, recovery);
+  const wizardSub = isSngQuoteLead(lead) ? await wizardSubmissionFor(lead) : null;
 
   const cards: ArrangeableCard[] = [
     {
@@ -388,6 +393,28 @@ export default async function QuoteLeadDetailPage({ params }: PageProps) {
           dogs={lead.numberOfDogs}
           routeDay={routeDay?.day ?? null}
           phone={SITE_CONFIG.phone}
+        />
+      ),
+    },
+    {
+      id: "quote-recovery",
+      zone: "side",
+      node: (
+        <QuoteRecoveryCard
+          leadId={lead.id}
+          status={recStatus}
+          statusLabel={RECOVERY_LABEL[recStatus]}
+          link={lead.resumeCode ? `${recovery.resumeBase}${lead.resumeCode}` : null}
+          disabled={lead.resumeDisabled}
+          openedAt={lead.resumeOpenedAt?.toISOString() ?? null}
+          lastOpenedAt={lead.resumeLastOpenedAt?.toISOString() ?? null}
+          openCount={lead.resumeOpenCount}
+          channel={lead.resumeChannel}
+          expiresAt={linkExpiresAt(lead, recovery)?.toISOString() ?? null}
+          hasEntry={!!(lead.sngEntryId || wizardSub?.sngEntryId)}
+          quotedPrice={wizardSub?.quotedPrice ?? null}
+          marketingAllowed={lead.marketingAllowed}
+          resumable={isSngQuoteLead(lead)}
         />
       ),
     },

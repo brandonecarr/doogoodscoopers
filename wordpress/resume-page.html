@@ -1,0 +1,47 @@
+<!-- DooGoodScoopers – Resume page (doogoodscoopers.com/r/?c=CODE)
+     Paste into a "Custom HTML" block on the page with slug "r".
+     Reads the code from ?c=, asks the CRM for the person's saved quote, and sends
+     them to the schedule page with everything filled in. Expired/disabled links
+     offer a fresh quote instead. -->
+<div id="dgs-resume" style="max-width:560px;margin:0 auto;padding:32px 20px;font-family:inherit;text-align:center;">
+  <p id="dgs-resume-status" style="font-size:17px;color:#4b5563;margin:0;">Loading your quote…</p>
+</div>
+<script>
+(function () {
+  var API = 'https://doogoodscoopers.vercel.app/api/v2/resume/';
+  var QUOTE = '/get-a-quote/';
+  var box = document.getElementById('dgs-resume');
+  var qp = new URLSearchParams(location.search);
+  var code = (qp.get('c') || '').trim().toUpperCase();
+  var ch = qp.get('ch') || '';
+  function esc(s) { return String(s || '').replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function btn(href, label) {
+    return '<a href="' + esc(href) + '" style="display:inline-block;margin-top:22px;padding:14px 28px;border-radius:14px;background:#0d9488;color:#fff;font-weight:700;font-size:17px;text-decoration:none;">' + esc(label) + '</a>';
+  }
+  function fresh(title, text) {
+    box.innerHTML = '<h1 style="font-size:28px;margin:0 0 10px;color:#0f172a;">' + esc(title) + '</h1>' +
+      '<p style="font-size:16px;color:#4b5563;margin:0;">' + esc(text) + '</p>' + btn(QUOTE, 'Get a fresh quote') +
+      '<p style="font-size:14px;color:#6b7280;margin-top:18px;">Questions? Call or text <a href="tel:+19093663744" style="color:#0d9488;">(909) 366-3744</a>.</p>';
+  }
+  if (!/^[A-Z0-9]{6}$/.test(code)) { fresh('Hmm, that link doesn’t look right', 'No worries — a new quote only takes a minute.'); return; }
+  fetch(API + code + (ch ? '?ch=' + encodeURIComponent(ch) : ''), { credentials: 'omit' })
+    .then(function (r) { return r.json().then(function (j) { return { status: r.status, j: j }; }); })
+    .then(function (res) {
+      var j = res.j || {};
+      if (!j.ok) {
+        if (j.reason === 'signed_up') fresh('You’re all set!', 'This quote has already been turned into a signup. Thank you!');
+        else if (j.reason === 'expired') fresh('This link has expired', 'Prices may have changed, so let’s start a fresh quote — it only takes a minute.');
+        else fresh('This link is no longer active', 'A new quote only takes a minute.');
+        return;
+      }
+      box.innerHTML =
+        '<p style="font-size:14px;letter-spacing:.08em;text-transform:uppercase;color:#0d9488;font-weight:700;margin:0 0 8px;">Welcome back' + (j.firstName ? ', ' + esc(j.firstName) : '') + '!</p>' +
+        '<h1 style="font-size:30px;line-height:1.2;margin:0 0 12px;color:#0f172a;">Your quote is saved. Pick up right where you left off.</h1>' +
+        (j.summary ? '<p style="font-size:17px;color:#374151;margin:0;">' + esc(j.summary) + (j.price ? ' \u2014 ' + esc(j.price) : '') + '</p>' : '') +
+        (j.coupon ? '<p style="font-size:15px;color:#4b5563;margin:14px 0 0;">Code <b>' + esc(j.coupon) + '</b> is already applied for you.</p>' : '') +
+        btn(j.continueUrl, 'Continue to schedule service') +
+        '<p style="font-size:14px;color:#6b7280;margin-top:18px;">Everything you entered is filled in. Need a change? You can edit any answer on the next page.</p>';
+    })
+    .catch(function () { fresh('We couldn’t load your quote', 'A new quote only takes a minute, or call/text us and we’ll finish it for you.'); });
+})();
+</script>

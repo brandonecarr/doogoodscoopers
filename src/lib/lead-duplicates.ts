@@ -147,7 +147,7 @@ export async function archiveConvertedLeads(phones: Array<string | null | undefi
   if (quoteIds.size) {
     const r = await prisma.quoteLead.updateMany({
       where: { id: { in: [...quoteIds] }, archived: false },
-      data: { archived: true, status: "CONVERTED" },
+      data: { archived: true, status: "CONVERTED", convertedAt: new Date() },
     });
     n += r.count;
   }
