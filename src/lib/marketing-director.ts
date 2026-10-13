@@ -121,7 +121,9 @@ export async function gatherContext(): Promise<Context> {
       prisma.subscriptionEvent.aggregate({ _sum: { revenue: true }, where: { excluded: false, kind: "CANCELLATION" } }),
       prisma.subscriptionEvent.count({ where: { excluded: false, kind: "SIGNUP", occurredAt: { gte: d30 } } }),
       prisma.subscriptionEvent.count({ where: { excluded: false, kind: "CANCELLATION", occurredAt: { gte: d30 } } }),
-      prisma.subscriptionEvent.count({ where: { excluded: false, kind: "QUOTE", occurredAt: { gte: d30 } } }),
+      // Real quote-form submissions (website wizard + Sweep&Go quote form). The
+      // growth dashboard's QUOTE events were a one-time import and stopped in Aug 2026.
+      prisma.quoteLead.count({ where: { createdAt: { gte: d30 }, NOT: { lastStep: { in: ["Manual Entry", "Phone Call"] } } } }),
       prisma.subscriptionEvent.groupBy({ by: ["reason"], where: { excluded: false, kind: "CANCELLATION", reason: { not: null } }, _count: { _all: true } }),
       prisma.sweepandgoCustomer.groupBy({ by: ["zipCode"], where: { active: true, zipCode: { not: null } }, _count: { _all: true } }),
       prisma.review.aggregate({ _count: { _all: true }, _avg: { rating: true }, where: { rating: { not: null } } }),

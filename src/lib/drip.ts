@@ -92,14 +92,16 @@ export async function findDripCandidates(campaign: DripCampaign): Promise<DripCa
   }
   // Abandoned Sweep&Go quotes: got a price, no signup after the recovery window.
   // Enrolls at the moment the quote turns "abandoned", so step delays count from then.
+  // Keyed on the quote's activity time (not createdAt) and open to returning leads:
+  // a known person running a fresh quote is exactly who recovery is for.
   if (types.has("abandoned_quotes")) {
     const { abandonMinutes } = await recoverySettings();
     const rows = await prisma.quoteLead.findMany({
       where: {
-        ...prospectBase,
+        archived: false,
         status: { not: "CONVERTED" },
         ...SNG_QUOTE_WHERE,
-        createdAt: { gt: since, lte: new Date(Date.now() - abandonMinutes * 60_000) },
+        lastActivityAt: { gt: since, lte: new Date(Date.now() - abandonMinutes * 60_000) },
       },
       select: { id: true, phone: true, email: true, firstName: true, lastName: true },
     });
