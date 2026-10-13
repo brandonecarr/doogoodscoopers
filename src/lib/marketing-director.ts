@@ -106,6 +106,8 @@ interface Context {
   reviewCount: number;
   avgRating: number | null;
   topReasons: { reason: string; count: number }[];
+  /** Recent cancellations with the note staff typed in Sweep&Go — the real "why". */
+  cancelNotes: { when: string; who: string; reason: string; note: string | null }[];
   topZips: { zip: string; count: number }[];
 }
 
@@ -114,7 +116,7 @@ export async function gatherContext(): Promise<Context> {
   const now = new Date();
   const d30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-  const [activeCustomers, sigRev, canRev, signups30, cancels30, quotes30, reasonsRaw, zipsRaw, reviewsAgg] =
+  const [activeCustomers, sigRev, canRev, signups30, cancels30, quotes30, reasonsRaw, zipsRaw, reviewsAgg, recentCancels] =
     await Promise.all([
       prisma.sweepandgoCustomer.count({ where: { active: true } }),
       prisma.subscriptionEvent.aggregate({ _sum: { revenue: true }, where: { excluded: false, kind: "SIGNUP" } }),
@@ -127,11 +129,24 @@ export async function gatherContext(): Promise<Context> {
       prisma.subscriptionEvent.groupBy({ by: ["reason"], where: { excluded: false, kind: "CANCELLATION", reason: { not: null } }, _count: { _all: true } }),
       prisma.sweepandgoCustomer.groupBy({ by: ["zipCode"], where: { active: true, zipCode: { not: null } }, _count: { _all: true } }),
       prisma.review.aggregate({ _count: { _all: true }, _avg: { rating: true }, where: { rating: { not: null } } }),
+      prisma.subscriptionEvent.findMany({
+        where: { excluded: false, kind: "CANCELLATION", occurredAt: { gte: new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000) } },
+        orderBy: { occurredAt: "desc" }, take: 15,
+        select: { occurredAt: true, clientName: true, reason: true, reasonDetail: true },
+      }),
     ]);
 
-  const topReasons = reasonsRaw
-    .map((r) => ({ reason: r.reason as string, count: r._count._all }))
-    .sort((a, b) => b.count - a.count).slice(0, 5);
+  // "No data" / "No reason provided" / blank all mean the same thing: nothing recorded.
+  const reasonCounts = new Map<string, number>();
+  for (const r of reasonsRaw) {
+    const label = !r.reason || ["No data", "No reason provided"].includes(r.reason) ? "No reason recorded" : r.reason;
+    reasonCounts.set(label, (reasonCounts.get(label) || 0) + r._count._all);
+  }
+  const topReasons = [...reasonCounts.entries()].map(([reason, count]) => ({ reason, count })).sort((a, b) => b.count - a.count).slice(0, 6);
+  const cancelNotes = recentCancels.map((c) => ({
+    when: c.occurredAt.toISOString().slice(0, 10), who: c.clientName || "customer",
+    reason: c.reason || "No reason recorded", note: c.reasonDetail,
+  }));
   const topZips = zipsRaw
     .map((z) => ({ zip: z.zipCode as string, count: z._count._all }))
     .sort((a, b) => b.count - a.count).slice(0, 6);
@@ -143,7 +158,7 @@ export async function gatherContext(): Promise<Context> {
     signups30, cancels30, net30: signups30 - cancels30, quotes30,
     reviewCount: reviewsAgg._count._all,
     avgRating: reviewsAgg._avg.rating ? Math.round(reviewsAgg._avg.rating * 10) / 10 : null,
-    topReasons, topZips,
+    topReasons, cancelNotes, topZips,
   };
 }
 
@@ -155,7 +170,8 @@ function contextBlock(c: Context): string {
     `Last 30 days — new signups: ${c.signups30}, cancellations: ${c.cancels30}, net: ${c.net30 >= 0 ? "+" : ""}${c.net30}`,
     `Website quote-form submissions in last 30 days: ${c.quotes30}`,
     `Reviews on file: ${c.reviewCount}${c.avgRating != null ? ` (avg ${c.avgRating}★)` : ""}`,
-    `Top cancellation reasons: ${c.topReasons.length ? c.topReasons.map((r) => `${r.reason} (${r.count})`).join(", ") : "n/a"}`,
+    `Top cancellation reasons (all time): ${c.topReasons.length ? c.topReasons.map((r) => `${r.reason} (${r.count})`).join(", ") : "n/a"}`,
+    `Recent cancellations with the note staff recorded in Sweep&Go (last 90 days):${c.cancelNotes.length ? "\n" + c.cancelNotes.map((n) => `  - ${n.when} ${n.who}: ${n.reason}${n.note ? ` — "${n.note}"` : ""}`).join("\n") : " none"}`,
     `Top customer zip codes: ${c.topZips.length ? c.topZips.map((z) => `${z.zip} (${z.count})`).join(", ") : "n/a"}`,
   ].join("\n");
 }

@@ -939,6 +939,10 @@ model SweepandgoCustomer {
   firstSeenAt       DateTime  @default(now())
   lastSyncedAt      DateTime  @default(now())
   removedAt         DateTime? // when it dropped off the active list (archived)
+  // From Sweep&Go's subscriptions API (termination fields on the canceled subscription).
+  cancelReason      String?
+  cancelNote        String?
+  canceledAt        DateTime?
 
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
@@ -1081,6 +1085,7 @@ model SubscriptionEvent {
   plan       String?
   revenue    Float?
   reason     String?
+  reasonDetail String? // the comment/note typed in Sweep&Go when the subscription was terminated
   source     String // csv-subscriptions | csv-quote | mirror-active | sync-customers
   dedupeKey  String   @unique
   createdAt  DateTime @default(now())

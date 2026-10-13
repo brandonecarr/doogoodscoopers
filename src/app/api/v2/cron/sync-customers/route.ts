@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { syncActiveCustomers } from "@/lib/sweepandgo-customer-sync";
+import { syncCancellationReasons } from "@/lib/sweepandgo-cancel-reasons";
 
 // Daily reconciliation of the Sweep&Go customer mirror (6 AM Pacific, vercel.json).
 // Changes normally land within ~30s via Sweep&Go client webhooks (see
@@ -17,5 +18,7 @@ export async function GET(request: NextRequest) {
   }
   const result = await syncActiveCustomers();
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: 502 });
-  return NextResponse.json({ success: true, ...result });
+  // Why people cancelled, from the subscriptions feed (~8 requests). Never blocks the sync.
+  const reasons = await syncCancellationReasons();
+  return NextResponse.json({ success: true, ...result, cancellationReasons: reasons });
 }
