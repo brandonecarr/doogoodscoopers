@@ -22,7 +22,8 @@ const PAGE_LENGTH = 50;
 const MAX_PAGES = 30;
 const CHURN_COMMENTS = new Set(["Canceled from employee portal", "Canceled by inactive client"]);
 /** Event reasons that carry no information and may be replaced by what Sweep&Go has. */
-const EMPTY_REASONS = new Set(["", "No data", "No reason provided", "Other", "null"]);
+const INACTIVE_LABEL = "Client went inactive (no reason recorded)";
+const EMPTY_REASONS = new Set(["", "No data", "No reason provided", "Other", "null", INACTIVE_LABEL]);
 
 export interface SngSubscription {
   status: string; canceled_at: string | null; client_name: string | null; client_email: string | null;
@@ -91,7 +92,7 @@ export async function applyCancellationReasons(reasons: CancelReason[]): Promise
   const DAY = 86_400_000;
   const allEvents = await prisma.subscriptionEvent.findMany({ where: { kind: "CANCELLATION" }, select: { id: true, email: true, clientName: true, occurredAt: true, reason: true, reasonDetail: true } });
   for (const r of reasons) {
-    const label = r.reason ?? (r.comment === "Canceled by inactive client" ? "Client went inactive (no reason recorded)" : null);
+    const label = r.reason ?? (r.comment === "Canceled by inactive client" ? INACTIVE_LABEL : null);
     if (r.email) {
       const u = await prisma.sweepandgoCustomer.updateMany({
         where: { email: { equals: r.email, mode: "insensitive" }, active: false },
