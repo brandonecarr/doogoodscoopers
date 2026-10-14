@@ -41,11 +41,12 @@ function nameFrom(full: string | null | undefined, fallback: string): string {
 }
 
 /**
- * Average invoiced amount per customer for the latest month that has a real billing run
- * (at least 10 invoices, so the 1st of a new month doesn't count until invoices land).
+ * Average invoiced amount per customer for the last COMPLETE month (the current month is
+ * still being billed: mid-month signups, paused and overdue customers get invoiced later).
  * Invoices are grouped by their billing period (falling back to creation date).
  */
-async function averageMonthlyCost(): Promise<TvBusiness["avgMonthlyCost"]> {
+async function averageMonthlyCost(now = new Date()): Promise<TvBusiness["avgMonthlyCost"]> {
+  const thisMonth = now.toLocaleDateString("en-CA", { year: "numeric", month: "2-digit", timeZone: "America/Los_Angeles" }).slice(0, 7);
   const rows = await prisma.$queryRaw<Array<{ month: string; customers: number; invoices: number; avgCents: number }>>`
     SELECT month, COUNT(*)::int AS customers, SUM(n)::int AS invoices, ROUND(AVG(total))::int AS "avgCents"
     FROM (
@@ -55,7 +56,7 @@ async function averageMonthlyCost(): Promise<TvBusiness["avgMonthlyCost"]> {
       GROUP BY 1, 2
     ) per_customer
     GROUP BY month
-    HAVING SUM(n) >= 10
+    HAVING SUM(n) >= 10 AND month < ${thisMonth}
     ORDER BY month DESC
     LIMIT 1`.catch(() => []);
   const r = rows[0];
@@ -92,7 +93,7 @@ export async function buildTvBusiness(now = new Date()): Promise<TvBusiness> {
       take: 10,
       select: { customerName: true, reviewedAt: true },
     }),
-    averageMonthlyCost(),
+    averageMonthlyCost(now),
   ]);
 
   const [last, current] = profit.rows.slice(-2);
