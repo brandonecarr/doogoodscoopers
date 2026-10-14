@@ -10,6 +10,11 @@ export interface TvBusiness {
   margin: { hasExpenses: boolean; marginPct: number | null; profitCents: number; expenseCents: number };
   /** Estimated monthly recurring revenue of active customers (same estimate as Customers → Dashboard). */
   mrrCents: number;
+  /**
+   * What the average customer is invoiced in a month: every invoice (paid or not) in the
+   * latest month with a full billing run, summed per customer, averaged across customers.
+   */
+  avgMonthlyCost: { cents: number; customers: number; monthLabel: string } | null;
   activeCustomers: number;
   reviews: { average: number | null; total: number | null; thisMonth: number; latest: { name: string; text: string; date: string } | null };
   cancellations: { days: number; total: number; reasons: { label: string; count: number }[] };
@@ -34,10 +39,33 @@ function nameFrom(full: string | null | undefined, fallback: string): string {
   return parts.length ? privateName(parts[0], parts.length > 1 ? parts[parts.length - 1] : null) : fallback;
 }
 
+/**
+ * Average invoiced amount per customer for the latest month that has a real billing run
+ * (at least 10 invoices, so the 1st of a new month doesn't count until invoices land).
+ * Invoices are grouped by their billing period (falling back to creation date).
+ */
+async function averageMonthlyCost(): Promise<TvBusiness["avgMonthlyCost"]> {
+  const rows = await prisma.$queryRaw<Array<{ month: string; customers: number; invoices: number; avgCents: number }>>`
+    SELECT month, COUNT(*)::int AS customers, SUM(n)::int AS invoices, ROUND(AVG(total))::int AS "avgCents"
+    FROM (
+      SELECT to_char(COALESCE("periodStart", "sngCreatedAt"), 'YYYY-MM') AS month, "nameKey", COUNT(*) AS n, SUM("totalCents") AS total
+      FROM "SngInvoice"
+      WHERE COALESCE("periodStart", "sngCreatedAt") IS NOT NULL
+      GROUP BY 1, 2
+    ) per_customer
+    GROUP BY month
+    HAVING SUM(n) >= 10
+    ORDER BY month DESC
+    LIMIT 1`.catch(() => []);
+  const r = rows[0];
+  if (!r) return null;
+  return { cents: Number(r.avgCents), customers: Number(r.customers), monthLabel: MONTH(r.month) };
+}
+
 export async function buildTvBusiness(now = new Date()): Promise<TvBusiness> {
   const cancelDays = 90;
   const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-  const [profit, active, settings, reviewsThisMonth, latestReview, cancels, signups, fiveStars] = await Promise.all([
+  const [profit, active, settings, reviewsThisMonth, latestReview, cancels, signups, fiveStars, avgCost] = await Promise.all([
     getProfitability(2),
     prisma.sweepandgoCustomer.findMany({ where: { active: true }, select: { subscriptionNames: true } }),
     prisma.appSetting.findMany({ where: { key: { in: ["google.bp.avgRating", "google.bp.reviewCount"] } } }),
@@ -63,6 +91,7 @@ export async function buildTvBusiness(now = new Date()): Promise<TvBusiness> {
       take: 10,
       select: { customerName: true, reviewedAt: true },
     }),
+    averageMonthlyCost(),
   ]);
 
   const [last, current] = profit.rows.slice(-2);
@@ -87,6 +116,7 @@ export async function buildTvBusiness(now = new Date()): Promise<TvBusiness> {
     },
     margin: { hasExpenses: profit.hasExpenses, marginPct: current.marginPct, profitCents: current.profitCents, expenseCents: current.expenseCents },
     mrrCents: Math.round(active.reduce((n, c) => n + estimateMonthlyRevenue(c.subscriptionNames), 0) * 100),
+    avgMonthlyCost: avgCost,
     activeCustomers: active.length,
     reviews: {
       average: setting("google.bp.avgRating"),
