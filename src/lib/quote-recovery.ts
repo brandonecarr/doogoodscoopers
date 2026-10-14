@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import prisma from "@/lib/prisma";
 import type { QuoteLead } from "@prisma/client";
+import { NOT_TEST_QUOTE_LEAD } from "@/lib/test-accounts";
 
 // ── Quote recovery ────────────────────────────────────────────────────────────
 // A Sweep&Go quote lead who never finished signing up gets a personal resume link
@@ -47,7 +48,7 @@ export function isSngQuoteLead(lead: { lastStep: string | null }): boolean {
   return /sweep&go|quote wizard/i.test(lead.lastStep || "");
 }
 /** Prisma filter for the same set. */
-export const SNG_QUOTE_WHERE = { OR: [{ lastStep: { contains: "Sweep&Go" } }, { lastStep: { contains: "Quote Wizard" } }] };
+export const SNG_QUOTE_WHERE = { AND: [{ OR: [{ lastStep: { contains: "Sweep&Go" } }, { lastStep: { contains: "Quote Wizard" } }] }, NOT_TEST_QUOTE_LEAD] };
 
 /** The lead's resume code, creating one the first time it's needed. */
 export async function ensureResumeCode(leadId: string): Promise<string | null> {

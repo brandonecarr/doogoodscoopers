@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { isTestIdentity, extraTestIdentities } from "@/lib/test-accounts";
 import { archiveConvertedLeads } from "@/lib/lead-duplicates";
 import { estimateMonthlyRevenue } from "@/lib/plan-pricing";
 import { recordSngCall } from "@/lib/sweepandgo-usage";
@@ -97,9 +98,16 @@ export async function syncActiveCustomers(): Promise<CustomerSyncResult> {
   let created = 0;
   let updated = 0;
   let leadsArchived = 0;
+  const extraTests = await extraTestIdentities();
+  const isTest = (x: { name?: string | null; email?: string | null; phones?: (string | null | undefined)[] }) => isTestIdentity(x, extraTests);
 
   for (const c of clients) {
     if (!c.client) continue;
+    // The owner's test signups never enter the mirror (or the growth chart, goal, TV…).
+    if (isTest({ name: [c.first_name, c.last_name].filter(Boolean).join(" "), email: c.email, phones: [c.cell_phone, c.home_phone] })) {
+      await prisma.sweepandgoCustomer.deleteMany({ where: { sngId: c.client } }).catch(() => {});
+      continue;
+    }
     seenIds.push(c.client);
     // Sweep&Go encodes the dog count in the plan name ("2d-1xW" = 2 dogs, once
     // a week). It's the only dog data their API exposes — no names or breeds.
@@ -187,8 +195,13 @@ export async function syncActiveCustomers(): Promise<CustomerSyncResult> {
     where: leavingWhere,
     data: { active: false, removedAt: now },
   });
-  // Record each cancellation on the growth dashboard (idempotent).
+  // Record each cancellation on the growth dashboard (idempotent). Test accounts are
+  // dropped from the mirror instead.
   for (const c of leaving) {
+    if (isTest({ name: [c.firstName, c.lastName].filter(Boolean).join(" "), email: c.email })) {
+      await prisma.sweepandgoCustomer.deleteMany({ where: { sngId: c.sngId } }).catch(() => {});
+      continue;
+    }
     await prisma.subscriptionEvent.upsert({
       where: { dedupeKey: `sng-cancel:${c.sngId}` },
       create: {

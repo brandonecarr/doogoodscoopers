@@ -3,6 +3,7 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
+import { NOT_TEST_QUOTE_LEAD } from "@/lib/test-accounts";
 import { newId, DEFAULT_SWIPE, type Slide, type LayoutId, type Theme, type Decor } from "@/lib/studio/templates";
 
 // ── The AI Marketing Director ────────────────────────────────────────────────
@@ -125,7 +126,7 @@ export async function gatherContext(): Promise<Context> {
       prisma.subscriptionEvent.count({ where: { excluded: false, kind: "CANCELLATION", occurredAt: { gte: d30 } } }),
       // Real quote-form submissions (website wizard + Sweep&Go quote form). The
       // growth dashboard's QUOTE events were a one-time import and stopped in Aug 2026.
-      prisma.quoteLead.count({ where: { createdAt: { gte: d30 }, NOT: { lastStep: { in: ["Manual Entry", "Phone Call"] } } } }),
+      prisma.quoteLead.count({ where: { createdAt: { gte: d30 }, AND: [{ NOT: { lastStep: { in: ["Manual Entry", "Phone Call"] } } }, NOT_TEST_QUOTE_LEAD] } }),
       prisma.subscriptionEvent.groupBy({ by: ["reason"], where: { excluded: false, kind: "CANCELLATION", reason: { not: null } }, _count: { _all: true } }),
       prisma.sweepandgoCustomer.groupBy({ by: ["zipCode"], where: { active: true, zipCode: { not: null } }, _count: { _all: true } }),
       prisma.review.aggregate({ _count: { _all: true }, _avg: { rating: true }, where: { rating: { not: null } } }),

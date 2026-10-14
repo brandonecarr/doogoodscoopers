@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { recordSngCall } from "@/lib/sweepandgo-usage";
+import { isTestIdentity, extraTestIdentities } from "@/lib/test-accounts";
 
 // One-time (re-runnable) backfill of DISABLED / inactive Sweep&Go residential
 // customers into the "Former customers" archive. Like the active-customer sync
@@ -99,9 +100,11 @@ export async function POST() {
   const dncPhones = new Set(dnc.map((d) => d.phone).filter(Boolean));
   const last10 = (p: string | null) => (p || "").replace(/\D/g, "").slice(-10);
   let skipped = 0;
+  const extraTests = await extraTestIdentities();
 
   for (const c of clients) {
     if (!c.client) continue;
+    if (isTestIdentity({ name: [c.first_name, c.last_name].filter(Boolean).join(" "), email: c.email, phones: [c.cell_phone, c.home_phone] }, extraTests)) { skipped++; continue; }
     if (dncIds.has(c.client) || dncEmails.has((c.email || "").trim().toLowerCase()) || dncPhones.has(last10(c.cell_phone)) || dncPhones.has(last10(c.home_phone))) {
       skipped++;
       continue;

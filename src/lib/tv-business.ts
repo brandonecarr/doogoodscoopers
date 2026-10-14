@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import { getProfitability } from "@/lib/profitability";
 import { estimateMonthlyRevenue } from "@/lib/plan-pricing";
 import { privateName } from "@/lib/tv-connector";
+import { TEST_NAME_KEYS } from "@/lib/test-accounts";
 
 export interface TvBusiness {
   revenue: { monthLabel: string; thisMonthCents: number; lastMonthLabel: string; lastMonthCents: number };
@@ -50,7 +51,7 @@ async function averageMonthlyCost(): Promise<TvBusiness["avgMonthlyCost"]> {
     FROM (
       SELECT to_char(COALESCE("periodStart", "sngCreatedAt"), 'YYYY-MM') AS month, "nameKey", COUNT(*) AS n, SUM("totalCents") AS total
       FROM "SngInvoice"
-      WHERE COALESCE("periodStart", "sngCreatedAt") IS NOT NULL
+      WHERE COALESCE("periodStart", "sngCreatedAt") IS NOT NULL AND "nameKey" <> ALL(${TEST_NAME_KEYS})
       GROUP BY 1, 2
     ) per_customer
     GROUP BY month
