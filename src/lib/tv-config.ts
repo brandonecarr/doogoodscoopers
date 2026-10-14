@@ -3,7 +3,11 @@
 // Keep in sync with OfficeTV/Packages/BoardKit/Sources/BoardKit/Models/Board.swift.
 // The TV knows how to draw every metric in CATALOG; anything else is rejected on save.
 
-export type SectionSize = "S" | "M" | "L" | "XL" | "FULL";
+/**
+ * A section's footprint on the TV's 4×3 grid: a preset name ("S" 1×1, "M" 2×1, "L" 2×2, "XL" 4×1,
+ * "FULL" 4×3) or any "WxH" (columns × rows), e.g. "3x1" or "4x2". Use sizeOf() to build one.
+ */
+export type SectionSize = string;
 export type SectionSource = "crm" | "pm" | "goal";
 export type ElementType =
   | "goalProgress" | "countdown" | "metric" | "kanban" | "funnel" | "customerMix"
@@ -46,11 +50,39 @@ export interface TvBoardConfig {
   rotateSeconds: number;
 }
 
-export const SIZE_CELLS: Record<SectionSize, { cols: number; rows: number }> = {
+export const GRID = { cols: 4, rows: 3 } as const;
+export interface SizeCells { cols: number; rows: number }
+const PRESET_CELLS: Record<string, SizeCells> = {
   S: { cols: 1, rows: 1 }, M: { cols: 2, rows: 1 }, L: { cols: 2, rows: 2 }, XL: { cols: 4, rows: 1 }, FULL: { cols: 4, rows: 3 },
 };
-export const SIZE_LABEL: Record<SectionSize, string> = { S: "S · 1×1", M: "M · 2×1", L: "L · 2×2", XL: "XL · 4×1", FULL: "Full screen" };
-export const ALL_SIZES: SectionSize[] = ["S", "M", "L", "XL", "FULL"];
+export const SIZE_PRESETS: SectionSize[] = ["S", "M", "L", "XL", "FULL"];
+
+/** Columns × rows for a size, or null when the string isn't a size the TV understands. */
+export function parseSize(size: unknown): SizeCells | null {
+  if (typeof size !== "string") return null;
+  const preset = PRESET_CELLS[size];
+  if (preset) return preset;
+  const m = /^([1-4])x([1-3])$/.exec(size);
+  return m ? { cols: Number(m[1]), rows: Number(m[2]) } : null;
+}
+/** Like parseSize, but an unknown size counts as 1×1 (for drawing previews). */
+export const sizeCells = (size: SectionSize): SizeCells => parseSize(size) ?? { cols: 1, rows: 1 };
+/** The canonical size string for a footprint: the preset name when one matches, else "WxH". */
+export function sizeOf(cols: number, rows: number): SectionSize {
+  const c = Math.min(GRID.cols, Math.max(1, Math.round(cols)));
+  const r = Math.min(GRID.rows, Math.max(1, Math.round(rows)));
+  return SIZE_PRESETS.find((p) => PRESET_CELLS[p].cols === c && PRESET_CELLS[p].rows === r) ?? `${c}x${r}`;
+}
+/** "2×1", or "Full screen" for the whole board. */
+export function sizeLabel(size: SectionSize): string {
+  const { cols, rows } = sizeCells(size);
+  return cols === GRID.cols && rows === GRID.rows ? "Full screen" : `${cols}×${rows}`;
+}
+/** True when a section of this size can show the catalog item (it meets the item's minimum). */
+export function fitsItem(item: CatalogItem, size: SectionSize): boolean {
+  const c = parseSize(size);
+  return !!c && c.cols >= item.minSize.cols && c.rows >= item.minSize.rows;
+}
 
 /** Everything the TV can show. `displays` are the visual variants the TV understands. */
 export interface CatalogItem {
@@ -60,7 +92,8 @@ export interface CatalogItem {
   group: "Goals" | "Sweep&Go" | "Admin" | "Other";
   type: ElementType;
   source: SectionSource;
-  sizes: SectionSize[];
+  /** The smallest footprint (columns × rows) the TV can draw this in; anything larger is fine. */
+  minSize: SizeCells;
   defaultTitle: string;
   displays?: { value: string; label: string }[];
   usesPipeline?: boolean;
@@ -70,42 +103,46 @@ export interface CatalogItem {
   fields?: ("target" | "person" | "place" | "text")[];
 }
 
-/** How many columns of a Kanban board fit on the TV at a given size. */
-export const maxKanbanColumns = (size: SectionSize) => (size === "FULL" ? 8 : 5);
+/** How many columns of a Kanban board fit on the TV at a given size (one-row sizes show a count per column). */
+export function maxKanbanColumns(size: SectionSize): number {
+  const { cols, rows } = sizeCells(size);
+  if (rows < 2) return 5;
+  return cols >= 4 ? 8 : cols === 3 ? 6 : 5;
+}
 
 export const CATALOG: CatalogItem[] = [
-  { metric: "goal.hero", label: "Goal progress", hint: "Ring, days left, pace and milestone banner", group: "Goals", type: "goalProgress", source: "goal", sizes: ["L", "FULL"], defaultTitle: "Goal" },
-  { metric: "sng.active.residential", label: "Residential customers", hint: "Active count and this week's change", group: "Sweep&Go", type: "metric", source: "crm", sizes: ["S"], defaultTitle: "Residential" },
-  { metric: "sng.active.commercial", label: "Commercial customers", hint: "Active count", group: "Sweep&Go", type: "metric", source: "crm", sizes: ["S"], defaultTitle: "Commercial" },
-  { metric: "sng.happy.families", label: "Happy families", hint: "All-time happy clients (Sweep&Go)", group: "Sweep&Go", type: "metric", source: "crm", sizes: ["S", "M"], defaultTitle: "Happy families" },
-  { metric: "sng.happy.dogs", label: "Happy dogs", hint: "Dogs across all happy clients (Sweep&Go)", group: "Sweep&Go", type: "metric", source: "crm", sizes: ["S", "M"], defaultTitle: "Happy dogs" },
-  { metric: "sng.completed.yards", label: "Completed yards", hint: "All-time completed cleanups (Sweep&Go)", group: "Sweep&Go", type: "metric", source: "crm", sizes: ["S", "M"], defaultTitle: "Completed yards" },
-  { metric: "sng.fieldShare.week", label: "Field share", hint: "Share of this week's completed visits per tech", group: "Sweep&Go", type: "barChart", source: "pm", sizes: ["M", "L"], defaultTitle: "Field share · this week", fields: ["person"] },
-  { metric: "sng.routes.today", label: "Today's routes", hint: "Yards done of scheduled, per tech", group: "Sweep&Go", type: "routeProgress", source: "pm", sizes: ["M", "XL"], defaultTitle: "Today's routes",
+  { metric: "goal.hero", label: "Goal progress", hint: "Ring, days left, pace and milestone banner", group: "Goals", type: "goalProgress", source: "goal", minSize: { cols: 2, rows: 2 }, defaultTitle: "Goal" },
+  { metric: "sng.active.residential", label: "Residential customers", hint: "Active count and this week's change", group: "Sweep&Go", type: "metric", source: "crm", minSize: { cols: 1, rows: 1 }, defaultTitle: "Residential" },
+  { metric: "sng.active.commercial", label: "Commercial customers", hint: "Active count", group: "Sweep&Go", type: "metric", source: "crm", minSize: { cols: 1, rows: 1 }, defaultTitle: "Commercial" },
+  { metric: "sng.happy.families", label: "Happy families", hint: "All-time happy clients (Sweep&Go)", group: "Sweep&Go", type: "metric", source: "crm", minSize: { cols: 1, rows: 1 }, defaultTitle: "Happy families" },
+  { metric: "sng.happy.dogs", label: "Happy dogs", hint: "Dogs across all happy clients (Sweep&Go)", group: "Sweep&Go", type: "metric", source: "crm", minSize: { cols: 1, rows: 1 }, defaultTitle: "Happy dogs" },
+  { metric: "sng.completed.yards", label: "Completed yards", hint: "All-time completed cleanups (Sweep&Go)", group: "Sweep&Go", type: "metric", source: "crm", minSize: { cols: 1, rows: 1 }, defaultTitle: "Completed yards" },
+  { metric: "sng.fieldShare.week", label: "Field share", hint: "Share of this week's completed visits per tech", group: "Sweep&Go", type: "barChart", source: "pm", minSize: { cols: 2, rows: 1 }, defaultTitle: "Field share · this week", fields: ["person"] },
+  { metric: "sng.routes.today", label: "Today's routes", hint: "Yards done of scheduled, per tech", group: "Sweep&Go", type: "routeProgress", source: "pm", minSize: { cols: 2, rows: 1 }, defaultTitle: "Today's routes",
     displays: [{ value: "crews", label: "A bar per tech" }, { value: "bar", label: "One overall bar" }] },
-  { metric: "sng.visits.ontime.week", label: "On-time visits", hint: "Completed ÷ scheduled this week", group: "Sweep&Go", type: "metric", source: "pm", sizes: ["S"], defaultTitle: "On-time visits" },
-  { metric: "sng.visits.rescheduled.week", label: "Rescheduled visits", hint: "Skipped + missed this week", group: "Sweep&Go", type: "metric", source: "pm", sizes: ["S"], defaultTitle: "Rescheduled · wk" },
-  { metric: "sng.visits.byCrew.week", label: "Visits by crew", hint: "Completed visits per tech this week", group: "Sweep&Go", type: "barChart", source: "pm", sizes: ["M", "L"], defaultTitle: "Visits this week by crew" },
-  { metric: "sng.avgQuote.30d", label: "Average visit price", hint: "Completed visits, last 30 days", group: "Sweep&Go", type: "metric", source: "crm", sizes: ["S"], defaultTitle: "Avg visit · 30 days" },
-  { metric: "crm.funnel.week", label: "This week's funnel", hint: "Leads → second stage → won", group: "Admin", type: "funnel", source: "crm", sizes: ["M", "L", "XL"], defaultTitle: "This week's funnel", usesPipeline: true },
-  { metric: "crm.pipeline", label: "Sales pipeline", hint: "M/XL: count per stage · L/Full: cards per stage", group: "Admin", type: "kanban", source: "crm", sizes: ["M", "L", "XL", "FULL"], defaultTitle: "Sales pipeline", usesPipeline: true },
-  { metric: "crm.leads.week", label: "New leads this week", hint: "Count, change and 8-week chart", group: "Admin", type: "barChart", source: "crm", sizes: ["M", "XL"], defaultTitle: "New leads this week", displays: [{ value: "trend", label: "Trend" }] },
-  { metric: "crm.winrate.30d", label: "Win rate", hint: "Converted ÷ leads, last 30 days", group: "Admin", type: "metric", source: "crm", sizes: ["S"], defaultTitle: "Win rate · 30 days" },
-  { metric: "crm.leadSources.30d", label: "Lead sources", hint: "Top four sources, last 30 days", group: "Admin", type: "barChart", source: "crm", sizes: ["M"], defaultTitle: "Lead sources · 30 days", displays: [{ value: "sources", label: "Sources grid" }] },
-  { metric: "crm.followups.today", label: "Follow up today", hint: "Leads and call-list prospects due today", group: "Admin", type: "list", source: "crm", sizes: ["M", "L", "FULL"], defaultTitle: "Follow up today", displays: [{ value: "detail", label: "Name + detail" }] },
-  { metric: "pm.tasks", label: "Task board", hint: "To do · In progress · Done this week", group: "Admin", type: "taskBoard", source: "pm", sizes: ["M", "L", "FULL"], defaultTitle: "Task board" },
-  { metric: "pm.kanban", label: "Kanban board", hint: "One of your custom boards (Kanban page). L/Full: cards · M/XL: counts", group: "Admin", type: "kanban", source: "pm", sizes: ["L", "M", "XL", "FULL"], defaultTitle: "Board", usesKanbanBoard: true },
-  { metric: "crm.reviews", label: "Reviews", hint: "Google star rating, reviews this month and the latest 5-star quote", group: "Admin", type: "reviews", source: "crm", sizes: ["S", "M", "L"], defaultTitle: "Google reviews" },
-  { metric: "crm.wins", label: "Wins", hint: "New signups and 5-star reviews from the last two weeks, plus milestones", group: "Admin", type: "wins", source: "crm", sizes: ["M", "L", "FULL"], defaultTitle: "Wins" },
-  { metric: "crm.avgMonthlyCost", label: "Average monthly cost", hint: "Every customer's invoices for the latest billed month, averaged per customer", group: "Admin", type: "metric", source: "crm", sizes: ["S", "M"], defaultTitle: "Avg monthly cost" },
-  { metric: "crm.revenue.month", label: "Revenue this month", hint: "Collected so far this month, with last month for comparison", group: "Admin", type: "metric", source: "crm", sizes: ["S", "M"], defaultTitle: "Revenue this month" },
-  { metric: "crm.margin.month", label: "Margin this month", hint: "Revenue minus costs (from the Profitability page)", group: "Admin", type: "metric", source: "crm", sizes: ["S", "M"], defaultTitle: "Margin this month" },
-  { metric: "crm.hireTrigger", label: "Hire trigger", hint: "Progress toward the number that pays for a tech", group: "Admin", type: "progress", source: "crm", sizes: ["M", "XL"], defaultTitle: "Hire a tech",
+  { metric: "sng.visits.ontime.week", label: "On-time visits", hint: "Completed ÷ scheduled this week", group: "Sweep&Go", type: "metric", source: "pm", minSize: { cols: 1, rows: 1 }, defaultTitle: "On-time visits" },
+  { metric: "sng.visits.rescheduled.week", label: "Rescheduled visits", hint: "Skipped + missed this week", group: "Sweep&Go", type: "metric", source: "pm", minSize: { cols: 1, rows: 1 }, defaultTitle: "Rescheduled · wk" },
+  { metric: "sng.visits.byCrew.week", label: "Visits by crew", hint: "Completed visits per tech this week", group: "Sweep&Go", type: "barChart", source: "pm", minSize: { cols: 2, rows: 1 }, defaultTitle: "Visits this week by crew" },
+  { metric: "sng.avgQuote.30d", label: "Average visit price", hint: "Completed visits, last 30 days", group: "Sweep&Go", type: "metric", source: "crm", minSize: { cols: 1, rows: 1 }, defaultTitle: "Avg visit · 30 days" },
+  { metric: "crm.funnel.week", label: "This week's funnel", hint: "Leads → second stage → won", group: "Admin", type: "funnel", source: "crm", minSize: { cols: 2, rows: 1 }, defaultTitle: "This week's funnel", usesPipeline: true },
+  { metric: "crm.pipeline", label: "Sales pipeline", hint: "One row tall: count per stage · two or more rows: cards per stage", group: "Admin", type: "kanban", source: "crm", minSize: { cols: 2, rows: 1 }, defaultTitle: "Sales pipeline", usesPipeline: true },
+  { metric: "crm.leads.week", label: "New leads this week", hint: "Count, change and 8-week chart", group: "Admin", type: "barChart", source: "crm", minSize: { cols: 2, rows: 1 }, defaultTitle: "New leads this week", displays: [{ value: "trend", label: "Trend" }] },
+  { metric: "crm.winrate.30d", label: "Win rate", hint: "Converted ÷ leads, last 30 days", group: "Admin", type: "metric", source: "crm", minSize: { cols: 1, rows: 1 }, defaultTitle: "Win rate · 30 days" },
+  { metric: "crm.leadSources.30d", label: "Lead sources", hint: "Top four sources, last 30 days", group: "Admin", type: "barChart", source: "crm", minSize: { cols: 2, rows: 1 }, defaultTitle: "Lead sources · 30 days", displays: [{ value: "sources", label: "Sources grid" }] },
+  { metric: "crm.followups.today", label: "Follow up today", hint: "Leads and call-list prospects due today", group: "Admin", type: "list", source: "crm", minSize: { cols: 2, rows: 1 }, defaultTitle: "Follow up today", displays: [{ value: "detail", label: "Name + detail" }] },
+  { metric: "pm.tasks", label: "Task board", hint: "To do · In progress · Done this week", group: "Admin", type: "taskBoard", source: "pm", minSize: { cols: 2, rows: 1 }, defaultTitle: "Task board" },
+  { metric: "pm.kanban", label: "Kanban board", hint: "One of your custom boards (Kanban page). Two or more rows tall: cards · one row: counts", group: "Admin", type: "kanban", source: "pm", minSize: { cols: 2, rows: 1 }, defaultTitle: "Board", usesKanbanBoard: true },
+  { metric: "crm.reviews", label: "Reviews", hint: "Google star rating, reviews this month and the latest 5-star quote", group: "Admin", type: "reviews", source: "crm", minSize: { cols: 1, rows: 1 }, defaultTitle: "Google reviews" },
+  { metric: "crm.wins", label: "Wins", hint: "New signups and 5-star reviews from the last two weeks, plus milestones", group: "Admin", type: "wins", source: "crm", minSize: { cols: 2, rows: 1 }, defaultTitle: "Wins" },
+  { metric: "crm.avgMonthlyCost", label: "Average monthly cost", hint: "Every customer's invoices for the latest billed month, averaged per customer", group: "Admin", type: "metric", source: "crm", minSize: { cols: 1, rows: 1 }, defaultTitle: "Avg monthly cost" },
+  { metric: "crm.revenue.month", label: "Revenue this month", hint: "Collected so far this month, with last month for comparison", group: "Admin", type: "metric", source: "crm", minSize: { cols: 1, rows: 1 }, defaultTitle: "Revenue this month" },
+  { metric: "crm.margin.month", label: "Margin this month", hint: "Revenue minus costs (from the Profitability page)", group: "Admin", type: "metric", source: "crm", minSize: { cols: 1, rows: 1 }, defaultTitle: "Margin this month" },
+  { metric: "crm.hireTrigger", label: "Hire trigger", hint: "Progress toward the number that pays for a tech", group: "Admin", type: "progress", source: "crm", minSize: { cols: 2, rows: 1 }, defaultTitle: "Hire a tech",
     displays: [{ value: "mrr", label: "Monthly recurring revenue" }, { value: "customers", label: "Active customers" }], fields: ["target"] },
-  { metric: "crm.cancelReasons.90d", label: "Why customers leave", hint: "Cancellation reasons, last 90 days", group: "Admin", type: "barChart", source: "crm", sizes: ["M", "L"], defaultTitle: "Why customers leave · 90 days" },
-  { metric: "pm.calendar.upcoming", label: "Coming up", hint: "Calendar entries and task due dates", group: "Admin", type: "list", source: "pm", sizes: ["M", "L", "FULL"], defaultTitle: "Coming up", displays: [{ value: "dated", label: "Date + event" }] },
-  { metric: "ext.weather", label: "Weather", hint: "Today and the next 3 days (U.S. National Weather Service)", group: "Other", type: "weather", source: "pm", sizes: ["S", "M", "XL"], defaultTitle: "Weather", fields: ["place"] },
-  { metric: "ext.announcement", label: "Announcement", hint: "A message you type, e.g. \"Welcome Sam!\"", group: "Other", type: "announcement", source: "pm", sizes: ["S", "M", "L", "XL", "FULL"], defaultTitle: "Announcement", fields: ["text"] },
+  { metric: "crm.cancelReasons.90d", label: "Why customers leave", hint: "Cancellation reasons, last 90 days", group: "Admin", type: "barChart", source: "crm", minSize: { cols: 2, rows: 1 }, defaultTitle: "Why customers leave · 90 days" },
+  { metric: "pm.calendar.upcoming", label: "Coming up", hint: "Calendar entries and task due dates", group: "Admin", type: "list", source: "pm", minSize: { cols: 2, rows: 1 }, defaultTitle: "Coming up", displays: [{ value: "dated", label: "Date + event" }] },
+  { metric: "ext.weather", label: "Weather", hint: "Today and the next 3 days (U.S. National Weather Service)", group: "Other", type: "weather", source: "pm", minSize: { cols: 1, rows: 1 }, defaultTitle: "Weather", fields: ["place"] },
+  { metric: "ext.announcement", label: "Announcement", hint: "A message you type, e.g. \"Welcome Sam!\"", group: "Other", type: "announcement", source: "pm", minSize: { cols: 1, rows: 1 }, defaultTitle: "Announcement", fields: ["text"] },
 ];
 
 export const catalogItem = (metric?: string) => CATALOG.find((c) => c.metric === metric);
@@ -126,7 +163,7 @@ export function newSection(item: CatalogItem, pipelineID?: string, board?: { id:
   return {
     id: `s-${Math.random().toString(36).slice(2, 9)}`,
     title: item.usesKanbanBoard && board ? board.name : item.defaultTitle,
-    size: item.sizes[0],
+    size: sizeOf(item.minSize.cols, item.minSize.rows),
     source: item.source,
     elements: [{ type: item.type, config: {
       metric: item.metric,
@@ -148,11 +185,11 @@ export function autoGoalTitle(target: number, segment: TvHeroGoal["segment"], de
 
 /** Places sections on the 4×3 grid like CSS grid auto-flow: row (and the TV's GridPacker). */
 export function packGrid(sizes: SectionSize[]): ({ col: number; row: number } | null)[] {
-  const COLS = 4, ROWS = 3;
+  const COLS = GRID.cols, ROWS = GRID.rows;
   const used = Array.from({ length: ROWS }, () => Array(COLS).fill(false));
   let cr = 0, cc = 0;
   return sizes.map((size) => {
-    const { cols: w, rows: h } = SIZE_CELLS[size];
+    const { cols: w, rows: h } = sizeCells(size);
     let r = cr, c = cc;
     const fits = (r: number, c: number) => {
       if (c + w > COLS || r + h > ROWS) return false;
@@ -193,7 +230,8 @@ export function validateConfig(cfg: TvBoardConfig, kanbanBoardIds?: Set<string>)
       const el = s.elements?.[0];
       const item = catalogItem(el?.config?.metric);
       if (!item) { errors.push(`${name}: "${s.title}" shows something the TV doesn't know.`); continue; }
-      if (!item.sizes.includes(s.size)) errors.push(`${name}: "${s.title}" can't be size ${s.size} (use ${item.sizes.join(" or ")}).`);
+      if (!parseSize(s.size)) errors.push(`${name}: "${s.title}" has a size the TV doesn't understand (${String(s.size)}).`);
+      else if (!fitsItem(item, s.size)) errors.push(`${name}: "${s.title}" needs at least ${item.minSize.cols}×${item.minSize.rows} (it's ${sizeLabel(s.size)}).`);
       if (!s.title?.trim()) errors.push(`${name}: a section is missing its title.`);
       if (item.usesPipeline && el?.config.pipelineID && !pipelineIds.has(el.config.pipelineID)) errors.push(`${name}: "${s.title}" uses a pipeline that no longer exists.`);
       if (item.fields?.includes("target") && !((el?.config.target ?? 0) > 0)) errors.push(`${name}: set the target for "${s.title}".`);

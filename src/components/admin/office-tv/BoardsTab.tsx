@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { Plus, Trash2, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, RotateCcw } from "lucide-react";
 import {
-  ALL_SIZES, CATALOG, SIZE_CELLS, SIZE_LABEL, catalogItem, defaultConfig, maxKanbanColumns, newSection, packGrid,
-  type TvBoard, type TvBoardConfig, type TvSection,
+  CATALOG, GRID, SIZE_PRESETS, catalogItem, defaultConfig, fitsItem, maxKanbanColumns, newSection, packGrid, sizeCells, sizeLabel, sizeOf,
+  type CatalogItem, type SectionSize, type SizeCells, type TvBoard, type TvBoardConfig, type TvSection,
 } from "@/lib/tv-config";
 
 const input = "w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent";
@@ -12,6 +12,10 @@ const label = "block text-sm font-medium text-gray-700 mb-1";
 const GROUPS = ["Goals", "Sweep&Go", "Admin", "Other"] as const;
 interface KanbanSummary { id: string; name: string; columns: { id: string; name: string; isDone: boolean }[] }
 const SOURCE_TINT: Record<string, string> = { goal: "bg-blue-50 border-blue-200", crm: "bg-white border-gray-200", pm: "bg-white border-gray-200" };
+const TOTAL_CELLS = GRID.cols * GRID.rows;
+const PRESET_NAME: Record<string, string> = { S: "S", M: "M", L: "L", XL: "XL", FULL: "Full" };
+/** "any size" or "2×1 or bigger" — the smallest footprint a catalog item can be shown in. */
+const minLabel = (c: CatalogItem) => (c.minSize.cols === 1 && c.minSize.rows === 1 ? "any size" : `${c.minSize.cols}×${c.minSize.rows} or bigger`);
 
 /** Boards, sections and a live 4×3 preview laid out exactly like the TV. */
 export function BoardsTab({ config, onChange, onOpenKanban }: { config: TvBoardConfig; onChange: (c: TvBoardConfig) => void; onOpenKanban: () => void }) {
@@ -70,7 +74,7 @@ export function BoardsTab({ config, onChange, onOpenKanban }: { config: TvBoardC
   }
 
   const placements = packGrid(board.sections.map((s) => s.size));
-  const usedCells = board.sections.reduce((n, s) => n + SIZE_CELLS[s.size].cols * SIZE_CELLS[s.size].rows, 0);
+  const usedCells = board.sections.reduce((n, s) => n + sizeCells(s.size).cols * sizeCells(s.size).rows, 0);
   const current = board.sections.find((s) => s.id === selected) ?? null;
   const currentItem = catalogItem(current?.elements[0]?.config.metric);
 
@@ -102,21 +106,21 @@ export function BoardsTab({ config, onChange, onOpenKanban }: { config: TvBoardC
           <div>
             <div className="flex justify-between text-xs text-gray-500 mb-1.5">
               <span>TV layout · tap a section to edit</span>
-              <span className={usedCells > 12 ? "text-red-600 font-semibold" : ""}>{usedCells} of 12 cells</span>
+              <span className={usedCells > TOTAL_CELLS ? "text-red-600 font-semibold" : ""}>{usedCells} of {TOTAL_CELLS} cells</span>
             </div>
             <div className="rounded-xl bg-[#F4F6F8] p-2.5 border border-gray-200">
               <div className="grid grid-cols-4 grid-rows-3 gap-1.5" style={{ aspectRatio: "1792 / 872" }}>
                 {board.sections.map((s, i) => {
                   const p = placements[i];
                   if (!p) return null;
-                  const cells = SIZE_CELLS[s.size];
+                  const cells = sizeCells(s.size);
                   const item = catalogItem(s.elements[0]?.config.metric);
                   return (
                     <button key={s.id} onClick={() => { setSelected(s.id); setAdding(false); }}
                       style={{ gridColumn: `${p.col + 1} / span ${cells.cols}`, gridRow: `${p.row + 1} / span ${cells.rows}` }}
                       className={`rounded-lg border text-left p-2 overflow-hidden transition-shadow ${SOURCE_TINT[s.source] || "bg-white border-gray-200"} ${selected === s.id ? "ring-2 ring-teal-500 shadow-md" : "hover:shadow"}`}>
                       <p className="text-[11px] sm:text-xs font-bold text-navy-900 truncate">{s.title}</p>
-                      <p className="text-[10px] text-gray-500 truncate">{item?.label ?? "Unknown"} · {s.size}</p>
+                      <p className="text-[10px] text-gray-500 truncate">{item?.label ?? "Unknown"} · {sizeLabel(s.size)}</p>
                     </button>
                   );
                 })}
@@ -145,7 +149,7 @@ export function BoardsTab({ config, onChange, onOpenKanban }: { config: TvBoardC
                   <div className="space-y-1.5">
                     {CATALOG.filter((c) => c.group === g).map((c) => (
                       <button key={c.metric} onClick={() => addSection(c.metric)} className="w-full text-left p-2.5 rounded-lg border border-gray-200 hover:border-teal-400 hover:bg-teal-50/40">
-                        <p className="text-sm font-semibold text-navy-900">{c.label} <span className="text-[10px] font-medium text-gray-400">{c.sizes.join(" · ")}</span></p>
+                        <p className="text-sm font-semibold text-navy-900">{c.label} <span className="text-[10px] font-medium text-gray-400">{minLabel(c)}</span></p>
                         <p className="text-xs text-gray-500">{c.hint}</p>
                       </button>
                     ))}
@@ -168,7 +172,7 @@ export function BoardsTab({ config, onChange, onOpenKanban }: { config: TvBoardC
                 <select value={currentItem.metric} onChange={(e) => {
                   const item = catalogItem(e.target.value)!;
                   const fresh = newSection(item, pipelineID, kanbanBoards[0]);
-                  setSection(current.id, { elements: fresh.elements, source: item.source, size: item.sizes.includes(current.size) ? current.size : item.sizes[0], title: current.title === currentItem.defaultTitle ? item.defaultTitle : current.title });
+                  setSection(current.id, { elements: fresh.elements, source: item.source, size: fitsItem(item, current.size) ? current.size : sizeOf(item.minSize.cols, item.minSize.rows), title: current.title === currentItem.defaultTitle ? item.defaultTitle : current.title });
                 }} className={input}>
                   {GROUPS.map((g) => <optgroup key={g} label={g}>{CATALOG.filter((c) => c.group === g).map((c) => <option key={c.metric} value={c.metric}>{c.label}</option>)}</optgroup>)}
                 </select>
@@ -176,18 +180,8 @@ export function BoardsTab({ config, onChange, onOpenKanban }: { config: TvBoardC
               </div>
               <div>
                 <label className={label}>Size</label>
-                <div className="grid grid-cols-3 gap-1.5">
-                  {ALL_SIZES.map((size) => {
-                    const ok = currentItem.sizes.includes(size);
-                    return (
-                      <button key={size} disabled={!ok} onClick={() => setSection(current.id, { size })}
-                        className={`py-2 rounded-lg text-xs font-semibold border ${current.size === size ? "bg-teal-600 border-teal-600 text-white" : "bg-white border-gray-200 text-gray-700"} disabled:opacity-30`}>
-                        {SIZE_LABEL[size]}
-                      </button>
-                    );
-                  })}
-                </div>
-                {current.size === "FULL" && board.sections.length > 1 && (
+                <SizePicker value={current.size} min={currentItem.minSize} onChange={(size) => setSection(current.id, { size })} />
+                {sizeCells(current.size).cols * sizeCells(current.size).rows === TOTAL_CELLS && board.sections.length > 1 && (
                   <p className="text-xs text-amber-700 mt-1.5">Full screen takes the whole board. Move the other sections to another board (or remove them) before saving.</p>
                 )}
               </div>
@@ -253,7 +247,7 @@ export function BoardsTab({ config, onChange, onOpenKanban }: { config: TvBoardC
                             );
                           })}
                         </div>
-                        <p className="text-xs text-gray-400 mt-1">Up to {maxKanbanColumns(current.size)} columns fit at this size{current.size !== "FULL" ? " (8 at Full screen)" : ""}.</p>
+                        <p className="text-xs text-gray-400 mt-1">Up to {maxKanbanColumns(current.size)} columns fit at this size{maxKanbanColumns(current.size) < 8 ? " (8 when it's 4 wide and at least 2 tall)" : ""}.</p>
                       </div>
                     )}
                   </>
@@ -348,5 +342,56 @@ function SectionFields({ fields, config, onChange, hireOnCustomers }: {
         </div>
       )}
     </>
+  );
+}
+
+/**
+ * Pick any width × height on the TV grid: hover the cells like a table picker, click to set.
+ * Cells smaller than what the section needs are greyed out. Presets below for one-tap sizes.
+ */
+function SizePicker({ value, min, onChange }: { value: SectionSize; min: SizeCells; onChange: (size: SectionSize) => void }) {
+  const [hover, setHover] = useState<SizeCells | null>(null);
+  const cur = sizeCells(value);
+  const shown = hover ?? cur;
+  const allowed = (c: SizeCells) => c.cols >= min.cols && c.rows >= min.rows;
+  const rows = Array.from({ length: GRID.rows }, (_, r) => r + 1);
+  const cols = Array.from({ length: GRID.cols }, (_, c) => c + 1);
+  return (
+    <div className="space-y-2">
+      <div className="flex items-start gap-3">
+        <div className="grid gap-1 p-1.5 rounded-lg bg-[#F4F6F8] border border-gray-200" style={{ gridTemplateColumns: `repeat(${GRID.cols}, 22px)` }}
+          onMouseLeave={() => setHover(null)} role="group" aria-label="Section size">
+          {rows.map((r) => cols.map((c) => {
+            const cell = { cols: c, rows: r };
+            const ok = allowed(cell);
+            const lit = c <= shown.cols && r <= shown.rows;
+            const picked = c <= cur.cols && r <= cur.rows;
+            return (
+              <button key={`${c}-${r}`} type="button" disabled={!ok} title={ok ? `${c}×${r}` : `Needs at least ${min.cols}×${min.rows}`}
+                aria-label={`${c} wide by ${r} tall`} aria-pressed={cur.cols === c && cur.rows === r}
+                onMouseEnter={() => ok && setHover(cell)} onFocus={() => ok && setHover(cell)} onBlur={() => setHover(null)}
+                onClick={() => ok && onChange(sizeOf(c, r))}
+                className={`h-[22px] w-[22px] rounded border transition-colors ${!ok ? "bg-gray-100 border-gray-200 cursor-not-allowed" : lit ? (hover ? "bg-teal-400 border-teal-500" : "bg-teal-600 border-teal-600") : picked ? "bg-teal-200 border-teal-300" : "bg-white border-gray-300 hover:border-teal-400"}`} />
+            );
+          }))}
+        </div>
+        <div className="text-sm pt-1">
+          <p className="font-semibold text-navy-900">{shown.cols} wide × {shown.rows} tall{PRESET_NAME[sizeOf(shown.cols, shown.rows)] ? ` · ${PRESET_NAME[sizeOf(shown.cols, shown.rows)]}` : ""}</p>
+          <p className="text-xs text-gray-500">{shown.cols * shown.rows} of {TOTAL_CELLS} cells{min.cols > 1 || min.rows > 1 ? ` · needs at least ${min.cols}×${min.rows}` : ""}</p>
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {SIZE_PRESETS.map((preset) => {
+          const cells = sizeCells(preset);
+          const ok = allowed(cells);
+          return (
+            <button key={preset} type="button" disabled={!ok} onClick={() => onChange(preset)}
+              className={`px-2.5 py-1 rounded-md text-[11px] font-semibold border ${value === preset ? "bg-teal-600 border-teal-600 text-white" : "bg-white border-gray-200 text-gray-700"} disabled:opacity-30`}>
+              {PRESET_NAME[preset]} · {cells.cols}×{cells.rows}
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
