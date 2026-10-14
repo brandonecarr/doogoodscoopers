@@ -20,7 +20,7 @@ const SOURCE_FOR: Record<BulkLeadType, "QUOTE_FORM" | "AD_LEAD" | "INSTAGRAM" | 
   quote: "QUOTE_FORM", ad: "AD_LEAD", instagram: "INSTAGRAM", canvasser: "CANVASSER",
 };
 
-const VALID_STATUSES = ["NEW", "CONTACTED", "NO_ANSWER", "NOT_INTERESTED", "WAITING_FOR_SIGNUP", "CONVERTED"];
+const VALID_STATUSES = ["NEW", "QUOTED", "CONTACTED", "NO_ANSWER", "NOT_INTERESTED", "WAITING_FOR_SIGNUP", "CONVERTED"];
 const VALID_GRADES = ["A", "B", "C", "D", "F"];
 
 export async function POST(request: Request) {

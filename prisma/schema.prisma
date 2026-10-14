@@ -18,6 +18,7 @@ enum LeadStatus {
   WAITING_FOR_SIGNUP
   CONVERTED
   PHONE_REVIEW // created from a phone call by AI call notes — needs a human review
+  QUOTED // got a price from the website quote form (/get-a-quote/) but hasn't signed up
 }
 
 // Lead source to track where leads come from

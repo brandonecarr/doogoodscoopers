@@ -22,6 +22,7 @@ const STATUS_STYLE: Record<string, string> = {
   NOT_INTERESTED: "bg-gray-100 text-gray-600",
   WAITING_FOR_SIGNUP: "bg-purple-50 text-purple-700",
   CONVERTED: "bg-green-50 text-green-700",
+  QUOTED: "bg-indigo-50 text-indigo-700",
 };
 
 export default async function InstagramLeadPage({ params }: { params: Promise<{ id: string }> }) {

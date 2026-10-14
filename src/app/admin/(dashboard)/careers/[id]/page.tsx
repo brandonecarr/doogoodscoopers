@@ -50,6 +50,7 @@ const statusLabels: Record<LeadStatus, string> = {
   WAITING_FOR_SIGNUP: "Waiting for Signup",
   CONVERTED: "Converted",
   PHONE_REVIEW: "Phone Review",
+  QUOTED: "Quoted",
 };
 
 function getStatusBadge(status: LeadStatus) {
@@ -61,6 +62,7 @@ function getStatusBadge(status: LeadStatus) {
     WAITING_FOR_SIGNUP: "bg-purple-100 text-purple-800",
     CONVERTED: "bg-green-100 text-green-800",
     PHONE_REVIEW: "bg-yellow-100 text-yellow-800",
+    QUOTED: "bg-indigo-100 text-indigo-800",
   };
 
   return (

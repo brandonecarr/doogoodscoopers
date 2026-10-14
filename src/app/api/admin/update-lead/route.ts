@@ -31,7 +31,7 @@ export async function POST(request: Request) {
     if (status) {
       const validStatuses: string[] = leadType === "prospect"
         ? [...PROSPECT_STATUSES]
-        : (["NEW", "CONTACTED", "NO_ANSWER", "NOT_INTERESTED", "WAITING_FOR_SIGNUP", "CONVERTED"] as LeadStatus[]);
+        : (["NEW", "QUOTED", "CONTACTED", "NO_ANSWER", "NOT_INTERESTED", "WAITING_FOR_SIGNUP", "CONVERTED"] as LeadStatus[]);
       if (!validStatuses.includes(status)) {
         return NextResponse.json(
           { success: false, message: "Invalid status" },

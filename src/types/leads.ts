@@ -8,7 +8,9 @@ export type LeadStatus =
   | "WAITING_FOR_SIGNUP"
   | "CONVERTED"
   /** Auto-created from a phone call by AI call notes; awaiting human review. */
-  | "PHONE_REVIEW";
+  | "PHONE_REVIEW"
+  /** Got a price from the website quote form but hasn't signed up. */
+  | "QUOTED";
 
 // Lead source to track where leads come from
 export type LeadSource = "QUOTE_FORM" | "OUT_OF_AREA" | "CAREERS" | "COMMERCIAL" | "AD_LEAD" | "CANVASSER";

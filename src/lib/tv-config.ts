@@ -113,6 +113,7 @@ export const catalogItem = (metric?: string) => CATALOG.find((c) => c.metric ===
 /** Every lead status in the admin (Prisma `LeadStatus`), for pipeline stages. */
 export const LEAD_STATUSES: { value: string; label: string }[] = [
   { value: "NEW", label: "New" },
+  { value: "QUOTED", label: "Quoted" },
   { value: "CONTACTED", label: "Contacted" },
   { value: "PHONE_REVIEW", label: "Phone review" },
   { value: "NO_ANSWER", label: "No answer" },
@@ -256,7 +257,7 @@ export function defaultConfig(now = new Date()): TvBoardConfig {
     heroGoal: { name: "500 active customers by Dec 31", metric: "activeCustomers", segment: "all", target: 500, deadline: new Date(Date.UTC(year, 11, 31, 8)).toISOString(), milestones: [400, 450, 500], celebrate: true },
     pipelines: [{ id: "sales", name: "Sales pipeline", stages: [
       { id: "new", name: "New lead", shortName: "New", sourceStatuses: ["NEW"], isWon: false },
-      { id: "quoted", name: "Quoted", sourceStatuses: ["CONTACTED", "PHONE_REVIEW"], isWon: false },
+      { id: "quoted", name: "Quoted", sourceStatuses: ["QUOTED", "CONTACTED", "PHONE_REVIEW"], isWon: false },
       { id: "first-visit", name: "First visit", shortName: "1st visit", sourceStatuses: ["WAITING_FOR_SIGNUP"], isWon: false },
       { id: "won", name: "Won", sourceStatuses: ["CONVERTED"], isWon: true },
     ] }],

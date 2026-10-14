@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 const STATUS_LABEL: Record<string, string> = {
   NEW: "New", CONTACTED: "Contacted", NO_ANSWER: "No answer",
-  NOT_INTERESTED: "Not interested", WAITING_FOR_SIGNUP: "Waiting", CONVERTED: "Signed up", PHONE_REVIEW: "Review",
+  NOT_INTERESTED: "Not interested", WAITING_FOR_SIGNUP: "Waiting", CONVERTED: "Signed up", PHONE_REVIEW: "Review", QUOTED: "Quoted",
 };
 
 export default async function MyLeadsPage() {

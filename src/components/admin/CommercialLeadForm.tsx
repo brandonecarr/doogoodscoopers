@@ -9,6 +9,7 @@ const STATUSES: { value: LeadStatus; label: string }[] = [
   { value: "CONTACTED", label: "Contacted" },
   { value: "PHONE_REVIEW", label: "Phone Review" },
   { value: "NO_ANSWER", label: "No Answer" },
+  { value: "QUOTED", label: "Quoted" },
   { value: "WAITING_FOR_SIGNUP", label: "Waiting for Signup" },
   { value: "NOT_INTERESTED", label: "Not Interested" },
   { value: "CONVERTED", label: "Converted" },

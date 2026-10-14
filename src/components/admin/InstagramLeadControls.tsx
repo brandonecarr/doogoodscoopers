@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Loader2, Save, Archive, ArchiveRestore, Trash2 } from "lucide-react";
 import { toDateInputValue, fromDateInputValue } from "@/lib/datetime";
 
-const STATUSES = ["NEW", "CONTACTED", "NO_ANSWER", "NOT_INTERESTED", "WAITING_FOR_SIGNUP", "CONVERTED"] as const;
+const STATUSES = ["NEW", "QUOTED", "CONTACTED", "NO_ANSWER", "NOT_INTERESTED", "WAITING_FOR_SIGNUP", "CONVERTED"] as const;
 
 export function InstagramLeadControls({
   id,

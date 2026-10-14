@@ -46,7 +46,7 @@ type Lead = { createdAt: Date; updatedAt: Date; status: string; archived: boolea
 
 const STATUS_LABEL: Record<string, string> = {
   NEW: "New lead", CONTACTED: "Contacted", NO_ANSWER: "No answer", NOT_INTERESTED: "Not interested",
-  WAITING_FOR_SIGNUP: "Waiting to sign up", CONVERTED: "Converted", PHONE_REVIEW: "Phone review",
+  WAITING_FOR_SIGNUP: "Waiting to sign up", CONVERTED: "Converted", PHONE_REVIEW: "Phone review", QUOTED: "Quoted",
   TO_CALL: "To call", ATTEMPTED: "Attempted",
 };
 

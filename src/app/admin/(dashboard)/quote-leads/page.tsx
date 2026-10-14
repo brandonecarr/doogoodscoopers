@@ -25,6 +25,7 @@ const statusLabels: Record<LeadStatus, string> = {
   WAITING_FOR_SIGNUP: "Waiting for Signup",
   CONVERTED: "Converted",
   PHONE_REVIEW: "Phone Review",
+  QUOTED: "Quoted",
 };
 
 function getStatusBadge(status: LeadStatus) {
@@ -36,6 +37,7 @@ function getStatusBadge(status: LeadStatus) {
     WAITING_FOR_SIGNUP: "bg-purple-100 text-purple-800",
     CONVERTED: "bg-green-100 text-green-800",
     PHONE_REVIEW: "bg-yellow-100 text-yellow-800",
+    QUOTED: "bg-indigo-100 text-indigo-800",
   };
 
   return (
@@ -177,6 +179,7 @@ export default function QuoteLeadsPage() {
             >
               <option value="all">All Statuses</option>
               <option value="NEW">New</option>
+              <option value="QUOTED">Quoted</option>
               <option value="CONTACTED">Contacted</option>
               <option value="NO_ANSWER">No Answer</option>
               <option value="NOT_INTERESTED">Not Interested</option>

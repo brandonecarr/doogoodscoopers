@@ -17,6 +17,7 @@ interface StatusUpdateFormProps {
 const statusOptions: { value: LeadStatus; label: string; color: string }[] = [
   { value: "PHONE_REVIEW", label: "Phone Review", color: "bg-yellow-500" },
   { value: "NEW", label: "New", color: "bg-teal-500" },
+  { value: "QUOTED", label: "Quoted", color: "bg-indigo-500" },
   { value: "CONTACTED", label: "Contacted", color: "bg-blue-500" },
   { value: "NO_ANSWER", label: "No Answer", color: "bg-orange-500" },
   { value: "NOT_INTERESTED", label: "Not Interested", color: "bg-gray-500" },

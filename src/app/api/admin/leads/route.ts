@@ -22,6 +22,7 @@ export interface CombinedLead {
 
 const ALL_STATUSES: LeadStatus[] = [
   "NEW",
+  "QUOTED",
   "CONTACTED",
   "NO_ANSWER",
   "NOT_INTERESTED",

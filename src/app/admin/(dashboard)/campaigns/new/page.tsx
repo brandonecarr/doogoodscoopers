@@ -27,7 +27,7 @@ const LEAD_TYPES = [
   { value: "outofarea", label: "Out of Area" },
   { value: "commercial", label: "Commercial" },
 ];
-const STATUSES = ["NEW", "CONTACTED", "NO_ANSWER", "NOT_INTERESTED", "WAITING_FOR_SIGNUP", "CONVERTED"];
+const STATUSES = ["NEW", "QUOTED", "CONTACTED", "NO_ANSWER", "NOT_INTERESTED", "WAITING_FOR_SIGNUP", "CONVERTED"];
 const GRADES = ["A", "B", "C", "D", "F"];
 
 function toggle(arr: string[], v: string): string[] {

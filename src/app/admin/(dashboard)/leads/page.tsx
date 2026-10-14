@@ -103,9 +103,10 @@ const COLOR_OPTIONS: ColorKey[] = ["teal", "blue", "orange", "gray", "purple", "
 const DEFAULT_COLUMNS: KanbanColumn[] = [
   { id: "phone_review",   name: "Phone Review Leads", color: "yellow", statusMapping: "PHONE_REVIEW" },
   { id: "new",            name: "New",       color: "teal",   statusMapping: "NEW" },
+  { id: "quoted",         name: "Quoted",    color: "indigo", statusMapping: "QUOTED" },
   { id: "contacted",      name: "Contacted", color: "blue",   statusMapping: "CONTACTED" },
   { id: "no_answer",      name: "No Answer", color: "orange", statusMapping: "NO_ANSWER" },
-  { id: "waiting",        name: "Quoted",    color: "purple", statusMapping: "WAITING_FOR_SIGNUP" },
+  { id: "waiting",        name: "Waiting for Signup", color: "purple", statusMapping: "WAITING_FOR_SIGNUP" },
   { id: "converted",      name: "Won",       color: "green",  statusMapping: "CONVERTED" },
   { id: "not_interested", name: "Lost",      color: "red",    statusMapping: "NOT_INTERESTED" },
 ];
@@ -186,11 +187,12 @@ function StatusBadge({ status }: { status: LeadStatus }) {
     WAITING_FOR_SIGNUP: "bg-purple-100 text-purple-800",
     CONVERTED: "bg-green-100 text-green-800",
     PHONE_REVIEW: "bg-yellow-100 text-yellow-800",
+    QUOTED: "bg-indigo-100 text-indigo-800",
   };
   const labels: Record<LeadStatus, string> = {
     NEW: "New", CONTACTED: "Contacted", NO_ANSWER: "No Answer",
     NOT_INTERESTED: "Not Interested", WAITING_FOR_SIGNUP: "Waiting for Signup", CONVERTED: "Converted",
-    PHONE_REVIEW: "Phone Review",
+    PHONE_REVIEW: "Phone Review", QUOTED: "Quoted",
   };
   return <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${styles[status]}`}>{labels[status]}</span>;
 }
@@ -584,9 +586,10 @@ export default function LeadsPage() {
               <option value="all">All Statuses</option>
               <option value="PHONE_REVIEW">Phone Review</option>
               <option value="NEW">New</option>
+              <option value="QUOTED">Quoted</option>
               <option value="CONTACTED">Contacted</option>
               <option value="NO_ANSWER">No Answer</option>
-              <option value="WAITING_FOR_SIGNUP">Quoted</option>
+              <option value="WAITING_FOR_SIGNUP">Waiting for Signup</option>
               <option value="CONVERTED">Won</option>
               <option value="NOT_INTERESTED">Lost</option>
             </select>
@@ -898,9 +901,10 @@ export default function LeadsPage() {
             <option value="" className="text-gray-900">Move to…</option>
             <option value="PHONE_REVIEW" className="text-gray-900">Phone Review</option>
             <option value="NEW" className="text-gray-900">New</option>
+            <option value="QUOTED" className="text-gray-900">Quoted</option>
             <option value="CONTACTED" className="text-gray-900">Contacted</option>
             <option value="NO_ANSWER" className="text-gray-900">No Answer</option>
-            <option value="WAITING_FOR_SIGNUP" className="text-gray-900">Quoted</option>
+            <option value="WAITING_FOR_SIGNUP" className="text-gray-900">Waiting for Signup</option>
             <option value="CONVERTED" className="text-gray-900">Won</option>
             <option value="NOT_INTERESTED" className="text-gray-900">Lost</option>
           </select>

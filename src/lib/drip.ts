@@ -173,8 +173,8 @@ export async function findDripCandidates(campaign: DripCampaign): Promise<DripCa
  * manually (No Answer, Converted, etc.) is never overwritten. No-op for
  * CUSTOMER (no lead status).
  */
-export async function markLeadContactedIfNew(leadType: LeadSource, leadId: string): Promise<void> {
-  const where = { id: leadId, status: LeadStatus.NEW };
+export async function markLeadContactedIfNew(leadType: LeadSource, leadId: string, from: LeadStatus[] = [LeadStatus.NEW]): Promise<void> {
+  const where = { id: leadId, status: { in: from } };
   const data = { status: LeadStatus.CONTACTED };
   if (leadType === "QUOTE_FORM") await prisma.quoteLead.updateMany({ where, data });
   else if (leadType === "AD_LEAD") await prisma.adLead.updateMany({ where, data });

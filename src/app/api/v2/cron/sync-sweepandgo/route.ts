@@ -179,6 +179,7 @@ export async function GET(request: NextRequest) {
         lastCleaned: q.last_time_yard_was_thoroughly_cleaned || null,
         notes: q.coupon_code ? `Coupon: ${q.coupon_code}` : null,
         lastStep: "Sweep&Go Quote Form",
+        status: "QUOTED" as const, // website quote form: priced, not signed up
         createdAt: new Date(q.created_at),
       },
     });

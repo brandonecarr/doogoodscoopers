@@ -3,7 +3,7 @@ import { getSession } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import type { LeadStatus } from "@/types/leads";
 
-const VALID_STATUS: LeadStatus[] = ["NEW", "CONTACTED", "NO_ANSWER", "NOT_INTERESTED", "WAITING_FOR_SIGNUP", "CONVERTED"];
+const VALID_STATUS: LeadStatus[] = ["NEW", "QUOTED", "CONTACTED", "NO_ANSWER", "NOT_INTERESTED", "WAITING_FOR_SIGNUP", "CONVERTED"];
 
 // PATCH → update an Instagram lead (status / grade / followup / notes / archived).
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {

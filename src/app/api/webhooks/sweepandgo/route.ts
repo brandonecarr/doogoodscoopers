@@ -317,6 +317,8 @@ export async function POST(request: NextRequest) {
           null,
         notes,
         lastStep: "Sweep&Go Quote Form",
+        // Website quote form (/get-a-quote/): they have a price, no signup yet.
+        status: "QUOTED" as const,
         // Quote recovery: the entry id lets a resume link finish THIS quote; the
         // consent flag is the "text me" box on the quote form.
         ...((data.id as string) ? { sngEntryId: String(data.id) } : {}),
@@ -370,6 +372,8 @@ export async function POST(request: NextRequest) {
           where: { id: existingLead.id },
           data: {
             ...leadData,
+            // Only a brand-new lead moves to Quoted; a status the owner set by hand stays.
+            status: existingLead.status === "NEW" ? "QUOTED" : existingLead.status,
             zipCode: zipCode || existingLead.zipCode || "",
             address: address || existingLead.address || null,
             city: city || existingLead.city || null,

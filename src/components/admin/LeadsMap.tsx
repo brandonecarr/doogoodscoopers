@@ -24,21 +24,22 @@ export interface MapPoint {
 
 const STATUS_LABEL: Record<LeadStatus, string> = {
   NEW: "New", CONTACTED: "Contacted", NO_ANSWER: "No Answer",
-  NOT_INTERESTED: "Lost", WAITING_FOR_SIGNUP: "Quoted", CONVERTED: "Won", PHONE_REVIEW: "Phone Review",
+  NOT_INTERESTED: "Lost", WAITING_FOR_SIGNUP: "Waiting for Signup", CONVERTED: "Won", PHONE_REVIEW: "Phone Review", QUOTED: "Quoted",
 };
 
 // Pin segment colors — matched to the status badges used across the leads UI.
 const STATUS_COLOR: Record<LeadStatus, string> = {
   PHONE_REVIEW: "#eab308",       // yellow
   NEW: "#14b8a6",                // teal
+  QUOTED: "#6366f1",             // indigo (Quoted)
   CONTACTED: "#3b82f6",          // blue
   NO_ANSWER: "#f97316",          // orange
-  WAITING_FOR_SIGNUP: "#a855f7", // purple (Quoted)
+  WAITING_FOR_SIGNUP: "#a855f7", // purple (Waiting for signup)
   CONVERTED: "#22c55e",          // green (Won)
   NOT_INTERESTED: "#9ca3af",     // gray (Lost)
 };
 // Draw order for the donut segments (pipeline order).
-const STATUS_ORDER: LeadStatus[] = ["PHONE_REVIEW", "NEW", "CONTACTED", "NO_ANSWER", "WAITING_FOR_SIGNUP", "CONVERTED", "NOT_INTERESTED"];
+const STATUS_ORDER: LeadStatus[] = ["PHONE_REVIEW", "NEW", "QUOTED", "CONTACTED", "NO_ANSWER", "WAITING_FOR_SIGNUP", "CONVERTED", "NOT_INTERESTED"];
 
 // Build a conic-gradient ring from a zip's status breakdown.
 function ringGradient(counts: Record<string, number>, total: number): string {

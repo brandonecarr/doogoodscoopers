@@ -467,7 +467,7 @@ export async function applyCallIntel(opts: {
     const filled = Object.entries(data).filter(([, v]) => v !== undefined).map(([k]) => k);
     if (filled.length) await prisma.quoteLead.update({ where: { id: quote.id }, data });
     await timeline("QUOTE_FORM", quote.id);
-    await markLeadContactedIfNew("QUOTE_FORM", quote.id);
+    await markLeadContactedIfNew("QUOTE_FORM", quote.id, ["NEW", "QUOTED"]); // a real call beats "just got a quote"
     return record({ action: filled.length ? "enriched" : "noted", leadType: "QUOTE_FORM", leadId: quote.id, fieldsFilled: filled });
   }
 
