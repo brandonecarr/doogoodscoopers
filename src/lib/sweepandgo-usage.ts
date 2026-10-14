@@ -5,15 +5,16 @@ import { sendAdminPush } from "@/lib/web-push";
 // ── Sweep&Go API usage guard ─────────────────────────────────────────────────
 // Every outbound Sweep&Go request is counted per Pacific day per endpoint, and
 // per clock hour. In Sept 2026 Sweep&Go support flagged ~70k requests/month from
-// us (a free-quotes poll running every minute). Their account limit is 100
-// requests/hour and 500/day; normal volume is now ~150/day and under 10/hour.
+// us (a free-quotes poll running every minute). Their account limit (raised Oct 2026)
+// is 200 requests/hour and 1,000/day; webhooks and onboarding requests don't count.
+// Normal volume is ~150/day and under 10/hour.
 // Crossing either alert (80% of the limit) sends one admin push, so a runaway
 // loop or over-eager cron is caught before Sweep&Go cuts us off.
 
-const DAILY_LIMIT = 500;
-const HOURLY_LIMIT = 100;
-const DAILY_ALERT = 400;
-const HOURLY_ALERT = 80;
+const DAILY_LIMIT = 1000;
+const HOURLY_LIMIT = 200;
+const DAILY_ALERT = 800;
+const HOURLY_ALERT = 160;
 const ALERT_MARKER = "__alert__";
 
 function pacificDay(): string {
@@ -86,6 +87,16 @@ export async function recordSngCall(url: string, method = "GET"): Promise<void> 
 }
 
 /** Today's (Pacific) request counts per endpoint, busiest first. */
+/** Requests this clock hour (the limit is 200/hour for the whole account). */
+export async function sngHourCount(): Promise<number> {
+  try {
+    const [row] = await prisma.$queryRaw<{ count: number }[]>`SELECT "count"::int AS count FROM "SngApiUsageHour" WHERE "hour" = date_trunc('hour', now())`;
+    return row?.count ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
 export async function sngUsageToday(): Promise<{ endpoint: string; count: number }[]> {
   const day = pacificDay();
   return prisma.$queryRaw<{ endpoint: string; count: number }[]>`

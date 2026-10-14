@@ -2,7 +2,7 @@
 // instead of by each TV. The TV asks /api/tv/snapshot every minute; Sweep&Go is only
 // called when a cached value is older than its schedule, so an idle office costs nothing.
 //
-// Sweep&Go allows 100 requests/hour and 500/day for the whole account, shared with the
+// Sweep&Go allows 200 requests/hour and 1,000/day for the whole account (webhooks are free), shared with the
 // admin's own syncs. Budget (one or many TVs): routes every 15 min in business hours /
 // hourly after, this week's visits every 30 min / 2 h, the 30-day report and all-time
 // totals daily (totals only when a board shows them), commercial count every 6 h.
@@ -14,7 +14,7 @@
 // flowing, the route and week lists are only re-fetched every few hours as a check;
 // if they stop arriving, polling falls back to the schedule above on its own.
 import prisma from "@/lib/prisma";
-import { recordSngCall } from "@/lib/sweepandgo-usage";
+import { recordSngCall, sngHourCount } from "@/lib/sweepandgo-usage";
 import { addDays, businessDay, dayStart, weekStartDay } from "@/lib/tv-connector";
 import { catalogItem, defaultConfig, type TvBoardConfig } from "@/lib/tv-config";
 
@@ -52,6 +52,11 @@ class RateLimited extends Error {}
 // (its Retry-After, else 15 minutes) in AppSetting so all server instances honour it.
 const PAUSE_KEY = "tv.sng.pausedUntil";
 const DEFAULT_PAUSE_MS = 15 * MIN;
+// Any other failure (timeout, 5xx) pauses TV fetches briefly too: the snapshot is requested
+// every minute, so without this a broken endpoint is retried 60× an hour and each try counts.
+const ERROR_PAUSE_MS = 3 * MIN;
+// Above this many requests in the current hour (limit 200) the TV stops refreshing and shows cached numbers.
+const HOUR_BUDGET = 120;
 
 async function pausedUntil(): Promise<Date | null> {
   const row = await prisma.appSetting.findUnique({ where: { key: PAUSE_KEY } });
@@ -80,8 +85,14 @@ async function get(path: string): Promise<unknown> {
       const until = await pause(res.headers.get("retry-after"));
       throw new RateLimited(`Sweep&Go is limiting requests; trying again at ${untilText(until)}`);
     }
-    if (!res.ok) throw new Error(`Sweep&Go HTTP ${res.status}`);
+    if (!res.ok) {
+      await pause(String(ERROR_PAUSE_MS / 1000));
+      throw new Error(`Sweep&Go HTTP ${res.status}`);
+    }
     return await res.json();
+  } catch (e) {
+    if (!(e instanceof RateLimited) && !(e instanceof Error && e.message.startsWith("Sweep&Go HTTP"))) await pause(String(ERROR_PAUSE_MS / 1000)); // timeout / network
+    throw e;
   } finally {
     clearTimeout(timer);
   }
@@ -95,6 +106,9 @@ async function cached<T>(key: string, maxAgeMs: number, fetchFresh: () => Promis
   let entry: Entry<T> | null = null;
   try { entry = row ? (JSON.parse(row.value) as Entry<T>) : null; } catch { entry = null; }
   if (entry && Date.now() - new Date(entry.fetchedAt).getTime() < maxAgeMs) return { data: entry.data };
+  // Hourly budget: once the hour is mostly spent, serve what we have rather than compete with
+  // the crons and webhooks for the last requests.
+  if ((await sngHourCount()) >= HOUR_BUDGET) return { data: entry?.data ?? null, warning: "Sweep&Go hourly budget reached; showing cached numbers" };
   try {
     const data = await fetchFresh();
     const value = JSON.stringify({ fetchedAt: new Date().toISOString(), data } satisfies Entry<T>);
@@ -123,26 +137,27 @@ function trim(rows: unknown): CachedJob[] {
 }
 
 /** Pacific business hours, when routes are actually moving. */
-function businessHours(now: Date): boolean {
-  const hour = Number(new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", hour: "numeric", hour12: false }).format(now));
-  return hour >= 6 && hour < 19;
-}
-
 // ── Live stops from Sweep&Go job webhooks ────────────────────────────────────────
 const WEBHOOK_SEEN_KEY = "tv.sng.jobWebhookAt";
-// Stops can be 45+ minutes apart, so "flowing" means a job webhook within 2 hours.
-const WEBHOOK_LIVE_MS = 120 * MIN;
 
-async function jobWebhooksLive(now: Date): Promise<boolean> {
-  const row = await prisma.appSetting.findUnique({ where: { key: WEBHOOK_SEEN_KEY } });
-  const at = row ? Date.parse(row.value) : NaN;
-  return Number.isFinite(at) && now.getTime() - at < WEBHOOK_LIVE_MS;
-}
 
 const COMPLETED = new Set(["job:completed", "notification:completed_job_notification", "commercial_notification:completed_job_notification"]);
 const SKIPPED = new Set(["notification:skipped_job_notification", "commercial_notification:skipped_job_notification"]);
 const STARTED = new Set(["job:started", "commercial_job:started"]);
+const OFF_SCHEDULE = new Set(["notification:off_schedule_notification", "commercial_notification:off_schedule_notification"]);
 const JOB_EVENT = /^(job:|commercial_job:|notification:|commercial_notification:)/;
+// Commercial client/subscription changes are the only thing that moves the commercial count.
+const COMMERCIAL_EVENT = /^commercial:(client_created|client_changed_status|subscription_created|subscription_canceled|subscription_paused|subscription_unpaused)$/;
+const DAY = 24 * 60 * MIN;
+
+/** Mark a cached entry stale so the next TV poll re-reads it — at most once per 10 minutes. */
+async function expireEntry(key: string, now: Date): Promise<void> {
+  await updateEntry(key, (e) => {
+    if (now.getTime() - Date.parse(e.fetchedAt) < 10 * MIN) return false;
+    e.fetchedAt = new Date(0).toISOString();
+    return true;
+  }).catch(() => {});
+}
 
 /** Read-modify-write one cached TV entry under a row lock, so concurrent deliveries can't clobber each other. */
 async function updateEntry(key: string, fn: (e: Entry<CachedJob[]>) => boolean): Promise<"updated" | "unchanged" | "missing"> {
@@ -164,6 +179,9 @@ async function updateEntry(key: string, fn: (e: Entry<CachedJob[]>) => boolean):
  * calling the API. `sentAt` is Sweep&Go's own event time. Never throws.
  */
 export async function applyJobWebhook(event: string, data: Record<string, unknown>, sentAt: Date | null, now = new Date()): Promise<void> {
+  // Webhooks are the source of truth; the API is only read once a day per list (and when a
+  // webhook says the list changed under us).
+  if (COMMERCIAL_EVENT.test(event)) { await expireEntry("tv.sng.commercial", now); return; }
   if (!JOB_EVENT.test(event)) return;
   try {
     await prisma.appSetting.upsert({
@@ -173,6 +191,8 @@ export async function applyJobWebhook(event: string, data: Record<string, unknow
     });
     const status = COMPLETED.has(event) ? 2 : SKIPPED.has(event) ? 3 : STARTED.has(event) ? 5 : null;
     const jobId = Number(data.job_id ?? data.id ?? 0);
+    // A stop moved off today's schedule: today's route list is no longer right.
+    if (OFF_SCHEDULE.has(event)) { await expireEntry(`tv.sng.routes:${businessDay(now)}`, now); return; }
     if (status == null || !(jobId > 0)) return; // e.g. on-the-way: proof of life only
 
     // The job's own date, so a late event can't touch another day's route. job:started sends
@@ -200,16 +220,18 @@ export async function applyJobWebhook(event: string, data: Record<string, unknow
       return true;
     });
 
-    // Count a completion in this week's visits if it's a stop on today's route and happened
-    // after that list was fetched. Unmatched events wait for the next fetch instead.
+    // Count a completion in this week's visits. job:completed carries the tech and price
+    // itself, so it counts whether or not the stop was on the cached route (the daily
+    // report fetch reconciles anything odd).
     const found = stop as CachedJob | null;
-    if (status === 2 && routes !== "missing" && found) {
+    void routes;
+    if (status === 2) {
       await updateEntry(`tv.sng.week:${weekStartDay(today)}:${today}`, (e) => {
         if (e.data.some((x) => x.job_id === jobId)) return false;
         if (sentAt && sentAt.getTime() <= Date.parse(e.fetchedAt)) return false; // already in the report
         e.data.push({
-          status_id: 2, assigned_to_name: found.assigned_to_name ?? ((data.tech_name as string) || null),
-          price: found.price ?? num(data.price), skip_reason_title: null, job_id: jobId,
+          status_id: 2, assigned_to_name: found?.assigned_to_name ?? ((data.assigned_to_name as string) || (data.tech_name as string) || null),
+          price: found?.price ?? num(data.price), skip_reason_title: null, job_id: jobId,
         });
         return true;
       });
@@ -224,9 +246,9 @@ export async function buildTvSweepAndGo(now = new Date()): Promise<TvSweepAndGo 
   const today = businessDay(now);
   const monday = weekStartDay(today);
   const monthAgo = addDays(today, -30);
-  const busy = businessHours(now);
-  // With job webhooks flowing, the lists stay current on their own; re-fetch only as a check.
-  const live = await jobWebhooksLive(now);
+  // Webhooks keep the lists current (stops started/done/skipped, completions, commercial
+  // changes); each list is read from the API once a day and re-read only when a webhook
+  // says it changed. Off-hours still get the same numbers, just no fresher.
   const warnings: string[] = [];
   const note = (r: { warning?: string }) => { if (r.warning && !warnings.includes(r.warning)) warnings.push(r.warning); };
 
@@ -237,14 +259,17 @@ export async function buildTvSweepAndGo(now = new Date()): Promise<TvSweepAndGo 
 
   const [residential, commercial, todayJobs, weekJobs, last30, events] = await Promise.all([
     prisma.sweepandgoCustomer.count({ where: { active: true } }),
-    cached<number>("commercial", 6 * 60 * MIN, async () => Number(((await get("/api/v2/commercial_clients/active")) as { paginate?: { total?: number } }).paginate?.total ?? 0)),
-    cached<CachedJob[]>(`routes:${today}`, (busy ? (live ? 120 : 15) : 60) * MIN, async () => trim(((await get(`/api/v1/dispatch_board/jobs_for_date?date=${today}`)) as { data?: unknown }).data)),
-    cached<CachedJob[]>(`week:${monday}:${today}`, (busy ? (live ? 240 : 30) : 120) * MIN, async () => trim(((await get(`/api/v2/report/completed_jobs_report?date_from=${monday}&date_to=${today}`)) as { job_list?: unknown }).job_list)),
-    cached<number | null>(`avg30:${today}`, 24 * 60 * MIN, async () => {
-      const jobs = trim(((await get(`/api/v2/report/completed_jobs_report?date_from=${monthAgo}&date_to=${today}`)) as { job_list?: unknown }).job_list);
-      const prices = jobs.filter((j) => j.status_id === 2 && (j.price ?? 0) > 0).map((j) => j.price!);
-      return prices.length ? Math.round((prices.reduce((a, b) => a + b, 0) / prices.length) * 100) : null;
-    }),
+    cached<number>("commercial", DAY, async () => Number(((await get("/api/v2/commercial_clients/active")) as { paginate?: { total?: number } }).paginate?.total ?? 0)),
+    cached<CachedJob[]>(`routes:${today}`, DAY, async () => trim(((await get(`/api/v1/dispatch_board/jobs_for_date?date=${today}`)) as { data?: unknown }).data)),
+    cached<CachedJob[]>(`week:${monday}:${today}`, DAY, async () => trim(((await get(`/api/v2/report/completed_jobs_report?date_from=${monday}&date_to=${today}`)) as { job_list?: unknown }).job_list)),
+    // The 30-day average visit price is only read when a board still shows it.
+    used.has("sng.avgQuote.30d")
+      ? cached<number | null>(`avg30:${today}`, DAY, async () => {
+          const jobs = trim(((await get(`/api/v2/report/completed_jobs_report?date_from=${monthAgo}&date_to=${today}`)) as { job_list?: unknown }).job_list);
+          const prices = jobs.filter((j) => j.status_id === 2 && (j.price ?? 0) > 0).map((j) => j.price!);
+          return prices.length ? Math.round((prices.reduce((a, b) => a + b, 0) / prices.length) * 100) : null;
+        })
+      : Promise.resolve({ data: null as number | null, warning: undefined as string | undefined }),
     prisma.subscriptionEvent.findMany({
       where: { kind: { in: ["SIGNUP", "CANCELLATION"] }, excluded: false, occurredAt: { gte: dayStart(addDays(today, -56)) } },
       select: { kind: true, occurredAt: true },

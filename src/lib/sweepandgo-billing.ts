@@ -9,7 +9,7 @@ import { recordSngCall } from "@/lib/sweepandgo-usage";
  *
  * 1. RATE LIMITS ARE THE BINDING CONSTRAINT. Sweep&Go returns HTTP 429 well
  *    before a full dataset can be pulled in one invocation — even at ~24
- *    requests and backoff (the account limit is 100/hour, 500/day). So the sync is RESUMABLE: it
+ *    requests and backoff (the account limit is 200/hour, 1,000/day). So the sync is RESUMABLE: it
  *    walks the feeds page by page, writes as it goes, and on a rate-limit stop
  *    it saves its position and continues on the next cron tick.
  * 2. WRITES ARE CUMULATIVE (upsert), never wipe-and-replace. A run that stops

@@ -16,7 +16,7 @@ import { recordSngCall } from "@/lib/sweepandgo-usage";
 //
 // ⚠️ Schedule is in vercel.json. History: every minute (~45k requests/month,
 // flagged by Sweep&Go), then every 5 min, then hourly, now once a day. Sweep&Go's
-// account limit is 100 requests/hour and 500/day. Don't speed this back up; if
+// account limit is 200 requests/hour and 1,000/day. Don't speed this back up; if
 // leads arrive slowly, fix the webhook instead. Every Sweep&Go call is counted
 // (lib/sweepandgo-usage.ts).
 //
