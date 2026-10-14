@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import { CampaignPauseToggle } from "@/components/admin/CampaignPauseToggle";
 import { BlastApproval } from "@/components/admin/BlastApproval";
 import { SendingHoursCard } from "@/components/admin/SendingHoursCard";
+import { TextSendingCard } from "@/components/admin/TextSendingCard";
 import { MessengerAutoReplyCard } from "@/components/admin/MessengerAutoReplyCard";
 import { PageHero, heroBtnPrimary, heroBtnSecondary, heroPrimaryStyle } from "@/components/admin/PageHero";
 
@@ -59,6 +60,7 @@ export default async function CampaignsPage() {
         }
       />
 
+      <TextSendingCard />
       <SendingHoursCard />
       <MessengerAutoReplyCard />
 

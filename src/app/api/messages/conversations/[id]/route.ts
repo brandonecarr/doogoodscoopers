@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { authenticateRequest, errorResponse } from "@/lib/api-auth";
 import { sendSms, isQuoConfigured, normalizePhoneNumber } from "@/lib/quo";
+import { isRelayConfigured, relayNumber, sendRelayText } from "@/lib/bluebubbles";
 import { sendEmail, isResendConfigured, wrapEmailHtml } from "@/lib/resend";
 
 function getSupabase() {
@@ -178,6 +179,7 @@ export async function POST(
         id,
         channel,
         org_id,
+        participant_our,
         client:client_id (
           id,
           first_name,
@@ -228,9 +230,20 @@ export async function POST(
       return NextResponse.json({ error: "Failed to create message" }, { status: 500 });
     }
 
-    // Send the message
+    // Send the message. A thread that lives on the iPhone number goes back out
+    // through the relay so the person keeps one conversation.
     let sendResult;
-    if (conversation.channel === "SMS") {
+    const viaRelay = conversation.channel === "SMS" && !!conversation.participant_our
+      && normalizePhoneNumber(String(conversation.participant_our)) === (await relayNumber())
+      && (await isRelayConfigured());
+    if (viaRelay) {
+      const normalizedPhone = normalizePhoneNumber(recipient);
+      if (!normalizedPhone) {
+        await supabase.from("messages").update({ status: "FAILED" }).eq("id", newMessage.id);
+        return NextResponse.json({ error: "Invalid phone number" }, { status: 400 });
+      }
+      sendResult = await sendRelayText({ to: normalizedPhone, body: message });
+    } else if (conversation.channel === "SMS") {
       if (!isQuoConfigured()) {
         await supabase
           .from("messages")
@@ -275,7 +288,7 @@ export async function POST(
         .from("messages")
         .update({
           status: "SENT",
-          provider: conversation.channel === "SMS" ? "quo" : "resend",
+          provider: conversation.channel === "SMS" ? (viaRelay ? "iphone" : "quo") : "resend",
           provider_id: sendResult.messageId,
         })
         .eq("id", newMessage.id);

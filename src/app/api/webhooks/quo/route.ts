@@ -11,11 +11,9 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import prisma from "@/lib/prisma";
-import type { LeadSource } from "@prisma/client";
-import { sendAdminPush } from "@/lib/web-push";
-import { isOptOutMessage, recordOptOut } from "@/lib/sms-optout";
+import { processInboundText, applyDeliveryStatus, captureOutboundText, getServiceSupabase, phoneCandidates } from "@/lib/inbound-text";
 import {
   verifyQuoWebhook,
   parseInboundMessage,
@@ -25,14 +23,7 @@ import {
 } from "@/lib/quo";
 import { analyzeCallSmart, applyCallIntel, applyCommercialCallIntel, isCallIntelConfigured } from "@/lib/call-intel";
 
-function getSupabase(): SupabaseClient {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !serviceKey) {
-    throw new Error("Supabase environment variables not configured");
-  }
-  return createClient(url, serviceKey);
-}
+const getSupabase = (): SupabaseClient => getServiceSupabase();
 
 // Resolve a Quo delivery event + payload into one of our allowed
 // messages.status CHECK values (DELIVERED | FAILED | SENT), or null to ignore.
@@ -112,410 +103,47 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function handleInbound(supabase: SupabaseClient, payload: unknown) {
+async function handleInbound(_supabase: SupabaseClient, payload: unknown) {
   const msg = parseInboundMessage(payload);
-  const normalizedFrom = normalizePhoneNumber(msg.from);
-
-  // Single-tenant: default org.
-  const { data: org } = await supabase.from("organizations").select("id").limit(1).single();
-  if (!org) {
-    console.error("[Quo] No organization found");
-    return NextResponse.json({ success: true, skipped: true });
-  }
-
-  // Match to a client by normalized phone.
-  let matchedClientId: string | null = null;
-  let matchedConversationId: string | null = null;
-
-  if (normalizedFrom) {
-    const { data: client } = await supabase
-      .from("clients")
-      .select("id, phone")
-      .eq("org_id", org.id)
-      .eq("phone", normalizedFrom)
-      .maybeSingle();
-
-    if (client) {
-      matchedClientId = client.id;
-
-      const { data: conversation } = await supabase
-        .from("message_conversations")
-        .select("id, unread_count")
-        .eq("client_id", client.id)
-        .eq("channel", "SMS")
-        .eq("status", "OPEN")
-        .order("last_message_at", { ascending: false, nullsFirst: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (conversation) {
-        matchedConversationId = conversation.id;
-      } else {
-        const { data: newConversation } = await supabase
-          .from("message_conversations")
-          .insert({
-            org_id: org.id,
-            client_id: client.id,
-            channel: "SMS",
-            status: "OPEN",
-            participant_our: getQuoFromNumber() || msg.to,
-            participant_their: normalizedFrom,
-            last_message_at: new Date().toISOString(),
-          })
-          .select("id")
-          .single();
-        matchedConversationId = newConversation?.id ?? null;
-      }
-    }
-  }
-
-  // Raw inbound receipt (media + full payload kept in raw_payload).
-  await supabase.from("inbound_messages").insert({
-    org_id: org.id,
-    from_address: msg.from,
-    to_address: msg.to,
-    body: msg.body,
-    channel: "SMS",
+  const r = await processInboundText({
     provider: "quo",
-    provider_id: msg.messageId,
-    matched_client_id: matchedClientId,
-    matched_conversation_id: matchedConversationId,
-    processed: !!matchedConversationId,
-    raw_payload: (payload as object) ?? {},
+    ourNumber: getQuoFromNumber(),
+    from: msg.from,
+    to: msg.to,
+    body: msg.body,
+    messageId: msg.messageId,
+    mediaUrls: msg.mediaUrls,
+    rawPayload: payload,
   });
-
-  // Thread the message and bump the conversation.
-  if (matchedConversationId) {
-    await supabase.from("messages").insert({
-      org_id: org.id,
-      conversation_id: matchedConversationId,
-      direction: "INBOUND",
-      body: msg.body,
-      status: "DELIVERED", // inbound is received; RECEIVED is not a valid status value
-      provider: "quo",
-      provider_id: msg.messageId,
-      metadata: msg.mediaUrls.length ? { mediaUrls: msg.mediaUrls } : {},
-    });
-
-    const { data: conv } = await supabase
-      .from("message_conversations")
-      .select("unread_count")
-      .eq("id", matchedConversationId)
-      .single();
-    await supabase
-      .from("message_conversations")
-      .update({
-        last_message_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        unread_count: (conv?.unread_count ?? 0) + 1,
-      })
-      .eq("id", matchedConversationId);
-  }
-
-  // A converted Sweep&Go customer texting is NOT a lead. Their old prospect lead
-  // should already be archived at conversion (sync-customers), but guard here too:
-  // never fire a "Lead replied" alert — or match a stale lead — for a real customer.
-  let isKnownCustomer = false;
-  if (!matchedClientId && normalizedFrom) {
-    const cand = phoneCandidates(normalizedFrom);
-    const customer = await prisma.sweepandgoCustomer.findFirst({
-      where: { active: true, OR: [{ cellPhone: { in: cand } }, { homePhone: { in: cand } }] },
-      select: { id: true },
-    });
-    isKnownCustomer = !!customer;
-  }
-
-  // No client/customer match → attach the reply to a LEAD (the /admin CRM). Matches
-  // QuoteLead first, then AdLead, by phone; logs a LeadMessage + notifies admins.
-  if (!matchedClientId && !isKnownCustomer && normalizedFrom && msg.messageId) {
-    const already = await prisma.leadMessage.findUnique({ where: { quoMessageId: msg.messageId } });
-    if (!already) {
-      const candidates = phoneCandidates(normalizedFrom);
-
-      // Prefer the lead we're already conversing with on this phone (the most
-      // recent existing message thread), so a reply joins the active
-      // conversation instead of landing on a stale duplicate lead. Fall back to
-      // the most-recently-created lead for the phone.
-      let match: { type: LeadSource; id: string; path: string } | null = null;
-      const thread = await prisma.leadMessage.findFirst({
-        where: { phone: { in: candidates } },
-        orderBy: { createdAt: "desc" },
-        select: { leadType: true, leadId: true },
-      });
-      if (thread) {
-        match = {
-          type: thread.leadType,
-          id: thread.leadId,
-          path: thread.leadType === "AD_LEAD" ? "ad-leads" : "quote-leads",
-        };
-      } else {
-        const quote = await prisma.quoteLead.findFirst({
-          where: { phone: { in: candidates } },
-          orderBy: { createdAt: "desc" },
-          select: { id: true },
-        });
-        if (quote) match = { type: "QUOTE_FORM", id: quote.id, path: "quote-leads" };
-        else {
-          const adl = await prisma.adLead.findFirst({
-            where: { phone: { in: candidates } },
-            orderBy: { createdAt: "desc" },
-            select: { id: true },
-          });
-          if (adl) match = { type: "AD_LEAD", id: adl.id, path: "ad-leads" };
-        }
-      }
-
-      if (match) {
-        await prisma.leadMessage.create({
-          data: {
-            leadType: match.type,
-            leadId: match.id,
-            direction: "INBOUND",
-            body: msg.body,
-            phone: normalizedFrom,
-            provider: "quo",
-            quoMessageId: msg.messageId,
-            status: "DELIVERED",
-          },
-        });
-        // A reply ends any active stop-on-reply drip for this lead — immediately,
-        // instead of waiting for the next scheduled step to come due.
-        const activeRecs = await prisma.campaignRecipient.findMany({
-          where: { leadType: match.type, leadId: match.id, status: "ACTIVE" },
-          select: { id: true, campaignId: true },
-        });
-        if (activeRecs.length) {
-          const stopCampaigns = await prisma.campaign.findMany({
-            where: { id: { in: activeRecs.map((r) => r.campaignId) }, type: "DRIP", stopOnReply: true },
-            select: { id: true },
-          });
-          const stopSet = new Set(stopCampaigns.map((c) => c.id));
-          const stopIds = activeRecs.filter((r) => stopSet.has(r.campaignId)).map((r) => r.id);
-          if (stopIds.length) {
-            await prisma.campaignRecipient.updateMany({
-              where: { id: { in: stopIds } },
-              data: { status: "STOPPED", error: "lead replied", nextSendAt: null },
-            });
-          }
-        }
-        // Look up the lead's name for the push notification.
-        const nameRow =
-          match.type === "AD_LEAD"
-            ? await prisma.adLead.findUnique({ where: { id: match.id }, select: { firstName: true, fullName: true } })
-            : await prisma.quoteLead.findUnique({ where: { id: match.id }, select: { firstName: true } });
-        const name =
-          (nameRow as { firstName?: string | null } | null)?.firstName ||
-          (nameRow as { fullName?: string | null } | null)?.fullName ||
-          normalizedFrom;
-        sendAdminPush({
-          title: "💬 Lead replied",
-          body: `${name}: ${msg.body.slice(0, 60)}`,
-          url: `/admin/${match.path}/${match.id}`,
-          tag: `lead-msg-${match.id}`,
-        }).catch(console.error);
-      }
-    }
-  }
-
-  // Opt-out: a lead replied STOP → add to do-not-contact and archive every
-  // lead with that phone. They're dead and can no longer be messaged.
-  if (normalizedFrom && isOptOutMessage(msg.body)) {
-    const keyword = msg.body.trim().toUpperCase().split(/\s+/)[0];
-    await recordOptOut(normalizedFrom, keyword);
-    const candidates = phoneCandidates(normalizedFrom);
-    const results = await Promise.all([
-      prisma.quoteLead.updateMany({ where: { phone: { in: candidates } }, data: { archived: true } }),
-      prisma.adLead.updateMany({ where: { phone: { in: candidates } }, data: { archived: true } }),
-      prisma.outOfAreaLead.updateMany({ where: { phone: { in: candidates } }, data: { archived: true } }),
-      prisma.commercialLead.updateMany({ where: { phone: { in: candidates } }, data: { archived: true } }),
-    ]);
-    const archived = results.reduce((n, r) => n + r.count, 0);
-    console.log(`[Quo] Opt-out (${keyword}) from ${normalizedFrom} — archived ${archived} lead(s)`);
-    sendAdminPush({
-      title: "🚫 Lead opted out (STOP)",
-      body: `${normalizedFrom} replied ${keyword} — archived ${archived} lead${archived === 1 ? "" : "s"}`,
-      url: "/admin/leads",
-      tag: `optout-${normalizedFrom}`,
-    }).catch(console.error);
-  }
-
-  // Reply forwarding (e.g. email a staffer).
-  const { data: forwardRules } = await supabase
-    .from("reply_forwarding_rules")
-    .select("*")
-    .eq("org_id", org.id)
-    .eq("is_enabled", true);
-
-  if (forwardRules && forwardRules.length > 0) {
-    const { sendEmail, wrapEmailHtml } = await import("@/lib/resend");
-    for (const rule of forwardRules) {
-      if (rule.forward_to_type === "EMAIL" && rule.forward_to_value) {
-        await sendEmail({
-          to: rule.forward_to_value,
-          subject: `New SMS from ${msg.from}`,
-          html: wrapEmailHtml(`
-            <p>You received a new SMS message:</p>
-            <blockquote style="border-left: 4px solid #14b8a6; padding-left: 16px; margin: 16px 0;">
-              ${msg.body}
-            </blockquote>
-            <p><strong>From:</strong> ${msg.from}</p>
-            <p><a href="${process.env.NEXT_PUBLIC_SITE_URL || ""}/app/office/messages">View in Dashboard</a></p>
-          `),
-        }).catch((e) => console.error("[Quo] forward email failed:", e));
-      }
-    }
-  }
-
-  return NextResponse.json({ success: true, conversation_id: matchedConversationId });
+  return NextResponse.json({ success: true, ...(r.skipped ? { skipped: true } : { conversation_id: r.conversationId ?? null }) });
 }
 
-async function handleDeliveryStatus(
-  supabase: SupabaseClient,
-  payload: unknown,
-  status: string
-) {
+async function handleDeliveryStatus(_supabase: SupabaseClient, payload: unknown, status: string) {
   const msg = parseInboundMessage(payload); // reuse: pulls id
   if (!msg.messageId) {
     return NextResponse.json({ success: true, skipped: "no message id" });
   }
-  const nowIso = new Date().toISOString();
-
-  await supabase.from("messages").update({ status }).eq("provider_id", msg.messageId);
-
-  await supabase
-    .from("notifications")
-    .update({
-      status,
-      ...(status === "DELIVERED" ? { delivered_at: nowIso } : {}),
-    })
-    .eq("provider_id", msg.messageId);
-
-  // Admin/CRM lead messages (Prisma) — same provider message id.
-  await prisma.leadMessage.updateMany({ where: { quoMessageId: msg.messageId }, data: { status } });
-
-  // A failed/undelivered send ends the drip for that lead: there's no point
-  // firing the remaining steps at a number the carrier won't deliver to.
-  let dripStopped = 0;
-  if (status === "FAILED") {
-    const leadMsgs = await prisma.leadMessage.findMany({
-      where: { quoMessageId: msg.messageId },
-      select: { leadType: true, leadId: true },
-    });
-    for (const lm of leadMsgs) {
-      const active = await prisma.campaignRecipient.findMany({
-        where: { leadType: lm.leadType, leadId: lm.leadId, status: "ACTIVE" },
-        select: { id: true, campaignId: true },
-      });
-      if (!active.length) continue;
-      const dripCampaigns = await prisma.campaign.findMany({
-        where: { id: { in: active.map((r) => r.campaignId) }, type: "DRIP" },
-        select: { id: true },
-      });
-      const dripSet = new Set(dripCampaigns.map((c) => c.id));
-      const stopIds = active.filter((r) => dripSet.has(r.campaignId)).map((r) => r.id);
-      if (stopIds.length) {
-        const res = await prisma.campaignRecipient.updateMany({
-          where: { id: { in: stopIds } },
-          data: { status: "STOPPED", error: "undeliverable (carrier rejected)", nextSendAt: null },
-        });
-        dripStopped += res.count;
-      }
-    }
-  }
-
+  const { dripStopped } = await applyDeliveryStatus(msg.messageId, status);
   return NextResponse.json({ success: true, status, dripStopped });
 }
 
 /**
  * Capture an OUTBOUND message that was sent from the Quo app (not through the CRM)
- * so the owner's own replies land in the lead's thread. No-ops when:
- *  - the message isn't outbound (inbound is handled by message.received), or
- *  - we already have it (it was sent through the CRM — deduped by quoMessageId), or
- *  - it carries no body, or its recipient doesn't match a lead.
- * Matches the recipient by phone: the active thread on that number first, then the
- * most recent QuoteLead, then AdLead — the same resolution used for inbound replies.
+ * so the owner's own replies land in the lead's thread. Outbound = the payload says
+ * so, or the sender is our own Quo number.
  */
 async function captureOutboundFromQuo(payload: unknown, status: string | null) {
   const msg = parseInboundMessage(payload);
   if (!msg.messageId) return;
-
-  // Outbound? Trust the payload's direction; otherwise infer from the sender being
-  // our own Quo number.
   const dir = (msg.direction || "").toLowerCase();
   const our = normalizePhoneNumber(getQuoFromNumber());
   const fromOurs = !!our && normalizePhoneNumber(msg.from) === our;
   const isOutbound = /out/.test(dir) || (!/in/.test(dir) && fromOurs);
   if (!isOutbound) return;
-
-  // Already recorded (sent through the CRM, or a duplicate event) → status update
-  // handles it; don't create a second row.
-  const existing = await prisma.leadMessage.findUnique({ where: { quoMessageId: msg.messageId } });
-  if (existing) return;
-
-  const body = (msg.body || "").trim();
-  if (!body) return; // a status ping with no content — nothing to show in the thread
-
-  const toPhone = normalizePhoneNumber(msg.to);
-  if (!toPhone) return;
-  const candidates = phoneCandidates(toPhone);
-
-  // Prefer the lead/customer we're already threading with on this number, then the
-  // most recent QuoteLead, then AdLead.
-  let match: { type: LeadSource; id: string } | null = null;
-  const thread = await prisma.leadMessage.findFirst({
-    where: { phone: { in: candidates } },
-    orderBy: { createdAt: "desc" },
-    select: { leadType: true, leadId: true },
-  });
-  if (thread) {
-    match = { type: thread.leadType, id: thread.leadId };
-  } else {
-    const quote = await prisma.quoteLead.findFirst({
-      where: { phone: { in: candidates } },
-      orderBy: { createdAt: "desc" },
-      select: { id: true },
-    });
-    if (quote) match = { type: "QUOTE_FORM", id: quote.id };
-    else {
-      const adl = await prisma.adLead.findFirst({
-        where: { phone: { in: candidates } },
-        orderBy: { createdAt: "desc" },
-        select: { id: true },
-      });
-      if (adl) match = { type: "AD_LEAD", id: adl.id };
-    }
-  }
-  if (!match) return;
-
-  try {
-    await prisma.leadMessage.create({
-      data: {
-        leadType: match.type,
-        leadId: match.id,
-        direction: "OUTBOUND",
-        body,
-        phone: toPhone,
-        provider: "quo",
-        quoMessageId: msg.messageId,
-        status: status || "SENT",
-      },
-    });
-  } catch (e) {
-    // Unique-constraint race (a concurrent event just created it) — safe to ignore.
-    console.warn("[Quo] outbound capture skipped:", (e as Error).message);
-  }
+  await captureOutboundText({ provider: "quo", to: msg.to, body: msg.body, messageId: msg.messageId }, status);
 }
 
 // ── Calls → lead/client timeline (Phase 4) ──────────────────────────────────
-
-/** Common stored formats for a US number so we can match raw-stored phones. */
-function phoneCandidates(e164: string): string[] {
-  const digits = e164.replace(/\D/g, "");
-  const ten = digits.slice(-10);
-  if (ten.length !== 10) return [e164];
-  const a = ten.slice(0, 3), m = ten.slice(3, 6), l = ten.slice(6);
-  return [`+1${ten}`, ten, `1${ten}`, `(${a}) ${m}-${l}`, `${a}-${m}-${l}`, `${a}.${m}.${l}`];
-}
 
 /** The external party's number on a call (the side that isn't our Quo number). */
 function callExternalNumber(payload: unknown): string | null {

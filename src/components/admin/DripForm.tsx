@@ -342,17 +342,29 @@ export function DripForm({ mode, campaignId, initial }: DripFormProps) {
 
         {/* Send channel */}
         <div>
-          <p className="text-sm font-medium text-navy-900 mb-1.5">Send text messages over</p>
-          <div className="flex gap-2">
-            <button type="button" onClick={() => setChannel("sms")} className="flex-1 px-3 py-2 rounded-lg text-[13px] font-semibold border transition-colors"
-              style={channel === "sms" ? { background: "#EFE9FF", color: "#6D3EF0", borderColor: "#6D3EF0" } : { color: "#6B7280", borderColor: "#E5E7EB" }}>
-              💬 Text (SMS)
-            </button>
-            <button type="button" onClick={() => setChannel("messenger")} className="flex-1 px-3 py-2 rounded-lg text-[13px] font-semibold border transition-colors"
-              style={channel === "messenger" ? { background: "#E7F1FF", color: "#0084FF", borderColor: "#0084FF" } : { color: "#6B7280", borderColor: "#E5E7EB" }}>
-              🔵 Facebook Messenger
-            </button>
+          <p className="text-sm font-medium text-navy-900 mb-1.5">Send text messages from</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {([
+              ["sms", "💬 Default", "#EFE9FF", "#6D3EF0"],
+              ["iphone", "📱 iPhone", "#E6F7EE", "#0F8A4F"],
+              ["quo", "☎️ Office line", "#FFF4E5", "#B45309"],
+              ["messenger", "🔵 Messenger", "#E7F1FF", "#0084FF"],
+            ] as const).map(([value, label, bg, fg]) => (
+              <button key={value} type="button" onClick={() => setChannel(value)} className="px-3 py-2 rounded-lg text-[13px] font-semibold border transition-colors"
+                style={channel === value ? { background: bg, color: fg, borderColor: fg } : { color: "#6B7280", borderColor: "#E5E7EB" }}>
+                {label}
+              </button>
+            ))}
           </div>
+          {channel === "sms" && (
+            <p className="text-[12px] text-gray-500 mt-1.5">Uses whichever line is set as the default under <b>Text sending</b> on the Campaigns page (the office Quo line or the iPhone).</p>
+          )}
+          {channel === "iphone" && (
+            <p className="text-[12px] text-gray-500 mt-1.5">Sends from the iPhone number as iMessage (blue bubble), or as a regular text when the person isn&apos;t on iMessage. Paced to a daily cap so the number stays healthy; falls back to the office line if the relay is down.</p>
+          )}
+          {channel === "quo" && (
+            <p className="text-[12px] text-gray-500 mt-1.5">Always sends from the Quo office line, even when the default is the iPhone.</p>
+          )}
           {channel === "messenger" && (
             <p className="text-[12px] text-gray-500 mt-1.5">Sends into each lead&apos;s Messenger thread (Meta-lead threads only), with automatic <b>SMS/email fallback</b> when there&apos;s no Messenger thread or the reply window has closed. Requires the Messenger connection to be live.</p>
           )}

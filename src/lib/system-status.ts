@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma";
 import { getSetting } from "@/lib/google-business";
+import { relayConfig } from "@/lib/bluebubbles";
 
 /**
  * One row per integration: is it configured, and where is it managed?
@@ -10,12 +11,13 @@ const has = (...keys: string[]) => keys.every((k) => !!process.env[k]);
 const missing = (...keys: string[]) => keys.filter((k) => !process.env[k]);
 
 export async function getIntegrationStatus(): Promise<IntegrationStatus[]> {
-  const [fbPage, fbPageName, googleEmail, googleTitle] = await Promise.all([
-    getSetting("facebook.pageToken"), getSetting("facebook.pageName"), getSetting("google.bp.connectedEmail"), getSetting("google.bp.locationTitle"),
+  const [fbPage, fbPageName, googleEmail, googleTitle, relay] = await Promise.all([
+    getSetting("facebook.pageToken"), getSetting("facebook.pageName"), getSetting("google.bp.connectedEmail"), getSetting("google.bp.locationTitle"), relayConfig(),
   ]);
   const rows: IntegrationStatus[] = [
     { name: "Sweep&Go", group: "Core", env: ["SWEEPANDGO_API_TOKEN", "SWEEPANDGO_WEBHOOK_SECRET"], ok: has("SWEEPANDGO_API_TOKEN"), detail: has("SWEEPANDGO_API_TOKEN") ? (has("SWEEPANDGO_WEBHOOK_SECRET") ? "API + webhook secret set" : "API set; webhook secret missing") : "API token missing", manageHref: "/admin/customers", manageLabel: "Customers" },
     { name: "Quo (SMS + calls)", group: "Core", env: ["QUO_API_KEY", "QUO_PHONE_NUMBER", "QUO_WEBHOOK_SECRET"], ok: has("QUO_API_KEY", "QUO_PHONE_NUMBER"), detail: has("QUO_API_KEY", "QUO_PHONE_NUMBER") ? "Ready" : `Missing ${missing("QUO_API_KEY", "QUO_PHONE_NUMBER").join(", ")}`, manageHref: "/admin/campaigns", manageLabel: "Campaigns" },
+    { name: "iPhone relay (BlueBubbles)", group: "Core", env: ["BLUEBUBBLES_PASSWORD", "BLUEBUBBLES_WEBHOOK_SECRET"], ok: !!relay && relay.enabled, detail: !has("BLUEBUBBLES_PASSWORD") ? "BLUEBUBBLES_PASSWORD missing" : !relay ? "Password set; no server URL yet (Campaigns → Text sending)" : relay.enabled ? `Ready · ${relay.number}` : "Switched off", manageHref: "/admin/campaigns", manageLabel: "Campaigns" },
     { name: "Resend (email)", group: "Core", env: ["RESEND_API_KEY", "RESEND_FROM_EMAIL"], ok: has("RESEND_API_KEY"), detail: has("RESEND_API_KEY") ? "Ready" : "API key missing", manageHref: "/admin/email", manageLabel: "Email" },
     { name: "Brevo (canvasser invites)", group: "Core", env: ["BREVO_API_KEY"], ok: has("BREVO_API_KEY"), detail: has("BREVO_API_KEY") ? "Ready" : "API key missing" },
     { name: "Web push notifications", group: "Core", env: ["NEXT_PUBLIC_VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY"], ok: has("NEXT_PUBLIC_VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY"), detail: has("NEXT_PUBLIC_VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY") ? "Ready" : "VAPID keys missing" },

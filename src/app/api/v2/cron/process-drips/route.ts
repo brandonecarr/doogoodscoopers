@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { sendSms, isQuoConfigured } from "@/lib/quo";
+import { isQuoConfigured } from "@/lib/quo";
+import { sendCampaignText, campaignTextProvider, type TextProvider } from "@/lib/text-send";
+import { isRelayConfigured, type RelayAllowance } from "@/lib/bluebubbles";
 import { renderTemplate, sendEmail, wrapEmailHtml } from "@/lib/resend";
 import { sendMessengerMessage, isMessengerConfigured } from "@/lib/messenger";
 import { optedOutKeys, optOutKey } from "@/lib/sms-optout";
@@ -33,7 +35,7 @@ export async function GET(request: NextRequest) {
   if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (!isQuoConfigured()) return NextResponse.json({ success: false, error: "Quo not configured" });
+  if (!isQuoConfigured() && !(await isRelayConfigured())) return NextResponse.json({ success: false, error: "No text provider configured (Quo or iPhone relay)" });
 
   const campaigns = await prisma.campaign.findMany({
     where: { type: "DRIP", active: true },
@@ -48,6 +50,9 @@ export async function GET(request: NextRequest) {
   let enrolled = 0;
   let sent = 0;
   let stopped = 0;
+  let deferred = 0;
+  // The iPhone relay sends at most once per run (pacing), shared across every drip.
+  const allowance: { current: RelayAllowance | null; used: boolean } = { current: null, used: false };
 
   const stop = (id: string, reason: string) =>
     prisma.campaignRecipient.update({ where: { id }, data: { status: "STOPPED", error: reason, nextSendAt: null } });
@@ -55,6 +60,7 @@ export async function GET(request: NextRequest) {
   for (const campaign of campaigns) {
     const steps = campaign.steps;
     if (steps.length === 0) continue;
+    const textProvider: TextProvider = await campaignTextProvider(campaign.channel);
 
     // 1) Enroll new matching leads (step 0 scheduled by its delay; usually now).
     const candidates = await findDripCandidates(campaign);
@@ -172,8 +178,8 @@ export async function GET(request: NextRequest) {
       // A "messenger" drip goes to Facebook Messenger when the lead has a linked
       // thread and the window is still open; otherwise it falls back to SMS, then
       // email. Every other campaign sends SMS exactly as before.
-      let provider = "quo";
-      let result: { success: boolean; messageId?: string | null; status?: string; error?: string } | null = null;
+      let provider: string = textProvider;
+      let result: { success: boolean; messageId?: string | null; status?: string; error?: string; deferred?: boolean } | null = null;
       if (isEmail) {
         provider = "email";
         const [e] = await sendCampaignBatch({
@@ -201,9 +207,10 @@ export async function GET(request: NextRequest) {
         // Fallback chain: SMS → email (covers no-thread, closed-window, AND a
         // Messenger send that errored).
         if (!result) {
-          if (r.phone && isQuoConfigured()) {
-            provider = "quo";
-            result = await sendSms({ to: r.phone, body });
+          if (r.phone && (isQuoConfigured() || textProvider === "iphone")) {
+            const t = await sendCampaignText({ to: r.phone, body, provider: textProvider, allowance });
+            provider = t.provider;
+            result = t;
           } else if (ad?.email) {
             const safe = body.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
             const e = await sendEmail({ to: ad.email, subject: "A quick note from DooGoodScoopers", text: body, html: wrapEmailHtml(`<p>${safe}</p>`) });
@@ -215,10 +222,13 @@ export async function GET(request: NextRequest) {
           }
         }
       } else {
-        provider = "quo";
-        result = await sendSms({ to: r.phone, body });
+        const t = await sendCampaignText({ to: r.phone, body, provider: textProvider, allowance });
+        provider = t.provider;
+        result = t;
       }
       if (!result) { provider = "none"; result = { success: false, error: "no send path" }; }
+      // iPhone pacing says not now: leave this step due; a later run sends it.
+      if (result.deferred) { deferred++; continue; }
 
       await prisma.leadMessage.create({
         data: {
@@ -228,7 +238,7 @@ export async function GET(request: NextRequest) {
           body: isEmail ? `✉️ ${renderTemplate(step.subject || "", { ...vars, reviewLink })}\n\n${body}` : body,
           phone: isEmail ? r.email! : r.phone,
           provider,
-          quoMessageId: provider === "quo" ? (result.messageId ?? null) : null,
+          quoMessageId: provider === "quo" || provider === "iphone" ? (result.messageId ?? null) : null,
           status: result.success ? result.status || "SENT" : "FAILED",
           adminEmail: campaign.adminEmail,
           campaignId: campaign.id,
@@ -310,5 +320,5 @@ export async function GET(request: NextRequest) {
     await prisma.campaign.update({ where: { id: campaign.id }, data: { totalRecipients: total } });
   }
 
-  return NextResponse.json({ success: true, campaigns: campaigns.length, enrolled, sent, stopped });
+  return NextResponse.json({ success: true, campaigns: campaigns.length, enrolled, sent, stopped, deferred });
 }

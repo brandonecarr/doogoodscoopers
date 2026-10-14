@@ -43,6 +43,7 @@ function humanDelay(min: number) {
   return `${min}m`;
 }
 
+const channelLabel: Record<string, string> = { sms: "default line", iphone: "iPhone", quo: "office line (Quo)", messenger: "Messenger first" };
 const audienceLabel: Record<string, string> = {
   quote: "Quote Form", manual: "Manual", meta: "Meta Ads", outofarea: "Out of Area", commercial: "Commercial",
   customers: "Customers", former_customers: "Former customers (win-back)",
@@ -129,7 +130,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
             </div>
             {isDrip && (
               <p className="text-[#9C9CB0] text-[12.5px] mt-2">
-                Audience: {trigger.map((t) => audienceLabel[t] || t).join(", ") || "—"} · stops on reply: {campaign.stopOnReply ? "yes" : "no"}
+                Audience: {trigger.map((t) => audienceLabel[t] || t).join(", ") || "—"} · stops on reply: {campaign.stopOnReply ? "yes" : "no"} · texts from: {channelLabel[campaign.channel] || "default line"}
                 {isWinback ? " · stops when they sign back up" : ""}
               </p>
             )}

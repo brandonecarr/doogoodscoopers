@@ -1,14 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { sendSms, isQuoConfigured } from "@/lib/quo";
+import { isQuoConfigured } from "@/lib/quo";
+import { sendCampaignText, campaignTextProvider } from "@/lib/text-send";
+import { isRelayConfigured, type RelayAllowance } from "@/lib/bluebubbles";
 import { renderTemplate } from "@/lib/resend";
 import { optedOutKeys, optOutKey } from "@/lib/sms-optout";
 import { getLeadPersonalization } from "@/lib/personalization";
 import { archiveConvertedLeads, isActiveCustomerByPhone } from "@/lib/lead-duplicates";
 import { activeClientPhones, phoneInActiveSet } from "@/lib/sweepandgo-lookup";
 
-// Drains queued campaign recipients and sends via Quo. Runs on a cron.
-// Batch + spacing keep us well under Quo's 10 req/s limit.
+// Drains queued campaign recipients and sends via Quo or the iPhone relay. Runs on a cron.
+// Batch + spacing keep us well under Quo's 10 req/s limit; the iPhone path is paced
+// separately (one send per run, daily cap) so a new number isn't flagged as spam.
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -24,8 +27,8 @@ export async function GET(request: NextRequest) {
   if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (!isQuoConfigured()) {
-    return NextResponse.json({ success: false, error: "Quo not configured" }, { status: 200 });
+  if (!isQuoConfigured() && !(await isRelayConfigured())) {
+    return NextResponse.json({ success: false, error: "No text provider configured (Quo or iPhone relay)" }, { status: 200 });
   }
 
   // Oldest active campaign first.
@@ -52,7 +55,10 @@ export async function GET(request: NextRequest) {
   let sent = 0;
   let failed = 0;
   let skipped = 0;
+  let deferred = 0;
   const optedOut = await optedOutKeys();
+  const provider = await campaignTextProvider(campaign.channel);
+  const allowance: { current: RelayAllowance | null; used: boolean } = { current: null, used: false };
 
   for (const r of pending) {
     // Never message a number that replied STOP.
@@ -89,7 +95,9 @@ export async function GET(request: NextRequest) {
       vars.firstName = r.name.trim().split(/\s+/)[0] || "";
     }
     const body = renderTemplate(campaign.body, vars);
-    const result = await sendSms({ to: r.phone, body });
+    const result = await sendCampaignText({ to: r.phone, body, provider, allowance });
+    // iPhone pacing says not now: leave the rest of the batch queued for a later run.
+    if (result.deferred) { deferred = pending.length - sent - failed - skipped; break; }
 
     await prisma.campaignRecipient.update({
       where: { id: r.id },
@@ -108,7 +116,7 @@ export async function GET(request: NextRequest) {
         direction: "OUTBOUND",
         body,
         phone: r.phone,
-        provider: "quo",
+        provider: result.provider,
         quoMessageId: result.messageId ?? null,
         status: result.success ? result.status || "SENT" : "FAILED",
         adminEmail: campaign.adminEmail,
@@ -129,6 +137,7 @@ export async function GET(request: NextRequest) {
   const remaining = await prisma.campaignRecipient.count({
     where: { campaignId: campaign.id, status: "PENDING" },
   });
+  if (deferred) console.log(`[campaigns] iPhone pacing: ${deferred} left queued (${allowance.current?.sentToday ?? "?"}/${allowance.current?.cap ?? "?"} today)`);
   if (remaining === 0) {
     await prisma.campaign.update({ where: { id: campaign.id }, data: { status: "SENT" } });
   }

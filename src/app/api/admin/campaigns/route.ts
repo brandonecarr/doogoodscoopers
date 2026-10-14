@@ -31,6 +31,11 @@ interface CreateBody {
   emailFromName?: string;
 }
 
+// Text channel: "sms" = the default provider (Campaigns → Text sending), "iphone" / "quo" force
+// one, "messenger" = Messenger first. See src/lib/text-send.ts.
+const CHANNELS = new Set(["sms", "messenger", "iphone", "quo"]);
+const channelOf = (v: unknown) => (typeof v === "string" && CHANNELS.has(v) ? v : "sms");
+
 // POST → create a blast (queued recipients) or a drip (trigger + steps; the
 // process-drips cron enrolls matching leads and sends the sequence over time).
 export async function POST(request: Request) {
@@ -56,7 +61,7 @@ export async function POST(request: Request) {
         status: isDraft ? "DRAFT" : "ACTIVE",
         active: !isDraft,
         stopOnReply: b.stopOnReply !== false,
-        channel: b.channel === "messenger" ? "messenger" : "sms",
+        channel: channelOf(b.channel),
         audienceFilter,
         emailFromName,
         adminEmail: session.email,

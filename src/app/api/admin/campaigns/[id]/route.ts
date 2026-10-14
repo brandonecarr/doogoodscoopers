@@ -99,7 +99,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
           name: b.name.trim(),
           body: steps[0]?.body || "",
           stopOnReply: b.stopOnReply !== false,
-          ...(b.channel ? { channel: b.channel === "messenger" ? "messenger" : "sms" } : {}),
+          ...(b.channel ? { channel: ["sms", "messenger", "iphone", "quo"].includes(b.channel) ? b.channel : "sms" } : {}),
           audienceFilter,
           emailFromName,
           steps: { create: steps },
