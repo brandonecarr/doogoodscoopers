@@ -4,6 +4,7 @@ import { sendAdminPush } from "@/lib/web-push";
 import { syncContactToQuo } from "@/lib/quo";
 import { optedOutKeys } from "@/lib/sms-optout";
 import { recordSngCall } from "@/lib/sweepandgo-usage";
+import { recordReengagement } from "@/lib/lead-duplicates";
 
 // Daily safety net for Sweep&Go free quotes.
 //
@@ -140,13 +141,15 @@ export async function GET(request: NextRequest) {
       const lead = await prisma.quoteLead.update({
         where: { id: existingLead.id },
         data: {
-          status: "NEW",
+          status: "QUOTED", // they have a fresh price in hand
           archived: false,
-          createdAt: new Date(), // bump to the top of the list + re-eligible for drips
+          createdAt: new Date(), // bump to the top of the list
           lastStep: "Sweep&Go Quote Form",
           notes: [existingLead.notes, note].filter(Boolean).join("\n"),
         },
       });
+      // Returning lead → the returning-quote drip (and off any cold/recovery drip).
+      await recordReengagement({ type: "quote", id: lead.id, createdAt: lead.createdAt }, { message: "🔁 Returning lead — ran a new quote on the website." }).catch((e) => console.error("[sync-sweepandgo] reengagement failed:", e));
       syncContactToQuo({
         externalId: `quotelead:${lead.id}`,
         firstName: lead.firstName,

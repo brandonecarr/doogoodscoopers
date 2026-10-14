@@ -6,7 +6,7 @@ import { isRelayConfigured, type RelayAllowance } from "@/lib/bluebubbles";
 import { renderTemplate, sendEmail, wrapEmailHtml } from "@/lib/resend";
 import { sendMessengerMessage, isMessengerConfigured } from "@/lib/messenger";
 import { optedOutKeys, optOutKey } from "@/lib/sms-optout";
-import { findDripCandidates, isLeadArchived, isWinbackCampaign, markLeadContactedIfNew } from "@/lib/drip";
+import { findDripCandidates, isLeadArchived, isWinbackCampaign, markLeadContactedIfNew, sweepReturningLeads } from "@/lib/drip";
 import { getLeadPersonalization } from "@/lib/personalization";
 import { loadSendWindow, clampToSendWindow, isWithinSendWindow } from "@/lib/send-window";
 import { notify } from "@/lib/notify";
@@ -41,6 +41,9 @@ export async function GET(request: NextRequest) {
     where: { type: "DRIP", active: true },
     include: { steps: { orderBy: { stepOrder: "asc" } } },
   });
+
+  // Returning leads (returnedAt set by any capture path) → their returning drip.
+  const returningEnrolled = await sweepReturningLeads().catch((e) => { console.error("[drips] returning sweep failed:", e); return 0; });
 
   const optedOut = await optedOutKeys();
   let unsubscribed: Set<string> | null = null; // loaded on the first email step
@@ -320,5 +323,5 @@ export async function GET(request: NextRequest) {
     await prisma.campaign.update({ where: { id: campaign.id }, data: { totalRecipients: total } });
   }
 
-  return NextResponse.json({ success: true, campaigns: campaigns.length, enrolled, sent, stopped, deferred });
+  return NextResponse.json({ success: true, campaigns: campaigns.length, enrolled, returningEnrolled, sent, stopped, deferred });
 }

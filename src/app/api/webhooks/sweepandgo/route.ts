@@ -8,6 +8,7 @@ import { recordWebhookEvent } from "@/lib/sweepandgo-webhook-log";
 import { applyJobWebhook } from "@/lib/tv-sweepandgo";
 import { syncCustomersForEvent } from "@/lib/sweepandgo-customer-sync";
 import { requestBillingRefresh } from "@/lib/sweepandgo-billing";
+import { recordReengagement } from "@/lib/lead-duplicates";
 
 // Room for a webhook-triggered customer sync (20s settle + ~2 API pages) after responding.
 export const maxDuration = 60;
@@ -352,18 +353,22 @@ export async function POST(request: NextRequest) {
         }).catch(() => {});
       }
 
+      // Any age: a lead from months ago quoting again is a returning lead (handled below),
+      // not a reason to create a second row for the same person.
       const existingLead = hasPhone
         ? await prisma.quoteLead.findFirst({
-            where: {
-              phone: { in: phoneMatch },
-              archived: false,
-              createdAt: { gte: recentCutoff },
-            },
+            where: { phone: { in: phoneMatch }, archived: false },
             orderBy: { createdAt: "desc" },
           })
         : null;
 
       if (existingLead) {
+        // A lead we last heard from hours ago (not one the sync cron or the website
+        // wizard just created for this very quote) is a RETURNING lead: they ran a
+        // new quote. Sweep&Go delivers each webhook 2–3×, so the 6h window also
+        // keeps repeats from re-triggering.
+        const lastSeen = existingLead.lastActivityAt ?? existingLead.createdAt;
+        const returning = existingLead.status !== "CONVERTED" && Date.now() - lastSeen.getTime() > 6 * 60 * 60 * 1000;
         // Enrich, never erase: the API-poll cron creates the lead fast without a
         // zip (the free_quotes API omits it); the webhook carries zip/address/
         // city, so fill those in — but keep whatever we already have if this
@@ -372,8 +377,8 @@ export async function POST(request: NextRequest) {
           where: { id: existingLead.id },
           data: {
             ...leadData,
-            // Only a brand-new lead moves to Quoted; a status the owner set by hand stays.
-            status: existingLead.status === "NEW" ? "QUOTED" : existingLead.status,
+            // A brand-new lead (or a returning one) moves to Quoted; a status the owner set by hand stays.
+            status: existingLead.status === "NEW" || returning ? "QUOTED" : existingLead.status,
             zipCode: zipCode || existingLead.zipCode || "",
             address: address || existingLead.address || null,
             city: city || existingLead.city || null,
@@ -390,8 +395,12 @@ export async function POST(request: NextRequest) {
         });
         // Instagram attribution — if this signup carried our tracking value.
         await linkInstagramConversion(lead.id, (data.tracking_field as string) || null, { firstName, lastName, email, phone, zipCode }).catch(() => {});
-        console.log(`[SweepAndGo] Quote lead deduped/updated: ${lead.id} — ${displayName}`);
-        return NextResponse.json({ success: true, lead_id: lead.id, type: "quote", deduped: true });
+        if (returning) {
+          await recordReengagement({ type: "quote", id: lead.id, createdAt: lead.createdAt }, { message: "🔁 Returning lead — ran a new quote on the website." }).catch((e) => console.error("[SweepAndGo] reengagement failed:", e));
+          sendAdminPush({ title: "🔁 Returning lead re-quoted", body: displayName, url: `/admin/quote-leads/${lead.id}`, tag: `requote-${lead.id}` }).catch(console.error);
+        }
+        console.log(`[SweepAndGo] Quote lead deduped/updated: ${lead.id} — ${displayName}${returning ? " (returning)" : ""}`);
+        return NextResponse.json({ success: true, lead_id: lead.id, type: "quote", deduped: true, returning });
       }
 
       const lead = await prisma.quoteLead.create({ data: leadData });

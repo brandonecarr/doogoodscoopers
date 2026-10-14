@@ -210,7 +210,16 @@ const MINUTE_MS = 60 * 1000;
  * receive two message streams at once. Returning campaigns are left alone.
  * Best-effort — never throws into lead capture. Returns how many it stopped.
  */
-async function stopColdDrips(leadType: LeadSource, leadId: string): Promise<number> {
+/** Audiences whose copy assumes a brand-new, never-heard-from lead. */
+const COLD_TOKENS = ["quote", "manual", "meta"];
+
+/**
+ * Ends a returning lead's cold-lead drips ("I saw you just ran a quote…" is wrong
+ * now). With `includeRecovery`, also ends the abandoned-quote recovery drip,
+ * because the returning sequence has taken the person over. Win-back, review and
+ * returning drips are never touched here.
+ */
+async function stopColdDrips(leadType: LeadSource, leadId: string, opts: { includeRecovery?: boolean } = {}): Promise<number> {
   const active = await prisma.campaignRecipient.findMany({
     where: { leadType, leadId, status: "ACTIVE" },
     select: { id: true, campaignId: true },
@@ -221,7 +230,12 @@ async function stopColdDrips(leadType: LeadSource, leadId: string): Promise<numb
     where: { id: { in: active.map((a) => a.campaignId) }, type: "DRIP" },
     select: { id: true, audienceFilter: true },
   });
-  const cold = new Set(camps.filter((c) => !isReturningCampaign(c.audienceFilter)).map((c) => c.id));
+  const stopTokens = opts.includeRecovery ? [...COLD_TOKENS, "abandoned_quotes"] : COLD_TOKENS;
+  const cold = new Set(camps.filter((c) => {
+    if (isReturningCampaign(c.audienceFilter)) return false;
+    const types = ((c.audienceFilter || {}) as { leadTypes?: string[] }).leadTypes || [];
+    return types.some((t) => stopTokens.includes(t));
+  }).map((c) => c.id));
   const ids = active.filter((a) => cold.has(a.campaignId)).map((a) => a.id);
   if (ids.length === 0) return 0;
 
@@ -253,7 +267,7 @@ async function stopColdDrips(leadType: LeadSource, leadId: string): Promise<numb
  * (ACTIVE), leave them be. Best-effort — never throws into lead capture.
  * Returns how many campaigns the lead was (re-)enrolled into.
  */
-export async function enrollReturningLead(leadType: LeadSource, leadId: string): Promise<number> {
+export async function enrollReturningLead(leadType: LeadSource, leadId: string, opts: { returnedAt?: Date } = {}): Promise<number> {
   if (leadType !== "AD_LEAD" && leadType !== "QUOTE_FORM") return 0;
 
   const campaigns = await prisma.campaign.findMany({
@@ -302,7 +316,7 @@ export async function enrollReturningLead(leadType: LeadSource, leadId: string):
     const firstAt = clampToSendWindow(new Date(Date.now() + (c.steps[0].delayMinutes || 0) * MINUTE_MS), window);
     const existing = await prisma.campaignRecipient.findUnique({
       where: { campaignId_leadType_leadId: { campaignId: c.id, leadType, leadId } },
-      select: { id: true, status: true },
+      select: { id: true, status: true, sentAt: true, createdAt: true },
     });
     try {
       if (!existing) {
@@ -310,7 +324,11 @@ export async function enrollReturningLead(leadType: LeadSource, leadId: string):
           data: { campaignId: c.id, leadType, leadId, phone, name, status: "ACTIVE", currentStep: 0, nextSendAt: firstAt },
         });
         n++;
-      } else if (existing.status === "COMPLETED" || existing.status === "STOPPED") {
+      } else if (
+        (existing.status === "COMPLETED" || existing.status === "STOPPED") &&
+        // On a timer sweep, only a return NEWER than the last run restarts the sequence.
+        (!opts.returnedAt || (existing.sentAt ?? existing.createdAt) < opts.returnedAt)
+      ) {
         await prisma.campaignRecipient.update({
           where: { id: existing.id },
           data: { status: "ACTIVE", currentStep: 0, nextSendAt: firstAt, error: null, sentAt: null, phone },
@@ -322,11 +340,31 @@ export async function enrollReturningLead(leadType: LeadSource, leadId: string):
       // unique race / transient — skip.
     }
   }
-  // They're on the returning sequence now — stop the cold-lead one.
+  // They're on the returning sequence now — stop the cold-lead one, and the
+  // abandoned-quote recovery drip too (one sequence at a time).
   try {
-    await stopColdDrips(leadType, leadId);
+    await stopColdDrips(leadType, leadId, { includeRecovery: true });
   } catch (e) {
     console.error("[drip] stopColdDrips failed:", e);
   }
+  return n;
+}
+
+/**
+ * Safety net for returning leads: anything that set `returnedAt` recently —
+ * the Sweep&Go webhook, the quote sync, the website wizard's edge function
+ * (which can't call into the app), Meta re-submits — gets enrolled here on the
+ * drips cron, in case the direct enrollment didn't run. Idempotent: an ACTIVE
+ * recipient is left alone and a finished one only restarts for a newer return.
+ */
+export async function sweepReturningLeads(hours = 24): Promise<number> {
+  const since = new Date(Date.now() - hours * 60 * 60 * 1000);
+  const [quotes, ads] = await Promise.all([
+    prisma.quoteLead.findMany({ where: { returnedAt: { gte: since }, archived: false }, select: { id: true, returnedAt: true } }),
+    prisma.adLead.findMany({ where: { returnedAt: { gte: since }, archived: false }, select: { id: true, returnedAt: true } }),
+  ]);
+  let n = 0;
+  for (const q of quotes) n += await enrollReturningLead("QUOTE_FORM", q.id, { returnedAt: q.returnedAt ?? undefined });
+  for (const a of ads) n += await enrollReturningLead("AD_LEAD", a.id, { returnedAt: a.returnedAt ?? undefined });
   return n;
 }
