@@ -191,7 +191,7 @@ export function Canvas(p: CanvasProps) {
         >
           {label(block, "block")}
           {toolbar(block, "block")}
-          <div className={`${block.type === "title" || block.type === "text" || block.type === "dynamic" ? "dgs-t" : ""} ${darkClass(block)}`} style={boxStyle(block)}>{renderBlock(block)}</div>
+          <div className={`dgs-box ${block.type === "title" || block.type === "text" || block.type === "dynamic" ? "dgs-t" : ""} ${darkClass(block)}`} style={boxStyle(block)}>{renderBlock(block)}</div>
           {block.condition && !previewing && <span className="dgs-cond">{block.condition.when === "present" ? "if" : "unless"} {`{{${block.condition.token}}}`}</span>}
         </div>
       </Fragment>
@@ -218,7 +218,7 @@ export function Canvas(p: CanvasProps) {
         onClick={(e) => { e.stopPropagation(); p.onSelect({ kind: "column", id: column.id }); }}
       >
         {label(column, "column")}
-        <div className={darkClass(column)} style={{ ...boxStyle(column), flex: 1, minHeight: column.blocks.length ? undefined : 48 }}>
+        <div className={`dgs-box ${darkClass(column)}`} style={{ ...boxStyle(column), flex: 1, minHeight: column.blocks.length ? undefined : 48 }}>
           {column.blocks.map((b, bi) => blockEl(b, column, bi))}
           {zone({ kind: "block", columnId: column.id, index: column.blocks.length }, `z-${column.id}-end`)}
           {!column.blocks.length && !p.dragging && <div className="dgs-empty">Drop a block here</div>}
@@ -243,7 +243,7 @@ export function Canvas(p: CanvasProps) {
         >
           {label(section, "section")}
           {toolbar(section, "section")}
-          <div className={`${section.background ? "dgs-sec" : ""} ${darkClass(section)}`} style={boxStyle(section)}>
+          <div className={`dgs-box ${section.background ? "dgs-sec" : ""} ${darkClass(section)}`} style={boxStyle(section)}>
             <div style={{ display: "flex", flexDirection: stacked ? "column" : "row", alignItems: section.vAlign === "middle" ? "center" : section.vAlign === "bottom" ? "flex-end" : "stretch", gap: stacked ? section.stackGap || 0 : 0 }}>
               {section.columns.map((c, i) => columnEl(c, section, i))}
             </div>
@@ -275,8 +275,10 @@ export function Canvas(p: CanvasProps) {
 const CANVAS_CSS = `
 .dgs-canvas{position:relative;min-height:100%;padding-bottom:48px;}
 .dgs-node{position:relative;}
-.dgs-canvas:not(.dgs-previewing) .dgs-node:hover{outline:1px dashed #a78bfa;outline-offset:-1px;}
-.dgs-canvas:not(.dgs-previewing) .dgs-node.dgs-selected{outline:2px solid #7c3aed;outline-offset:-2px;z-index:2;}
+/* Hover and selection frames sit on the element itself (the .dgs-box carries its radius), so they follow rounded corners. */
+.dgs-canvas:not(.dgs-previewing) .dgs-node:hover > .dgs-box{outline:1px dashed #a78bfa;outline-offset:-1px;}
+.dgs-canvas:not(.dgs-previewing) .dgs-node.dgs-selected > .dgs-box{outline:2px solid #7c3aed;outline-offset:-2px;}
+.dgs-canvas:not(.dgs-previewing) .dgs-node.dgs-selected{z-index:2;}
 .dgs-canvas:not(.dgs-previewing) .dgs-section.dgs-selected{z-index:1;}
 .dgs-label{position:absolute;top:-1px;left:0;transform:translateY(-100%);z-index:5;background:#ede9fe;color:#5b21b6;border:1px solid #c4b5fd;border-radius:6px 6px 0 0;padding:1px 8px;font:600 11px/16px ui-sans-serif,system-ui,sans-serif;pointer-events:none;white-space:nowrap;}
 .dgs-label-sel{background:#7c3aed;color:#fff;border-color:#7c3aed;}
