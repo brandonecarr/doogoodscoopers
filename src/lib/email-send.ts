@@ -26,6 +26,17 @@ export function isEmailConfigured(): boolean {
   return isBrevoConfigured() || !!apiKey;
 }
 
+/** The compliant footer on its own (postal address + unsubscribe), for designs that bring their own document. */
+function complianceFooter(unsubUrl: string): string {
+  return `<div style="max-width:600px;margin:0 auto;padding:20px;text-align:center;color:#9ca3af;font-size:12px;font-family:Arial,Helvetica,sans-serif;">
+    <p style="margin:0 0 6px;">${ADDRESS}</p>
+    <p style="margin:0;">You received this because you're a DooGoodScoopers contact. <a href="${unsubUrl}" style="color:#9ca3af;">Unsubscribe</a>.</p>
+  </div>`;
+}
+
+/** A designed email that is already a complete HTML document (e.g. a send-ready handoff). */
+export const isFullDocument = (html: string) => /<!doctype\s+html|<body[\s>]/i.test(html);
+
 /** Wrap a body in a minimal responsive shell + compliant footer. */
 export function wrapNewsletter(bodyHtml: string, unsubUrl: string): string {
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
@@ -55,10 +66,18 @@ function prepare(opts: { subject: string; html: string; from: CampaignFrom; reci
   const firstName = (r.name || "").trim().split(/\s+/)[0] || "";
   const unsubUrl = `${SITE}/unsubscribe?token=${unsubToken(r.email)}`;
   const oneClick = `${SITE}/api/email/unsubscribe?token=${unsubToken(r.email)}`;
-  const body = renderTemplate(opts.html, { firstName, name: r.name || "" });
+  const body = renderTemplate(opts.html, { firstName, name: r.name || "", unsubscribeUrl: unsubUrl });
+  // A complete document (its own <body>, styles and footer) goes out untouched; it only
+  // gets the compliance footer appended when it has no unsubscribe link of its own.
+  let html: string;
+  if (isFullDocument(body)) {
+    html = /unsubscribe/i.test(body) ? body : body.replace(/<\/body>/i, `${complianceFooter(unsubUrl)}</body>`);
+  } else {
+    html = wrapNewsletter(body, unsubUrl);
+  }
   return {
     subject: renderTemplate(opts.subject, { firstName, name: r.name || "" }),
-    html: wrapNewsletter(body, unsubUrl),
+    html,
     headers: {
       "List-Unsubscribe": `<${oneClick}>`,
       "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",

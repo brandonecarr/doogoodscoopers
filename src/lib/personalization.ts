@@ -1,6 +1,6 @@
 import prisma from "@/lib/prisma";
 import type { LeadSource } from "@prisma/client";
-import { resumeLinkForLead, recoverySettings, type ResumeChannel } from "@/lib/quote-recovery";
+import { resumeLinkForLead, recoverySettings, wizardSubmissionFor, type ResumeChannel } from "@/lib/quote-recovery";
 import { cityFromZip } from "@/lib/geo/zipCity";
 
 /**
@@ -34,7 +34,9 @@ export interface LeadVars {
   // {{reviewLink}} (Google review link, for review drips), {{resumeLink}} (the
   // lead's pick-up-where-you-left-off link on the website) and {{coupon}} (the
   // quote-recovery coupon) are also provided at runtime via the index signature
-  // below — see getLeadPersonalization.
+  // below — see getLeadPersonalization. Quote leads also get {{frequency}} ("Weekly"),
+  // {{monthlyRate}} ("$89", from the quote the wizard stored) and {{resumeCode}}.
+  // {{unsubscribeUrl}} is filled per recipient by the email sender.
   [key: string]: string;
 }
 
@@ -50,7 +52,30 @@ export const EMPTY_LEAD_VARS: LeadVars = {
   reviewLink: "",
   resumeLink: "",
   coupon: "",
+  frequency: "",
+  monthlyRate: "",
+  resumeCode: "",
+  unsubscribeUrl: "",
 };
+
+/** Short cleanup-frequency labels, as the quote cards show them. */
+const SHORT_FREQUENCY: Record<string, string> = {
+  once_a_week: "Weekly", weekly: "Weekly", two_times_a_week: "2x weekly", bi_weekly: "Bi-weekly", biweekly: "Bi-weekly", "bi-weekly": "Bi-weekly",
+  once_a_month: "Monthly", monthly: "Monthly", one_time: "One-time", onetime: "One-time", "one time": "One-time",
+};
+export function frequencyLabel(raw: string | null | undefined): string {
+  const f = (raw || "").trim();
+  if (!f) return "";
+  return SHORT_FREQUENCY[f.toLowerCase()] || SHORT_FREQUENCY[f.toLowerCase().replace(/[\s-]+/g, "_")] || f.replace(/_/g, " ");
+}
+/** "$89" from the wizard's stored quote ("$89/monthly + Initial Cleaning…" or "$99* For Your One-Time Cleanup"). */
+export function monthlyRateFrom(quotedPrice: string | null | undefined): string {
+  const qp = quotedPrice || "";
+  const monthly = qp.match(/^\$(\d+(?:\.\d+)?)\/month/);
+  if (monthly) return "$" + monthly[1];
+  const oneTime = /one-time/i.test(qp) ? qp.match(/^\$(\d+)/)?.[1] : null;
+  return oneTime ? "$" + oneTime : "";
+}
 
 /**
  * First name ONLY — the first whitespace-delimited token. Strips middle initials
@@ -110,6 +135,16 @@ export async function getLeadPersonalization(leadType: LeadSource, leadId: strin
   base.coupon = recovery.coupon;
   // Only quote leads have a Sweep&Go quote to resume; everyone else gets the plain quote page.
   base.resumeLink = leadType === "QUOTE_FORM" ? await resumeLinkForLead(leadId, opts.channel, recovery) : recovery.quoteUrl;
+  if (leadType === "QUOTE_FORM") {
+    // resumeLinkForLead just made sure the code exists; the monthly rate comes from the wizard's stored quote.
+    const l = await prisma.quoteLead.findUnique({ where: { id: leadId }, select: { id: true, phone: true, resumeCode: true, frequency: true } });
+    if (l) {
+      base.resumeCode = l.resumeCode || "";
+      base.frequency = frequencyLabel(l.frequency);
+      const sub = await wizardSubmissionFor(l).catch(() => null);
+      base.monthlyRate = monthlyRateFrom(sub?.quotedPrice);
+    }
+  }
   return base;
 }
 

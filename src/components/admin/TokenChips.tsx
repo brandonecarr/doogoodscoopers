@@ -9,6 +9,9 @@ const TOKENS: Array<{ label: string; snippet: string; title?: string }> = [
   { label: "ZIP", snippet: "{{zipCode}}" },
   { label: "City", snippet: "{{city}}", title: "The lead's city — from the ZIP when they didn't type one" },
   { label: "Dogs", snippet: "{{dogs}}", title: 'e.g. "2 dogs"' },
+  { label: "Frequency", snippet: "{{frequency}}", title: 'Quote leads: "Weekly", "Bi-weekly", "Monthly"' },
+  { label: "Monthly rate", snippet: "{{monthlyRate}}", title: 'Quote leads: the quoted monthly price, e.g. "$89"' },
+  { label: "Resume code", snippet: "{{resumeCode}}", title: "Quote leads: their 6-character resume code" },
 ];
 
 export function TokenChips({ onInsert, email = false, className = "" }: { onInsert: (snippet: string) => void; email?: boolean; className?: string }) {
