@@ -2,6 +2,7 @@ import { Resend } from "resend";
 import { renderTemplate } from "@/lib/resend";
 import { brevoSend, isBrevoConfigured, mapLimit, parseAddr } from "@/lib/brevo-email";
 import { unsubToken } from "@/lib/email-unsubscribe";
+import { applyShowConditions } from "@/lib/email-designer/conditions";
 
 const apiKey = process.env.RESEND_API_KEY;
 // Default sender = our verified Brevo sender.
@@ -66,7 +67,8 @@ function prepare(opts: { subject: string; html: string; from: CampaignFrom; reci
   const firstName = (r.name || "").trim().split(/\s+/)[0] || "";
   const unsubUrl = `${SITE}/unsubscribe?token=${unsubToken(r.email)}`;
   const oneClick = `${SITE}/api/email/unsubscribe?token=${unsubToken(r.email)}`;
-  const body = renderTemplate(opts.html, { firstName, name: r.name || "", unsubscribeUrl: unsubUrl });
+  // Designer show-conditions on tokens this sender knows; a drip has already resolved the rest.
+  const body = renderTemplate(applyShowConditions(opts.html, { firstName, name: r.name || "", unsubscribeUrl: unsubUrl }), { firstName, name: r.name || "", unsubscribeUrl: unsubUrl });
   // A complete document (its own <body>, styles and footer) goes out untouched; it only
   // gets the compliance footer appended when it has no unsubscribe link of its own.
   let html: string;

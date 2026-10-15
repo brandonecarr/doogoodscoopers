@@ -18,6 +18,7 @@ export const SAMPLE_TOKENS: Record<string, string> = {
 /** Fill every known token (plain or URL-encoded, as the builder stores link tokens) with its sample value. */
 export function sampleTokens(text: string): string {
   return text
+    .replace(/<!--dgs:if\s+\w+\s+(?:present|absent)-->|<!--dgs:endif-->/g, "")
     .replace(/\{\{\s*(\w+)\s*\}\}/g, (m, k) => SAMPLE_TOKENS[k] ?? m)
     .replace(/%7B%7B\s*(\w+)\s*%7D%7D/gi, (m, k) => SAMPLE_TOKENS[k] ?? m);
 }

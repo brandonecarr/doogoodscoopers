@@ -6,10 +6,10 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { ArrowLeft, Plus, Trash2, Clock, Zap, Loader2, ArrowUp, ArrowDown, Mail, MessageSquare, Eye, LayoutTemplate, X, Paintbrush } from "lucide-react";
 import { emailTextToHtml, textFromHtml } from "@/lib/campaign-email";
-import type { EmailBuilderHandle } from "@/components/admin/EmailBuilder";
+import type { EmailDesignerHandle } from "@/components/admin/designer/EmailDesigner";
 
 // The same drag-and-drop designer the email blasts use (heavy; loaded only when opened).
-const EmailBuilder = dynamic(() => import("@/components/admin/EmailBuilder"), {
+const EmailDesigner = dynamic(() => import("@/components/admin/designer/EmailDesigner"), {
   ssr: false,
   loading: () => <div className="flex items-center justify-center h-full text-sm text-gray-500"><Loader2 className="w-5 h-5 animate-spin mr-2" /> Loading designer…</div>,
 });
@@ -96,7 +96,7 @@ export function DripForm({ mode, campaignId, initial }: DripFormProps) {
   const [preview, setPreview] = useState<number | null>(null);
   // Designer modal: which step is being designed.
   const [designing, setDesigning] = useState<number | null>(null);
-  const builderRef = useRef<EmailBuilderHandle | null>(null);
+  const builderRef = useRef<EmailDesignerHandle | null>(null);
   const [emailTemplates, setEmailTemplates] = useState<{ id: string; name: string }[]>([]);
   useEffect(() => {
     fetch("/api/admin/email-templates").then((r) => (r.ok ? r.json() : { templates: [] })).then((d) => setEmailTemplates(d.templates || [])).catch(() => {});
@@ -610,7 +610,7 @@ export function DripForm({ mode, campaignId, initial }: DripFormProps) {
             </div>
           </div>
           <div className="flex-1 min-h-0">
-            <EmailBuilder
+            <EmailDesigner
               initialHtml={steps[designing]?.html || (steps[designing]?.body ? emailTextToHtml(steps[designing].body) : undefined)}
               initialDesign={steps[designing]?.designJson || null}
               onReady={(h) => (builderRef.current = h)}

@@ -14,6 +14,7 @@ import { archiveConvertedLeads, isActiveCustomerByPhone } from "@/lib/lead-dupli
 import { activeClientPhones, phoneInActiveSet } from "@/lib/sweepandgo-lookup";
 import { sendCampaignBatch } from "@/lib/email-send";
 import { emailTextToHtml, decodeTemplateTokens } from "@/lib/campaign-email";
+import { applyShowConditions } from "@/lib/email-designer/conditions";
 import { unsubscribedSet, normalizeEmail } from "@/lib/email-unsubscribe";
 
 // Drives DRIP campaigns: enrolls new matching leads and sends each recipient's
@@ -188,7 +189,7 @@ export async function GET(request: NextRequest) {
         const [e] = await sendCampaignBatch({
           subject: renderTemplate(step.subject || "", { ...vars, reviewLink }),
           // A designed email (from the builder) is sent as-is with its tokens filled; a text step is formatted.
-          html: step.html ? renderTemplate(decodeTemplateTokens(step.html), { ...vars, reviewLink }) : emailTextToHtml(body),
+          html: step.html ? renderTemplate(applyShowConditions(decodeTemplateTokens(step.html), { ...vars, reviewLink }), { ...vars, reviewLink }) : emailTextToHtml(body),
           from: { fromName: campaign.emailFromName },
           recipients: [{ id: r.id, email: r.email!, name: r.name }],
         });

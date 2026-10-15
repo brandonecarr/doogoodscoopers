@@ -5,11 +5,11 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { ArrowLeft, Loader2, Send, Users, Eye, Paintbrush, LayoutTemplate, X } from "lucide-react";
-import type { EmailBuilderHandle } from "@/components/admin/EmailBuilder";
+import type { EmailDesignerHandle } from "@/components/admin/designer/EmailDesigner";
 import { fromDateTimeLocalValue } from "@/lib/datetime";
 import { sampleTokens } from "@/lib/sample-tokens";
 
-const EmailBuilder = dynamic(() => import("@/components/admin/EmailBuilder"), {
+const EmailDesigner = dynamic(() => import("@/components/admin/designer/EmailDesigner"), {
   ssr: false,
   loading: () => <div className="h-full flex items-center justify-center text-gray-400">Loading designer…</div>,
 });
@@ -54,7 +54,7 @@ export default function NewEmailPage() {
   const [showBuilder, setShowBuilder] = useState(false);
   const [templates, setTemplates] = useState<{ id: string; name: string }[]>([]);
   const [segments, setSegments] = useState<{ id: string; name: string; filter: { leadTypes?: string[]; withinDays?: number; customerFrequencies?: string[]; customerAddon?: "" | "has" | "none" } }[]>([]);
-  const builderRef = useRef<EmailBuilderHandle | null>(null);
+  const builderRef = useRef<EmailDesignerHandle | null>(null);
 
   const toggle = (v: string) => setLeadTypes((p) => (p.includes(v) ? p.filter((x) => x !== v) : [...p, v]));
 
@@ -336,7 +336,7 @@ export default function NewEmailPage() {
             </div>
           </div>
           <div className="flex-1 min-h-0">
-            <EmailBuilder initialHtml={html} initialDesign={designJson} onReady={(h) => (builderRef.current = h)} />
+            <EmailDesigner initialHtml={html} initialDesign={designJson} onReady={(h) => (builderRef.current = h)} />
           </div>
         </div>
       )}

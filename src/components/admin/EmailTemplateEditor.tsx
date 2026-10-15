@@ -5,9 +5,9 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { ArrowLeft, Loader2, Save } from "lucide-react";
-import type { EmailBuilderHandle } from "@/components/admin/EmailBuilder";
+import type { EmailDesignerHandle } from "@/components/admin/designer/EmailDesigner";
 
-const EmailBuilder = dynamic(() => import("@/components/admin/EmailBuilder"), {
+const EmailDesigner = dynamic(() => import("@/components/admin/designer/EmailDesigner"), {
   ssr: false,
   loading: () => <div className="h-full flex items-center justify-center text-gray-400">Loading designer…</div>,
 });
@@ -31,7 +31,7 @@ export default function EmailTemplateEditor({ templateId }: { templateId?: strin
   const [initialDesign, setInitialDesign] = useState<object | null>(null);
   const [ready, setReady] = useState(isNew);
   const [saving, setSaving] = useState(false);
-  const handleRef = useRef<EmailBuilderHandle | null>(null);
+  const handleRef = useRef<EmailDesignerHandle | null>(null);
 
   useEffect(() => {
     if (isNew) return;
@@ -79,12 +79,12 @@ export default function EmailTemplateEditor({ templateId }: { templateId?: strin
       </div>
       <div className="rounded-xl border border-gray-200 overflow-hidden" style={{ height: "calc(100vh - 200px)", minHeight: 600 }}>
         {ready ? (
-          <EmailBuilder initialHtml={initialHtml ?? undefined} initialDesign={initialDesign} onReady={(h) => (handleRef.current = h)} />
+          <EmailDesigner initialHtml={initialHtml ?? undefined} initialDesign={initialDesign} onReady={(h) => (handleRef.current = h)} />
         ) : (
           <div className="h-full flex items-center justify-center text-gray-400">Loading…</div>
         )}
       </div>
-      <p className="text-xs text-gray-400">Use {"{{firstName}}"} anywhere to personalize. Drag blocks in from the left; click any element to style it on the right. <strong>Email body</strong> sets the background, width and fonts for the whole email.</p>
+      <p className="text-xs text-gray-400">Click anything in the email to edit it; its settings open on the left. The <strong>Style</strong> tab holds the brand library and the email-wide text, link and button styles.</p>
     </div>
   );
 }
