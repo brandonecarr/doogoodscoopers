@@ -209,16 +209,18 @@ export function Canvas(p: CanvasProps) {
         className={`dgs-node dgs-column ${sel("column", column.id) ? "dgs-selected" : ""} ${hidden ? "dgs-hidden-on-device" : ""}`}
         style={{
           width: stacked ? "100%" : `${column.width}%`, flex: stacked ? undefined : `0 0 ${column.width}%`, boxSizing: "border-box",
-          paddingLeft: stacked || i === 0 ? 0 : gap / 2, paddingRight: stacked || i === section.columns.length - 1 ? 0 : gap / 2,
+          // The margin is padding on the cell in the email (so "behind the margin" paint covers it); same here.
+          paddingTop: column.margin.top, paddingBottom: column.margin.bottom,
+          paddingLeft: (stacked || i === 0 ? 0 : gap / 2) + (stacked ? 0 : column.margin.left), paddingRight: (stacked || i === section.columns.length - 1 ? 0 : gap / 2) + (stacked ? 0 : column.margin.right),
           display: "flex", flexDirection: "column", justifyContent: column.vAlign === "middle" ? "center" : column.vAlign === "bottom" ? "flex-end" : "flex-start",
-          ...toStyle({ ...marginCss(column), padding: undefined, margin: pad(column.margin) }),
+          ...toStyle({ ...marginCss(column), padding: undefined }),
         }}
         onMouseEnter={() => setHover({ kind: "column", id: column.id })}
         onMouseLeave={() => setHover(null)}
         onClick={(e) => { e.stopPropagation(); p.onSelect({ kind: "column", id: column.id }); }}
       >
         {label(column, "column")}
-        <div className={`dgs-box ${darkClass(column)}`} style={{ ...boxStyle(column), flex: 1, minHeight: column.blocks.length ? undefined : 48 }}>
+        <div className={`dgs-box ${darkClass(column)}`} style={{ ...boxStyle(column), minHeight: column.blocks.length ? undefined : 48 }}>
           {column.blocks.map((b, bi) => blockEl(b, column, bi))}
           {zone({ kind: "block", columnId: column.id, index: column.blocks.length }, `z-${column.id}-end`)}
           {!column.blocks.length && !p.dragging && <div className="dgs-empty">Drop a block here</div>}
@@ -235,8 +237,8 @@ export function Canvas(p: CanvasProps) {
       <Fragment key={section.id}>
         {zone({ kind: "section", index: si }, `zs-${si}`)}
         <div
-          className={`dgs-node dgs-section ${sel("section", section.id) ? "dgs-selected" : ""} ${hidden ? "dgs-hidden-on-device" : ""}`}
-          style={toStyle(marginCss(section))}
+          className={`dgs-node dgs-section ${sel("section", section.id) ? "dgs-selected" : ""} ${hidden ? "dgs-hidden-on-device" : ""} ${section.fullWidthBg && section.background ? "dgs-full" : ""}`}
+          style={{ ...toStyle(marginCss(section)), ...(section.fullWidthBg && section.background ? ({ "--dgs-full-bg": section.background } as React.CSSProperties) : {}) }}
           onMouseEnter={() => setHover({ kind: "section", id: section.id })}
           onMouseLeave={() => setHover(null)}
           onClick={(e) => { e.stopPropagation(); p.onSelect({ kind: "section", id: section.id }); }}
@@ -273,7 +275,10 @@ export function Canvas(p: CanvasProps) {
 }
 
 const CANVAS_CSS = `
-.dgs-canvas{position:relative;min-height:100%;padding-bottom:48px;}
+.dgs-canvas{position:relative;min-height:100%;padding-bottom:48px;overflow-x:hidden;}
+/* "Background full width": the section color runs edge to edge behind the body column. */
+.dgs-full::before{content:"";position:absolute;top:0;bottom:0;left:-3000px;right:-3000px;background:var(--dgs-full-bg);z-index:0;}
+.dgs-full > *{position:relative;z-index:1;}
 .dgs-node{position:relative;}
 /* Hover and selection frames sit on the element itself (the .dgs-box carries its radius), so they follow rounded corners. */
 .dgs-canvas:not(.dgs-previewing) .dgs-node:hover > .dgs-box{outline:1px dashed #a78bfa;outline-offset:-1px;}

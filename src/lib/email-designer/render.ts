@@ -209,13 +209,23 @@ function wrapCondition(html: string, box: Box): string {
 
 export const darkClass = (box: Box) => (box.dark && (box.dark.background || box.dark.color) ? `dgs-d-${box.id}` : "");
 
+/**
+ * A box's look (background, corners, border) sits on its own table with the separate
+ * border model, and the padding on the cell inside. Mail clients draw cell borders
+ * square under the collapsed model even with a radius, so decorating the cell
+ * directly loses the rounded corners.
+ */
+function boxTable(box: Box, inner: string, extraClass = "", tdAttrs = ""): string {
+  const decor = css({ "background-color": box.background || null, ...radiusDecl(box.radius, box.radiusCorners), ...borderDecl(box.border) });
+  const cls = [darkClass(box), extraClass].filter(Boolean).join(" ");
+  const padding = isZero(box.padding) ? "" : ` style="padding:${pad(box.padding)}"`;
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"${box.background ? ` bgcolor="${box.background}"` : ""}${cls ? ` class="${cls}"` : ""} style="border-collapse:separate;border-spacing:0;${decor}"><tr><td${tdAttrs}${padding}>${inner}</td></tr></table>`;
+}
+
 function blockCell(block: Block, styles: GlobalStyles): string {
   const cls = visibilityClass(block.visibility);
   const outerCss = css(marginCss(block));
-  const outer = outerCss ? ` style="${outerCss}"` : "";
-  const inner = css(boxCss(block));
-  const dc = darkClass(block);
-  const body = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"${cls ? ` class="${cls}"` : ""}><tr><td${outer}><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td${dc ? ` class="${dc}"` : ""}${inner ? ` style="${inner}"` : ""}>${renderBlock(block, styles)}</td></tr></table></td></tr></table>`;
+  const body = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"${cls ? ` class="${cls}"` : ""}><tr><td${outerCss ? ` style="${outerCss}"` : ""}>${boxTable(block, renderBlock(block, styles))}</td></tr></table>`;
   return wrapCondition(body, block);
 }
 
@@ -223,23 +233,20 @@ function columnCell(column: Column, section: Section, styles: GlobalStyles, inde
   const gap = section.columnGap;
   const first = index === 0, last = index === section.columns.length - 1;
   const gapPad = gap ? `padding-left:${first ? 0 : px(gap / 2)};padding-right:${last ? 0 : px(gap / 2)};` : "";
-  const inner = css(boxCss(column));
-  const cls = ["dgs-col", last ? "" : "dgs-col-gap", visibilityClass(column.visibility)].filter(Boolean).join(" ");
-  const dc = darkClass(column);
+  // dgs-stack: goes block-level on phones; dgs-col-gap: every column but the last carries the stacked gap.
+  const cls = ["dgs-col", section.stackOnMobile ? "dgs-stack" : "", last ? "" : "dgs-col-gap", visibilityClass(column.visibility)].filter(Boolean).join(" ");
   const outerCss = css(marginCss(column));
-  const cell = `<td class="${cls}" width="${column.width}%" valign="${column.vAlign}" style="width:${column.width}%;vertical-align:${column.vAlign};${gapPad}${outerCss ? outerCss + ";" : ""}"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td valign="${column.vAlign}"${dc ? ` class="${dc}"` : ""}${inner ? ` style="${inner}"` : ""}>${column.blocks.map((b) => blockCell(b, styles)).join("\n")}</td></tr></table></td>`;
+  const cell = `<td class="${cls}" width="${column.width}%" valign="${column.vAlign}" style="width:${column.width}%;vertical-align:${column.vAlign};${gapPad}${outerCss ? outerCss + ";" : ""}">${boxTable(column, column.blocks.map((b) => blockCell(b, styles)).join("\n"), "", ` valign="${column.vAlign}"`)}</td>`;
   return wrapCondition(cell, column);
 }
 
 export function renderSection(section: Section, styles: GlobalStyles): string {
   const cls = visibilityClass(section.visibility);
-  const inner = css(boxCss(section, { "vertical-align": section.vAlign }));
   const cols = section.columns.map((c, i) => columnCell(c, section, styles, i)).join("");
-  const stack = section.stackOnMobile ? "" : " dgs-nostack";
   const gapCls = section.stackOnMobile && section.stackGap ? ` dgs-sg-${Math.round(section.stackGap)}` : "";
-  const dc = [darkClass(section), section.background ? "dgs-sec" : ""].filter(Boolean).join(" ");
   const outerCss = css(marginCss(section));
-  const row = `<tr${cls ? ` class="${cls}"` : ""}><td${outerCss ? ` style="${outerCss}"` : ""}><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td${section.background ? ` bgcolor="${section.background}"` : ""}${dc ? ` class="${dc}"` : ""}${inner ? ` style="${inner}"` : ""}><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="dgs-cols${stack}${gapCls}"><tr>${cols}</tr></table></td></tr></table></td></tr>`;
+  const inner = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="dgs-cols${gapCls}"><tr>${cols}</tr></table>`;
+  const row = `<tr${cls ? ` class="${cls}"` : ""}><td${outerCss ? ` style="${outerCss}"` : ""}>${boxTable(section, inner, section.background ? "dgs-sec" : "")}</td></tr>`;
   return wrapCondition(row, section);
 }
 
@@ -309,14 +316,43 @@ export function darkCss(design: Design): string {
   ${darkCssText(design, "[data-ogsc] ", "\n  ")}`;
 }
 
-/** The full email document. `viewInBrowserUrl` is left as a token the sender can fill. */
+/**
+ * The full email document. Sections render in runs inside the body column; a section
+ * with "background full width" becomes its own edge-to-edge band with the body column
+ * centered inside it. `viewInBrowserUrl` is left as a token the sender can fill.
+ */
 export function renderDesign(design: Design): string {
   const s = design.styles;
   const w = s.bodyWidth;
-  const sections = design.sections.map((sec) => renderSection(sec, s)).join("\n");
+  const p = s.bodyPadding;
+  type Run = { band: Section | null; sections: Section[] };
+  const runs: Run[] = [];
+  for (const sec of design.sections) {
+    if (sec.fullWidthBg && sec.background) { runs.push({ band: sec, sections: [sec] }); continue; }
+    const last = runs[runs.length - 1];
+    if (last && !last.band) last.sections.push(sec); else runs.push({ band: null, sections: [sec] });
+  }
+  if (!runs.length) runs.push({ band: null, sections: [] });
+
   const preheader = s.preheader ? `<div style="display:none;font-size:1px;color:${s.pageBg};line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">${esc(s.preheader)}&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;</div>` : "";
-  const viewInBrowser = s.viewInBrowser ? `<div style="text-align:center;padding:12px 0 0;font-family:${s.text.paragraph.font};font-size:12px;"><a href="{{viewInBrowserUrl}}" style="color:${s.text.paragraph.color};text-decoration:underline;">View in browser</a></div>` : "";
   const bodyStyle = css({ width: px(w), "max-width": px(w), "background-color": s.bodyBg, "border-radius": s.bodyRadius ? px(s.bodyRadius) : null });
+  const column = (rows: string, body: boolean) => `<!--[if mso]><table role="presentation" width="${w}" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
+<table role="presentation" class="dgs-wrap${body ? " dgs-body" : ""}" width="${w}" cellpadding="0" cellspacing="0" border="0"${body ? ` bgcolor="${s.bodyBg}"` : ""} style="${body ? bodyStyle : `width:${px(w)};max-width:${px(w)}`}">
+${rows}
+</table>
+<!--[if mso]></td></tr></table><![endif]-->`;
+  const rows: string[] = [];
+  if (s.viewInBrowser) rows.push(`<tr><td align="center" class="dgs-page-c" style="padding:${pad({ top: p.top, right: p.right, bottom: 0, left: p.left })};font-family:${s.text.paragraph.font};font-size:12px;"><a href="{{viewInBrowserUrl}}" style="color:${s.text.paragraph.color};text-decoration:underline;">View in browser</a></td></tr>`);
+  runs.forEach((run, i) => {
+    const edge = { top: i === 0 && !s.viewInBrowser ? p.top : i === 0 ? 12 : 0, right: p.right, bottom: i === runs.length - 1 ? p.bottom : 0, left: p.left };
+    if (run.band) {
+      const cls = ["dgs-band", "dgs-sec", darkClass(run.band)].filter(Boolean).join(" ");
+      rows.push(`<tr><td align="center" bgcolor="${run.band.background}" class="${cls}" style="background-color:${run.band.background};padding:${pad(edge)};">${column(renderSection(run.band, s), false)}</td></tr>`);
+    } else {
+      rows.push(`<tr><td align="center" class="dgs-page-c" style="padding:${pad(edge)};">${column(run.sections.map((sec) => renderSection(sec, s)).join("\n"), true)}</td></tr>`);
+    }
+  });
+
   return `<!DOCTYPE html>
 <html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
@@ -334,25 +370,18 @@ ${googleFontLink(design)}
   .dgs-mobile{display:none !important;max-height:0;overflow:hidden;mso-hide:all;}
   @media only screen and (max-width:${w + 20}px){
     .dgs-wrap{width:100% !important;max-width:100% !important;}
-    .dgs-cols:not(.dgs-nostack) .dgs-col{display:block !important;width:100% !important;padding-left:0 !important;padding-right:0 !important;}${stackGapCss(design)}
     .dgs-desktop{display:none !important;max-height:0;overflow:hidden;}
     .dgs-mobile{display:block !important;max-height:none !important;}
     tr.dgs-mobile{display:table-row !important;}
     td.dgs-mobile{display:table-cell !important;}
+    td.dgs-stack{display:block !important;width:100% !important;padding-left:0 !important;padding-right:0 !important;}${stackGapCss(design)}
   }${darkCss(design)}
 </style>
 </head>
 <body style="margin:0;padding:0;background-color:${s.pageBg};">
 ${preheader}
 <table role="presentation" class="dgs-page" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${s.pageBg}" style="background-color:${s.pageBg};">
-<tr><td align="center" class="dgs-page-c" style="padding:${pad(s.bodyPadding)};">
-${viewInBrowser}
-<!--[if mso]><table role="presentation" width="${w}" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
-<table role="presentation" class="dgs-wrap dgs-body" width="${w}" cellpadding="0" cellspacing="0" border="0" bgcolor="${s.bodyBg}" style="${bodyStyle}">
-${sections}
-</table>
-<!--[if mso]></td></tr></table><![endif]-->
-</td></tr>
+${rows.join("\n")}
 </table>
 </body>
 </html>`;
