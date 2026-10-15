@@ -120,6 +120,9 @@ export async function applyCancellationReasons(reasons: CancelReason[]): Promise
 export async function syncCancellationReasons(): Promise<{ ok: boolean; subscriptions: number; reasons: number; customers: number; events: number; error?: string }> {
   try {
     const subs = await fetchAllSubscriptions();
+    // Same pull feeds the subscriptions mirror (Office TV next-month projection) for free.
+    const { mirrorSubscriptions } = await import("@/lib/sweepandgo-subscriptions");
+    await mirrorSubscriptions(subs).catch((e) => console.error("[subscriptions] mirror failed:", e));
     const reasons = cancelReasonsFrom(subs);
     const applied = await applyCancellationReasons(reasons);
     return { ok: true, subscriptions: subs.length, reasons: reasons.length, ...applied };

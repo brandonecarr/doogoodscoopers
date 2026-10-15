@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { billingRefreshDue, syncSngBilling, recordBillingSyncResult } from "@/lib/sweepandgo-billing";
+import { syncSubscriptionsIfDue } from "@/lib/sweepandgo-subscriptions";
 
 // Every 15 minutes: refresh the billing mirror ONLY if a Sweep&Go billing webhook
 // (invoice finalized / payment accepted / payment declined) arrived since the last run,
@@ -14,11 +15,14 @@ export async function GET(request: NextRequest) {
   if (secret && request.headers.get("authorization") !== `Bearer ${secret}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  // Subscriptions mirror (webhook-flagged, debounced): ~8 requests when it runs.
+  const subscriptions = await syncSubscriptionsIfDue().catch((e) => ({ ran: false, reason: `failed: ${e instanceof Error ? e.message : e}` }));
+
   const check = await billingRefreshDue();
-  if (!check.due) return NextResponse.json({ skipped: true, reason: check.reason });
+  if (!check.due) return NextResponse.json({ skipped: true, reason: check.reason, subscriptions });
 
   const started = Date.now();
   const result = await syncSngBilling({ refreshOnly: true });
   await recordBillingSyncResult(result);
-  return NextResponse.json({ reason: check.reason, ...result, ms: Date.now() - started });
+  return NextResponse.json({ reason: check.reason, ...result, subscriptions, ms: Date.now() - started });
 }

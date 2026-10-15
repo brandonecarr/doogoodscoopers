@@ -1657,3 +1657,35 @@ model KanbanCard {
   @@index([columnId, sortOrder])
   @@index([boardId])
 }
+
+/// Mirror of Sweep&Go's residential subscriptions feed, replaced in full on each pull
+/// (the feed carries no subscription id). Feeds the Office TV's next-month projection.
+model SngSubscription {
+  id               String    @id @default(cuid())
+  syncedAt         DateTime  @default(now())
+  clientName       String?
+  clientEmail      String?
+  nameKey          String
+  status           String // active | canceled | paused | ...
+  category         String? // prepaid | postpaid
+  billingInterval  String? // monthly | weekly | bi-weekly | one_time
+  name             String? // add-on name, e.g. "Sanitization Spray"; null for the main plan
+  priceCents       Int       @default(0)
+  pricingPlan      String?
+  servicePlan      String?
+  frequency        String?
+  numberOfDogs     String?
+  zipCode          String?
+  startDate        DateTime?
+  endDate          DateTime?
+  canceledAt       DateTime?
+  currentPeriodEnd DateTime?
+  pauseStart       DateTime?
+  pauseEnd         DateTime?
+  couponCode       String?
+  couponPercent    Float?
+  couponEnd        DateTime?
+
+  @@index([status])
+  @@index([nameKey])
+}

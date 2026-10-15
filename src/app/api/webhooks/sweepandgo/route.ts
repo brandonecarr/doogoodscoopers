@@ -8,6 +8,7 @@ import { recordWebhookEvent } from "@/lib/sweepandgo-webhook-log";
 import { applyJobWebhook } from "@/lib/tv-sweepandgo";
 import { syncCustomersForEvent } from "@/lib/sweepandgo-customer-sync";
 import { requestBillingRefresh } from "@/lib/sweepandgo-billing";
+import { requestSubscriptionRefresh } from "@/lib/sweepandgo-subscriptions";
 import { recordReengagement } from "@/lib/lead-duplicates";
 import { isOptedOut } from "@/lib/sms-optout";
 
@@ -204,6 +205,8 @@ export async function POST(request: NextRequest) {
     await applyJobWebhook(event, data, sentAt);
 
     if (BILLING_EVENTS.has(event)) await requestBillingRefresh();
+    // Subscription changes → refresh the subscriptions mirror (TV projection) once the burst settles.
+    if (/^(client|commercial):subscription_/.test(event)) await requestSubscriptionRefresh();
 
     // Signups/cancellations reach the customer mirror (and archive converted leads, which
     // stops their drips) within ~30s instead of waiting for the daily sync.

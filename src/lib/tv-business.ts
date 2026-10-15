@@ -5,6 +5,7 @@ import { getProfitability } from "@/lib/profitability";
 import { estimateMonthlyRevenue } from "@/lib/plan-pricing";
 import { privateName } from "@/lib/tv-connector";
 import { TEST_NAME_KEYS } from "@/lib/test-accounts";
+import { projectedMonthCents } from "@/lib/sweepandgo-subscriptions";
 
 export interface TvBusiness {
   revenue: { monthLabel: string; thisMonthCents: number; lastMonthLabel: string; lastMonthCents: number };
@@ -16,12 +17,23 @@ export interface TvBusiness {
    * latest month with a full billing run, summed per customer, averaged across customers.
    */
   avgMonthlyCost: { cents: number; customers: number; monthLabel: string } | null;
+  /**
+   * Invoices by billing month: how much of this month's (and last month's) invoicing has been
+   * paid, and next month projected from every active subscription's monthly amount.
+   */
+  invoices: {
+    thisMonth: TvInvoiceMonth;
+    lastMonth: TvInvoiceMonth;
+    nextMonth: { monthLabel: string; cents: number; subscriptions: number; asOf: string | null } | null;
+  };
   activeCustomers: number;
   reviews: { average: number | null; total: number | null; thisMonth: number; latest: { name: string; text: string; date: string } | null };
   cancellations: { days: number; total: number; reasons: { label: string; count: number }[] };
   /** Newest first. */
   wins: { kind: "signup" | "review"; title: string; detail: string; date: string }[];
 }
+
+export interface TvInvoiceMonth { monthLabel: string; invoicedCents: number; paidCents: number; invoices: number; paidInvoices: number }
 
 const MONTH = (key: string) => {
   const [y, m] = key.split("-").map(Number);
@@ -64,10 +76,44 @@ async function averageMonthlyCost(now = new Date()): Promise<TvBusiness["avgMont
   return { cents: Number(r.avgCents), customers: Number(r.customers), monthLabel: MONTH(r.month) };
 }
 
+/** Invoiced vs paid for one billing month (by period start, else creation date), tests excluded. */
+async function invoiceMonth(monthKey: string): Promise<TvInvoiceMonth> {
+  const rows = await prisma.$queryRaw<Array<{ invoiced: number; paid: number; n: number; paidN: number }>>`
+    SELECT COALESCE(SUM("totalCents"), 0)::int AS invoiced,
+           COALESCE(SUM("paidCents" - "refundedCents"), 0)::int AS paid,
+           COUNT(*)::int AS n,
+           COUNT(*) FILTER (WHERE "remainingCents" <= 0 AND "paidCents" > 0)::int AS "paidN"
+    FROM "SngInvoice"
+    WHERE to_char(COALESCE("periodStart", "sngCreatedAt"), 'YYYY-MM') = ${monthKey}
+      AND "nameKey" <> ALL(${TEST_NAME_KEYS})`.catch(() => []);
+  const r = rows[0];
+  return { monthLabel: MONTH(monthKey), invoicedCents: Number(r?.invoiced ?? 0), paidCents: Number(r?.paid ?? 0), invoices: Number(r?.n ?? 0), paidInvoices: Number(r?.paidN ?? 0) };
+}
+
+async function invoiceNumbers(now: Date): Promise<TvBusiness["invoices"]> {
+  const key = (d: Date) => d.toLocaleDateString("en-CA", { year: "numeric", month: "2-digit", timeZone: "America/Los_Angeles" }).slice(0, 7);
+  const [y, m] = key(now).split("-").map(Number);
+  const thisKey = key(now);
+  const lastKey = `${m === 1 ? y - 1 : y}-${String(m === 1 ? 12 : m - 1).padStart(2, "0")}`;
+  const nextStart = new Date(Date.UTC(y, m, 1));
+  const nextEnd = new Date(Date.UTC(y, m + 1, 1));
+  const nextKey = `${nextStart.getUTCFullYear()}-${String(nextStart.getUTCMonth() + 1).padStart(2, "0")}`;
+  const [thisMonth, lastMonth, projection] = await Promise.all([
+    invoiceMonth(thisKey),
+    invoiceMonth(lastKey),
+    projectedMonthCents(nextStart, nextEnd).catch(() => null),
+  ]);
+  return {
+    thisMonth,
+    lastMonth,
+    nextMonth: projection && projection.asOf ? { monthLabel: MONTH(nextKey), cents: projection.cents, subscriptions: projection.subscriptions, asOf: projection.asOf.toISOString() } : null,
+  };
+}
+
 export async function buildTvBusiness(now = new Date()): Promise<TvBusiness> {
   const cancelDays = 90;
   const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-  const [profit, active, settings, reviewsThisMonth, latestReview, cancels, signups, fiveStars, avgCost] = await Promise.all([
+  const [profit, active, settings, reviewsThisMonth, latestReview, cancels, signups, fiveStars, avgCost, invoices] = await Promise.all([
     getProfitability(2),
     prisma.sweepandgoCustomer.findMany({ where: { active: true }, select: { subscriptionNames: true } }),
     prisma.appSetting.findMany({ where: { key: { in: ["google.bp.avgRating", "google.bp.reviewCount"] } } }),
@@ -94,6 +140,7 @@ export async function buildTvBusiness(now = new Date()): Promise<TvBusiness> {
       select: { customerName: true, reviewedAt: true },
     }),
     averageMonthlyCost(now),
+    invoiceNumbers(now),
   ]);
 
   const [last, current] = profit.rows.slice(-2);
@@ -119,6 +166,7 @@ export async function buildTvBusiness(now = new Date()): Promise<TvBusiness> {
     margin: { hasExpenses: profit.hasExpenses, marginPct: current.marginPct, profitCents: current.profitCents, expenseCents: current.expenseCents },
     mrrCents: Math.round(active.reduce((n, c) => n + estimateMonthlyRevenue(c.subscriptionNames), 0) * 100),
     avgMonthlyCost: avgCost,
+    invoices,
     activeCustomers: active.length,
     reviews: {
       average: setting("google.bp.avgRating"),
