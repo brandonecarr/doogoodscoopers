@@ -3,7 +3,7 @@ import { optedOutKeys, optOutKey } from "@/lib/sms-optout";
 import { loadSendWindow, clampToSendWindow } from "@/lib/send-window";
 import { LeadStatus, type LeadSource } from "@prisma/client";
 import { formerCustomers } from "@/lib/former-customers";
-import { recoverySettings, SNG_QUOTE_WHERE } from "@/lib/quote-recovery";
+import { recoverySettings, SNG_QUOTE_STEP_WHERE } from "@/lib/quote-recovery";
 
 /**
  * Drip-campaign enrollment. A drip auto-enrolls NEW leads (created after the
@@ -100,7 +100,9 @@ export async function findDripCandidates(campaign: DripCampaign): Promise<DripCa
       where: {
         archived: false,
         status: { not: "CONVERTED" },
-        ...SNG_QUOTE_WHERE,
+        // Test numbers are allowed in (the owner tests sequences with their own phone);
+        // they stay out of every count and report.
+        ...SNG_QUOTE_STEP_WHERE,
         lastActivityAt: { gt: since, lte: new Date(Date.now() - abandonMinutes * 60_000) },
       },
       select: { id: true, phone: true, email: true, firstName: true, lastName: true },

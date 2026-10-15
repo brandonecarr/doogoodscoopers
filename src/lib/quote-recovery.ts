@@ -48,7 +48,10 @@ export function isSngQuoteLead(lead: { lastStep: string | null }): boolean {
   return /sweep&go|quote wizard/i.test(lead.lastStep || "");
 }
 /** Prisma filter for the same set. */
-export const SNG_QUOTE_WHERE = { AND: [{ OR: [{ lastStep: { contains: "Sweep&Go" } }, { lastStep: { contains: "Quote Wizard" } }] }, NOT_TEST_QUOTE_LEAD] };
+/** A lead that ran a website / Sweep&Go quote — test numbers included (used for drip enrollment, so the owner can test with their own phone). */
+export const SNG_QUOTE_STEP_WHERE = { OR: [{ lastStep: { contains: "Sweep&Go" } }, { lastStep: { contains: "Quote Wizard" } }] };
+/** Same, minus test identities — for stats, reports and the recovery page. */
+export const SNG_QUOTE_WHERE = { AND: [SNG_QUOTE_STEP_WHERE, NOT_TEST_QUOTE_LEAD] };
 
 /** The lead's resume code, creating one the first time it's needed. */
 export async function ensureResumeCode(leadId: string): Promise<string | null> {

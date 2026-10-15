@@ -136,7 +136,8 @@ export async function GET(request: NextRequest) {
       // lead. Otherwise the same quote — which lingers in the lookback window
       // for ~30 min — would re-bump/re-notify every minute.
       if (new Date(q.created_at) <= existingLead.createdAt) continue;
-      if (existingLead.status === "CONVERTED") continue; // already a customer; leave it
+      // (A converted lead quoting again is a former customer coming back — still returning;
+      // the drip send loop skips anyone who is an ACTIVE Sweep&Go customer.)
       const note = `Re-quoted ${new Date().toLocaleDateString("en-US")}`;
       const lead = await prisma.quoteLead.update({
         where: { id: existingLead.id },
