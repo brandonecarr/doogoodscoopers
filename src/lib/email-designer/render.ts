@@ -108,6 +108,15 @@ export function boxCss(box: Box, extra: Record<string, string | null | undefined
   };
 }
 
+/** Style of the cell that carries a box's margin: the margin as padding, plus the optional paint behind it. */
+export function marginCss(box: Box): Record<string, string | null | undefined> {
+  return {
+    padding: isZero(box.margin) ? null : pad(box.margin),
+    "background-color": box.outer?.background || null,
+    ...borderDecl(box.outer?.border ?? null),
+  };
+}
+
 const visibilityClass = (v: Box["visibility"]) => (v === "desktop" ? "dgs-desktop" : v === "mobile" ? "dgs-mobile" : "");
 
 // ── Inline rich text ─────────────────────────────────────────────────────────
@@ -202,7 +211,8 @@ export const darkClass = (box: Box) => (box.dark && (box.dark.background || box.
 
 function blockCell(block: Block, styles: GlobalStyles): string {
   const cls = visibilityClass(block.visibility);
-  const outer = isZero(block.margin) ? "" : ` style="padding:${pad(block.margin)}"`;
+  const outerCss = css(marginCss(block));
+  const outer = outerCss ? ` style="${outerCss}"` : "";
   const inner = css(boxCss(block));
   const dc = darkClass(block);
   const body = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"${cls ? ` class="${cls}"` : ""}><tr><td${outer}><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td${dc ? ` class="${dc}"` : ""}${inner ? ` style="${inner}"` : ""}>${renderBlock(block, styles)}</td></tr></table></td></tr></table>`;
@@ -214,9 +224,10 @@ function columnCell(column: Column, section: Section, styles: GlobalStyles, inde
   const first = index === 0, last = index === section.columns.length - 1;
   const gapPad = gap ? `padding-left:${first ? 0 : px(gap / 2)};padding-right:${last ? 0 : px(gap / 2)};` : "";
   const inner = css(boxCss(column));
-  const cls = ["dgs-col", visibilityClass(column.visibility)].filter(Boolean).join(" ");
+  const cls = ["dgs-col", last ? "" : "dgs-col-gap", visibilityClass(column.visibility)].filter(Boolean).join(" ");
   const dc = darkClass(column);
-  const cell = `<td class="${cls}" width="${column.width}%" valign="${column.vAlign}" style="width:${column.width}%;vertical-align:${column.vAlign};${gapPad}${isZero(column.margin) ? "" : `padding:${pad(column.margin)};`}"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td valign="${column.vAlign}"${dc ? ` class="${dc}"` : ""}${inner ? ` style="${inner}"` : ""}>${column.blocks.map((b) => blockCell(b, styles)).join("\n")}</td></tr></table></td>`;
+  const outerCss = css(marginCss(column));
+  const cell = `<td class="${cls}" width="${column.width}%" valign="${column.vAlign}" style="width:${column.width}%;vertical-align:${column.vAlign};${gapPad}${outerCss ? outerCss + ";" : ""}"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td valign="${column.vAlign}"${dc ? ` class="${dc}"` : ""}${inner ? ` style="${inner}"` : ""}>${column.blocks.map((b) => blockCell(b, styles)).join("\n")}</td></tr></table></td>`;
   return wrapCondition(cell, column);
 }
 
@@ -225,8 +236,10 @@ export function renderSection(section: Section, styles: GlobalStyles): string {
   const inner = css(boxCss(section, { "vertical-align": section.vAlign }));
   const cols = section.columns.map((c, i) => columnCell(c, section, styles, i)).join("");
   const stack = section.stackOnMobile ? "" : " dgs-nostack";
+  const gapCls = section.stackOnMobile && section.stackGap ? ` dgs-sg-${Math.round(section.stackGap)}` : "";
   const dc = [darkClass(section), section.background ? "dgs-sec" : ""].filter(Boolean).join(" ");
-  const row = `<tr${cls ? ` class="${cls}"` : ""}><td${isZero(section.margin) ? "" : ` style="padding:${pad(section.margin)}"`}><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"${section.background ? ` bgcolor="${section.background}"` : ""}><tr><td${dc ? ` class="${dc}"` : ""}${inner ? ` style="${inner}"` : ""}><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="dgs-cols${stack}"><tr>${cols}</tr></table></td></tr></table></td></tr>`;
+  const outerCss = css(marginCss(section));
+  const row = `<tr${cls ? ` class="${cls}"` : ""}><td${outerCss ? ` style="${outerCss}"` : ""}><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td${section.background ? ` bgcolor="${section.background}"` : ""}${dc ? ` class="${dc}"` : ""}${inner ? ` style="${inner}"` : ""}><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="dgs-cols${stack}${gapCls}"><tr>${cols}</tr></table></td></tr></table></td></tr>`;
   return wrapCondition(row, section);
 }
 
@@ -249,6 +262,12 @@ export function googleFontLink(design: Design): string {
   if (!names.length) return "";
   const fam = names.map((n) => `family=${encodeURIComponent(n).replace(/%20/g, "+")}:wght@400;600;700`).join("&");
   return `<link href="https://fonts.googleapis.com/css2?${fam}&display=swap" rel="stylesheet" />`;
+}
+
+/** Mobile rules for sections with a stacked gap: one per distinct gap size. */
+export function stackGapCss(design: Design): string {
+  const gaps = [...new Set(design.sections.filter((s) => s.stackOnMobile && s.stackGap).map((s) => Math.round(s.stackGap!)))];
+  return gaps.map((g) => `\n    .dgs-sg-${g} .dgs-col-gap{padding-bottom:${g}px !important;}`).join("");
 }
 
 /** The dark-mode rules, every declaration !important so it beats the inline styles. */
@@ -315,7 +334,7 @@ ${googleFontLink(design)}
   .dgs-mobile{display:none !important;max-height:0;overflow:hidden;mso-hide:all;}
   @media only screen and (max-width:${w + 20}px){
     .dgs-wrap{width:100% !important;max-width:100% !important;}
-    .dgs-cols:not(.dgs-nostack) .dgs-col{display:block !important;width:100% !important;}
+    .dgs-cols:not(.dgs-nostack) .dgs-col{display:block !important;width:100% !important;padding-left:0 !important;padding-right:0 !important;}${stackGapCss(design)}
     .dgs-desktop{display:none !important;max-height:0;overflow:hidden;}
     .dgs-mobile{display:block !important;max-height:none !important;}
     tr.dgs-mobile{display:table-row !important;}

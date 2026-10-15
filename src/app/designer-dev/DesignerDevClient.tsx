@@ -13,9 +13,13 @@ export default function DesignerDevClient() {
   const [html, setHtml] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   // ?sample=e1 loads public/dev-samples/e1.html (a handoff email) instead of the starter.
-  const [initial, setInitial] = useState<string | null>(() => (typeof window !== "undefined" && !new URLSearchParams(window.location.search).get("sample") ? STARTER : null));
+  const [initial, setInitial] = useState<string | null>(() => (typeof window !== "undefined" && !new URLSearchParams(window.location.search).get("sample") && !new URLSearchParams(window.location.search).get("design") ? STARTER : null));
+  // ?design=name loads public/dev-samples/name.json as a v2 design instead.
+  const [initialDesign, setInitialDesign] = useState<unknown>(null);
   useEffect(() => {
-    const sample = new URLSearchParams(window.location.search).get("sample");
+    const q = new URLSearchParams(window.location.search);
+    const sample = q.get("sample"), design = q.get("design");
+    if (design) { fetch(`/dev-samples/${design}.json`).then((r) => r.json()).then((d) => { setInitialDesign(d); setInitial(""); }).catch(() => setInitial(STARTER)); return; }
     if (!sample) return;
     fetch(`/dev-samples/${sample}.html`).then((r) => (r.ok ? r.text() : STARTER)).then((t) => setInitial(t)).catch(() => setInitial(STARTER));
   }, []);
@@ -28,7 +32,7 @@ export default function DesignerDevClient() {
         <button type="button" onClick={() => setHtml(ref.current?.getHtml() ?? "")} className="ml-auto px-3 py-1 rounded bg-navy-900 text-white">Export HTML</button>
       </div>
       <div className="flex-1 min-h-0">
-        <EmailDesigner initialHtml={initial} onReady={(h) => (ref.current = h)} onChange={setDirty} />
+        <EmailDesigner initialDesign={initialDesign ?? undefined} initialHtml={initial} onReady={(h) => (ref.current = h)} onChange={setDirty} />
       </div>
       {html !== null && (
         <div className="fixed inset-0 z-[60] bg-black/50 p-8" onClick={() => setHtml(null)}>

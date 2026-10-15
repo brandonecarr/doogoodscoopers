@@ -11,6 +11,14 @@ import { SAMPLE_TOKENS } from "@/lib/sample-tokens";
 const ALLOWED = new Set(["B", "STRONG", "I", "EM", "U", "S", "STRIKE", "A", "BR", "SPAN"]);
 
 /** Normalize contentEditable output to the small inline vocabulary. */
+/** Inline style properties that survive editing (what a designed email needs for a span or link). */
+const KEPT_PROPS = ["color", "font-size", "font-weight", "font-style", "font-family", "letter-spacing", "text-decoration", "background-color", "border-radius", "padding", "display", "width", "height", "line-height", "text-align", "vertical-align"];
+function keptStyle(el: HTMLElement): string {
+  const out: string[] = [];
+  for (const p of KEPT_PROPS) { const v = el.style.getPropertyValue(p); if (v) out.push(`${p}:${v.replace(/"/g, "'")}`); }
+  return out.join(";");
+}
+
 export function sanitizeInline(html: string): string {
   if (typeof window === "undefined") return html;
   const doc = new DOMParser().parseFromString(`<div>${html}</div>`, "text/html");
@@ -28,10 +36,10 @@ export function sanitizeInline(html: string): string {
     if (tag === "I" || tag === "EM") return `<i>${inner}</i>`;
     if (tag === "U") return `<u>${inner}</u>`;
     if (tag === "S" || tag === "STRIKE") return `<s>${inner}</s>`;
-    if (tag === "A") return `<a href="${(el.getAttribute("href") || "#").replace(/"/g, "&quot;")}">${inner}</a>`;
+    if (tag === "A") { const st = keptStyle(el); return `<a href="${(el.getAttribute("href") || "#").replace(/"/g, "&quot;")}"${st ? ` style="${st}"` : ""}>${inner}</a>`; }
     if (tag === "SPAN") {
-      const color = el.style.color;
-      return color ? `<span style="color:${color}">${inner}</span>` : inner;
+      const st = keptStyle(el);
+      return st ? `<span style="${st}">${inner}</span>` : inner;
     }
     return inner;
   };

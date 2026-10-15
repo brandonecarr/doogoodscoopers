@@ -37,6 +37,8 @@ export interface Box {
   condition: Condition | null;
   /** Dark-mode overrides for this element (used when the email's dark mode is on). */
   dark?: { background?: string | null; color?: string | null };
+  /** Paint behind the margin: lets a section sit inset inside a larger card (background + border around the margin area). */
+  outer?: { background: string | null; border: Border | null };
 }
 
 export interface TextStyle {
@@ -78,7 +80,7 @@ export type Block =
 export type BlockType = Block["type"];
 
 export interface Column extends Box { width: number; vAlign: VAlign; blocks: Block[] }
-export interface Section extends Box { columns: Column[]; vAlign: VAlign; columnGap: number; fullWidthBg: boolean; stackOnMobile: boolean }
+export interface Section extends Box { columns: Column[]; vAlign: VAlign; columnGap: number; fullWidthBg: boolean; stackOnMobile: boolean; /** Vertical space between columns once they stack on phones. */ stackGap?: number }
 
 export interface TextRole { font: string; size: number; color: string; lineHeight: number; bold: boolean; letterSpacing: number }
 export interface GlobalStyles {

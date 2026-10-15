@@ -21,6 +21,21 @@ export function BoxFields({ box, brand, onChange, showBackground = true, darkEna
       <PanelSection title="Spacing">
         <SpacingInput label="Padding" value={box.padding} onChange={(padding) => onChange({ padding })} hint="Space inside, between the edge and the content" />
         <SpacingInput label="Margin" value={box.margin} onChange={(margin) => onChange({ margin })} hint="Space outside, around the element" />
+        <p className="text-[12px] text-gray-500 mt-2 mb-1">Behind the margin <span className="text-gray-400">(lets this sit inset inside a larger card)</span></p>
+        <Field label="Color"><ColorInput value={box.outer?.background ?? null} onChange={(background) => onChange({ outer: { background, border: box.outer?.border ?? null } })} brand={brand.colors} /></Field>
+        <BorderInput value={box.outer?.border ?? null} onChange={(border) => onChange({ outer: { background: box.outer?.background ?? null, border } })} brand={brand.colors} />
+        {box.outer?.border && box.outer.border.size > 0 && (
+          <Field label="Sides">
+            <div className="flex gap-1">
+              {(["top", "right", "bottom", "left"] as const).map((side) => {
+                const ob = box.outer!.border!;
+                const sides = ob.sides && ob.sides.length ? ob.sides : (["top", "right", "bottom", "left"] as const);
+                const on = sides.includes(side);
+                return <button key={side} type="button" title={side} onClick={() => onChange({ outer: { background: box.outer?.background ?? null, border: { ...ob, sides: on ? sides.filter((s) => s !== side) : [...sides, side] } } })} className={`h-7 px-2 text-[11px] rounded-md border ${on ? "bg-violet-100 border-violet-300 text-violet-700" : "bg-white border-gray-200 text-gray-400"}`}>{side[0].toUpperCase()}</button>;
+              })}
+            </div>
+          </Field>
+        )}
       </PanelSection>
       {showBackground && (
         <PanelSection title="Background">

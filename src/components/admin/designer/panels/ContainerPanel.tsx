@@ -42,6 +42,7 @@ export function SectionPanel({ section, styles, brand, onChange, onClose, onSave
           <Field label="Vertical alignment" hint="Where shorter columns sit next to taller ones"><VAlignGroup value={section.vAlign} onChange={(vAlign) => onChange({ vAlign, columns: section.columns.map((c) => ({ ...c, vAlign })) })} /></Field>
           <Field label="Space between columns"><NumberInput value={section.columnGap} onChange={(n) => onChange({ columnGap: n ?? 0 })} unit="px" max={60} width={64} /></Field>
           <Field label="Stack on mobile" hint="Columns go one above the other on phones"><Toggle value={section.stackOnMobile} onChange={(stackOnMobile) => onChange({ stackOnMobile })} /></Field>
+          {section.stackOnMobile && section.columns.length > 1 && <Field label="Gap when stacked" hint="Vertical space between the stacked columns on phones"><NumberInput value={section.stackGap ?? 0} onChange={(n) => onChange({ stackGap: n ?? 0 })} unit="px" max={60} width={64} /></Field>}
           <Field label="Background full width" hint="Paint the section color edge to edge behind the email"><Toggle value={section.fullWidthBg} onChange={(fullWidthBg) => onChange({ fullWidthBg })} /></Field>
         </PanelSection>
         <PanelSection title="Columns" right={section.columns.length < 4 ? <button type="button" onClick={addColumn} className="text-[12px] text-violet-700 hover:underline flex items-center gap-1"><Plus className="w-3.5 h-3.5" /> Add column</button> : null}>

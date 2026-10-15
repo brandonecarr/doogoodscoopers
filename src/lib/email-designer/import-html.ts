@@ -58,6 +58,13 @@ function alignOf(el: HTMLElement): Align {
   return "left";
 }
 
+const KEPT_INLINE = ["color", "font-size", "font-weight", "font-style", "font-family", "letter-spacing", "text-decoration", "background-color", "border-radius", "padding", "display", "width", "height", "line-height", "text-align", "vertical-align"];
+/** The inline styles a span or link keeps (mirrors the editor's sanitizeInline). */
+function keptInline(el: HTMLElement): string {
+  const s = styleOf(el);
+  return KEPT_INLINE.filter((p) => s[p]).map((p) => `${p}:${s[p].replace(/"/g, "'")}`).join(";");
+}
+
 /** Inline HTML of an element with only the tags a text block supports. */
 function inlineHtml(node: Node): string {
   if (node.nodeType === NodeType.TEXT_NODE) return node.rawText.replace(/\s+/g, " ");
@@ -66,20 +73,14 @@ function inlineHtml(node: Node): string {
   const tag = el.tagName.toLowerCase();
   const inner = el.childNodes.map(inlineHtml).join("");
   if (tag === "br") return "<br>";
-  if (tag === "a") return `<a href="${el.getAttribute("href") || "#"}">${inner}</a>`;
+  if (tag === "a") { const st = keptInline(el); return `<a href="${el.getAttribute("href") || "#"}"${st ? ` style="${st}"` : ""}>${inner}</a>`; }
   if (tag === "b" || tag === "strong") return `<b>${inner}</b>`;
   if (tag === "i" || tag === "em") return `<i>${inner}</i>`;
   if (tag === "u") return `<u>${inner}</u>`;
   if (tag === "s" || tag === "strike") return `<s>${inner}</s>`;
   if (tag === "span") {
-    const s = styleOf(el);
-    const wrap: string[] = [];
-    if (/bold|[6-9]00/.test(s["font-weight"] || "")) wrap.push("b");
-    if (s["font-style"] === "italic") wrap.push("i");
-    const c = color(s["color"]);
-    let out = inner;
-    for (const w of wrap) out = `<${w}>${out}</${w}>`;
-    return c ? `<span style="color:${c}">${out}</span>` : out;
+    const st = keptInline(el);
+    return st ? `<span style="${st}">${inner}</span>` : inner;
   }
   return inner;
 }

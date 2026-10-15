@@ -5,7 +5,7 @@ import { ArrowUp, ArrowDown, Copy, Trash2, Move, Eye, EyeOff, Bookmark } from "l
 import {
   type Design, type Section, type Column, type Block, type Selection, type BrandLibrary, type Box, nodeName,
 } from "@/lib/email-designer/model";
-import { textCss, linkCss, pad, borderCss, borderDecl, radiusDecl, socialIconUrl, SOCIAL_LABEL, darkCssText, darkClass } from "@/lib/email-designer/render";
+import { textCss, linkCss, pad, borderCss, borderDecl, radiusDecl, socialIconUrl, SOCIAL_LABEL, darkCssText, darkClass, marginCss } from "@/lib/email-designer/render";
 import { sampleTokens } from "@/lib/sample-tokens";
 import { RichText } from "./RichText";
 
@@ -184,7 +184,7 @@ export function Canvas(p: CanvasProps) {
         {zone({ kind: "block", columnId: column.id, index }, `z-${column.id}-${index}`)}
         <div
           className={`dgs-node dgs-block ${sel("block", block.id) ? "dgs-selected" : ""} ${hidden ? "dgs-hidden-on-device" : ""}`}
-          style={toStyle({ padding: pad(block.margin) })}
+          style={toStyle(marginCss(block))}
           onMouseEnter={() => setHover({ kind: "block", id: block.id })}
           onMouseLeave={() => setHover(null)}
           onClick={(e) => { e.stopPropagation(); p.onSelect({ kind: "block", id: block.id }); }}
@@ -211,7 +211,7 @@ export function Canvas(p: CanvasProps) {
           width: stacked ? "100%" : `${column.width}%`, flex: stacked ? undefined : `0 0 ${column.width}%`, boxSizing: "border-box",
           paddingLeft: stacked || i === 0 ? 0 : gap / 2, paddingRight: stacked || i === section.columns.length - 1 ? 0 : gap / 2,
           display: "flex", flexDirection: "column", justifyContent: column.vAlign === "middle" ? "center" : column.vAlign === "bottom" ? "flex-end" : "flex-start",
-          ...toStyle({ margin: pad(column.margin) }),
+          ...toStyle({ ...marginCss(column), padding: undefined, margin: pad(column.margin) }),
         }}
         onMouseEnter={() => setHover({ kind: "column", id: column.id })}
         onMouseLeave={() => setHover(null)}
@@ -236,7 +236,7 @@ export function Canvas(p: CanvasProps) {
         {zone({ kind: "section", index: si }, `zs-${si}`)}
         <div
           className={`dgs-node dgs-section ${sel("section", section.id) ? "dgs-selected" : ""} ${hidden ? "dgs-hidden-on-device" : ""}`}
-          style={toStyle({ padding: pad(section.margin) })}
+          style={toStyle(marginCss(section))}
           onMouseEnter={() => setHover({ kind: "section", id: section.id })}
           onMouseLeave={() => setHover(null)}
           onClick={(e) => { e.stopPropagation(); p.onSelect({ kind: "section", id: section.id }); }}
@@ -244,7 +244,7 @@ export function Canvas(p: CanvasProps) {
           {label(section, "section")}
           {toolbar(section, "section")}
           <div className={`${section.background ? "dgs-sec" : ""} ${darkClass(section)}`} style={boxStyle(section)}>
-            <div style={{ display: "flex", flexDirection: stacked ? "column" : "row", alignItems: section.vAlign === "middle" ? "center" : section.vAlign === "bottom" ? "flex-end" : "stretch", gap: stacked ? 12 : 0 }}>
+            <div style={{ display: "flex", flexDirection: stacked ? "column" : "row", alignItems: section.vAlign === "middle" ? "center" : section.vAlign === "bottom" ? "flex-end" : "stretch", gap: stacked ? section.stackGap || 0 : 0 }}>
               {section.columns.map((c, i) => columnEl(c, section, i))}
             </div>
           </div>
