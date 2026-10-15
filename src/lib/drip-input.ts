@@ -1,10 +1,12 @@
 import { LINK_PLACEHOLDER } from "@/lib/campaign-templates";
+import { textFromHtml } from "@/lib/campaign-email";
+import type { Prisma } from "@prisma/client";
 
 // Shared validation for the drip builder's create and edit requests.
 
 export interface DripInput {
   leadTypes?: string[];
-  steps?: Array<{ body?: string; delayMinutes?: number; channel?: string; subject?: string }>;
+  steps?: Array<{ body?: string; delayMinutes?: number; channel?: string; subject?: string; html?: string; designJson?: unknown }>;
   excludeIds?: unknown;
   includeNew?: unknown;
   emailFromName?: unknown;
@@ -12,15 +14,21 @@ export interface DripInput {
 
 export function parseDripInput(b: DripInput, opts: { draft: boolean }) {
   const steps = (b.steps || [])
-    .filter((s) => s.body?.trim())
+    // An email step may be a designed email (html) with no typed body.
+    .filter((s) => s.body?.trim() || (s.channel === "email" && s.html?.trim()))
     .map((s, i) => {
       const channel = s.channel === "email" ? "email" : "sms";
+      const html = channel === "email" && s.html?.trim() ? s.html.trim() : null;
+      const designJson = html && s.designJson && typeof s.designJson === "object" ? (s.designJson as Prisma.InputJsonValue) : undefined;
       return {
         stepOrder: i,
-        body: s.body!.trim(),
+        // A designed email keeps a text summary in body (lists, timeline, previews).
+        body: (s.body || "").trim() || (html ? textFromHtml(html, 600) : ""),
         delayMinutes: Math.max(0, Math.round(s.delayMinutes || 0)),
         channel,
         subject: channel === "email" ? (s.subject || "").trim() || null : null,
+        html,
+        ...(designJson ? { designJson } : {}),
       };
     });
   const leadTypes = b.leadTypes || [];
@@ -47,10 +55,10 @@ export function parseDripInput(b: DripInput, opts: { draft: boolean }) {
 }
 
 /** Why a sequence isn't ready to send, or null. */
-export function stepsProblem(steps: Array<{ body: string; channel: string; subject: string | null }>): string | null {
+export function stepsProblem(steps: Array<{ body: string; channel: string; subject: string | null; html?: string | null }>): string | null {
   const i = steps.findIndex((s) => s.channel === "email" && !s.subject);
   if (i >= 0) return `Message ${i + 1} is an email and needs a subject`;
-  const j = steps.findIndex((s) => s.body.includes(LINK_PLACEHOLDER));
+  const j = steps.findIndex((s) => s.body.includes(LINK_PLACEHOLDER) || (s.html || "").includes(LINK_PLACEHOLDER));
   if (j >= 0) return `Message ${j + 1} still has the placeholder signup link. Replace it with your real link.`;
   return null;
 }

@@ -13,7 +13,7 @@ import { notify } from "@/lib/notify";
 import { archiveConvertedLeads, isActiveCustomerByPhone } from "@/lib/lead-duplicates";
 import { activeClientPhones, phoneInActiveSet } from "@/lib/sweepandgo-lookup";
 import { sendCampaignBatch } from "@/lib/email-send";
-import { emailTextToHtml } from "@/lib/campaign-email";
+import { emailTextToHtml, decodeTemplateTokens } from "@/lib/campaign-email";
 import { unsubscribedSet, normalizeEmail } from "@/lib/email-unsubscribe";
 
 // Drives DRIP campaigns: enrolls new matching leads and sends each recipient's
@@ -187,7 +187,8 @@ export async function GET(request: NextRequest) {
         provider = "email";
         const [e] = await sendCampaignBatch({
           subject: renderTemplate(step.subject || "", { ...vars, reviewLink }),
-          html: emailTextToHtml(body),
+          // A designed email (from the builder) is sent as-is with its tokens filled; a text step is formatted.
+          html: step.html ? renderTemplate(decodeTemplateTokens(step.html), { ...vars, reviewLink }) : emailTextToHtml(body),
           from: { fromName: campaign.emailFromName },
           recipients: [{ id: r.id, email: r.email!, name: r.name }],
         });

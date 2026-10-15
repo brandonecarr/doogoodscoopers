@@ -207,8 +207,8 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
                     {s.channel === "email" ? <Mail className="w-3.5 h-3.5" /> : <MessageSquare className="w-3.5 h-3.5" />}
                     {s.channel === "email" ? "Email" : "Text"} · {i === 0 ? (s.delayMinutes > 0 ? `${humanDelay(s.delayMinutes)} after enrollment` : "immediately") : `+${humanDelay(s.delayMinutes)} after previous`}
                   </span>
-                  {s.channel === "email" && <p className="text-navy-900 font-medium">{s.subject}</p>}
-                  <p className="text-gray-800 whitespace-pre-wrap">{s.body}</p>
+                  {s.channel === "email" && <p className="text-navy-900 font-medium">{s.subject}{s.html ? <span className="ml-2 text-[10px] font-semibold uppercase tracking-wide text-violet-700 bg-violet-50 px-1.5 py-0.5 rounded">Designed email</span> : null}</p>}
+                  <p className="text-gray-800 whitespace-pre-wrap">{s.html ? s.body.slice(0, 280) + (s.body.length > 280 ? "…" : "") : s.body}</p>
                 </div>
               </li>
             ))}

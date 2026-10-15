@@ -1,10 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Plus, Trash2, Clock, Zap, Loader2, ArrowUp, ArrowDown, Mail, MessageSquare, Eye } from "lucide-react";
-import { emailTextToHtml } from "@/lib/campaign-email";
+import dynamic from "next/dynamic";
+import { ArrowLeft, Plus, Trash2, Clock, Zap, Loader2, ArrowUp, ArrowDown, Mail, MessageSquare, Eye, LayoutTemplate, X, Paintbrush } from "lucide-react";
+import { emailTextToHtml, textFromHtml } from "@/lib/campaign-email";
+import type { EmailBuilderHandle } from "@/components/admin/EmailBuilder";
+
+// The same drag-and-drop designer the email blasts use (heavy; loaded only when opened).
+const EmailBuilder = dynamic(() => import("@/components/admin/EmailBuilder"), {
+  ssr: false,
+  loading: () => <div className="flex items-center justify-center h-full text-sm text-gray-500"><Loader2 className="w-5 h-5 animate-spin mr-2" /> Loading designer…</div>,
+});
+
+/** Sample values so a preview reads like a real email. */
+const SAMPLE_TOKENS: Record<string, string> = { firstName: "Jamie", name: "Jamie Lee", city: "Fontana", zipCode: "92336", dogs: "2 dogs", numberOfDogs: "2", dogWord: "dogs", resumeLink: "https://doogoodscoopers.com/r/?c=SAMPLE", coupon: "WELCOME25", reviewLink: "https://g.page/r/review" };
+const sample = (s: string) => s.replace(/\{\{\s*(\w+)\s*\}\}/g, (m, k) => SAMPLE_TOKENS[k] ?? m).replace(/%7B%7B\s*(\w+)\s*%7D%7D/gi, (m, k) => SAMPLE_TOKENS[k] ?? m);
 import { winbackTemplate, quoteRecoveryTemplate, WINBACK_CODE, WINBACK_FROM, LINK_PLACEHOLDER } from "@/lib/campaign-templates";
 import { TokenChips, appendSnippet } from "@/components/admin/TokenChips";
 
@@ -18,6 +30,9 @@ export interface DripStep {
   channel?: "sms" | "email";
   subject?: string;
   body: string;
+  /** Email steps: a designed email from the builder (sent instead of body). */
+  html?: string;
+  designJson?: object | null;
   delayValue: number;
   delayUnit: DelayUnit;
 }
@@ -81,6 +96,27 @@ export function DripForm({ mode, campaignId, initial }: DripFormProps) {
   const [offerEnds, setOfferEnds] = useState(() => { const d = new Date(); d.setDate(d.getDate() + 14); return ymd(d); });
   const [signupLink, setSignupLink] = useState("");
   const [preview, setPreview] = useState<number | null>(null);
+  // Designer modal: which step is being designed.
+  const [designing, setDesigning] = useState<number | null>(null);
+  const builderRef = useRef<EmailBuilderHandle | null>(null);
+  const [emailTemplates, setEmailTemplates] = useState<{ id: string; name: string }[]>([]);
+  useEffect(() => {
+    fetch("/api/admin/email-templates").then((r) => (r.ok ? r.json() : { templates: [] })).then((d) => setEmailTemplates(d.templates || [])).catch(() => {});
+  }, []);
+  const hasContent = (s: DripStep) => !!s.body.trim() || (s.channel === "email" && !!s.html?.trim());
+  async function applyEmailTemplate(i: number, id: string) {
+    const res = await fetch(`/api/admin/email-templates/${id}`);
+    if (!res.ok) return;
+    const d = await res.json();
+    const t = d.template || d;
+    updateStep(i, { html: t.html || "", designJson: t.designJson || null, subject: steps[i].subject || t.subject || "" });
+  }
+  function applyDesign() {
+    if (designing !== null && builderRef.current) {
+      updateStep(designing, { html: builderRef.current.getHtml(), designJson: builderRef.current.getDesign() });
+    }
+    setDesigning(null);
+  }
   const [saving, setSaving] = useState<null | "draft" | "launch">(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -144,8 +180,8 @@ export function DripForm({ mode, campaignId, initial }: DripFormProps) {
     // A draft can be incomplete; a live campaign needs a trigger + a message.
     if (!asDraft) {
       if (leadTypes.length === 0) return setError("Pick at least one trigger lead type.");
-      if (!steps.some((s) => s.body.trim())) return setError("Add at least one message.");
-      const noSubject = steps.findIndex((s) => s.channel === "email" && s.body.trim() && !s.subject?.trim());
+      if (!steps.some(hasContent)) return setError("Add at least one message.");
+      const noSubject = steps.findIndex((s) => s.channel === "email" && hasContent(s) && !s.subject?.trim());
       if (noSubject >= 0) return setError(`Message ${noSubject + 1} is an email and needs a subject.`);
       if (steps.some((s) => s.body.includes(LINK_PLACEHOLDER))) return setError("A message still has the placeholder signup link. Replace it with your real link.");
       if (isFormer && mode === "create" && !confirm(`Activate now? ${willEnroll.length} former customers will be enrolled and the first message starts going out right away (within sending hours).`)) return;
@@ -160,13 +196,17 @@ export function DripForm({ mode, campaignId, initial }: DripFormProps) {
         stopOnReply,
         channel,
         steps: steps
-          .filter((s) => s.body.trim())
-          .map((s) => ({
-            channel: s.channel === "email" ? "email" : "sms",
-            subject: s.channel === "email" ? (s.subject || "").trim() : "",
-            body: s.body.trim(),
-            delayMinutes: Math.max(0, Math.round(s.delayValue * UNIT_MINUTES[s.delayUnit])),
-          })),
+          .filter(hasContent)
+          .map((s) => {
+            const designed = s.channel === "email" && !!s.html?.trim();
+            return {
+              channel: s.channel === "email" ? "email" : "sms",
+              subject: s.channel === "email" ? (s.subject || "").trim() : "",
+              body: designed ? textFromHtml(s.html!, 600) : s.body.trim(),
+              ...(designed ? { html: s.html, designJson: s.designJson || undefined } : {}),
+              delayMinutes: Math.max(0, Math.round(s.delayValue * UNIT_MINUTES[s.delayUnit])),
+            };
+          }),
         emailFromName: fromName.trim(),
         ...(isFormer ? { excludeIds: [...(excluded ?? [])], includeNew } : {}),
       };
@@ -463,9 +503,11 @@ export function DripForm({ mode, campaignId, initial }: DripFormProps) {
                 </button>
               </div>
               {step.channel === "email" ? (
-                <button type="button" onClick={() => setPreview(preview === i ? null : i)} className="flex items-center gap-1 text-xs text-violet-700 hover:underline">
-                  <Eye className="w-3.5 h-3.5" /> {preview === i ? "Hide preview" : "Preview"}
-                </button>
+                !step.html ? (
+                  <button type="button" onClick={() => setPreview(preview === i ? null : i)} className="flex items-center gap-1 text-xs text-violet-700 hover:underline">
+                    <Eye className="w-3.5 h-3.5" /> {preview === i ? "Hide preview" : "Preview"}
+                  </button>
+                ) : null
               ) : (
                 <span className="text-xs text-gray-400">{step.body.length} characters{step.body.length > 160 ? ` · sends as ${Math.ceil(step.body.length / 153)} text segments` : ""}</span>
               )}
@@ -478,24 +520,55 @@ export function DripForm({ mode, campaignId, initial }: DripFormProps) {
                 className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
               />
             )}
-            <textarea
-              value={step.body}
-              onChange={(e) => updateStep(i, { body: e.target.value })}
-              rows={step.channel === "email" ? 10 : 3}
-              placeholder={step.channel === "email" ? "Email text…  Leave a blank line between paragraphs." : "Message…  Use {{firstName}}, {{city}}, {{zipCode}}, {{dogs}}, {{resumeLink}}, {{coupon}} or {{reviewLink}} to personalize."}
-              className={`w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent ${step.channel === "email" ? "resize-y" : "resize-none"}`}
-            />
-            <TokenChips email={step.channel === "email"} onInsert={(t) => updateStep(i, { body: appendSnippet(step.body, t) })} />
             {step.channel === "email" && (
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden text-xs font-semibold">
+                  <button type="button" onClick={() => { if (!step.html || confirm("Switch this email to plain text? The design is kept until you save.")) updateStep(i, { html: "", designJson: null }); }}
+                    className={`px-2.5 py-1 ${!step.html ? "bg-violet-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}>Plain text</button>
+                  <button type="button" onClick={() => { if (!step.html) setDesigning(i); }}
+                    className={`flex items-center gap-1 px-2.5 py-1 ${step.html ? "bg-violet-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}><Paintbrush className="w-3.5 h-3.5" /> Designed</button>
+                </div>
+                {step.html ? (
+                  <button type="button" onClick={() => setDesigning(i)} className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg border border-gray-200 text-navy-900 hover:bg-gray-50">
+                    <LayoutTemplate className="w-3.5 h-3.5" /> Open designer
+                  </button>
+                ) : null}
+                {emailTemplates.length > 0 && (
+                  <select defaultValue="" onChange={(e) => { if (e.target.value) applyEmailTemplate(i, e.target.value); e.target.value = ""; }}
+                    className="text-xs border border-gray-200 rounded-lg px-2 py-1 text-gray-600">
+                    <option value="" disabled>{step.html ? "Replace with a template…" : "Start from an email template…"}</option>
+                    {emailTemplates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                )}
+              </div>
+            )}
+            {step.channel === "email" && step.html ? (
+              <div className="border border-gray-200 rounded-lg overflow-hidden bg-[#f1f5f9]">
+                <iframe title={`Email ${i + 1}`} sandbox="" srcDoc={sample(step.html)} className="w-full h-[320px] bg-white" />
+                <p className="px-3 py-1.5 text-[11px] text-gray-500 border-t border-gray-200 bg-white">Designed email · sent exactly like this with {"{{firstName}}"}, {"{{city}}"}, {"{{resumeLink}}"} and the other tokens filled in. Open the designer to change it.</p>
+              </div>
+            ) : (
+              <>
+                <textarea
+                  value={step.body}
+                  onChange={(e) => updateStep(i, { body: e.target.value })}
+                  rows={step.channel === "email" ? 10 : 3}
+                  placeholder={step.channel === "email" ? "Email text…  Leave a blank line between paragraphs. Or switch to Designed for the drag-and-drop builder." : "Message…  Use {{firstName}}, {{city}}, {{zipCode}}, {{dogs}}, {{resumeLink}}, {{coupon}} or {{reviewLink}} to personalize."}
+                  className={`w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent ${step.channel === "email" ? "resize-y" : "resize-none"}`}
+                />
+                <TokenChips email={step.channel === "email"} onInsert={(t) => updateStep(i, { body: appendSnippet(step.body, t) })} />
+              </>
+            )}
+            {step.channel === "email" && !step.html && (
               <p className="text-xs text-gray-500">
                 Use <code className="bg-gray-100 px-1 rounded">{"{{firstName}}"}</code> to personalize, <code className="bg-gray-100 px-1 rounded">**bold**</code> for bold, and put{" "}
                 <code className="bg-gray-100 px-1 rounded">[Button text](https://link)</code> on its own line for a button.
               </p>
             )}
-            {step.channel === "email" && preview === i && (
+            {step.channel === "email" && !step.html && preview === i && (
               <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
-                <p className="px-4 py-2 text-sm border-b border-gray-100 bg-gray-50 text-gray-700"><b>Subject:</b> {(step.subject || "").replace(/\{\{firstName\}\}/g, "Jamie")}</p>
-                <div dangerouslySetInnerHTML={{ __html: emailTextToHtml(step.body.replace(/\{\{firstName\}\}/g, "Jamie")) }} />
+                <p className="px-4 py-2 text-sm border-b border-gray-100 bg-gray-50 text-gray-700"><b>Subject:</b> {sample(step.subject || "")}</p>
+                <div dangerouslySetInnerHTML={{ __html: emailTextToHtml(sample(step.body)) }} />
               </div>
             )}
             {templates.length > 0 && step.channel !== "email" && (
@@ -525,6 +598,28 @@ export function DripForm({ mode, campaignId, initial }: DripFormProps) {
           Add message
         </button>
       </div>
+
+      {/* Full-screen designer for one email step (same builder as the email blasts). */}
+      {designing !== null && (
+        <div className="fixed inset-0 z-50 bg-white flex flex-col">
+          <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100">
+            <div className="flex items-center gap-2 text-sm font-medium text-navy-900">
+              <LayoutTemplate className="w-4 h-4 text-teal-600" /> Email designer · message {designing + 1}{steps[designing]?.subject ? ` · ${steps[designing].subject}` : ""}
+            </div>
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={() => setDesigning(null)} className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 rounded-lg border border-gray-200 flex items-center gap-1.5"><X className="w-4 h-4" /> Cancel</button>
+              <button type="button" onClick={applyDesign} className="px-4 py-1.5 text-sm bg-teal-600 text-white rounded-lg hover:bg-teal-700 font-medium">Use this design</button>
+            </div>
+          </div>
+          <div className="flex-1 min-h-0">
+            <EmailBuilder
+              initialHtml={steps[designing]?.html || (steps[designing]?.body ? emailTextToHtml(steps[designing].body) : undefined)}
+              initialDesign={steps[designing]?.designJson || null}
+              onReady={(h) => (builderRef.current = h)}
+            />
+          </div>
+        </div>
+      )}
 
       {error && <p className="text-sm text-red-600">{error}</p>}
       <div className="flex flex-wrap items-center gap-3">

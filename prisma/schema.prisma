@@ -791,6 +791,8 @@ model CampaignStep {
   delayMinutes Int      @default(0) // wait before this step, relative to the previous (step 0 = 0)
   channel      String   @default("sms") // sms (the campaign's text channel) | email
   subject      String?  // email steps only
+  html         String?  @db.Text // email steps: a designed email (sent instead of body); body then holds a text summary
+  designJson   Json?    // the email builder's project data, so the design can be re-opened
 
   @@index([campaignId])
 }

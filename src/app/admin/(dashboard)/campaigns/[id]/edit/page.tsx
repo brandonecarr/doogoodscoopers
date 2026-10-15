@@ -24,9 +24,11 @@ export default async function EditCampaignPage({ params }: { params: Promise<{ i
       channel: s.channel === "email" ? ("email" as const) : ("sms" as const),
       subject: s.subject || "",
       body: s.body,
+      html: s.html || "",
+      designJson: (s.designJson as object | null) ?? null,
       ...minutesToStep(s.delayMinutes),
     }));
-    if (steps.length === 0) steps.push({ channel: "sms", subject: "", body: "", delayValue: 0, delayUnit: "days" });
+    if (steps.length === 0) steps.push({ channel: "sms", subject: "", body: "", html: "", designJson: null, delayValue: 0, delayUnit: "days" });
     return (
       <DripForm
         mode="edit"
