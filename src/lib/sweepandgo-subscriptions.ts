@@ -23,6 +23,8 @@ const REFRESH_REQUESTED_KEY = "subscriptions.refreshRequestedAt";
 const LAST_RUN_KEY = "subscriptions.lastRunAt";
 const REFRESH_SETTLE_MS = 2 * 60 * 1000;
 const REFRESH_MIN_GAP_MS = 60 * 60 * 1000;
+/** A mirror older than this (or empty) asks the cron for a fill, so the TV never waits for the nightly run. */
+const STALE_MS = 36 * 60 * 60 * 1000;
 
 const date = (v: string | null | undefined): Date | null => {
   if (!v) return null;
@@ -77,6 +79,18 @@ export async function requestSubscriptionRefresh(at = new Date()): Promise<void>
   await setSetting(REFRESH_REQUESTED_KEY, at.toISOString()).catch((e) => console.error("[subscriptions] could not flag refresh:", e));
 }
 
+/**
+ * Flag a refresh only if none is pending: the TV asks every minute, and re-flagging
+ * would keep resetting the cron's 2-minute settle so the pull never ran.
+ */
+async function requestRefreshIfIdle(): Promise<void> {
+  const [requested, lastRun] = await Promise.all([getSetting(REFRESH_REQUESTED_KEY).catch(() => null), getSetting(LAST_RUN_KEY).catch(() => null)]);
+  const reqAt = requested ? new Date(requested).getTime() : 0;
+  const lastAt = lastRun ? new Date(lastRun).getTime() : 0;
+  if (reqAt > lastAt) return; // already pending
+  await requestSubscriptionRefresh();
+}
+
 /** Pull + mirror now if a webhook asked for it, the burst settled, and the last pull is over an hour old. */
 export async function syncSubscriptionsIfDue(now = new Date()): Promise<{ ran: boolean; reason: string; count?: number }> {
   const [requested, lastRun] = await Promise.all([getSetting(REFRESH_REQUESTED_KEY).catch(() => null), getSetting(LAST_RUN_KEY).catch(() => null)]);
@@ -118,5 +132,7 @@ export async function projectedMonthCents(from: Date, to: Date): Promise<{ cents
     n++;
   }
   const latest = rows.length ? rows.reduce((d, s) => (s.syncedAt > d ? s.syncedAt : d), rows[0].syncedAt) : null;
+  // Empty or stale mirror → ask the 15-minute cron to pull it (idempotent while pending).
+  if (!latest || Date.now() - latest.getTime() > STALE_MS) await requestRefreshIfIdle().catch(() => {});
   return { cents: Math.round(total), subscriptions: n, asOf: latest };
 }
