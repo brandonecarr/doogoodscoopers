@@ -213,11 +213,11 @@ export function LeadMessages({ leadId, leadType, phone, initialMessages, optedOu
             onChange={(e) => setBody(e.target.value)}
             placeholder={
               viaMessenger
-                ? messengerOpen ? "Reply on Facebook Messenger…  (use {{firstName}}, {{zipCode}} or {{dogs}})" : "Messenger window closed"
+                ? messengerOpen ? "Reply on Facebook Messenger…  (use {{firstName}}, {{city}}, {{zipCode}} or {{dogs}})" : "Messenger window closed"
                 : optedOut
                 ? "This lead opted out (STOP)"
                 : phone
-                  ? "Type a message…  (use {{firstName}}, {{zipCode}} or {{dogs}})"
+                  ? "Type a message…  (use {{firstName}}, {{city}}, {{zipCode}} or {{dogs}})"
                   : "Add a phone number first"
             }
             rows={3}

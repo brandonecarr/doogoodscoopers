@@ -1,6 +1,7 @@
 import prisma from "@/lib/prisma";
 import type { LeadSource } from "@prisma/client";
 import { resumeLinkForLead, recoverySettings, type ResumeChannel } from "@/lib/quote-recovery";
+import { cityFromZip } from "@/lib/geo/zipCity";
 
 /**
  * Personalization tokens available to SMS templates ({{firstName}}, {{zipCode}},
@@ -22,6 +23,8 @@ export interface LeadVars {
   lastName: string;
   name: string;
   zipCode: string;
+  /** The lead's city: what they typed, else looked up from the ZIP (offline dataset). Empty when unknown. */
+  city: string;
   /** Bare count, e.g. "2". Empty when unknown. */
   numberOfDogs: string;
   /** Count + correctly pluralized noun, e.g. "1 dog" / "2 dogs". Empty when unknown. */
@@ -40,6 +43,7 @@ export const EMPTY_LEAD_VARS: LeadVars = {
   lastName: "",
   name: "",
   zipCode: "",
+  city: "",
   numberOfDogs: "",
   dogs: "",
   dogWord: "",
@@ -75,6 +79,12 @@ function dogTokens(raw: string | null | undefined): Pick<LeadVars, "numberOfDogs
   return { numberOfDogs: s, dogs: `${s} dogs`, dogWord: "dogs" };
 }
 
+/** The city to print: the stored one when present, else derived from the ZIP. */
+function cityToken(city: string | null | undefined, zip: string | null | undefined): string {
+  const c = (city || "").trim();
+  return c || cityFromZip(zip) || "";
+}
+
 /** Best-effort dog count from an ad lead's captured form fields (customFields JSON). */
 function adDogCount(customFields: unknown): string {
   if (!customFields || typeof customFields !== "object") return "";
@@ -108,7 +118,7 @@ async function baseLeadVars(leadType: LeadSource, leadId: string): Promise<LeadV
     case "QUOTE_FORM": {
       const l = await prisma.quoteLead.findUnique({
         where: { id: leadId },
-        select: { firstName: true, lastName: true, zipCode: true, numberOfDogs: true },
+        select: { firstName: true, lastName: true, zipCode: true, city: true, numberOfDogs: true },
       });
       if (!l) return { ...EMPTY_LEAD_VARS };
       const name = [l.firstName, l.lastName].filter(Boolean).join(" ");
@@ -117,13 +127,14 @@ async function baseLeadVars(leadType: LeadSource, leadId: string): Promise<LeadV
         lastName: l.lastName || "",
         name,
         zipCode: l.zipCode || "",
+        city: cityToken(l.city, l.zipCode),
         ...dogTokens(l.numberOfDogs),
       };
     }
     case "AD_LEAD": {
       const l = await prisma.adLead.findUnique({
         where: { id: leadId },
-        select: { firstName: true, lastName: true, fullName: true, zipCode: true, customFields: true },
+        select: { firstName: true, lastName: true, fullName: true, zipCode: true, city: true, customFields: true },
       });
       if (!l) return { ...EMPTY_LEAD_VARS };
       const name = l.fullName || [l.firstName, l.lastName].filter(Boolean).join(" ");
@@ -132,6 +143,7 @@ async function baseLeadVars(leadType: LeadSource, leadId: string): Promise<LeadV
         lastName: l.lastName || "",
         name,
         zipCode: l.zipCode || "",
+        city: cityToken(l.city, l.zipCode),
         ...dogTokens(adDogCount(l.customFields)),
       };
     }
@@ -142,15 +154,15 @@ async function baseLeadVars(leadType: LeadSource, leadId: string): Promise<LeadV
       });
       if (!l) return { ...EMPTY_LEAD_VARS };
       const name = [l.firstName, l.lastName].filter(Boolean).join(" ");
-      return { firstName: firstNameOf(l.firstName || name), lastName: l.lastName || "", name, zipCode: l.zipCode || "", ...dogTokens("") };
+      return { firstName: firstNameOf(l.firstName || name), lastName: l.lastName || "", name, zipCode: l.zipCode || "", city: cityToken(null, l.zipCode), ...dogTokens("") };
     }
     case "COMMERCIAL": {
       const l = await prisma.commercialLead.findUnique({
         where: { id: leadId },
-        select: { contactName: true, zipCode: true },
+        select: { contactName: true, zipCode: true, city: true },
       });
       if (!l) return { ...EMPTY_LEAD_VARS };
-      return { firstName: firstNameOf(l.contactName || ""), lastName: "", name: l.contactName || "", zipCode: l.zipCode || "", ...dogTokens("") };
+      return { firstName: firstNameOf(l.contactName || ""), lastName: "", name: l.contactName || "", zipCode: l.zipCode || "", city: cityToken(l.city, l.zipCode), ...dogTokens("") };
     }
     case "CAREERS": {
       const l = await prisma.careerApplication.findUnique({
@@ -159,16 +171,16 @@ async function baseLeadVars(leadType: LeadSource, leadId: string): Promise<LeadV
       });
       if (!l) return { ...EMPTY_LEAD_VARS };
       const name = [l.firstName, l.lastName].filter(Boolean).join(" ");
-      return { firstName: firstNameOf(l.firstName || name), lastName: l.lastName || "", name, zipCode: "", ...dogTokens("") };
+      return { firstName: firstNameOf(l.firstName || name), lastName: l.lastName || "", name, zipCode: "", city: "", ...dogTokens("") };
     }
     case "CUSTOMER": {
       const l = await prisma.sweepandgoCustomer.findUnique({
         where: { id: leadId },
-        select: { firstName: true, lastName: true, zipCode: true },
+        select: { firstName: true, lastName: true, zipCode: true, city: true },
       });
       if (!l) return { ...EMPTY_LEAD_VARS };
       const name = [l.firstName, l.lastName].filter(Boolean).join(" ");
-      return { firstName: firstNameOf(l.firstName || name), lastName: l.lastName || "", name, zipCode: l.zipCode || "", ...dogTokens("") };
+      return { firstName: firstNameOf(l.firstName || name), lastName: l.lastName || "", name, zipCode: l.zipCode || "", city: cityToken(l.city, l.zipCode), ...dogTokens("") };
     }
   }
   return { ...EMPTY_LEAD_VARS };

@@ -482,7 +482,7 @@ export function DripForm({ mode, campaignId, initial }: DripFormProps) {
               value={step.body}
               onChange={(e) => updateStep(i, { body: e.target.value })}
               rows={step.channel === "email" ? 10 : 3}
-              placeholder={step.channel === "email" ? "Email text…  Leave a blank line between paragraphs." : "Message…  Use {{firstName}}, {{zipCode}}, {{dogs}}, {{resumeLink}}, {{coupon}} or {{reviewLink}} to personalize."}
+              placeholder={step.channel === "email" ? "Email text…  Leave a blank line between paragraphs." : "Message…  Use {{firstName}}, {{city}}, {{zipCode}}, {{dogs}}, {{resumeLink}}, {{coupon}} or {{reviewLink}} to personalize."}
               className={`w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent ${step.channel === "email" ? "resize-y" : "resize-none"}`}
             />
             <TokenChips email={step.channel === "email"} onInsert={(t) => updateStep(i, { body: appendSnippet(step.body, t) })} />

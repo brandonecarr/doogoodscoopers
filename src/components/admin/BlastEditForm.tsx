@@ -53,7 +53,7 @@ export function BlastEditForm({ campaignId, initialName, initialBody }: { campai
           value={body}
           onChange={(e) => setBody(e.target.value)}
           rows={4}
-          placeholder="Message…  Use {{firstName}}, {{zipCode}} {{dogs}} or {{resumeLink}} to personalize."
+          placeholder="Message…  Use {{firstName}}, {{city}}, {{zipCode}}, {{dogs}} or {{resumeLink}} to personalize."
           className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg resize-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
         />
         <TokenChips onInsert={(t) => setBody((b) => appendSnippet(b, t))} />

@@ -7,6 +7,7 @@ import { Link2, Ticket } from "lucide-react";
 const TOKENS: Array<{ label: string; snippet: string; title?: string }> = [
   { label: "First name", snippet: "{{firstName}}" },
   { label: "ZIP", snippet: "{{zipCode}}" },
+  { label: "City", snippet: "{{city}}", title: "The lead's city — from the ZIP when they didn't type one" },
   { label: "Dogs", snippet: "{{dogs}}", title: 'e.g. "2 dogs"' },
 ];
 
