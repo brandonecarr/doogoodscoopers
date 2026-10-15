@@ -14,9 +14,7 @@ const EmailBuilder = dynamic(() => import("@/components/admin/EmailBuilder"), {
   loading: () => <div className="flex items-center justify-center h-full text-sm text-gray-500"><Loader2 className="w-5 h-5 animate-spin mr-2" /> Loading designer…</div>,
 });
 
-/** Sample values so a preview reads like a real email. */
-const SAMPLE_TOKENS: Record<string, string> = { firstName: "Jamie", name: "Jamie Lee", city: "Fontana", zipCode: "92336", dogs: "2 dogs", numberOfDogs: "2", dogWord: "dogs", resumeLink: "https://doogoodscoopers.com/r/?c=SAMPLE", coupon: "WELCOME25", reviewLink: "https://g.page/r/review", frequency: "Weekly", monthlyRate: "$89", resumeCode: "KMN7YM", unsubscribeUrl: "#", reviewCount: "66", review1Text: "They text when they're on the way, send a photo of the closed gate, and my yard has never looked better.", review1Name: "Maria G.", review1City: "Rancho Cucamonga", review2Text: "Easy signup, same tech every week, and the yard is spotless. Worth every penny.", review2Name: "James T.", review2City: "Fontana" };
-const sample = (s: string) => s.replace(/\{\{\s*(\w+)\s*\}\}/g, (m, k) => SAMPLE_TOKENS[k] ?? m).replace(/%7B%7B\s*(\w+)\s*%7D%7D/gi, (m, k) => SAMPLE_TOKENS[k] ?? m);
+import { sampleTokens as sample } from "@/lib/sample-tokens";
 import { winbackTemplate, quoteRecoveryTemplate, WINBACK_CODE, WINBACK_FROM, LINK_PLACEHOLDER } from "@/lib/campaign-templates";
 import { TokenChips, appendSnippet } from "@/components/admin/TokenChips";
 

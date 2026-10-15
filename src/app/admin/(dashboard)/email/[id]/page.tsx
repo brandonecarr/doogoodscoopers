@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Mail, Send, MousePointerClick, Eye, AlertTriangle, UserMinus, CheckCircle2, XCircle, MinusCircle } from "lucide-react";
 import prisma from "@/lib/prisma";
 import { EmailStatsSyncButton } from "@/components/admin/EmailStatsSyncButton";
+import { sampleTokens } from "@/lib/sample-tokens";
 
 export const dynamic = "force-dynamic";
 
@@ -162,7 +163,7 @@ export default async function EmailCampaignDetail({ params }: { params: Promise<
       <details className="dgs-card overflow-hidden">
         <summary className="px-4 py-3 cursor-pointer text-sm font-semibold text-navy-900 select-none">Email preview</summary>
         <div className="border-t border-gray-100 bg-gray-50 p-4">
-          <iframe title="Email preview" srcDoc={c.html} className="w-full h-[600px] bg-white rounded-lg border border-gray-200" />
+          <iframe title="Email preview" srcDoc={sampleTokens(c.html)} className="w-full h-[600px] bg-white rounded-lg border border-gray-200" />
         </div>
       </details>
     </div>

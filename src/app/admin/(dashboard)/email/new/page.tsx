@@ -7,6 +7,7 @@ import dynamic from "next/dynamic";
 import { ArrowLeft, Loader2, Send, Users, Eye, Paintbrush, LayoutTemplate, X } from "lucide-react";
 import type { EmailBuilderHandle } from "@/components/admin/EmailBuilder";
 import { fromDateTimeLocalValue } from "@/lib/datetime";
+import { sampleTokens } from "@/lib/sample-tokens";
 
 const EmailBuilder = dynamic(() => import("@/components/admin/EmailBuilder"), {
   ssr: false,
@@ -289,7 +290,7 @@ export default function NewEmailPage() {
           {showPreview && (
             <div className="dgs-card p-3">
               <p className="text-xs text-gray-400 px-2 pb-2">Preview</p>
-              <iframe title="preview" className="w-full h-[420px] rounded-lg border border-gray-100 bg-white" srcDoc={html.replace(/\{\{\s*firstName\s*\}\}/g, "Jordan")} />
+              <iframe title="preview" className="w-full h-[420px] rounded-lg border border-gray-100 bg-white" srcDoc={sampleTokens(html)} />
             </div>
           )}
 
