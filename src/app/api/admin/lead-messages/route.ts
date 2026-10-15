@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import prisma from "@/lib/prisma";
-import { sendSms, isQuoConfigured } from "@/lib/quo";
+import { isQuoConfigured } from "@/lib/quo";
+import { sendThreadText } from "@/lib/text-send";
+import { isRelayConfigured } from "@/lib/bluebubbles";
 import { renderTemplate } from "@/lib/resend";
 import { isOptedOut } from "@/lib/sms-optout";
 import { getLeadPersonalization, firstNameOf } from "@/lib/personalization";
@@ -121,9 +123,10 @@ export async function POST(request: Request) {
   if (!vars.lastName) vars.lastName = contact.lastName || "";
   const rendered = renderTemplate(body, vars);
 
-  const result = isQuoConfigured()
-    ? await sendSms({ to: contact.phone, body: rendered })
-    : { success: false, error: "Quo not configured" as string, messageId: undefined, status: undefined };
+  // Follows the conversation: the line the lead's thread is already on (iPhone or Quo).
+  const result = isQuoConfigured() || (await isRelayConfigured())
+    ? await sendThreadText({ leadType: mapped, leadId, to: contact.phone, body: rendered })
+    : { success: false, provider: "quo" as const, error: "Texting isn't configured" as string, messageId: undefined, status: undefined };
 
   const message = await prisma.leadMessage.create({
     data: {
@@ -132,7 +135,7 @@ export async function POST(request: Request) {
       direction: "OUTBOUND",
       body: rendered,
       phone: contact.phone,
-      provider: "quo",
+      provider: result.provider,
       quoMessageId: result.messageId ?? null,
       status: result.success ? result.status || "SENT" : "FAILED",
       adminEmail: session.email,

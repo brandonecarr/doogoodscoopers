@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import prisma from "@/lib/prisma";
-import { sendSms, isQuoConfigured } from "@/lib/quo";
+import { isQuoConfigured } from "@/lib/quo";
+import { sendThreadText } from "@/lib/text-send";
+import { isRelayConfigured } from "@/lib/bluebubbles";
 import { renderTemplate } from "@/lib/resend";
 import { isOptedOut } from "@/lib/sms-optout";
 import { firstNameOf } from "@/lib/personalization";
@@ -23,7 +25,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
 
   const phone = customer.cellPhone || customer.homePhone;
   if (!phone) return NextResponse.json({ error: "This customer has no phone number." }, { status: 400 });
-  if (!isQuoConfigured()) return NextResponse.json({ error: "Texting isn't configured yet." }, { status: 400 });
+  if (!isQuoConfigured() && !(await isRelayConfigured())) return NextResponse.json({ error: "Texting isn't configured yet." }, { status: 400 });
   if (await isOptedOut(phone)) {
     return NextResponse.json({ error: "This customer replied STOP and can no longer be texted.", optedOut: true }, { status: 409 });
   }
@@ -47,7 +49,8 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     reviewLink,
   });
 
-  const result = await sendSms({ to: phone, body });
+  // Follows the customer's existing thread line (iPhone or Quo).
+  const result = await sendThreadText({ leadType: "CUSTOMER", leadId: id, to: phone, body });
 
   await prisma.leadMessage.create({
     data: {
@@ -56,7 +59,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       direction: "OUTBOUND",
       body,
       phone,
-      provider: "quo",
+      provider: result.provider,
       quoMessageId: result.messageId ?? null,
       status: result.success ? result.status || "SENT" : "FAILED",
       adminEmail: session.email,

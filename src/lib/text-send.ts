@@ -15,8 +15,9 @@
 
 import prisma from "@/lib/prisma";
 import { sendSms, isQuoConfigured, type SendSmsResult } from "@/lib/quo";
-import { relayConfig, relayAllowance, sendRelayText, type RelayAllowance } from "@/lib/bluebubbles";
+import { relayConfig, relayAllowance, sendRelayText, isRelayConfigured, type RelayAllowance } from "@/lib/bluebubbles";
 import type { TextProvider } from "@/lib/inbound-text";
+import type { LeadSource } from "@prisma/client";
 
 export type { TextProvider };
 
@@ -80,6 +81,44 @@ export async function sendCampaignText(opts: {
       return { ...q, provider: "quo" };
     }
     return { success: false, provider: "iphone", error: cfg ? "iPhone relay is switched off" : "iPhone relay not configured" };
+  }
+  if (!isQuoConfigured()) return { success: false, provider: "quo", error: "Quo not configured" };
+  const q = await sendSms({ to: opts.to, body: opts.body });
+  return { ...q, provider: "quo" };
+}
+
+/**
+ * Which line a one-off text to this lead should leave from: the line the conversation
+ * is already on (the latest text either way), else the campaign default, else Quo.
+ * Keeps every lead in a single thread on their phone.
+ */
+export async function threadTextProvider(leadType: LeadSource, leadId: string): Promise<TextProvider> {
+  const last = await prisma.leadMessage.findFirst({
+    where: { leadType, leadId, provider: { in: ["quo", "iphone"] } },
+    orderBy: { createdAt: "desc" },
+    select: { provider: true },
+  });
+  const wanted: TextProvider = last ? (last.provider === "iphone" ? "iphone" : "quo") : await defaultTextProvider();
+  if (wanted === "iphone" && !(await isRelayConfigured())) return isQuoConfigured() ? "quo" : "iphone";
+  return wanted;
+}
+
+/**
+ * Sends a one-off text (a reply from the lead profile, a review request) on the lead's
+ * thread line. Not paced: a human reply never waits on the campaign cap. Falls back to
+ * Quo if the relay send fails and fallback is allowed.
+ */
+export async function sendThreadText(opts: { leadType: LeadSource; leadId: string; to: string; body: string }): Promise<CampaignTextResult> {
+  const provider = await threadTextProvider(opts.leadType, opts.leadId);
+  if (provider === "iphone") {
+    const cfg = await relayConfig();
+    const r = await sendRelayText({ to: opts.to, body: opts.body });
+    if (r.success) return { ...r, provider: "iphone" };
+    if (cfg?.fallbackToQuo !== false && isQuoConfigured()) {
+      const q = await sendSms({ to: opts.to, body: opts.body });
+      return { ...q, provider: "quo", error: q.success ? undefined : `${q.error} (after iPhone relay failed: ${r.error})` };
+    }
+    return { ...r, provider: "iphone" };
   }
   if (!isQuoConfigured()) return { success: false, provider: "quo", error: "Quo not configured" };
   const q = await sendSms({ to: opts.to, body: opts.body });

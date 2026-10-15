@@ -188,7 +188,7 @@ export function LeadMessages({ leadId, leadType, phone, initialMessages, optedOu
                     {m.body}
                   </div>
                   <span className="text-[11px] text-gray-400 mt-0.5 px-1" suppressHydrationWarning>
-                    {fb ? "Messenger · " : ""}{formatTime(m.createdAt)}
+                    {fb ? "Messenger · " : m.provider === "iphone" ? "iPhone · " : ""}{formatTime(m.createdAt)}
                     {outbound && m.status ? ` · ${m.status.toLowerCase()}` : ""}
                   </span>
                 </div>
