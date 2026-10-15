@@ -15,6 +15,7 @@ import { activeClientPhones, phoneInActiveSet } from "@/lib/sweepandgo-lookup";
 import { sendCampaignBatch } from "@/lib/email-send";
 import { emailTextToHtml, decodeTemplateTokens } from "@/lib/campaign-email";
 import { applyShowConditions } from "@/lib/email-designer/conditions";
+import { viewUrl } from "@/lib/email-view";
 import { unsubscribedSet, normalizeEmail } from "@/lib/email-unsubscribe";
 
 // Drives DRIP campaigns: enrolls new matching leads and sends each recipient's
@@ -192,6 +193,7 @@ export async function GET(request: NextRequest) {
           html: step.html ? renderTemplate(applyShowConditions(decodeTemplateTokens(step.html), { ...vars, reviewLink }), { ...vars, reviewLink }) : emailTextToHtml(body),
           from: { fromName: campaign.emailFromName },
           recipients: [{ id: r.id, email: r.email!, name: r.name }],
+          viewUrlFor: step.html ? () => viewUrl("s", [step.id, r.leadType, r.leadId]) : undefined,
         });
         result = { success: !e.error, messageId: e.resendId, status: "SENT", error: e.error ?? undefined };
       } else if (campaign.channel === "messenger" && r.leadType === "AD_LEAD") {

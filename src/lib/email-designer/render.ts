@@ -8,7 +8,7 @@
 
 import {
   type Design, type Section, type Column, type Block, type Box, type TextStyle, type TextRole, type Spacing, type Border, type GlobalStyles,
-  type SocialNetwork, googleFontsIn,
+  type SocialNetwork, googleFontsIn, darkOf,
 } from "./model";
 
 export const ICON_BASE = "https://oxorxznxhwdortpblfke.supabase.co/storage/v1/object/public/email-assets/social";
@@ -117,7 +117,7 @@ export function styleLinks(html: string, styles: GlobalStyles): string {
   const l = css(linkCss(styles));
   return html.replace(/<a\b([^>]*)>/gi, (m, attrs: string) => {
     if (/\bstyle=/i.test(attrs)) return m;
-    return `<a${attrs} style="${l}">`;
+    return `<a${attrs} class="dgs-a" style="${l}">`;
   });
 }
 
@@ -127,13 +127,13 @@ export function renderBlock(block: Block, styles: GlobalStyles): string {
   switch (block.type) {
     case "title": {
       const tag = `h${block.level}`;
-      return `<${tag} style="${css(textCss(styles, block, block.style, block.align))}">${styleLinks(block.html, styles)}</${tag}>`;
+      return `<${tag} class="dgs-t" style="${css(textCss(styles, block, block.style, block.align))}">${styleLinks(block.html, styles)}</${tag}>`;
     }
     case "text":
-      return `<div style="${css(textCss(styles, block, block.style, block.align))}">${styleLinks(block.html, styles)}</div>`;
+      return `<div class="dgs-t" style="${css(textCss(styles, block, block.style, block.align))}">${styleLinks(block.html, styles)}</div>`;
     case "dynamic": {
       const value = `{{${block.token}}}`;
-      return `<div style="${css(textCss(styles, block, block.style, block.align))}">${esc(block.prefix)}${value}${esc(block.suffix)}</div>`;
+      return `<div class="dgs-t" style="${css(textCss(styles, block, block.style, block.align))}">${esc(block.prefix)}${value}${esc(block.suffix)}</div>`;
     }
     case "image":
     case "logo": {
@@ -198,11 +198,14 @@ function wrapCondition(html: string, box: Box): string {
   return box.condition ? `<!--dgs:if ${box.condition.token} ${box.condition.when}-->${html}<!--dgs:endif-->` : html;
 }
 
+export const darkClass = (box: Box) => (box.dark && (box.dark.background || box.dark.color) ? `dgs-d-${box.id}` : "");
+
 function blockCell(block: Block, styles: GlobalStyles): string {
   const cls = visibilityClass(block.visibility);
   const outer = isZero(block.margin) ? "" : ` style="padding:${pad(block.margin)}"`;
   const inner = css(boxCss(block));
-  const body = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"${cls ? ` class="${cls}"` : ""}><tr><td${outer}><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td${inner ? ` style="${inner}"` : ""}>${renderBlock(block, styles)}</td></tr></table></td></tr></table>`;
+  const dc = darkClass(block);
+  const body = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"${cls ? ` class="${cls}"` : ""}><tr><td${outer}><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td${dc ? ` class="${dc}"` : ""}${inner ? ` style="${inner}"` : ""}>${renderBlock(block, styles)}</td></tr></table></td></tr></table>`;
   return wrapCondition(body, block);
 }
 
@@ -212,7 +215,8 @@ function columnCell(column: Column, section: Section, styles: GlobalStyles, inde
   const gapPad = gap ? `padding-left:${first ? 0 : px(gap / 2)};padding-right:${last ? 0 : px(gap / 2)};` : "";
   const inner = css(boxCss(column));
   const cls = ["dgs-col", visibilityClass(column.visibility)].filter(Boolean).join(" ");
-  const cell = `<td class="${cls}" width="${column.width}%" valign="${column.vAlign}" style="width:${column.width}%;vertical-align:${column.vAlign};${gapPad}${isZero(column.margin) ? "" : `padding:${pad(column.margin)};`}"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td valign="${column.vAlign}"${inner ? ` style="${inner}"` : ""}>${column.blocks.map((b) => blockCell(b, styles)).join("\n")}</td></tr></table></td>`;
+  const dc = darkClass(column);
+  const cell = `<td class="${cls}" width="${column.width}%" valign="${column.vAlign}" style="width:${column.width}%;vertical-align:${column.vAlign};${gapPad}${isZero(column.margin) ? "" : `padding:${pad(column.margin)};`}"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td valign="${column.vAlign}"${dc ? ` class="${dc}"` : ""}${inner ? ` style="${inner}"` : ""}>${column.blocks.map((b) => blockCell(b, styles)).join("\n")}</td></tr></table></td>`;
   return wrapCondition(cell, column);
 }
 
@@ -221,7 +225,8 @@ export function renderSection(section: Section, styles: GlobalStyles): string {
   const inner = css(boxCss(section, { "vertical-align": section.vAlign }));
   const cols = section.columns.map((c, i) => columnCell(c, section, styles, i)).join("");
   const stack = section.stackOnMobile ? "" : " dgs-nostack";
-  const row = `<tr${cls ? ` class="${cls}"` : ""}><td${isZero(section.margin) ? "" : ` style="padding:${pad(section.margin)}"`}><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"${section.background ? ` bgcolor="${section.background}"` : ""}><tr><td${inner ? ` style="${inner}"` : ""}><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="dgs-cols${stack}"><tr>${cols}</tr></table></td></tr></table></td></tr>`;
+  const dc = [darkClass(section), section.background ? "dgs-sec" : ""].filter(Boolean).join(" ");
+  const row = `<tr${cls ? ` class="${cls}"` : ""}><td${isZero(section.margin) ? "" : ` style="padding:${pad(section.margin)}"`}><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"${section.background ? ` bgcolor="${section.background}"` : ""}><tr><td${dc ? ` class="${dc}"` : ""}${inner ? ` style="${inner}"` : ""}><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="dgs-cols${stack}"><tr>${cols}</tr></table></td></tr></table></td></tr>`;
   return wrapCondition(row, section);
 }
 
@@ -246,6 +251,45 @@ export function googleFontLink(design: Design): string {
   return `<link href="https://fonts.googleapis.com/css2?${fam}&display=swap" rel="stylesheet" />`;
 }
 
+/** The dark-mode rules, every declaration !important so it beats the inline styles. */
+export function darkRules(design: Design): { selectors: string[]; decl: string }[] {
+  const d = darkOf(design.styles);
+  if (!d.enabled) return [];
+  const rules: { selectors: string[]; decl: string }[] = [
+    { selectors: [".dgs-page", ".dgs-page-c"], decl: `background-color:${d.pageBg} !important;` },
+    { selectors: [".dgs-body"], decl: `background-color:${d.bodyBg} !important;` },
+    { selectors: [".dgs-t", ".dgs-t *"], decl: `color:${d.text} !important;` },
+    { selectors: [".dgs-a", ".dgs-t a"], decl: `color:${d.link} !important;` },
+  ];
+  if (d.sectionBg) rules.push({ selectors: [".dgs-sec"], decl: `background-color:${d.sectionBg} !important;` });
+  for (const sec of design.sections) {
+    const boxes: Box[] = [sec, ...sec.columns, ...sec.columns.flatMap((c) => c.blocks)];
+    for (const b of boxes) {
+      if (!b.dark) continue;
+      const decl = [b.dark.background ? `background-color:${b.dark.background} !important;` : "", b.dark.color ? `color:${b.dark.color} !important;` : ""].join("");
+      if (!decl) continue;
+      rules.push({ selectors: [`.dgs-d-${b.id}`], decl });
+      if (b.dark.color) rules.push({ selectors: [`.dgs-d-${b.id} .dgs-t`, `.dgs-d-${b.id} .dgs-t *`], decl: `color:${b.dark.color} !important;` });
+    }
+  }
+  return rules;
+}
+
+/** The dark rules as CSS text, every selector prefixed (e.g. "[data-ogsc] " or a preview scope). */
+export function darkCssText(design: Design, prefix: string, sep = "\n"): string {
+  return darkRules(design).map((r) => `${r.selectors.map((s) => prefix + s).join(",")}{${r.decl}}`).join(sep);
+}
+
+/** Dark-mode CSS: media query + Outlook.com's [data-ogsc] hook. */
+export function darkCss(design: Design): string {
+  if (!darkRules(design).length) return "";
+  return `
+  @media (prefers-color-scheme: dark){
+    ${darkCssText(design, "", "\n    ")}
+  }
+  ${darkCssText(design, "[data-ogsc] ", "\n  ")}`;
+}
+
 /** The full email document. `viewInBrowserUrl` is left as a token the sender can fill. */
 export function renderDesign(design: Design): string {
   const s = design.styles;
@@ -260,6 +304,7 @@ export function renderDesign(design: Design): string {
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="x-apple-disable-message-reformatting" />
+${darkOf(s).enabled ? '<meta name="color-scheme" content="light dark" /><meta name="supported-color-schemes" content="light dark" />' : ""}
 <title></title>
 <!--[if mso]><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml><![endif]-->
 ${googleFontLink(design)}
@@ -275,16 +320,16 @@ ${googleFontLink(design)}
     .dgs-mobile{display:block !important;max-height:none !important;}
     tr.dgs-mobile{display:table-row !important;}
     td.dgs-mobile{display:table-cell !important;}
-  }
+  }${darkCss(design)}
 </style>
 </head>
 <body style="margin:0;padding:0;background-color:${s.pageBg};">
 ${preheader}
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${s.pageBg}" style="background-color:${s.pageBg};">
-<tr><td align="center" style="padding:${pad(s.bodyPadding)};">
+<table role="presentation" class="dgs-page" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${s.pageBg}" style="background-color:${s.pageBg};">
+<tr><td align="center" class="dgs-page-c" style="padding:${pad(s.bodyPadding)};">
 ${viewInBrowser}
 <!--[if mso]><table role="presentation" width="${w}" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
-<table role="presentation" class="dgs-wrap" width="${w}" cellpadding="0" cellspacing="0" border="0" bgcolor="${s.bodyBg}" style="${bodyStyle}">
+<table role="presentation" class="dgs-wrap dgs-body" width="${w}" cellpadding="0" cellspacing="0" border="0" bgcolor="${s.bodyBg}" style="${bodyStyle}">
 ${sections}
 </table>
 <!--[if mso]></td></tr></table><![endif]-->

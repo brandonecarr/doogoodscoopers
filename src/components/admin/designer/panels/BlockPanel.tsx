@@ -1,7 +1,8 @@
 "use client";
 
 import { Plus, Trash2, X } from "lucide-react";
-import { type Block, type BrandLibrary, type GlobalStyles, type SocialNetwork, BLOCK_LABEL, spacing } from "@/lib/email-designer/model";
+import { type Block, type BrandLibrary, type GlobalStyles, type SocialNetwork, BLOCK_LABEL, spacing, darkOf,
+} from "@/lib/email-designer/model";
 import { SOCIAL_LABEL } from "@/lib/email-designer/render";
 import { PanelSection, Field, NumberInput, TextInput, ColorInput, Select, AlignGroup, Toggle, SpacingInput, BorderInput, NameEditor, Segment, inputCls } from "../ui";
 import { ImagePicker } from "../ImagePicker";
@@ -26,7 +27,7 @@ export function BlockPanel({ block, styles, brand, onChange, onClose }: { block:
       </div>
       <div className="flex-1 overflow-y-auto">
         {specific(b, styles, brand, set)}
-        <BoxFields box={b} brand={brand} onChange={set} />
+        <BoxFields box={b} brand={brand} onChange={set} darkEnabled={darkOf(styles).enabled} />
       </div>
     </div>
   );

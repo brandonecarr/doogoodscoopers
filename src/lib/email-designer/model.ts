@@ -35,6 +35,8 @@ export interface Box {
   border: Border | null;
   visibility: Visibility;
   condition: Condition | null;
+  /** Dark-mode overrides for this element (used when the email's dark mode is on). */
+  dark?: { background?: string | null; color?: string | null };
 }
 
 export interface TextStyle {
@@ -92,7 +94,14 @@ export interface GlobalStyles {
   text: { paragraph: TextRole; title1: TextRole; title2: TextRole; title3: TextRole };
   link: { color: string; bold: boolean; italic: boolean; underline: boolean };
   button: { font: string; size: number; color: string; bg: string; radius: number; bold: boolean; width: number | null; inner: Spacing; borderSize: number; borderColor: string };
+  /** Optional dark-mode palette (see DEFAULT_DARK). */
+  dark?: Partial<DarkStyles>;
 }
+
+export interface DarkStyles { enabled: boolean; pageBg: string; bodyBg: string; text: string; link: string; sectionBg: string | null }
+export const DEFAULT_DARK: DarkStyles = { enabled: false, pageBg: "#0B1220", bodyBg: "#111827", text: "#E5E7EB", link: "#7CC7FF", sectionBg: null };
+/** The design's dark palette (older designs have none). */
+export const darkOf = (s: GlobalStyles): DarkStyles => ({ ...DEFAULT_DARK, ...(s.dark || {}) });
 
 export interface Design { version: 2; styles: GlobalStyles; sections: Section[] }
 

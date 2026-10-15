@@ -1,11 +1,11 @@
 "use client";
 
 import { Fragment, useState, type CSSProperties, type DragEvent } from "react";
-import { ArrowUp, ArrowDown, Copy, Trash2, Move, Eye, EyeOff } from "lucide-react";
+import { ArrowUp, ArrowDown, Copy, Trash2, Move, Eye, EyeOff, Bookmark } from "lucide-react";
 import {
   type Design, type Section, type Column, type Block, type Selection, type BrandLibrary, type Box, nodeName,
 } from "@/lib/email-designer/model";
-import { textCss, linkCss, pad, borderCss, borderDecl, radiusDecl, socialIconUrl, SOCIAL_LABEL } from "@/lib/email-designer/render";
+import { textCss, linkCss, pad, borderCss, borderDecl, radiusDecl, socialIconUrl, SOCIAL_LABEL, darkCssText, darkClass } from "@/lib/email-designer/render";
 import { sampleTokens } from "@/lib/sample-tokens";
 import { RichText } from "./RichText";
 
@@ -21,7 +21,10 @@ export interface CanvasProps {
   selection: Selection;
   device: Device;
   previewing: boolean;
+  /** Show the email's dark-mode colors (only when the design has dark mode on). */
+  dark?: boolean;
   dragging: boolean;
+  onSaveSection?: (id: string) => void;
   onSelect: (s: Selection) => void;
   onChangeBlock: (id: string, patch: Partial<Block>) => void;
   onDrop: (e: DragEvent, target: DropTarget) => void;
@@ -85,6 +88,7 @@ export function Canvas(p: CanvasProps) {
         <button type="button" title="Move up" onClick={() => p.onMove(selection, -1)} className="dgs-tb"><ArrowUp className="w-3.5 h-3.5" /></button>
         <button type="button" title="Move down" onClick={() => p.onMove(selection, 1)} className="dgs-tb"><ArrowDown className="w-3.5 h-3.5" /></button>
         <button type="button" title="Duplicate" onClick={() => p.onDuplicate(selection)} className="dgs-tb"><Copy className="w-3.5 h-3.5" /></button>
+        {kind === "section" && p.onSaveSection && <button type="button" title="Save to library" onClick={() => p.onSaveSection!(node.id)} className="dgs-tb"><Bookmark className="w-3.5 h-3.5" /></button>}
         <button type="button" title="Delete" onClick={() => p.onDelete(selection)} className="dgs-tb dgs-tb-danger"><Trash2 className="w-3.5 h-3.5" /></button>
       </div>
     );
@@ -187,7 +191,7 @@ export function Canvas(p: CanvasProps) {
         >
           {label(block, "block")}
           {toolbar(block, "block")}
-          <div style={boxStyle(block)}>{renderBlock(block)}</div>
+          <div className={`${block.type === "title" || block.type === "text" || block.type === "dynamic" ? "dgs-t" : ""} ${darkClass(block)}`} style={boxStyle(block)}>{renderBlock(block)}</div>
           {block.condition && !previewing && <span className="dgs-cond">{block.condition.when === "present" ? "if" : "unless"} {`{{${block.condition.token}}}`}</span>}
         </div>
       </Fragment>
@@ -214,7 +218,7 @@ export function Canvas(p: CanvasProps) {
         onClick={(e) => { e.stopPropagation(); p.onSelect({ kind: "column", id: column.id }); }}
       >
         {label(column, "column")}
-        <div style={{ ...boxStyle(column), flex: 1, minHeight: column.blocks.length ? undefined : 48 }}>
+        <div className={darkClass(column)} style={{ ...boxStyle(column), flex: 1, minHeight: column.blocks.length ? undefined : 48 }}>
           {column.blocks.map((b, bi) => blockEl(b, column, bi))}
           {zone({ kind: "block", columnId: column.id, index: column.blocks.length }, `z-${column.id}-end`)}
           {!column.blocks.length && !p.dragging && <div className="dgs-empty">Drop a block here</div>}
@@ -239,7 +243,7 @@ export function Canvas(p: CanvasProps) {
         >
           {label(section, "section")}
           {toolbar(section, "section")}
-          <div style={boxStyle(section)}>
+          <div className={`${section.background ? "dgs-sec" : ""} ${darkClass(section)}`} style={boxStyle(section)}>
             <div style={{ display: "flex", flexDirection: stacked ? "column" : "row", alignItems: section.vAlign === "middle" ? "center" : section.vAlign === "bottom" ? "flex-end" : "stretch", gap: stacked ? 12 : 0 }}>
               {section.columns.map((c, i) => columnEl(c, section, i))}
             </div>
@@ -251,8 +255,8 @@ export function Canvas(p: CanvasProps) {
   };
 
   return (
-    <div className={`dgs-canvas ${previewing ? "dgs-previewing" : ""}`} style={{ background: s.pageBg }} onClick={() => p.onSelect(null)}>
-      <style>{CANVAS_CSS}</style>
+    <div className={`dgs-canvas dgs-page ${previewing ? "dgs-previewing" : ""} ${p.dark ? "dgs-dark" : ""}`} style={{ background: s.pageBg }} onClick={() => p.onSelect(null)}>
+      <style>{CANVAS_CSS}{p.dark ? darkCssText(design, ".dgs-canvas.dgs-dark ") : ""}</style>
       <div style={{ padding: pad(s.bodyPadding), paddingTop: Math.max(s.bodyPadding.top, 44) }}>
         {s.viewInBrowser && <div style={{ textAlign: "center", padding: "12px 0 0", fontFamily: s.text.paragraph.font, fontSize: 12, color: s.text.paragraph.color, textDecoration: "underline" }}>View in browser</div>}
         <div className="dgs-body" style={{ width, maxWidth: "100%", margin: "0 auto", background: s.bodyBg, borderRadius: s.bodyRadius, minHeight: 200 }}>
@@ -263,7 +267,7 @@ export function Canvas(p: CanvasProps) {
           )}
         </div>
       </div>
-      <div className="dgs-device-note">{previewing ? <><Eye className="w-3.5 h-3.5" /> Preview with sample values</> : <><EyeOff className="w-3.5 h-3.5" /> Editing · {device === "mobile" ? "mobile" : "desktop"} view</>}</div>
+      <div className="dgs-device-note">{previewing ? <><Eye className="w-3.5 h-3.5" /> Preview with sample values</> : <><EyeOff className="w-3.5 h-3.5" /> Editing · {device === "mobile" ? "mobile" : "desktop"} view</>}{p.dark ? " · dark mode" : ""}</div>
     </div>
   );
 }

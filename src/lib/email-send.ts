@@ -51,7 +51,7 @@ export function wrapNewsletter(bodyHtml: string, unsubUrl: string): string {
 }
 
 export interface CampaignFrom { fromName?: string | null; fromEmail?: string | null; replyTo?: string | null }
-export interface OutRecipient { id: string; email: string; name: string | null }
+export interface OutRecipient { id: string; email: string; name: string | null; /** Lead behind a drip send, for its hosted copy. */ leadType?: string; leadId?: string }
 export interface SendResult { id: string; resendId: string | null; error: string | null }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -62,21 +62,26 @@ function extractBatchIds(res: any): (string | null)[] {
 }
 
 /** One fully-rendered message, ready for whichever provider sends it. */
-function prepare(opts: { subject: string; html: string; from: CampaignFrom; recipient: OutRecipient }) {
+/**
+ * The HTML one recipient receives: show-conditions and tokens resolved, then either
+ * sent as-is (a complete document, with the compliance footer appended when it has
+ * no unsubscribe link of its own) or wrapped in the newsletter chrome.
+ * Shared by the sender and the hosted "view in browser" copy so they match.
+ */
+export function personalizeHtml(html: string, vars: Record<string, string>, unsubUrl: string): string {
+  const body = renderTemplate(applyShowConditions(html, vars), vars);
+  if (isFullDocument(body)) return /unsubscribe/i.test(body) ? body : body.replace(/<\/body>/i, `${complianceFooter(unsubUrl)}</body>`);
+  return wrapNewsletter(body, unsubUrl);
+}
+
+function prepare(opts: { subject: string; html: string; from: CampaignFrom; recipient: OutRecipient; viewUrlFor?: (r: OutRecipient) => string | null }) {
   const r = opts.recipient;
   const firstName = (r.name || "").trim().split(/\s+/)[0] || "";
   const unsubUrl = `${SITE}/unsubscribe?token=${unsubToken(r.email)}`;
   const oneClick = `${SITE}/api/email/unsubscribe?token=${unsubToken(r.email)}`;
+  const viewInBrowserUrl = opts.viewUrlFor?.(r) || "";
   // Designer show-conditions on tokens this sender knows; a drip has already resolved the rest.
-  const body = renderTemplate(applyShowConditions(opts.html, { firstName, name: r.name || "", unsubscribeUrl: unsubUrl }), { firstName, name: r.name || "", unsubscribeUrl: unsubUrl });
-  // A complete document (its own <body>, styles and footer) goes out untouched; it only
-  // gets the compliance footer appended when it has no unsubscribe link of its own.
-  let html: string;
-  if (isFullDocument(body)) {
-    html = /unsubscribe/i.test(body) ? body : body.replace(/<\/body>/i, `${complianceFooter(unsubUrl)}</body>`);
-  } else {
-    html = wrapNewsletter(body, unsubUrl);
-  }
+  const html = personalizeHtml(opts.html, { firstName, name: r.name || "", unsubscribeUrl: unsubUrl, viewInBrowserUrl }, unsubUrl);
   return {
     subject: renderTemplate(opts.subject, { firstName, name: r.name || "" }),
     html,
@@ -97,6 +102,8 @@ export async function sendCampaignBatch(opts: {
   html: string;
   from: CampaignFrom;
   recipients: OutRecipient[];
+  /** Builds the hosted "view in browser" link for a recipient (blasts and drips differ). */
+  viewUrlFor?: (r: OutRecipient) => string | null;
 }): Promise<SendResult[]> {
   // A display name alone (e.g. "Brandon at DooGoodScoopers") rides on the default verified address.
   const defaultAddr = parseAddr(FROM_DEFAULT);

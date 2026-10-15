@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Trash2, Loader2, Check } from "lucide-react";
+import { Plus, Trash2, Loader2, Check, Moon } from "lucide-react";
 import {
-  type GlobalStyles, type BrandLibrary, type TextRole, type SocialNetwork, SYSTEM_FONTS, GOOGLE_FAMILIES, googleFont, defaultStyles,
+  type GlobalStyles, type BrandLibrary, type TextRole, type SocialNetwork, SYSTEM_FONTS, GOOGLE_FAMILIES, googleFont, defaultStyles, darkOf, DEFAULT_DARK,
 } from "@/lib/email-designer/model";
 import { SOCIAL_LABEL } from "@/lib/email-designer/render";
-import { PanelSection, Field, NumberInput, ColorInput, Select, Segment, SpacingInput, TextInput, inputCls } from "../ui";
+import { PanelSection, Field, NumberInput, ColorInput, Select, Segment, SpacingInput, TextInput, Toggle, inputCls } from "../ui";
 import { ImagePicker } from "../ImagePicker";
 import { FontSelect } from "./BoxFields";
 
@@ -23,6 +23,8 @@ export function StylePanel({ styles, brand, onChange, onBrandChange, brandSaving
   const set = (patch: Partial<GlobalStyles>) => onChange({ ...styles, ...patch });
   const setRole_ = (patch: Partial<TextRole>) => set({ text: { ...styles.text, [role]: { ...styles.text[role], ...patch } } });
   const r = styles.text[role];
+  const dark = darkOf(styles);
+  const setDark = (patch: Partial<typeof dark>) => set({ dark: { ...dark, ...patch } });
   const roleLabel: Record<keyof GlobalStyles["text"], string> = { paragraph: "Paragraph", title1: "Title 1", title2: "Title 2", title3: "Title 3" };
 
   const applyBrand = () => onChange({ ...defaultStyles(brand), bodyWidth: styles.bodyWidth, viewInBrowser: styles.viewInBrowser, preheader: styles.preheader, bodyPadding: styles.bodyPadding });
@@ -55,10 +57,24 @@ export function StylePanel({ styles, brand, onChange, onBrandChange, brandSaving
         <Field label="Page color" hint="Behind the email body"><ColorInput value={styles.pageBg} onChange={(c) => set({ pageBg: c || "#F6FAFB" })} brand={brand.colors} allowEmpty={false} /></Field>
       </PanelSection>
       <PanelSection title="Header">
+        <Field label="Show 'View in browser' link" hint="A hosted copy of the email, personalized for each recipient"><Toggle value={styles.viewInBrowser} onChange={(viewInBrowser) => set({ viewInBrowser })} /></Field>
         <div className="py-1.5">
           <p className="text-[13px] text-gray-700 mb-1">Preheader <span className="text-gray-400">(preview text in the inbox)</span></p>
           <TextInput value={styles.preheader} onChange={(preheader) => set({ preheader })} placeholder="Your rate is locked in, {{firstName}}…" />
         </div>
+      </PanelSection>
+
+      <PanelSection title="Dark mode" right={<Toggle value={dark.enabled} onChange={(enabled) => setDark({ enabled })} />}>
+        <p className="text-[12px] text-gray-500 flex items-start gap-1.5"><Moon className="w-3.5 h-3.5 mt-0.5 shrink-0" /> {dark.enabled ? "Inboxes in dark mode get these colors instead of the light ones. Any element can override them in its own Dark mode settings; use the moon button above the email to preview." : "Off: inboxes in dark mode show the email as designed (some apps still invert colors on their own)."}</p>
+        {dark.enabled && (
+          <div className="mt-2">
+            <Field label="Page color"><ColorInput value={dark.pageBg} onChange={(c) => setDark({ pageBg: c || DEFAULT_DARK.pageBg })} brand={brand.colors} allowEmpty={false} /></Field>
+            <Field label="Body color"><ColorInput value={dark.bodyBg} onChange={(c) => setDark({ bodyBg: c || DEFAULT_DARK.bodyBg })} brand={brand.colors} allowEmpty={false} /></Field>
+            <Field label="Section color" hint="Blank keeps each section's own color"><ColorInput value={dark.sectionBg} onChange={(sectionBg) => setDark({ sectionBg })} brand={brand.colors} /></Field>
+            <Field label="Text color"><ColorInput value={dark.text} onChange={(c) => setDark({ text: c || DEFAULT_DARK.text })} brand={brand.colors} allowEmpty={false} /></Field>
+            <Field label="Link color"><ColorInput value={dark.link} onChange={(c) => setDark({ link: c || DEFAULT_DARK.link })} brand={brand.colors} allowEmpty={false} /></Field>
+          </div>
+        )}
       </PanelSection>
 
       <PanelSection title="Text styles">

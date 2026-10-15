@@ -1,13 +1,13 @@
 "use client";
 
-import { X, Plus, Trash2 } from "lucide-react";
-import { type Section, type Column, type BrandLibrary, newColumn } from "@/lib/email-designer/model";
+import { X, Plus, Trash2, Bookmark } from "lucide-react";
+import { type Section, type Column, type BrandLibrary, type GlobalStyles, newColumn, darkOf } from "@/lib/email-designer/model";
 import { PanelSection, Field, NumberInput, Toggle, NameEditor, VAlignGroup, inputCls } from "../ui";
 import { BoxFields } from "./BoxFields";
 
 /* Settings for a section (row of columns) or a single column. */
 
-export function SectionPanel({ section, brand, onChange, onClose }: { section: Section; brand: BrandLibrary; onChange: (patch: Partial<Section>) => void; onClose: () => void }) {
+export function SectionPanel({ section, styles, brand, onChange, onClose, onSave }: { section: Section; styles: GlobalStyles; brand: BrandLibrary; onChange: (patch: Partial<Section>) => void; onClose: () => void; onSave?: () => void }) {
   const setWidth = (i: number, w: number) => {
     const cols = section.columns.map((c, j) => (j === i ? { ...c, width: w } : c));
     onChange({ columns: cols });
@@ -32,7 +32,10 @@ export function SectionPanel({ section, brand, onChange, onClose }: { section: S
           <span className="text-[11px] uppercase tracking-wider text-gray-400 shrink-0">Section</span>
           <NameEditor value={section.name} placeholder="Section" onChange={(name) => onChange({ name: name || undefined })} />
         </div>
-        <button type="button" onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500" title="Close"><X className="w-4 h-4" /></button>
+        <div className="flex items-center gap-1 shrink-0">
+          {onSave && <button type="button" onClick={onSave} className="h-7 px-2 rounded-lg border border-gray-200 bg-white hover:bg-violet-50 hover:border-violet-300 text-[11px] font-medium text-gray-700 flex items-center gap-1" title="Save this section to reuse in other emails"><Bookmark className="w-3.5 h-3.5" /> Save to library</button>}
+          <button type="button" onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500" title="Close"><X className="w-4 h-4" /></button>
+        </div>
       </div>
       <div className="flex-1 overflow-y-auto">
         <PanelSection title="Layout">
@@ -55,13 +58,13 @@ export function SectionPanel({ section, brand, onChange, onClose }: { section: S
           </div>
           {total !== 100 && <p className="text-[11px] text-amber-700 mt-1.5">Widths add up to {total}%. Make them total 100% so columns fill the row.</p>}
         </PanelSection>
-        <BoxFields box={section} brand={brand} onChange={onChange} />
+        <BoxFields box={section} brand={brand} onChange={onChange} darkEnabled={darkOf(styles).enabled} />
       </div>
     </div>
   );
 }
 
-export function ColumnPanel({ column, brand, onChange, onClose }: { column: Column; brand: BrandLibrary; onChange: (patch: Partial<Column>) => void; onClose: () => void }) {
+export function ColumnPanel({ column, styles, brand, onChange, onClose }: { column: Column; styles: GlobalStyles; brand: BrandLibrary; onChange: (patch: Partial<Column>) => void; onClose: () => void }) {
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
@@ -76,7 +79,7 @@ export function ColumnPanel({ column, brand, onChange, onClose }: { column: Colu
           <Field label="Width"><NumberInput value={column.width} onChange={(n) => onChange({ width: n ?? 50 })} unit="%" min={10} max={100} width={64} /></Field>
           <Field label="Vertical alignment"><VAlignGroup value={column.vAlign} onChange={(vAlign) => onChange({ vAlign })} /></Field>
         </PanelSection>
-        <BoxFields box={column} brand={brand} onChange={onChange} />
+        <BoxFields box={column} brand={brand} onChange={onChange} darkEnabled={darkOf(styles).enabled} />
       </div>
     </div>
   );

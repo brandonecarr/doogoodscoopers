@@ -2,14 +2,16 @@
 
 import type { DragEvent, ReactNode } from "react";
 import {
-  Type, AlignLeft, Image as ImageIcon, Video, MousePointerClick, Braces, BadgeCheck, Share2, Code2, Minus, ShoppingBag, Menu, Space, GripHorizontal, Bookmark,
+  Type, AlignLeft, Image as ImageIcon, Video, MousePointerClick, Braces, BadgeCheck, Share2, Code2, Minus, ShoppingBag, Menu, Space, GripHorizontal, Bookmark, Trash2, Loader2,
 } from "lucide-react";
-import { type BlockType, type BrandLibrary, BLOCK_LABEL } from "@/lib/email-designer/model";
+import { type BlockType, type BrandLibrary, type Section, BLOCK_LABEL } from "@/lib/email-designer/model";
 import { SECTION_PRESETS } from "@/lib/email-designer/presets";
+import { NameEditor } from "./ui";
 
-/* Content tab: draggable blocks, prebuilt sections, and (phase 2) saved sections. */
+/* Content tab: draggable blocks, prebuilt sections, and sections saved to the library. */
 
 export type RailTab = "blocks" | "sections" | "saved";
+export interface SavedSection { id: string; name: string; section: Section; updatedAt: string }
 
 const BLOCK_ICONS: Record<BlockType, ReactNode> = {
   title: <Type className="w-6 h-6" />, text: <AlignLeft className="w-6 h-6" />, image: <ImageIcon className="w-6 h-6" />, video: <Video className="w-6 h-6" />,
@@ -18,10 +20,11 @@ const BLOCK_ICONS: Record<BlockType, ReactNode> = {
 };
 const ORDER: BlockType[] = ["title", "text", "image", "video", "button", "dynamic", "logo", "social", "html", "divider", "product", "navigation", "spacer"];
 
-export function ContentRail({ tab, setTab, brand, onDragStart, onDragEnd, onAddBlock, onAddSection }: {
+export function ContentRail({ tab, setTab, brand, onDragStart, onDragEnd, onAddBlock, onAddSection, saved, savedLoading, onAddSaved, onRenameSaved, onDeleteSaved }: {
   tab: RailTab; setTab: (t: RailTab) => void; brand: BrandLibrary;
-  onDragStart: (e: DragEvent, payload: { newBlock?: BlockType; newSection?: string }) => void; onDragEnd: () => void;
+  onDragStart: (e: DragEvent, payload: { newBlock?: BlockType; newSection?: string; newSaved?: string }) => void; onDragEnd: () => void;
   onAddBlock: (type: BlockType) => void; onAddSection: (key: string) => void;
+  saved: SavedSection[]; savedLoading: boolean; onAddSaved: (id: string) => void; onRenameSaved: (id: string, name: string) => void; onDeleteSaved: (id: string) => void;
 }) {
   void brand;
   return (
@@ -57,11 +60,28 @@ export function ContentRail({ tab, setTab, brand, onDragStart, onDragEnd, onAddB
             ))}
           </div>
         )}
-        {tab === "saved" && (
+        {tab === "saved" && savedLoading && <div className="text-center py-10 text-gray-400"><Loader2 className="w-5 h-5 mx-auto animate-spin" /></div>}
+        {tab === "saved" && !savedLoading && !saved.length && (
           <div className="text-center py-10 text-gray-400">
             <Bookmark className="w-8 h-8 mx-auto mb-2" />
-            <p className="text-[13px]">Saved sections arrive in phase 2.</p>
-            <p className="text-[12px] mt-1">You&apos;ll be able to save any section here and reuse it in other emails.</p>
+            <p className="text-[13px]">No saved sections yet.</p>
+            <p className="text-[12px] mt-1">Select any section in the email and choose &ldquo;Save to library&rdquo; to reuse it in other emails.</p>
+          </div>
+        )}
+        {tab === "saved" && !savedLoading && saved.length > 0 && (
+          <div className="space-y-2">
+            {saved.map((sv) => (
+              <div key={sv.id} draggable title="Drag onto the email, or click to add at the end"
+                onDragStart={(e) => onDragStart(e, { newSaved: sv.id })} onDragEnd={onDragEnd} onClick={() => onAddSaved(sv.id)}
+                className="w-full text-left p-3 rounded-xl border border-gray-200 bg-white hover:border-violet-400 hover:shadow-sm cursor-grab active:cursor-grabbing">
+                <div className="flex items-center gap-2">
+                  <GripHorizontal className="w-3.5 h-3.5 text-gray-300 shrink-0" />
+                  <div className="flex-1 min-w-0 text-[13px] font-semibold text-navy-900" onClick={(e) => e.stopPropagation()}><NameEditor value={sv.name} placeholder="Saved section" onChange={(name) => { if (name.trim()) onRenameSaved(sv.id, name.trim()); }} /></div>
+                  <button type="button" title="Remove from library" onClick={(e) => { e.stopPropagation(); if (window.confirm(`Remove "${sv.name}" from the library? Emails that already use it keep their copy.`)) onDeleteSaved(sv.id); }} className="p-1 text-gray-400 hover:text-red-600"><Trash2 className="w-3.5 h-3.5" /></button>
+                </div>
+                <p className="text-[12px] text-gray-500 mt-0.5 ml-5">{sv.section.columns.length} column{sv.section.columns.length === 1 ? "" : "s"} · {sv.section.columns.reduce((n, c) => n + c.blocks.length, 0)} block{sv.section.columns.reduce((n, c) => n + c.blocks.length, 0) === 1 ? "" : "s"} · saved {new Date(sv.updatedAt).toLocaleDateString()}</p>
+              </div>
+            ))}
           </div>
         )}
       </div>

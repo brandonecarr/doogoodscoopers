@@ -1,16 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
-import { LayoutGrid, Paintbrush, Undo2, Redo2, Monitor, Smartphone, Eye, Pencil, Loader2 } from "lucide-react";
+import { LayoutGrid, Paintbrush, Undo2, Redo2, Monitor, Smartphone, Eye, Pencil, Loader2, Moon, Sun } from "lucide-react";
 import {
   type Design, type Block, type Section, type Column, type Selection, type BrandLibrary, type BlockType, type GlobalStyles,
-  DEFAULT_BRAND, emptyDesign, isDesign, newBlock, newSection, cloneWithIds, findBlock, findColumn, findSection,
+  DEFAULT_BRAND, emptyDesign, isDesign, newBlock, newSection, cloneWithIds, findBlock, findColumn, findSection, nodeName, darkOf,
 } from "@/lib/email-designer/model";
 import { renderDesign } from "@/lib/email-designer/render";
 import { importHtml } from "@/lib/email-designer/import-html";
 import { buildPreset } from "@/lib/email-designer/presets";
 import { Canvas, type DropTarget, type Device } from "./Canvas";
-import { ContentRail, type RailTab } from "./ContentRail";
+import { ContentRail, type RailTab, type SavedSection } from "./ContentRail";
 import { BlockPanel } from "./panels/BlockPanel";
 import { SectionPanel, ColumnPanel } from "./panels/ContainerPanel";
 import { StylePanel } from "./panels/StylePanel";
@@ -32,7 +32,7 @@ interface Props {
   onChange?: (dirty: boolean) => void;
 }
 
-const DT = { newBlock: "dgs/new-block", newSection: "dgs/new-section", moveBlock: "dgs/move-block", moveSection: "dgs/move-section" };
+const DT = { newBlock: "dgs/new-block", newSection: "dgs/new-section", newSaved: "dgs/new-saved", moveBlock: "dgs/move-block", moveSection: "dgs/move-section" };
 
 export default function EmailDesigner({ initialDesign, initialHtml, onReady, onChange }: Props) {
   const [brand, setBrand] = useState<BrandLibrary>(DEFAULT_BRAND);
@@ -49,7 +49,12 @@ export default function EmailDesigner({ initialDesign, initialHtml, onReady, onC
   const [railTab, setRailTab] = useState<RailTab>("blocks");
   const [device, setDevice] = useState<Device>("desktop");
   const [previewing, setPreviewing] = useState(false);
+  const [darkPreview, setDarkPreview] = useState(false);
   const [dragging, setDragging] = useState(false);
+  const [saved, setSaved] = useState<SavedSection[]>([]);
+  const [savedLoading, setSavedLoading] = useState(true);
+  const savedRef = useRef<SavedSection[]>([]);
+  savedRef.current = saved;
   const dirtyRef = useRef(false);
   const designRef = useRef<Design | null>(null);
   designRef.current = design;
@@ -57,6 +62,9 @@ export default function EmailDesigner({ initialDesign, initialHtml, onReady, onC
   // Brand library, then the document (imported from HTML when it isn't a v2 design).
   useEffect(() => {
     fetch("/api/admin/email-brand").then((r) => (r.ok ? r.json() : null)).then((d) => { if (d?.brand) setBrand(d.brand); }).catch(() => {}).finally(() => setBrandLoaded(true));
+  }, []);
+  useEffect(() => {
+    fetch("/api/admin/email-sections").then((r) => (r.ok ? r.json() : null)).then((d) => { if (d?.sections) setSaved(d.sections); }).catch(() => {}).finally(() => setSavedLoading(false));
   }, []);
   useEffect(() => {
     if (!brandLoaded || design) return;
@@ -167,11 +175,34 @@ export default function EmailDesigner({ initialDesign, initialHtml, onReady, onC
     return d;
   });
 
+  // ── Saved sections (the library) ───────────────────────────────────────────
+  const savedCopy = (id: string): Section | null => { const sv = savedRef.current.find((s) => s.id === id); return sv ? cloneWithIds(sv.section) : null; };
+  const saveToLibrary = async (sectionId: string) => {
+    const d = designRef.current; const f = d ? findSection(d, sectionId) : null;
+    if (!f) return;
+    const name = window.prompt("Name this section for the library:", nodeName(f.section));
+    if (name === null) return;
+    const res = await fetch("/api/admin/email-sections", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: name.trim() || nodeName(f.section), section: f.section }) });
+    if (!res.ok) { window.alert("Couldn't save the section. Try again."); return; }
+    const data = await res.json();
+    setSaved((list) => [data.section, ...list]);
+    setSelection(null); setLeftTab("content"); setRailTab("saved");
+  };
+  const renameSaved = async (id: string, name: string) => {
+    setSaved((list) => list.map((s) => (s.id === id ? { ...s, name } : s)));
+    await fetch("/api/admin/email-sections", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, name }) }).catch(() => {});
+  };
+  const deleteSaved = async (id: string) => {
+    setSaved((list) => list.filter((s) => s.id !== id));
+    await fetch(`/api/admin/email-sections?id=${encodeURIComponent(id)}`, { method: "DELETE" }).catch(() => {});
+  };
+
   // ── Drag and drop ──────────────────────────────────────────────────────────
 
-  const onRailDragStart = (e: DragEvent, payload: { newBlock?: BlockType; newSection?: string }) => {
+  const onRailDragStart = (e: DragEvent, payload: { newBlock?: BlockType; newSection?: string; newSaved?: string }) => {
     if (payload.newBlock) e.dataTransfer.setData(DT.newBlock, payload.newBlock);
     if (payload.newSection) e.dataTransfer.setData(DT.newSection, payload.newSection);
+    if (payload.newSaved) e.dataTransfer.setData(DT.newSaved, payload.newSaved);
     e.dataTransfer.effectAllowed = "copyMove";
     setDragging(true);
   };
@@ -185,10 +216,12 @@ export default function EmailDesigner({ initialDesign, initialHtml, onReady, onC
     setDragging(false);
     const nb = e.dataTransfer.getData(DT.newBlock) as BlockType;
     const ns = e.dataTransfer.getData(DT.newSection);
+    const nsv = e.dataTransfer.getData(DT.newSaved);
     const mb = e.dataTransfer.getData(DT.moveBlock);
     const ms = e.dataTransfer.getData(DT.moveSection);
     if (nb) { const b = newBlock(nb, brand); insertBlock(b, target); setSelection({ kind: "block", id: b.id }); return; }
     if (ns) { const s = buildPreset(ns, brand); if (s) { insertSection(s, target); setSelection({ kind: "section", id: s.id }); } return; }
+    if (nsv) { const s = savedCopy(nsv); if (s) { insertSection(s, target); setSelection({ kind: "section", id: s.id }); } return; }
     if (mb) {
       setDesign((d) => {
         const f = findBlock(d, mb); if (!f) return d;
@@ -251,9 +284,10 @@ export default function EmailDesigner({ initialDesign, initialHtml, onReady, onC
   const panel = (() => {
     if (leftTab === "style") return <StylePanel styles={design.styles} brand={brand} onChange={(styles: GlobalStyles) => setDesign((d) => ({ ...d, styles }))} onBrandChange={changeBrand} brandSaving={brandSaving} brandSaved={brandSaved} />;
     if (selected && selection?.kind === "block") return <BlockPanel block={selected as Block} styles={design.styles} brand={brand} onChange={(patch) => updateBlock(selected.id, patch)} onClose={() => setSelection(null)} />;
-    if (selected && selection?.kind === "section") return <SectionPanel section={selected as Section} brand={brand} onChange={(patch) => updateSection(selected.id, patch)} onClose={() => setSelection(null)} />;
-    if (selected && selection?.kind === "column") return <ColumnPanel column={selected as Column} brand={brand} onChange={(patch) => updateColumn(selected.id, patch)} onClose={() => setSelection(null)} />;
-    return <ContentRail tab={railTab} setTab={setRailTab} brand={brand} onDragStart={onRailDragStart} onDragEnd={() => setDragging(false)} onAddBlock={(t) => addAtEnd(newBlock(t, brand))} onAddSection={(k) => { const s = buildPreset(k, brand); if (s) addAtEnd(undefined, s); }} />;
+    if (selected && selection?.kind === "section") return <SectionPanel section={selected as Section} styles={design.styles} brand={brand} onChange={(patch) => updateSection(selected.id, patch)} onClose={() => setSelection(null)} onSave={() => saveToLibrary(selected.id)} />;
+    if (selected && selection?.kind === "column") return <ColumnPanel column={selected as Column} styles={design.styles} brand={brand} onChange={(patch) => updateColumn(selected.id, patch)} onClose={() => setSelection(null)} />;
+    return <ContentRail tab={railTab} setTab={setRailTab} brand={brand} onDragStart={onRailDragStart} onDragEnd={() => setDragging(false)} onAddBlock={(t) => addAtEnd(newBlock(t, brand))} onAddSection={(k) => { const s = buildPreset(k, brand); if (s) addAtEnd(undefined, s); }}
+      saved={saved} savedLoading={savedLoading} onAddSaved={(id) => { const s = savedCopy(id); if (s) addAtEnd(undefined, s); }} onRenameSaved={renameSaved} onDeleteSaved={deleteSaved} />;
   })();
 
   return (
@@ -280,13 +314,18 @@ export default function EmailDesigner({ initialDesign, initialHtml, onReady, onC
               <button type="button" onClick={() => setDevice("desktop")} title="Desktop" className={`p-1.5 ${device === "desktop" ? "bg-gray-100 text-navy-900" : "text-gray-500"}`}><Monitor className="w-4 h-4" /></button>
               <button type="button" onClick={() => setDevice("mobile")} title="Mobile" className={`p-1.5 ${device === "mobile" ? "bg-gray-100 text-navy-900" : "text-gray-500"}`}><Smartphone className="w-4 h-4" /></button>
             </div>
+            {darkOf(design.styles).enabled && (
+              <button type="button" onClick={() => setDarkPreview((v) => !v)} title={darkPreview ? "Show light mode" : "Show dark mode"} className={`p-1.5 rounded-lg border ${darkPreview ? "bg-navy-900 text-white border-navy-900" : "bg-white border-gray-200 text-gray-500 hover:bg-gray-50"}`}>
+                {darkPreview ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+              </button>
+            )}
             <button type="button" onClick={() => { setPreviewing((v) => !v); setSelection(null); }} className={`h-8 px-3 rounded-lg border text-[12px] font-medium flex items-center gap-1.5 ${previewing ? "bg-navy-900 text-white border-navy-900" : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"}`}>
               {previewing ? <><Pencil className="w-3.5 h-3.5" /> Back to editing</> : <><Eye className="w-3.5 h-3.5" /> Preview</>}
             </button>
           </div>
         </div>
         <div className="flex-1 min-h-0 overflow-auto dgs-dots">
-          <Canvas design={design} brand={brand} selection={selection} device={device} previewing={previewing} dragging={dragging}
+          <Canvas design={design} brand={brand} selection={selection} device={device} previewing={previewing} dark={darkPreview && darkOf(design.styles).enabled} dragging={dragging} onSaveSection={saveToLibrary}
             onSelect={(sel) => { setSelection(sel); if (sel) setLeftTab("content"); }}
             onChangeBlock={(id, patch) => updateBlock(id, patch)}
             onDrop={onDrop} onDragStart={onCanvasDragStart} onDragEnd={() => setDragging(false)}

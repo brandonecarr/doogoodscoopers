@@ -1,6 +1,6 @@
 "use client";
 
-import { Monitor, Smartphone, MonitorSmartphone } from "lucide-react";
+import { Monitor, Smartphone, MonitorSmartphone, Moon } from "lucide-react";
 import type { Box, BrandLibrary, Condition, TextStyle } from "@/lib/email-designer/model";
 import { SYSTEM_FONTS, GOOGLE_FAMILIES, googleFamily } from "@/lib/email-designer/model";
 import { PanelSection, Field, NumberInput, ColorInput, SpacingInput, BorderInput, Segment, Select, inputCls } from "../ui";
@@ -9,8 +9,13 @@ import { TOKENS } from "../RichText";
 /* Settings every element and container shares: spacing, background, corners,
    borders, which devices show it, and a show-condition on a personalization token. */
 
-export function BoxFields({ box, brand, onChange, showBackground = true }: { box: Box; brand: BrandLibrary; onChange: (patch: Partial<Box>) => void; showBackground?: boolean }) {
+export function BoxFields({ box, brand, onChange, showBackground = true, darkEnabled = false }: { box: Box; brand: BrandLibrary; onChange: (patch: Partial<Box>) => void; showBackground?: boolean; darkEnabled?: boolean }) {
   const cond: Condition | null = box.condition;
+  const dark = box.dark || {};
+  const setDark = (patch: { background?: string | null; color?: string | null }) => {
+    const next = { ...dark, ...patch };
+    onChange({ dark: next.background || next.color ? next : undefined });
+  };
   return (
     <>
       <PanelSection title="Spacing">
@@ -40,6 +45,13 @@ export function BoxFields({ box, brand, onChange, showBackground = true }: { box
           </Field>
         )}
       </PanelSection>
+      {darkEnabled && (
+        <PanelSection title="Dark mode">
+          <p className="text-[12px] text-gray-500 mb-1 flex items-center gap-1"><Moon className="w-3.5 h-3.5" /> Colors for inboxes in dark mode. Blank keeps the email-wide dark colors.</p>
+          <Field label="Background"><ColorInput value={dark.background ?? null} onChange={(background) => setDark({ background })} brand={brand.colors} /></Field>
+          <Field label="Text color"><ColorInput value={dark.color ?? null} onChange={(color) => setDark({ color })} brand={brand.colors} /></Field>
+        </PanelSection>
+      )}
       <PanelSection title="Content visibility">
         <p className="text-[12px] text-gray-500 mb-2">Display or hide based on the type of device or a condition.</p>
         <p className="text-[12px] text-gray-700 mb-1">Show on:</p>

@@ -1689,3 +1689,15 @@ model SngSubscription {
   @@index([status])
   @@index([nameKey])
 }
+
+/// A section saved from the email designer for reuse (Content → Saved tab).
+model EmailSavedSection {
+  id         String   @id @default(cuid())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  name       String
+  section    Json
+  adminEmail String?
+
+  @@index([createdAt])
+}

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { viewUrl } from "@/lib/email-view";
 import { sendCampaignBatch, isEmailConfigured } from "@/lib/email-send";
 import { unsubscribedSet, normalizeEmail } from "@/lib/email-unsubscribe";
 import { activeClientEmails, emailInActiveSet } from "@/lib/sweepandgo-lookup";
@@ -74,6 +75,7 @@ export async function GET(request: NextRequest) {
       html: campaign.html,
       from: { fromName: campaign.fromName, fromEmail: campaign.fromEmail, replyTo: campaign.replyTo },
       recipients: toSend.map((r) => ({ id: r.id, email: r.email, name: r.name })),
+      viewUrlFor: (r) => viewUrl("r", [r.id]),
     });
     for (const res of results) {
       if (res.resendId) {
