@@ -2,6 +2,7 @@ import prisma from "@/lib/prisma";
 import type { LeadSource } from "@prisma/client";
 import { resumeLinkForLead, recoverySettings, wizardSubmissionFor, type ResumeChannel } from "@/lib/quote-recovery";
 import { cityFromZip } from "@/lib/geo/zipCity";
+import { privateName } from "@/lib/tv-connector";
 
 /**
  * Personalization tokens available to SMS templates ({{firstName}}, {{zipCode}},
@@ -56,7 +57,79 @@ export const EMPTY_LEAD_VARS: LeadVars = {
   monthlyRate: "",
   resumeCode: "",
   unsubscribeUrl: "",
+  reviewCount: "",
+  review1Text: "",
+  review1Name: "",
+  review1City: "",
+  review2Text: "",
+  review2Name: "",
+  review2City: "",
 };
+
+/** Cut a review to about `max` characters at a word boundary, so a card stays short. */
+function shortQuote(text: string, max = 220): string {
+  const t = text.replace(/\s+/g, " ").trim();
+  if (t.length <= max) return t;
+  const cut = t.slice(0, max - 1);
+  return cut.slice(0, Math.max(cut.lastIndexOf(" "), max - 40)).replace(/[,;:\s]+$/, "") + "…";
+}
+
+/**
+ * Social-proof tokens: the Google review count and two five-star reviews with text,
+ * newest first, preferring reviewers from the lead's own city. Cities come from the
+ * matching Sweep&Go customer; a reviewer we can't place is labeled by the lead's area.
+ */
+async function reviewTokens(leadCity: string): Promise<Pick<LeadVars, "reviewCount" | "review1Text" | "review1Name" | "review1City" | "review2Text" | "review2Name" | "review2City">> {
+  const out = { reviewCount: "", review1Text: "", review1Name: "", review1City: "", review2Text: "", review2Name: "", review2City: "" };
+  try {
+    const [countRow, reviews] = await Promise.all([
+      prisma.appSetting.findUnique({ where: { key: "google.bp.reviewCount" } }),
+      prisma.review.findMany({
+        where: { status: "COMPLETED", rating: 5, reviewText: { not: null } },
+        orderBy: { reviewedAt: "desc" },
+        take: 40,
+        select: { customerName: true, reviewText: true, sngCustomerId: true },
+      }),
+    ]);
+    const total = Number(countRow?.value);
+    out.reviewCount = Number.isFinite(total) && total > 0 ? String(total) : String(await prisma.review.count({ where: { status: "COMPLETED", platform: "google" } }));
+
+    const usable = reviews.filter((r) => (r.reviewText || "").trim().length >= 20);
+    if (usable.length === 0) return out;
+    // City lookup: the linked Sweep&Go customer, else a customer with the same name.
+    const names = usable.map((r) => r.customerName.trim().split(/\s+/)).filter((p) => p.length > 1);
+    const customers = await prisma.sweepandgoCustomer.findMany({
+      where: { OR: [
+        { id: { in: usable.map((r) => r.sngCustomerId).filter((x): x is string => !!x) } },
+        { lastName: { in: names.map((p) => p[p.length - 1]), mode: "insensitive" } },
+      ] },
+      select: { id: true, firstName: true, lastName: true, city: true, zipCode: true },
+    });
+    const cityFor = (r: { customerName: string; sngCustomerId: string | null }): string => {
+      const parts = r.customerName.trim().split(/\s+/);
+      const hit = customers.find((c) => c.id === r.sngCustomerId)
+        ?? customers.find((c) => parts.length > 1 && c.firstName?.toLowerCase() === parts[0].toLowerCase() && c.lastName?.toLowerCase() === parts[parts.length - 1].toLowerCase());
+      // The customer's own city, else the city of their ZIP; never the lead's city.
+      return (hit?.city || "").trim() || cityFromZip(hit?.zipCode) || "";
+    };
+    const placed = usable.map((r) => ({ ...r, city: cityFor(r) }));
+    const lc = leadCity.trim().toLowerCase();
+    const picked = [
+      ...placed.filter((r) => lc && r.city.toLowerCase() === lc),
+      ...placed.filter((r) => !(lc && r.city.toLowerCase() === lc)),
+    ].slice(0, 2);
+    picked.forEach((r, i) => {
+      const parts = r.customerName.trim().split(/\s+/);
+      const key = i === 0 ? "review1" : "review2";
+      out[`${key}Text` as "review1Text"] = shortQuote(r.reviewText || "");
+      out[`${key}Name` as "review1Name"] = privateName(parts[0], parts.length > 1 ? parts[parts.length - 1] : null, "A customer");
+      out[`${key}City` as "review1City"] = r.city || "Inland Empire";
+    });
+  } catch (e) {
+    console.error("[personalization] review tokens failed:", e);
+  }
+  return out;
+}
 
 /** Short cleanup-frequency labels, as the quote cards show them. */
 const SHORT_FREQUENCY: Record<string, string> = {
@@ -133,6 +206,7 @@ export async function getLeadPersonalization(leadType: LeadSource, leadId: strin
   const [base, reviewLink, recovery] = await Promise.all([baseLeadVars(leadType, leadId), getReviewLink(), recoverySettings()]);
   base.reviewLink = reviewLink;
   base.coupon = recovery.coupon;
+  Object.assign(base, await reviewTokens(base.city));
   // Only quote leads have a Sweep&Go quote to resume; everyone else gets the plain quote page.
   base.resumeLink = leadType === "QUOTE_FORM" ? await resumeLinkForLead(leadId, opts.channel, recovery) : recovery.quoteUrl;
   if (leadType === "QUOTE_FORM") {
