@@ -1,6 +1,6 @@
 import prisma from "@/lib/prisma";
 import { optedOutKeys, optOutKey } from "@/lib/sms-optout";
-import { loadSendWindow, clampToSendWindow } from "@/lib/send-window";
+import { loadSendWindow, clampStepToSendWindow } from "@/lib/send-window";
 import { LeadStatus, type LeadSource } from "@prisma/client";
 import { formerCustomers } from "@/lib/former-customers";
 import { recoverySettings, SNG_QUOTE_STEP_WHERE } from "@/lib/quote-recovery";
@@ -315,7 +315,7 @@ export async function enrollReturningLead(leadType: LeadSource, leadId: string, 
   const window = await loadSendWindow();
   let n = 0;
   for (const c of returning) {
-    const firstAt = clampToSendWindow(new Date(Date.now() + (c.steps[0].delayMinutes || 0) * MINUTE_MS), window);
+    const firstAt = clampStepToSendWindow(new Date(Date.now() + (c.steps[0].delayMinutes || 0) * MINUTE_MS), c.steps[0], window);
     const existing = await prisma.campaignRecipient.findUnique({
       where: { campaignId_leadType_leadId: { campaignId: c.id, leadType, leadId } },
       select: { id: true, status: true, sentAt: true, createdAt: true },

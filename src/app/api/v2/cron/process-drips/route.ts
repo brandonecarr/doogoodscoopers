@@ -8,7 +8,7 @@ import { sendMessengerMessage, isMessengerConfigured } from "@/lib/messenger";
 import { optedOutKeys, optOutKey } from "@/lib/sms-optout";
 import { findDripCandidates, isLeadArchived, isWinbackCampaign, markLeadContactedIfNew, sweepReturningLeads } from "@/lib/drip";
 import { getLeadPersonalization } from "@/lib/personalization";
-import { loadSendWindow, clampToSendWindow, isWithinSendWindow } from "@/lib/send-window";
+import { loadSendWindow, clampToSendWindow, clampStepToSendWindow, isWithinSendWindow, stepObeysSendWindow } from "@/lib/send-window";
 import { notify } from "@/lib/notify";
 import { archiveConvertedLeads, isActiveCustomerByPhone } from "@/lib/lead-duplicates";
 import { activeClientPhones, phoneInActiveSet } from "@/lib/sweepandgo-lookup";
@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
             name: c.name,
             status: "ACTIVE",
             currentStep: 0,
-            nextSendAt: clampToSendWindow(new Date(Date.now() + (steps[0].delayMinutes || 0) * MINUTE), sendWindow),
+            nextSendAt: clampStepToSendWindow(new Date(Date.now() + (steps[0].delayMinutes || 0) * MINUTE), steps[0], sendWindow),
           },
         });
         enrolled++;
@@ -149,16 +149,17 @@ export async function GET(request: NextRequest) {
         if (c?.reviewStatus === "REVIEW_COMPLETE") { await stop(r.id, "customer left a review"); stopped++; continue; }
       }
 
-      // Quiet hours: don't text in the middle of the night. If this send came
+      // Quiet hours: don't text in the middle of the night. If this text came
       // due outside the window, push it to the next window open and skip for now.
-      if (!isWithinSendWindow(new Date(), sendWindow)) {
+      // Email steps are exempt — they go out whenever they come due.
+      if (stepObeysSendWindow(step) && !isWithinSendWindow(new Date(), sendWindow)) {
         await prisma.campaignRecipient.update({ where: { id: r.id }, data: { nextSendAt: clampToSendWindow(new Date(), sendWindow) } });
         continue;
       }
 
       // Move past a step this person can't receive, keeping the rest of the schedule.
       const next = steps[r.currentStep + 1];
-      const nextAt = next ? clampToSendWindow(new Date(Date.now() + (next.delayMinutes || 0) * MINUTE), sendWindow) : null;
+      const nextAt = next ? clampStepToSendWindow(new Date(Date.now() + (next.delayMinutes || 0) * MINUTE), next, sendWindow) : null;
       const isEmail = step.channel === "email";
       if (isEmail && !unsubscribed) unsubscribed = await unsubscribedSet();
       // (A phone-less Messenger lead still gets text steps through Messenger.)

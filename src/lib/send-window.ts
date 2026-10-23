@@ -1,7 +1,8 @@
 import prisma from "@/lib/prisma";
 
-// Quiet hours for drip sends: never text a lead in the middle of the night.
+// Quiet hours for drip TEXTS: never text a lead in the middle of the night.
 // A lead may come in at 1am; without this the next step could fire at 3am.
+// Email steps are exempt and send whenever they come due (see clampStepToSendWindow).
 // Configurable via AppSetting (keys under "drips.window."), business-timezone
 // aware. Defaults to 8am–8pm America/Los_Angeles (within the TCPA 8am–9pm rule).
 
@@ -89,6 +90,19 @@ export function clampToSendWindow(desired: Date, win: SendWindow = DEFAULT_SEND_
   // Past the window today → open at startHour tomorrow (local date).
   const next = tzParts(new Date(desired.getTime() + 86_400_000), win.timeZone);
   return zonedWallClockToUtc(next.year, next.month, next.day, win.startHour, 0, win.timeZone);
+}
+
+/** A step the quiet-hours window applies to. Only texts wait; emails go any time. */
+export function stepObeysSendWindow(step: { channel: string } | null | undefined): boolean {
+  return step?.channel !== "email";
+}
+
+/**
+ * Schedule a drip step: a text step is clamped to the send window, an email
+ * step keeps its desired time (the owner wants emails out whenever they're due).
+ */
+export function clampStepToSendWindow(desired: Date, step: { channel: string } | null | undefined, win: SendWindow = DEFAULT_SEND_WINDOW): Date {
+  return stepObeysSendWindow(step) ? clampToSendWindow(desired, win) : desired;
 }
 
 /** Load the configured send window from AppSetting, falling back to defaults. */

@@ -74,7 +74,7 @@ export function SendingHoursCard() {
           </div>
           <div>
             <p className="text-sm font-semibold text-navy-900 leading-none">Drip sending hours</p>
-            <p className="text-xs text-gray-500 mt-1">Automated drip texts only go out during these hours — no 3am messages.</p>
+            <p className="text-xs text-gray-500 mt-1">Drip texts only go out during these hours — no 3am messages. Drip emails send any time.</p>
           </div>
         </div>
 

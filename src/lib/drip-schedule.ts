@@ -1,5 +1,5 @@
 import prisma from "@/lib/prisma";
-import { loadSendWindow, clampToSendWindow } from "@/lib/send-window";
+import { loadSendWindow, clampStepToSendWindow } from "@/lib/send-window";
 
 const MINUTE = 60 * 1000;
 
@@ -8,7 +8,7 @@ const MINUTE = 60 * 1000;
  *
  * For each ACTIVE recipient that has already received a message, the next send is
  * recomputed off their LAST send time using the CURRENT delay of their pending
- * step:  nextSendAt = lastSentAt + newDelay  (clamped to the send window).
+ * step:  nextSendAt = lastSentAt + newDelay  (texts clamped to the send window; emails not).
  *
  * - If the new interval hasn't elapsed yet, the next send moves to that new time.
  * - If the new (shorter) interval has ALREADY elapsed, nextSendAt lands in the past
@@ -27,7 +27,7 @@ export async function rescheduleActiveRecipients(campaignId: string): Promise<nu
   const steps = await prisma.campaignStep.findMany({
     where: { campaignId },
     orderBy: { stepOrder: "asc" },
-    select: { delayMinutes: true },
+    select: { delayMinutes: true, channel: true },
   });
   if (steps.length === 0) return 0;
 
@@ -53,7 +53,7 @@ export async function rescheduleActiveRecipients(campaignId: string): Promise<nu
     }
 
     const desired = new Date(r.sentAt.getTime() + (step.delayMinutes || 0) * MINUTE);
-    const next = clampToSendWindow(desired, window);
+    const next = clampStepToSendWindow(desired, step, window);
 
     // Only write when it actually shifts (>30s), so unchanged steps don't churn.
     if (!r.nextSendAt || Math.abs(r.nextSendAt.getTime() - next.getTime()) > 30_000) {
