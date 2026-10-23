@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Trash2, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, RotateCcw } from "lucide-react";
+import { Plus, Trash2, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, RotateCcw, Eye, EyeOff } from "lucide-react";
 import {
   CATALOG, GRID, SIZE_PRESETS, catalogItem, defaultConfig, fitsItem, maxKanbanColumns, newSection, packGrid, sizeCells, sizeLabel, sizeOf,
   type CatalogItem, type SectionSize, type SizeCells, type TvBoard, type TvBoardConfig, type TvSection,
@@ -49,6 +49,12 @@ export function BoardsTab({ config, onChange, onOpenKanban }: { config: TvBoardC
     setBoards(boards);
     setBoardIndex(to);
   }
+  const shownCount = config.boards.filter((b) => !b.hidden).length;
+  /** Takes the board off the TV (or puts it back) without deleting it. The last shown board can't be turned off. */
+  function toggleBoard() {
+    if (!board.hidden && shownCount <= 1) return;
+    setBoard({ ...board, hidden: !board.hidden });
+  }
   function removeBoard() {
     if (config.boards.length <= 1) return;
     if (!confirm(`Remove "${board.title}" and its sections?`)) return;
@@ -84,8 +90,9 @@ export function BoardsTab({ config, onChange, onOpenKanban }: { config: TvBoardC
       <div className="flex flex-wrap items-center gap-2">
         {config.boards.map((b, i) => (
           <button key={b.id} onClick={() => { setBoardIndex(i); setSelected(null); setAdding(false); }}
-            className={`px-3.5 py-2 rounded-lg text-sm font-semibold border ${i === bi ? "bg-teal-600 border-teal-600 text-white" : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"}`}>
-            {i + 1}. {b.title || "Untitled"}
+            title={b.hidden ? "Off · not shown on the TV" : undefined}
+            className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold border ${i === bi ? "bg-teal-600 border-teal-600 text-white" : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"} ${b.hidden && i !== bi ? "opacity-50" : ""}`}>
+            {b.hidden && <EyeOff className="w-3.5 h-3.5" />}{i + 1}. {b.title || "Untitled"}
           </button>
         ))}
         <button onClick={addBoard} className="inline-flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium text-teal-700 hover:bg-teal-50"><Plus className="w-4 h-4" /> Add board</button>
@@ -99,8 +106,16 @@ export function BoardsTab({ config, onChange, onOpenKanban }: { config: TvBoardC
             <div className="flex-1 min-w-[200px]"><label className={label}>Board title (shown in the TV header)</label><input value={board.title} onChange={(e) => setBoard({ ...board, title: e.target.value })} className={input} /></div>
             <button onClick={() => moveBoard(-1)} disabled={bi === 0} title="Show earlier" className="p-2.5 rounded-lg border border-gray-200 bg-white disabled:opacity-30"><ArrowLeft className="w-4 h-4" /></button>
             <button onClick={() => moveBoard(1)} disabled={bi === config.boards.length - 1} title="Show later" className="p-2.5 rounded-lg border border-gray-200 bg-white disabled:opacity-30"><ArrowRight className="w-4 h-4" /></button>
+            <button onClick={toggleBoard} disabled={!board.hidden && shownCount <= 1}
+              title={board.hidden ? "Turn on · show this board on the TV" : shownCount <= 1 ? "The TV needs at least one board on" : "Turn off · keep this board but don't show it on the TV"}
+              className={`inline-flex items-center gap-1.5 px-3 py-2.5 rounded-lg border text-sm font-semibold disabled:opacity-30 ${board.hidden ? "border-gray-200 bg-gray-50 text-gray-500" : "border-teal-200 bg-teal-50 text-teal-700"}`}>
+              {board.hidden ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}{board.hidden ? "Off" : "On"}
+            </button>
             <button onClick={removeBoard} disabled={config.boards.length <= 1} title="Remove board" className="p-2.5 rounded-lg border border-red-200 bg-white text-red-600 disabled:opacity-30"><Trash2 className="w-4 h-4" /></button>
           </div>
+          {board.hidden && (
+            <p className="text-xs text-gray-500 -mt-2">This board is off: it&apos;s kept here with all its sections but the TV skips it. Turn it on to put it back in the rotation.</p>
+          )}
 
           {/* TV preview: same 4×3 grid and packing as the TV (1792×872 design area). */}
           <div>

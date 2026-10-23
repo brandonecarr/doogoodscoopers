@@ -29,7 +29,12 @@ export interface TvElement {
   };
 }
 export interface TvSection { id: string; title: string; size: SectionSize; source: SectionSource; elements: TvElement[] }
-export interface TvBoard { id: string; title: string; sections: TvSection[] }
+/**
+ * `hidden` keeps a board in the config without showing it on the TV (toggle on the Boards tab).
+ * Admin-only: /api/tv/config strips hidden boards before the TV sees them and puts them back
+ * when the TV saves, so the Swift model doesn't need the field.
+ */
+export interface TvBoard { id: string; title: string; sections: TvSection[]; hidden?: boolean }
 export interface TvPipelineStage { id: string; name: string; shortName?: string; sourceStatuses: string[]; isWon: boolean }
 export interface TvPipeline { id: string; name: string; stages: TvPipelineStage[] }
 export interface TvHeroGoal {
@@ -220,6 +225,7 @@ export function packGrid(sizes: SectionSize[]): ({ col: number; row: number } | 
 export function validateConfig(cfg: TvBoardConfig, kanbanBoardIds?: Set<string>): string[] {
   const errors: string[] = [];
   if (!Array.isArray(cfg.boards) || cfg.boards.length === 0) errors.push("Add at least one board.");
+  else if (cfg.boards.every((b) => b.hidden)) errors.push("Turn on at least one board so the TV has something to show.");
   const pipelineIds = new Set((cfg.pipelines || []).map((p) => p.id));
 
   for (const board of cfg.boards || []) {
