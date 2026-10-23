@@ -1,6 +1,6 @@
 import prisma from "@/lib/prisma";
 import { isTestIdentity, extraTestIdentities } from "@/lib/test-accounts";
-import { archiveConvertedLeads } from "@/lib/lead-duplicates";
+import { archiveConvertedLeads, stopProspectDripsByPhone } from "@/lib/lead-duplicates";
 import { estimateMonthlyRevenue } from "@/lib/plan-pricing";
 import { recordSngCall } from "@/lib/sweepandgo-usage";
 
@@ -104,8 +104,11 @@ export async function syncActiveCustomers(): Promise<CustomerSyncResult> {
   for (const c of clients) {
     if (!c.client) continue;
     // The owner's test signups never enter the mirror (or the growth chart, goal, TV…).
+    // They DO still end the test lead's drips, so a sequence can be tested end to end:
+    // quote → enroll → sign up → drip stops, exactly like a real customer.
     if (isTest({ name: [c.first_name, c.last_name].filter(Boolean).join(" "), email: c.email, phones: [c.cell_phone, c.home_phone] })) {
       await prisma.sweepandgoCustomer.deleteMany({ where: { sngId: c.client } }).catch(() => {});
+      try { await stopProspectDripsByPhone([c.cell_phone, c.home_phone]); } catch (e) { console.error("[sync-customers] test-signup drip stop failed:", e); }
       continue;
     }
     seenIds.push(c.client);

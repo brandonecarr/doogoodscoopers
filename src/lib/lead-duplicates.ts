@@ -158,7 +158,44 @@ export async function archiveConvertedLeads(phones: Array<string | null | undefi
     });
     n += r.count;
   }
+  // Drop them off every prospect drip NOW (quote, Meta, returning, quote recovery),
+  // not at their next due step. Customer drips (win-back, reviews) use the CUSTOMER
+  // lead type, so they're untouched.
+  const converted: Array<{ leadType: "QUOTE_FORM" | "AD_LEAD"; leadId: string }> = [
+    ...[...quoteIds].map((id) => ({ leadType: "QUOTE_FORM" as const, leadId: id })),
+    ...[...adIds].map((id) => ({ leadType: "AD_LEAD" as const, leadId: id })),
+  ];
+  await stopProspectDripsForLeads(converted);
   return n;
+}
+
+/**
+ * A prospect signed up → end every ACTIVE drip sequence they're in, immediately.
+ * Idempotent; returns how many recipients it stopped. Prospect lead types only.
+ */
+export async function stopProspectDripsForLeads(leads: Array<{ leadType: "QUOTE_FORM" | "AD_LEAD"; leadId: string }>): Promise<number> {
+  if (leads.length === 0) return 0;
+  const r = await prisma.campaignRecipient.updateMany({
+    where: { status: "ACTIVE", OR: leads.map((l) => ({ leadType: l.leadType, leadId: l.leadId })) },
+    data: { status: "STOPPED", nextSendAt: null, error: "signed up — now a Sweep&Go customer" },
+  });
+  return r.count;
+}
+
+/**
+ * Same, keyed by phone: every prospect lead (quote + ad) sharing one of these numbers
+ * comes off their drips. Used for the owner's test signups, which never enter the
+ * customer mirror (so archiveConvertedLeads never sees them) but still need the
+ * "signed up → drip ends" behaviour so sequences can be tested end to end.
+ */
+export async function stopProspectDripsByPhone(phones: Array<string | null | undefined>): Promise<number> {
+  const leads: Array<{ leadType: "QUOTE_FORM" | "AD_LEAD"; leadId: string }> = [];
+  for (const p of phones) {
+    for (const ref of await findProspectLeadsByPhone(p)) {
+      leads.push({ leadType: ref.type === "quote" ? "QUOTE_FORM" : "AD_LEAD", leadId: ref.id });
+    }
+  }
+  return stopProspectDripsForLeads(leads);
 }
 
 /** The record that should survive a merge: richest type, then earliest created. */
