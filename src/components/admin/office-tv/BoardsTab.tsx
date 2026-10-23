@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Trash2, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, RotateCcw, Eye, EyeOff } from "lucide-react";
+import { Plus, Trash2, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, RotateCcw, EyeOff } from "lucide-react";
 import {
   CATALOG, GRID, SIZE_PRESETS, catalogItem, defaultConfig, fitsItem, maxKanbanColumns, newSection, packGrid, sizeCells, sizeLabel, sizeOf,
   type CatalogItem, type SectionSize, type SizeCells, type TvBoard, type TvBoardConfig, type TvSection,
@@ -106,11 +106,15 @@ export function BoardsTab({ config, onChange, onOpenKanban }: { config: TvBoardC
             <div className="flex-1 min-w-[200px]"><label className={label}>Board title (shown in the TV header)</label><input value={board.title} onChange={(e) => setBoard({ ...board, title: e.target.value })} className={input} /></div>
             <button onClick={() => moveBoard(-1)} disabled={bi === 0} title="Show earlier" className="p-2.5 rounded-lg border border-gray-200 bg-white disabled:opacity-30"><ArrowLeft className="w-4 h-4" /></button>
             <button onClick={() => moveBoard(1)} disabled={bi === config.boards.length - 1} title="Show later" className="p-2.5 rounded-lg border border-gray-200 bg-white disabled:opacity-30"><ArrowRight className="w-4 h-4" /></button>
-            <button onClick={toggleBoard} disabled={!board.hidden && shownCount <= 1}
-              title={board.hidden ? "Turn on · show this board on the TV" : shownCount <= 1 ? "The TV needs at least one board on" : "Turn off · keep this board but don't show it on the TV"}
-              className={`inline-flex items-center gap-1.5 px-3 py-2.5 rounded-lg border text-sm font-semibold disabled:opacity-30 ${board.hidden ? "border-gray-200 bg-gray-50 text-gray-500" : "border-teal-200 bg-teal-50 text-teal-700"}`}>
-              {board.hidden ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}{board.hidden ? "Off" : "On"}
-            </button>
+            <label className="inline-flex items-center gap-2 h-[42px] px-1 select-none"
+              title={board.hidden ? "Turn on · show this board on the TV" : shownCount <= 1 ? "The TV needs at least one board on" : "Turn off · keep this board but don't show it on the TV"}>
+              <span className={`text-sm font-semibold ${board.hidden ? "text-gray-400" : "text-teal-700"}`}>{board.hidden ? "Off" : "On"}</span>
+              <button type="button" role="switch" aria-checked={!board.hidden} onClick={toggleBoard} disabled={!board.hidden && shownCount <= 1}
+                className="relative inline-flex h-6 w-11 flex-shrink-0 rounded-full transition-colors disabled:opacity-50"
+                style={{ background: board.hidden ? "#D1D5DB" : "#0D9488" }}>
+                <span className={`inline-block h-5 w-5 rounded-full bg-white shadow transform transition-transform mt-0.5 ${board.hidden ? "translate-x-0.5" : "translate-x-[22px]"}`} />
+              </button>
+            </label>
             <button onClick={removeBoard} disabled={config.boards.length <= 1} title="Remove board" className="p-2.5 rounded-lg border border-red-200 bg-white text-red-600 disabled:opacity-30"><Trash2 className="w-4 h-4" /></button>
           </div>
           {board.hidden && (
