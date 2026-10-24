@@ -55,7 +55,12 @@ export function RichText({ html, style, tag = "div", onChange, onFocusChange }: 
   const [focused, setFocused] = useState(false);
   const [tokenOpen, setTokenOpen] = useState(false);
 
-  // Only push external html into the editable when it's not being edited (avoids caret jumps).
+  // The editable's contents are owned by the browser while it has focus. React must never
+  // re-render them: binding dangerouslySetInnerHTML to `html` made every keystroke (emit →
+  // parent state → new prop) rewrite innerHTML, which drops the caret to the start, so the
+  // next character landed in front of the last and text came out backwards. Instead the
+  // element renders with no children, and external html is pushed in here only when the
+  // block isn't being edited (initial mount, undo, panel edits).
   useEffect(() => {
     if (!focused && ref.current && ref.current.innerHTML !== html) ref.current.innerHTML = html;
   }, [html, focused]);
@@ -108,7 +113,6 @@ export function RichText({ html, style, tag = "div", onChange, onFocusChange }: 
           if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); link(); }
         }}
         onPaste={(e) => { e.preventDefault(); document.execCommand("insertText", false, e.clipboardData.getData("text/plain")); }}
-        dangerouslySetInnerHTML={{ __html: html }}
       />
     </div>
   );
