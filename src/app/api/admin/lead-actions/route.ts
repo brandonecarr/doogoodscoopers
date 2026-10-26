@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import type { LeadSource } from "@prisma/client";
+import { findOutOfAreaMatch, withOutOfAreaLock } from "@/lib/out-of-area-dedupe";
 
 type LeadTypeKey = "quote" | "outofarea" | "career" | "commercial" | "adlead" | "canvasser";
 
@@ -78,17 +79,37 @@ async function moveToOutOfArea(leadType: LeadTypeKey, id: string, adminEmail: st
       : `Moved from Meta Ad Leads${"adSource" in src && src.adSource ? ` (${src.adSource})` : ""}`;
   const carried = [origin, src.notes?.trim()].filter(Boolean).join("\n\n");
 
-  const created = await prisma.outOfAreaLead.create({
-    data: {
-      firstName: first || name,
-      lastName: last,
-      email: src.email || "",
-      phone: src.phone || "",
-      zipCode: src.zipCode || "",
-      notes: carried || null,
-      grade: src.grade ?? null,
-      followupDate: src.followupDate ?? null,
-    },
+  // If Sweep&Go already dropped this person into Out of Area (it does for every
+  // out-of-area quote), merge into that row instead of creating a second one.
+  const created = await withOutOfAreaLock({ email: src.email, phone: src.phone }, async (tx) => {
+    const existingId = await findOutOfAreaMatch(tx, { email: src.email, phone: src.phone });
+    if (existingId) {
+      const existing = await tx.outOfAreaLead.findUniqueOrThrow({ where: { id: existingId } });
+      return tx.outOfAreaLead.update({
+        where: { id: existingId },
+        data: {
+          notes: [existing.notes?.trim(), carried].filter(Boolean).join("\n\n") || null,
+          email: existing.email || src.email || "",
+          phone: existing.phone || src.phone || "",
+          zipCode: existing.zipCode || src.zipCode || "",
+          lastName: existing.lastName || last,
+          grade: existing.grade ?? src.grade ?? null,
+          followupDate: existing.followupDate ?? src.followupDate ?? null,
+        },
+      });
+    }
+    return tx.outOfAreaLead.create({
+      data: {
+        firstName: first || name,
+        lastName: last,
+        email: src.email || "",
+        phone: src.phone || "",
+        zipCode: src.zipCode || "",
+        notes: carried || null,
+        grade: src.grade ?? null,
+        followupDate: src.followupDate ?? null,
+      },
+    });
   });
 
   const from = leadTypeMap[leadType];

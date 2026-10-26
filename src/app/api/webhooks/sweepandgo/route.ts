@@ -5,6 +5,7 @@ import { syncContactToQuo } from "@/lib/quo";
 import { linkInstagramConversion } from "@/lib/instagram-leads";
 import { phoneVariants } from "@/lib/call-intel";
 import { recordWebhookEvent } from "@/lib/sweepandgo-webhook-log";
+import { findOutOfAreaMatch, withOutOfAreaLock } from "@/lib/out-of-area-dedupe";
 import { applyJobWebhook } from "@/lib/tv-sweepandgo";
 import { syncCustomersForEvent } from "@/lib/sweepandgo-customer-sync";
 import { requestBillingRefresh } from "@/lib/sweepandgo-billing";
@@ -237,15 +238,27 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: true, skipped: true });
       }
 
-      const lead = await prisma.outOfAreaLead.create({
-        data: {
-          firstName,
-          lastName: lastName || "",
-          email,
-          phone,
-          zipCode,
-        },
+      // Sweep&Go delivers each out-of-area quote ~4 times (our URL is registered more
+      // than once). Only the first delivery for a person in 24h creates a row and pushes.
+      const { lead, duplicate } = await withOutOfAreaLock({ email, phone }, async (tx) => {
+        const existingId = await findOutOfAreaMatch(tx, { email, phone }, new Date(Date.now() - 24 * 3600 * 1000));
+        if (existingId) return { lead: { id: existingId }, duplicate: true };
+        const created = await tx.outOfAreaLead.create({
+          data: {
+            firstName,
+            lastName: lastName || "",
+            email,
+            phone,
+            zipCode,
+          },
+        });
+        return { lead: created, duplicate: false };
       });
+
+      if (duplicate) {
+        console.log(`[SweepAndGo] Duplicate out-of-area delivery skipped (existing lead ${lead.id})`);
+        return NextResponse.json({ success: true, lead_id: lead.id, type: "out_of_area", duplicate: true });
+      }
 
       sendAdminPush({
         title: "📍 New Out-of-Area Lead",
