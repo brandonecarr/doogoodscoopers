@@ -1147,6 +1147,40 @@ model Review {
 // =====================
 // Simple key/value config for the /admin section (e.g. review-source links,
 // the Google "leave a review" link used by review-request SMS).
+// Sona (Quo's AI agent) outbound calls placed from a lead's profile. One row per
+// button press; `status` mirrors Quo's agent-call statuses and ends final at
+// completed / failed / no-answer / busy / voicemail / voicemail-left / canceled / error.
+model SonaCall {
+  id                 String     @id @default(cuid())
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  leadType           LeadSource
+  leadId             String
+  leadName           String?
+  fromNumber         String
+  toNumber           String
+  task               String     @db.Text
+  voicemail          String     @default("hang-up") // "hang-up" | "leave-message"
+  voicemailMessage   String?    @db.Text
+  maxDurationSeconds Int        @default(300)
+  idempotencyKey     String     @unique
+  agentCallId        String?    @unique // Quo's AR… id once dialing started
+  status             String     @default("queued")
+  title              String?
+  summary            String?    @db.Text
+  collectedData      Json?
+  rawResult          Json?
+  error              String?    @db.Text
+  startedBy          String // admin email
+  startedAt          DateTime?
+  endedAt            DateTime?
+  lastPolledAt       DateTime?
+  noteId             String? // the LeadUpdate written when the call ended
+
+  @@index([leadType, leadId, createdAt])
+  @@index([status])
+}
+
 model AppSetting {
   key       String   @id
   value     String   @db.Text

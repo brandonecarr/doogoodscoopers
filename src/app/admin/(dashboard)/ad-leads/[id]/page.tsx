@@ -12,6 +12,7 @@ import { isOptedOut } from "@/lib/sms-optout";
 import { FollowupGrade } from "@/components/admin/FollowupGrade";
 import { LeadActions } from "@/components/admin/LeadActions";
 import { ArrangeableBoard, type ArrangeableCard } from "@/components/admin/ArrangeableBoard";
+import { SonaCallCard } from "@/components/admin/SonaCallCard";
 import type { AdLead } from "@/types/leads";
 
 interface PageProps {
@@ -304,6 +305,11 @@ export default async function AdLeadDetailPage({ params }: PageProps) {
       id: "updates",
       zone: "main",
       node: <LeadUpdates leadId={typedLead.id} leadType="adlead" updates={typedUpdates} />,
+    },
+    {
+      id: "sona-call",
+      zone: "side",
+      node: <SonaCallCard leadType="AD_LEAD" leadId={typedLead.id} />,
     },
     {
       id: "status",

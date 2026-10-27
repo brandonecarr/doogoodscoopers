@@ -83,6 +83,10 @@
     {
       "path": "/api/v2/cron/tv-daily-metrics",
       "schedule": "55 * * * *"
+    },
+    {
+      "path": "/api/v2/cron/sona-calls",
+      "schedule": "* * * * *"
     }
   ]
 }

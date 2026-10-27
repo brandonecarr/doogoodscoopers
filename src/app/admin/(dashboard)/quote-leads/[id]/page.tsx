@@ -19,6 +19,7 @@ import { ArrangeableBoard, type ArrangeableCard } from "@/components/admin/Arran
 import { suggestInstagramLeadsForQuote } from "@/lib/instagram-leads";
 import { InstagramMatchButton } from "@/components/admin/InstagramMatchButton";
 import { QuoteRecoveryCard } from "@/components/admin/QuoteRecoveryCard";
+import { SonaCallCard } from "@/components/admin/SonaCallCard";
 import { recoverySettings, recoveryStatus, RECOVERY_LABEL, linkExpiresAt, isSngQuoteLead, wizardSubmissionFor } from "@/lib/quote-recovery";
 
 interface PageProps {
@@ -384,6 +385,11 @@ export default async function QuoteLeadDetailPage({ params }: PageProps) {
           }))}
         />
       ),
+    },
+    {
+      id: "sona-call",
+      zone: "side",
+      node: <SonaCallCard leadType="QUOTE_FORM" leadId={lead.id} />,
     },
     {
       id: "voicemail-script",
