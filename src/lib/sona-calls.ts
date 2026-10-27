@@ -18,6 +18,7 @@ import { getLeadPersonalization } from "@/lib/personalization";
 import { isOptedOut } from "@/lib/sms-optout";
 import { loadSendWindow, isWithinSendWindow } from "@/lib/send-window";
 import { normalizePhoneNumber } from "@/lib/quo";
+import { renderTemplate } from "@/lib/resend";
 
 export const SONA_FINAL = new Set(["completed", "failed", "no-answer", "busy", "voicemail", "voicemail-left", "canceled", "error"]);
 export type SonaLeadType = Extract<LeadSource, "QUOTE_FORM" | "AD_LEAD" | "COMMERCIAL" | "OUT_OF_AREA">;
@@ -62,28 +63,43 @@ export function toE164(phone: string | null | undefined): string | null {
   return n && /^\+1\d{10}$/.test(n) ? n : null;
 }
 
-const CALL_FACTS = [
-  "Key facts you can share: no contracts, cancel any time; the first visit is an initial cleanup priced after we see the yard, then the regular rate applies; the card on file is billed on the 1st of the month; we text when we're on the way and send a photo of the closed gate when done; a sanitizing and deodorizing spray can be added to any visit; questions can go to (909) 366-3744.",
-  "Do not book a specific date or time; say Brandon or Valerie will confirm the first visit. If they say they already signed up, thank them and end the call. If they're not interested, thank them politely and end the call. Keep the call under three minutes and never argue.",
-].join(" ");
+const CALL_FACTS =
+  "Key facts you can share: no contracts, cancel any time; the first visit is an initial cleanup priced after we see the yard, then the regular rate applies; the card on file is billed on the 1st of the month; we text when we're on the way and send a photo of the closed gate when done; a sanitizing and deodorizing spray can be added to any visit; questions can go to (909) 366-3744. " +
+  "Do not book a specific date or time; say Brandon or Valerie will confirm the first visit. If they say they already signed up, thank them and end the call. If they're not interested, thank them politely and end the call. Keep the call under three minutes and never argue.";
 
-/** The prefilled task for the confirm panel, built from the lead's own details. */
+/**
+ * Built-in call scripts, one per lead type, with {{tokens}} filled from the lead.
+ * The owner can replace any of them in Settings → "Sona call scripts" (AppSetting
+ * sona.task.<LEAD_TYPE>); an empty setting falls back to these.
+ *
+ * Tokens: {{firstName}} {{name}} {{city}} {{zipCode}} {{dogs}} {{numberOfDogs}} {{frequency}}
+ * {{monthlyRate}} {{quoteDetails}} ("2 dogs, weekly service in Fontana 92336")
+ * {{rateSentence}} (" Their quoted rate is $89 per month." or blank) {{callFacts}}.
+ */
+export const DEFAULT_SONA_TEMPLATES: Record<string, string> = {
+  QUOTE_FORM: "You are calling {{firstName}} on behalf of DooGoodScoopers, a dog waste removal service in the Inland Empire and High Desert. They requested a quote on our website{{quoteDetailsClause}} but haven't scheduled yet.{{rateSentence}} Goal: find out whether they'd like to get started, answer their questions, and if yes, confirm the best day of the week for service and how we get into the yard (gate location, whether dogs will be put away). {{callFacts}}",
+  AD_LEAD: "You are calling {{firstName}} on behalf of DooGoodScoopers, a dog waste removal service in the Inland Empire and High Desert. They responded to one of our ads{{whereClause}}. Goal: learn how many dogs they have and how often they'd like the yard cleaned, answer their questions, and if they're interested, confirm the best day of the week and how we get into the yard. {{callFacts}}",
+  COMMERCIAL: "You are calling {{firstName}} on behalf of DooGoodScoopers, a commercial pet waste removal service for HOAs, apartment communities and parks in the Inland Empire and High Desert. They inquired about service for their property. Goal: confirm the property type and location, the number of pet stations or common areas, and how often they'd like service, then say Brandon will follow up with a written proposal. {{callFacts}}",
+  OUT_OF_AREA: "You are calling {{firstName}} on behalf of DooGoodScoopers, a dog waste removal service. Goal: follow up on their interest, answer questions, and collect the best day of the week and yard access details if they want service. {{callFacts}}",
+};
+
+/** The prefilled task for the confirm panel: the owner's template for this lead type (or the built-in one), filled from the lead. */
 export async function defaultSonaTask(leadType: LeadSource, leadId: string): Promise<string> {
   const v = await getLeadPersonalization(leadType, leadId);
-  const who = v.firstName || v.name || "the lead";
+  const custom = (await prisma.appSetting.findUnique({ where: { key: `sona.task.${leadType}` } }))?.value?.trim();
+  const template = custom || DEFAULT_SONA_TEMPLATES[leadType] || DEFAULT_SONA_TEMPLATES.OUT_OF_AREA;
   const where = [v.city, v.zipCode].filter(Boolean).join(" ");
-  if (leadType === "QUOTE_FORM") {
-    const quote = [v.dogs, v.frequency ? `${v.frequency.toLowerCase()} service` : "", where ? `in ${where}` : ""].filter(Boolean).join(", ");
-    const rate = v.monthlyRate ? ` Their quoted rate is ${v.monthlyRate} per month.` : "";
-    return `You are calling ${who} on behalf of DooGoodScoopers, a dog waste removal service in the Inland Empire and High Desert. They requested a quote on our website${quote ? ` for ${quote}` : ""} but haven't scheduled yet.${rate} Goal: find out whether they'd like to get started, answer their questions, and if yes, confirm the best day of the week for service and how we get into the yard (gate location, whether dogs will be put away). ${CALL_FACTS}`.slice(0, 2000);
-  }
-  if (leadType === "AD_LEAD") {
-    return `You are calling ${who} on behalf of DooGoodScoopers, a dog waste removal service in the Inland Empire and High Desert. They responded to one of our ads${where ? ` from ${where}` : ""}. Goal: learn how many dogs they have and how often they'd like the yard cleaned, answer their questions, and if they're interested, confirm the best day of the week and how we get into the yard. ${CALL_FACTS}`.slice(0, 2000);
-  }
-  if (leadType === "COMMERCIAL") {
-    return `You are calling ${who} on behalf of DooGoodScoopers, a commercial pet waste removal service for HOAs, apartment communities and parks in the Inland Empire and High Desert. They inquired about service for their property. Goal: confirm the property type and location, the number of pet stations or common areas, and how often they'd like service, then say Brandon will follow up with a written proposal. ${CALL_FACTS}`.slice(0, 2000);
-  }
-  return `You are calling ${who} on behalf of DooGoodScoopers, a dog waste removal service. Goal: follow up on their interest, answer questions, and collect the best day of the week and yard access details if they want service. ${CALL_FACTS}`.slice(0, 2000);
+  const quoteDetails = [v.dogs, v.frequency ? `${v.frequency.toLowerCase()} service` : "", where ? `in ${where}` : ""].filter(Boolean).join(", ");
+  const vars: Record<string, string> = {
+    ...v,
+    firstName: v.firstName || v.name || "the lead",
+    quoteDetails,
+    quoteDetailsClause: quoteDetails ? ` for ${quoteDetails}` : "",
+    whereClause: where ? ` from ${where}` : "",
+    rateSentence: v.monthlyRate ? ` Their quoted rate is ${v.monthlyRate} per month.` : "",
+    callFacts: CALL_FACTS,
+  };
+  return renderTemplate(template, vars).replace(/\{\{\s*[a-zA-Z]+\s*\}\}/g, "").replace(/[ ]{2,}/g, " ").trim().slice(0, 2000);
 }
 
 export interface StartSonaCallInput {

@@ -126,7 +126,7 @@ export function SonaCallCard({ leadType, leadId }: { leadType: LeadType; leadId:
           <label className="block">
             <span className="text-xs font-medium text-gray-600">What Sona should do on the call</span>
             <textarea value={task} onChange={(e) => setTask(e.target.value)} rows={9} maxLength={2000} className="mt-1 w-full text-sm rounded-lg border border-gray-200 p-2.5 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white" />
-            <span className="text-[11px] text-gray-400">{task.length} / 2000</span>
+            <span className="text-[11px] text-gray-400">{task.length} / 2000 · <a href="/admin/settings#sona-scripts" className="text-teal-700 hover:underline">edit the default script in Settings</a></span>
           </label>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <label className="block">

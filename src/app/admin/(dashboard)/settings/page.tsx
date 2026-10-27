@@ -20,6 +20,13 @@ const GROUPS: GroupDef[] = [
     fields: [{ key: "calls.ai.enabled", label: "Take notes and fill blanks", type: "boolean" }, { key: "calls.ai.createLeads", label: "Create leads from unknown callers", type: "boolean" }] },
   { id: "reviews", title: "Review links", description: "Used on the Reviews page and inside review-request texts.", prefix: "reviews.", manageHref: "/admin/reviews", manageLabel: "Reviews",
     fields: [{ key: "reviews.google.url", label: "Google reviews link", type: "url" }, { key: "reviews.google.writeUrl", label: "Google \"leave a review\" link", type: "url", hint: "Google Business Profile → Ask for reviews." }, { key: "reviews.yelp.url", label: "Yelp reviews link", type: "url" }, { key: "reviews.yelp.notRecommendedUrl", label: "Yelp – Not Recommended link", type: "url" }] },
+  { id: "sona-scripts", title: "Sona call scripts", description: "What Sona says when you press \"Have Sona call\" on a lead. Leave a script blank to use the built-in one; you can still edit the text per call before placing it. Tokens: {{firstName}} {{name}} {{city}} {{zipCode}} {{dogs}} {{frequency}} {{monthlyRate}} {{quoteDetails}} {{rateSentence}} {{callFacts}}.", prefix: "sona.", manageHref: "/admin/settings#sona", manageLabel: "Connection",
+    fields: [
+      { key: "sona.task.QUOTE_FORM", label: "Script for website quote leads", type: "textarea", placeholder: "Built-in: You are calling {{firstName}} on behalf of DooGoodScoopers… They requested a quote on our website{{quoteDetailsClause}} but haven't scheduled yet.{{rateSentence}} Goal: find out whether they'd like to get started… {{callFacts}}" },
+      { key: "sona.task.AD_LEAD", label: "Script for ad leads", type: "textarea", placeholder: "Built-in: You are calling {{firstName}} on behalf of DooGoodScoopers… They responded to one of our ads{{whereClause}}. Goal: learn how many dogs they have and how often… {{callFacts}}" },
+      { key: "sona.dailyCap", label: "Daily cap (calls per day)", type: "number", min: 0, max: 500, placeholder: "20", hint: "0 = no cap. Each call uses 50 Quo credits." },
+      { key: "sona.fromNumber", label: "Call from (E.164)", type: "text", placeholder: "+19093663744", hint: "Must be a Quo number the connected user belongs to." },
+    ] },
   { id: "facebook-login", title: "Facebook Login", description: "Only needed if Facebook rejects the login with an invalid-scopes error.", prefix: "facebook.loginConfigId", manageHref: "/admin/messenger", manageLabel: "Messenger",
     fields: [{ key: "facebook.loginConfigId", label: "Login for Business configuration ID", type: "text", placeholder: "Numbers only" }] },
 ];
