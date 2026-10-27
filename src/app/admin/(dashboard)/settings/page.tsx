@@ -6,6 +6,7 @@ import { AdminUsersCard } from "@/components/admin/settings/AdminUsersCard";
 import { CanvasserUsersCard } from "@/components/admin/settings/CanvasserUsersCard";
 import { SettingsGroupCard, type GroupDef } from "@/components/admin/settings/SettingsGroupCard";
 import { AllSettingsCard } from "@/components/admin/settings/AllSettingsCard";
+import { SonaConnectionCard } from "@/components/admin/settings/SonaConnectionCard";
 
 export const dynamic = "force-dynamic";
 
@@ -66,7 +67,7 @@ export default async function SettingsPage() {
         title="Settings"
         subtitle={`${counts.admins} admin${counts.admins === 1 ? "" : "s"} · ${counts.canvassers} canvasser${counts.canvassers === 1 ? "" : "s"} · ${okCount} of ${integrations.length} integrations ready${version ? ` · build ${version}` : ""}`}
         icon={<div className="w-11 h-11 rounded-[13px] flex items-center justify-center" style={{ background: "linear-gradient(150deg,#C4B5FD,#6D3EF0)" }}><Settings className="w-[22px] h-[22px] text-white" /></div>}
-        actions={<><NavLink id="users" label="Users" /><NavLink id="office-tv" label="Office TV" /><NavLink id="integrations" label="Integrations" /><NavLink id="features" label="Features" /><NavLink id="areas" label="All areas" /></>}
+        actions={<><NavLink id="users" label="Users" /><NavLink id="office-tv" label="Office TV" /><NavLink id="integrations" label="Integrations" /><NavLink id="sona" label="Sona calls" /><NavLink id="features" label="Features" /><NavLink id="areas" label="All areas" /></>}
       />
 
       {/* System at a glance */}
@@ -102,6 +103,8 @@ export default async function SettingsPage() {
           </div>
         ))}
       </div>
+
+      <SonaConnectionCard />
 
       {/* Feature settings */}
       <div id="features" className="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
