@@ -18,7 +18,7 @@ import { getLeadPersonalization } from "@/lib/personalization";
 import { isOptedOut } from "@/lib/sms-optout";
 import { loadSendWindow, isWithinSendWindow } from "@/lib/send-window";
 import { normalizePhoneNumber } from "@/lib/quo";
-import { renderTemplate } from "@/lib/resend";
+import { compilePlaybook, parsePlaybook, fillTokens, DEFAULT_SONA_PLAYBOOKS, SONA_LEAD_TYPES, SONA_MAX_TASK, type SonaPlaybookLeadType } from "@/lib/sona-playbook";
 
 export const SONA_FINAL = new Set(["completed", "failed", "no-answer", "busy", "voicemail", "voicemail-left", "canceled", "error"]);
 export type SonaLeadType = Extract<LeadSource, "QUOTE_FORM" | "AD_LEAD" | "COMMERCIAL" | "OUT_OF_AREA">;
@@ -68,38 +68,31 @@ const CALL_FACTS =
   "Do not book a specific date or time; say Brandon or Valerie will confirm the first visit. If they say they already signed up, thank them and end the call. If they're not interested, thank them politely and end the call. Keep the call under three minutes and never argue.";
 
 /**
- * Built-in call scripts, one per lead type, with {{tokens}} filled from the lead.
- * The owner can replace any of them in Settings → "Sona call scripts" (AppSetting
- * sona.task.<LEAD_TYPE>); an empty setting falls back to these.
- *
- * Tokens: {{firstName}} {{name}} {{city}} {{zipCode}} {{dogs}} {{numberOfDogs}} {{frequency}}
- * {{monthlyRate}} {{quoteDetails}} ("2 dogs, weekly service in Fontana 92336")
- * {{rateSentence}} (" Their quoted rate is $89 per month." or blank) {{callFacts}}.
+ * The prefilled task for the confirm panel. Precedence: the owner's playbook for this
+ * lead type (/admin/sona-playbooks) → a plain-text template (sona.task.<TYPE>) →
+ * the built-in playbook. Tokens are filled from the lead.
  */
-export const DEFAULT_SONA_TEMPLATES: Record<string, string> = {
-  QUOTE_FORM: "You are calling {{firstName}} on behalf of DooGoodScoopers, a dog waste removal service in the Inland Empire and High Desert. They requested a quote on our website{{quoteDetailsClause}} but haven't scheduled yet.{{rateSentence}} Goal: find out whether they'd like to get started, answer their questions, and if yes, confirm the best day of the week for service and how we get into the yard (gate location, whether dogs will be put away). {{callFacts}}",
-  AD_LEAD: "You are calling {{firstName}} on behalf of DooGoodScoopers, a dog waste removal service in the Inland Empire and High Desert. They responded to one of our ads{{whereClause}}. Goal: learn how many dogs they have and how often they'd like the yard cleaned, answer their questions, and if they're interested, confirm the best day of the week and how we get into the yard. {{callFacts}}",
-  COMMERCIAL: "You are calling {{firstName}} on behalf of DooGoodScoopers, a commercial pet waste removal service for HOAs, apartment communities and parks in the Inland Empire and High Desert. They inquired about service for their property. Goal: confirm the property type and location, the number of pet stations or common areas, and how often they'd like service, then say Brandon will follow up with a written proposal. {{callFacts}}",
-  OUT_OF_AREA: "You are calling {{firstName}} on behalf of DooGoodScoopers, a dog waste removal service. Goal: follow up on their interest, answer questions, and collect the best day of the week and yard access details if they want service. {{callFacts}}",
-};
-
-/** The prefilled task for the confirm panel: the owner's template for this lead type (or the built-in one), filled from the lead. */
 export async function defaultSonaTask(leadType: LeadSource, leadId: string): Promise<string> {
   const v = await getLeadPersonalization(leadType, leadId);
-  const custom = (await prisma.appSetting.findUnique({ where: { key: `sona.task.${leadType}` } }))?.value?.trim();
-  const template = custom || DEFAULT_SONA_TEMPLATES[leadType] || DEFAULT_SONA_TEMPLATES.OUT_OF_AREA;
+  const [pbRow, txtRow] = await Promise.all([
+    prisma.appSetting.findUnique({ where: { key: `sona.playbook.${leadType}` } }),
+    prisma.appSetting.findUnique({ where: { key: `sona.task.${leadType}` } }),
+  ]);
+  const playbook = parsePlaybook(pbRow?.value);
+  const type = (SONA_LEAD_TYPES as readonly string[]).includes(leadType) ? (leadType as SonaPlaybookLeadType) : "OUT_OF_AREA";
+  const template = playbook ? compilePlaybook(playbook) : (txtRow?.value?.trim() || compilePlaybook(DEFAULT_SONA_PLAYBOOKS[type]));
   const where = [v.city, v.zipCode].filter(Boolean).join(" ");
   const quoteDetails = [v.dogs, v.frequency ? `${v.frequency.toLowerCase()} service` : "", where ? `in ${where}` : ""].filter(Boolean).join(", ");
   const vars: Record<string, string> = {
     ...v,
     firstName: v.firstName || v.name || "the lead",
-    quoteDetails,
+    quoteDetails: quoteDetails || "their yard",
     quoteDetailsClause: quoteDetails ? ` for ${quoteDetails}` : "",
     whereClause: where ? ` from ${where}` : "",
     rateSentence: v.monthlyRate ? ` Their quoted rate is ${v.monthlyRate} per month.` : "",
     callFacts: CALL_FACTS,
   };
-  return renderTemplate(template, vars).replace(/\{\{\s*[a-zA-Z]+\s*\}\}/g, "").replace(/[ ]{2,}/g, " ").trim().slice(0, 2000);
+  return fillTokens(template, vars).slice(0, SONA_MAX_TASK);
 }
 
 export interface StartSonaCallInput {
