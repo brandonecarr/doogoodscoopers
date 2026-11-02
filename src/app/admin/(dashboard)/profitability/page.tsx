@@ -112,9 +112,7 @@ export default async function ProfitabilityPage() {
                   <tr key={r.month} className="border-b border-gray-50 last:border-0">
                     <td className="px-2 py-2.5 text-navy-900 font-medium whitespace-nowrap">{fmtMonth(r.month)}</td>
                     <td className="px-2 py-2.5 text-right text-gray-600">{r.customers || "—"}</td>
-                    <td className="px-2 py-2.5 text-right text-navy-900" title={r.partialRefunds ? `Sweep&Go's payments report shows ${money2(r.sngReportCents)} — it leaves out ${r.partialRefunds} partially refunded payment${r.partialRefunds === 1 ? "" : "s"} (${money2(r.partialKeptCents)} kept)` : undefined}>
-                      {money2(r.revenueCents)}{r.partialRefunds > 0 && <span className="text-gray-400" aria-hidden> *</span>}
-                    </td>
+                    <td className="px-2 py-2.5 text-right text-navy-900">{money2(r.revenueCents)}</td>
                     <td className="px-2 py-2.5 text-right text-gray-600">{p.hasExpenses ? money2(r.expenseCents) : "—"}</td>
                     <td className={`px-2 py-2.5 text-right font-semibold ${!p.hasExpenses ? "text-gray-400" : r.profitCents >= 0 ? "text-green-700" : "text-red-600"}`}>
                       {p.hasExpenses ? money2(r.profitCents) : "—"}
@@ -128,15 +126,10 @@ export default async function ProfitabilityPage() {
             </table>
           </div>
           <p className="text-[11.5px] text-gray-500 mt-3">
-            Collected is money that actually arrived, counted on the day it was paid (Sweep&amp;Go payments, net of refunds, test accounts excluded) — not what was invoiced.
-            A September invoice paid in October is October money; an October invoice paid Nov 1 is November money. This is how Sweep&amp;Go&apos;s own reports count a month.
+            Collected is money that actually arrived, counted on the day it was paid (Sweep&amp;Go payments, test accounts excluded) — not what was invoiced.
+            A September invoice paid in October is October money; an October invoice paid Nov 1 is November money. It matches Sweep&amp;Go&apos;s payments report exactly:
+            a payment that was later refunded, even in part, is left out of its month.
           </p>
-          {p.rows.some((r) => r.partialRefunds > 0) && (
-            <p className="text-[11.5px] text-gray-500 mt-1">
-              * Includes a partially refunded payment. Sweep&amp;Go&apos;s payments report drops those entirely, so it reads lower by the part you kept:
-              {" "}{[...p.rows].reverse().filter((r) => r.partialRefunds > 0).map((r) => `${fmtMonth(r.month)} ${money2(r.sngReportCents)} there vs ${money2(r.revenueCents)} here (${money2(r.partialKeptCents)} kept on ${r.partialRefunds} payment${r.partialRefunds === 1 ? "" : "s"})`).join("; ")}.
-            </p>
-          )}
 
           {p.byCategory.length > 0 && (
             <div className="mt-5 pt-4 border-t border-gray-100">
