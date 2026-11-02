@@ -1439,6 +1439,32 @@ model SngInvoice {
   @@index([remainingCents])
 }
 
+/// Sweep&Go payments mirror (the /payments feed). Cash basis: revenue by the date
+/// money moved, net of refunds — the same way Sweep&Go's own reports count a month.
+/// The feed carries no id, so `key` is a hash of the row's identifying fields.
+model SngPayment {
+  id                 String   @id @default(cuid())
+  key                String   @unique
+  paidOn             DateTime @db.Date
+  amountCents        Int      @default(0)
+  refundedCents      Int      @default(0)
+  tipCents           Int      @default(0)
+  status             String? // succeeded | failed | partially_refunded | refunded
+  method             String? // credit_card | check | ...
+  description        String?
+  invoiceNumber      String?
+  clientName         String?
+  nameKey            String
+  commercialClient   String?
+  commercialLocation String?
+  syncedAt           DateTime @default(now())
+
+  @@index([paidOn])
+  @@index([nameKey])
+  @@index([invoiceNumber])
+  @@index([status])
+}
+
 // =====================
 // EXPENSES / PROFITABILITY
 // =====================

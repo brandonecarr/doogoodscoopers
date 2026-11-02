@@ -5,7 +5,8 @@ import { syncSngBilling, recordBillingSyncResult } from "@/lib/sweepandgo-billin
 // the lifetime-value header and invoice list on each customer profile. Between these,
 // billing webhooks trigger hourly-at-most refreshes via /api/v2/cron/sync-billing-events.
 export const dynamic = "force-dynamic";
-export const maxDuration = 150;
+// A full nightly walk is ~55 paced requests (invoices + payments), ~3 minutes.
+export const maxDuration = 300;
 
 export async function GET(request: NextRequest) {
   const secret = process.env.CRON_SECRET;

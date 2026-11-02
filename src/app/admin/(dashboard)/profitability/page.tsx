@@ -27,7 +27,7 @@ export default async function ProfitabilityPage() {
   );
 
   const tiles = [
-    { icon: DollarSign, label: "Revenue this month", value: money(current.revenueCents), sub: `${current.customers} customers billed`, tint: "#16A34A" },
+    { icon: DollarSign, label: "Collected this month", value: money(current.revenueCents), sub: `${current.payments} payments from ${current.customers} customers`, tint: "#16A34A" },
     { icon: Wallet, label: "Costs this month", value: p.hasExpenses ? money(current.expenseCents) : "—", sub: p.hasExpenses ? `${money(current.recurringCents)} overhead + ${money(current.onetimeCents)} one-off` : "add expenses below", tint: "#DC2626" },
     { icon: TrendingUp, label: "Profit this month", value: p.hasExpenses ? money(current.profitCents) : "—", sub: prior && p.hasExpenses ? `${prior.profitCents <= current.profitCents ? "▲" : "▼"} vs ${fmtMonth(prior.month)}` : "revenue minus costs", tint: current.profitCents >= 0 ? "#6D3EF0" : "#DC2626" },
     { icon: Percent, label: "Margin", value: p.hasExpenses && current.marginPct !== null ? `${current.marginPct.toFixed(0)}%` : "—", sub: "profit ÷ revenue", tint: "#0EA5E9" },
@@ -37,7 +37,7 @@ export default async function ProfitabilityPage() {
     <div className="space-y-3.5 pb-20 lg:pb-0">
       <PageHero
         title="Profitability"
-        subtitle="Real collected revenue against your costs — what the business actually keeps"
+        subtitle="Money actually collected, by the day it was paid, against your costs — what the business actually keeps"
         backHref="/admin/customers"
         icon={
           <div className="w-11 h-11 rounded-[13px] flex items-center justify-center" style={{ background: "linear-gradient(150deg,#8B6BFF,#6D3EF0)" }}>
@@ -60,6 +60,12 @@ export default async function ProfitabilityPage() {
           </div>
         ))}
       </div>
+
+      {!p.paymentsReady && (
+        <div className="dgs-card p-4 text-[13px] text-gray-700" style={{ borderColor: "#F59E0B" }}>
+          The Sweep&amp;Go payment history is still importing. Revenue shows $0 until the first pass finishes (a few minutes), then updates on its own.
+        </div>
+      )}
 
       {/* Break-even — the number that says how many customers just pay the bills. */}
       {p.breakEvenCustomers !== null && (
@@ -95,7 +101,7 @@ export default async function ProfitabilityPage() {
                 <tr className="text-left text-[11px] uppercase tracking-wide text-gray-500 border-b border-gray-100">
                   <th className="px-2 py-2 font-semibold">Month</th>
                   <th className="px-2 py-2 font-semibold text-right">Customers</th>
-                  <th className="px-2 py-2 font-semibold text-right">Revenue</th>
+                  <th className="px-2 py-2 font-semibold text-right">Collected</th>
                   <th className="px-2 py-2 font-semibold text-right">Costs</th>
                   <th className="px-2 py-2 font-semibold text-right">Profit</th>
                   <th className="px-2 py-2 font-semibold text-right">Margin</th>
@@ -106,7 +112,9 @@ export default async function ProfitabilityPage() {
                   <tr key={r.month} className="border-b border-gray-50 last:border-0">
                     <td className="px-2 py-2.5 text-navy-900 font-medium whitespace-nowrap">{fmtMonth(r.month)}</td>
                     <td className="px-2 py-2.5 text-right text-gray-600">{r.customers || "—"}</td>
-                    <td className="px-2 py-2.5 text-right text-navy-900">{money2(r.revenueCents)}</td>
+                    <td className="px-2 py-2.5 text-right text-navy-900" title={r.partialRefunds ? `Sweep&Go's payments report shows ${money2(r.sngReportCents)} — it leaves out ${r.partialRefunds} partially refunded payment${r.partialRefunds === 1 ? "" : "s"} (${money2(r.partialKeptCents)} kept)` : undefined}>
+                      {money2(r.revenueCents)}{r.partialRefunds > 0 && <span className="text-gray-400" aria-hidden> *</span>}
+                    </td>
                     <td className="px-2 py-2.5 text-right text-gray-600">{p.hasExpenses ? money2(r.expenseCents) : "—"}</td>
                     <td className={`px-2 py-2.5 text-right font-semibold ${!p.hasExpenses ? "text-gray-400" : r.profitCents >= 0 ? "text-green-700" : "text-red-600"}`}>
                       {p.hasExpenses ? money2(r.profitCents) : "—"}
@@ -120,8 +128,15 @@ export default async function ProfitabilityPage() {
             </table>
           </div>
           <p className="text-[11.5px] text-gray-500 mt-3">
-            Revenue is money actually collected on Sweep&amp;Go invoices (paid minus refunds) — not what was billed.
+            Collected is money that actually arrived, counted on the day it was paid (Sweep&amp;Go payments, net of refunds, test accounts excluded) — not what was invoiced.
+            A September invoice paid in October is October money; an October invoice paid Nov 1 is November money. This is how Sweep&amp;Go&apos;s own reports count a month.
           </p>
+          {p.rows.some((r) => r.partialRefunds > 0) && (
+            <p className="text-[11.5px] text-gray-500 mt-1">
+              * Includes a partially refunded payment. Sweep&amp;Go&apos;s payments report drops those entirely, so it reads lower by the part you kept:
+              {" "}{[...p.rows].reverse().filter((r) => r.partialRefunds > 0).map((r) => `${fmtMonth(r.month)} ${money2(r.sngReportCents)} there vs ${money2(r.revenueCents)} here (${money2(r.partialKeptCents)} kept on ${r.partialRefunds} payment${r.partialRefunds === 1 ? "" : "s"})`).join("; ")}.
+            </p>
+          )}
 
           {p.byCategory.length > 0 && (
             <div className="mt-5 pt-4 border-t border-gray-100">

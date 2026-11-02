@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { billingRefreshDue, syncSngBilling, recordBillingSyncResult } from "@/lib/sweepandgo-billing";
+import { billingRefreshDue, billingWalkPending, syncSngBilling, recordBillingSyncResult } from "@/lib/sweepandgo-billing";
 import { syncSubscriptionsIfDue } from "@/lib/sweepandgo-subscriptions";
 
 // Every 15 minutes: refresh the billing mirror ONLY if a Sweep&Go billing webhook
@@ -8,7 +8,8 @@ import { syncSubscriptionsIfDue } from "@/lib/sweepandgo-subscriptions";
 // newest invoices (refresh-only: 4 requests) and never advances a full walk; otherwise it
 // returns without calling Sweep&Go at all. The daily /api/v2/cron/sync-billing reconciles.
 export const dynamic = "force-dynamic";
-export const maxDuration = 150;
+// Usually a few requests; up to a full ~55-request walk when one is pending.
+export const maxDuration = 300;
 
 export async function GET(request: NextRequest) {
   const secret = process.env.CRON_SECRET;
@@ -18,10 +19,20 @@ export async function GET(request: NextRequest) {
   // Subscriptions mirror (webhook-flagged, debounced): ~8 requests when it runs.
   const subscriptions = await syncSubscriptionsIfDue().catch((e) => ({ ran: false, reason: `failed: ${e instanceof Error ? e.message : e}` }));
 
+  const started = Date.now();
+
+  // A feed that has never been imported, or a walk that stopped part-way, is finished
+  // here rather than waiting for tomorrow's daily run (a full walk is ~55 requests, once).
+  const walk = await billingWalkPending();
+  if (walk.pending) {
+    const result = await syncSngBilling({ full: true });
+    await recordBillingSyncResult(result);
+    return NextResponse.json({ reason: walk.reason, ...result, subscriptions, ms: Date.now() - started });
+  }
+
   const check = await billingRefreshDue();
   if (!check.due) return NextResponse.json({ skipped: true, reason: check.reason, subscriptions });
 
-  const started = Date.now();
   const result = await syncSngBilling({ refreshOnly: true });
   await recordBillingSyncResult(result);
   return NextResponse.json({ reason: check.reason, ...result, subscriptions, ms: Date.now() - started });

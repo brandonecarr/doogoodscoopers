@@ -1,11 +1,23 @@
 import prisma from "@/lib/prisma";
+import { TEST_NAME_KEYS } from "@/lib/test-accounts";
 
 /**
- * Profit & loss. Revenue is REAL — money actually collected, from the Sweep&Go
- * invoice mirror (paid minus refunded). Costs are whatever the owner enters.
+ * Profit & loss. Revenue is REAL — money actually collected — on a CASH BASIS:
+ * Sweep&Go payments by the date the money moved, net of refunds, from the
+ * payments mirror (`SngPayment`). Costs are whatever the owner enters.
+ *
+ * Why payments and not invoices: invoices are dated by creation, so an October
+ * invoice settled by check on Nov 1 counted as October, a September invoice paid
+ * Oct 21 never counted as October, a check for $161 against a $160 invoice showed
+ * as $160, and a refund on a manual charge was invisible. Those four put October
+ * 2026 at $8,008.60 against the $7,912.60 actually collected. Sweep&Go's own
+ * reports count the same way this does — with one quirk, see `sngReportCents`.
  *
  * Everything is INTEGER CENTS end to end, so a year of arithmetic can't drift.
  */
+
+/** Payment statuses that moved money (net of `refundedCents`). Failed attempts never count. */
+const COLLECTED_STATUSES = ["succeeded", "partially_refunded", "refunded"];
 
 export const EXPENSE_CATEGORIES: { key: string; label: string }[] = [
   { key: "payroll", label: "Payroll & labor" },
@@ -27,7 +39,18 @@ export const categoryLabel = (key: string) =>
 
 export interface MonthRow {
   month: string; // "YYYY-MM"
+  /** Collected this month: succeeded payments net of refunds, test accounts excluded. */
   revenueCents: number;
+  /**
+   * What Sweep&Go's payments report shows for the month. It counts only payments whose
+   * status is still "succeeded", so a payment that was later PARTLY refunded drops out
+   * entirely (the part the business kept included). `revenueCents` keeps the kept part.
+   */
+  sngReportCents: number;
+  /** Partially refunded payments this month: how many, and the net the business kept. */
+  partialRefunds: number;
+  partialKeptCents: number;
+  payments: number;
   recurringCents: number;
   onetimeCents: number;
   expenseCents: number;
@@ -50,6 +73,8 @@ export interface Profitability {
   /** Customers needed just to cover today's fixed overhead. */
   breakEvenCustomers: number | null;
   hasExpenses: boolean;
+  /** False until the payments mirror has rows (first backfill still running). */
+  paymentsReady: boolean;
 }
 
 const ymUTC = (d: Date) => `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
@@ -77,22 +102,31 @@ export async function getProfitability(months = 12): Promise<Profitability> {
   const keys = monthKeys(months);
   const windowStart = monthStart(keys[0]);
 
-  const [revenueRows, expenses] = await Promise.all([
-    prisma.$queryRawUnsafe<{ month: string; cents: bigint; customers: bigint }[]>(
-      `select to_char("sngCreatedAt", 'YYYY-MM') as month,
-              sum("paidCents" - "refundedCents")::bigint as cents,
-              count(distinct "nameKey")::bigint as customers
-         from "SngInvoice"
-        where "sngCreatedAt" >= $1
-        group by 1`,
-      windowStart
-    ),
+  type Rev = { cents: number; sngReport: number; partials: number; partialKept: number; payments: number; customers: number };
+  const [revenueRows, expenses, paymentCount] = await Promise.all([
+    prisma.$queryRaw<{ month: string; cents: bigint; sng_report: bigint; partials: bigint; partial_kept: bigint; payments: bigint; customers: bigint }[]>`
+      select to_char("paidOn", 'YYYY-MM') as month,
+             sum("amountCents" - "refundedCents")::bigint as cents,
+             sum("amountCents") filter (where status = 'succeeded')::bigint as sng_report,
+             count(*) filter (where status = 'partially_refunded')::bigint as partials,
+             sum("amountCents" - "refundedCents") filter (where status = 'partially_refunded')::bigint as partial_kept,
+             count(*) filter (where "amountCents" > "refundedCents")::bigint as payments,
+             count(distinct "nameKey") filter (where "amountCents" > "refundedCents")::bigint as customers
+        from "SngPayment"
+       where "paidOn" >= ${windowStart}
+         and status = any(${COLLECTED_STATUSES})
+         and "nameKey" <> all(${TEST_NAME_KEYS})
+       group by 1`,
     prisma.expense.findMany(),
+    prisma.sngPayment.count(),
   ]);
 
-  const revByMonth = new Map<string, { cents: number; customers: number }>();
+  const revByMonth = new Map<string, Rev>();
   for (const r of revenueRows) {
-    revByMonth.set(r.month, { cents: Number(r.cents ?? 0), customers: Number(r.customers ?? 0) });
+    revByMonth.set(r.month, {
+      cents: Number(r.cents ?? 0), sngReport: Number(r.sng_report ?? 0), partials: Number(r.partials ?? 0),
+      partialKept: Number(r.partial_kept ?? 0), payments: Number(r.payments ?? 0), customers: Number(r.customers ?? 0),
+    });
   }
 
   const catTotals = new Map<string, number>();
@@ -125,6 +159,10 @@ export async function getProfitability(months = 12): Promise<Profitability> {
     return {
       month: key,
       revenueCents,
+      sngReportCents: rev?.sngReport ?? 0,
+      partialRefunds: rev?.partials ?? 0,
+      partialKeptCents: rev?.partialKept ?? 0,
+      payments: rev?.payments ?? 0,
       recurringCents,
       onetimeCents,
       expenseCents,
@@ -159,5 +197,6 @@ export async function getProfitability(months = 12): Promise<Profitability> {
         ? Math.ceil(monthlyOverheadCents / avgRevenuePerCustomerCents)
         : null,
     hasExpenses: expenses.length > 0,
+    paymentsReady: paymentCount > 0,
   };
 }

@@ -121,6 +121,7 @@ DOMAIN NOTES
 - Estimated MRR ≈ sum of "SubscriptionEvent"."revenue" where "kind" = 'SIGNUP' minus where "kind" = 'CANCELLATION'. SubscriptionEvent."kind" is one of SIGNUP / CANCELLATION / QUOTE; "occurredAt" is the timestamp.
 - Leads live in several pipelines — inspect the schema: "QuoteLead" (website/quote + Meta/IG), "AdLead", "CanvasserLead" (door-to-door), "OutOfAreaLead". Most lead tables have "status", "createdAt", "source", "zipCode", "archived".
 - Reviews are in "Review" ("rating" 1–5). Funnels: "Funnel", "FunnelSession", "FunnelEvent".
+- MONTHLY revenue / money collected comes from "SngPayment" (mirrored Sweep&Go payments, cash basis): sum("amountCents" - "refundedCents") / 100 where status in ('succeeded','partially_refunded','refunded'), grouped by "paidOn" (a DATE, the day the money moved). Never count status = 'failed'. Exclude test accounts ("nameKey" not in the test list). "invoiceNumber" links a payment to its "SngInvoice".
 - Lifetime revenue per customer comes from "SngInvoice" (mirrored Sweep&Go invoices): sum("paidCents" - "refundedCents") / 100, matched to a customer by "nameKey" = lowercased "firstName" || ' ' || "lastName". Amounts are INTEGER CENTS. "remainingCents" > 0 means still owed.
 - "SubscriptionEvent"."excluded" = true marks test signups made while trialling Sweep&Go. ALWAYS add "excluded" = false to signup/cancellation stats, or the numbers are inflated.
 - CANVASSERS (door-to-door reps) live in "Canvasser" ("name", "email", "active", "lastLoginAt", "invitedAt"). Their fieldwork:

@@ -1,9 +1,11 @@
+import { createHash } from "crypto";
 import prisma from "@/lib/prisma";
 import { getSetting, setSetting } from "@/lib/google-business";
 import { recordSngCall } from "@/lib/sweepandgo-usage";
 
 /**
- * Sweep&Go billing mirror — invoices + payments.
+ * Sweep&Go billing mirror — invoices (per-customer lifetime value) + payments
+ * (cash-basis monthly revenue for Profitability).
  *
  * ⚠️ These numbers are money shown on a customer's profile. Two hard-won rules:
  *
@@ -35,10 +37,13 @@ const RETRIES = 2;             // for transient errors only — NEVER for 429s
 // through a 429 just deepens the hole (one run burned 5 minutes on backoff and
 // was killed at the 300s function limit). So: take a small bite each run, and
 // the instant we see a 429, save our place and leave the API alone.
-// A full walk at 50/page is ~22 pages, so one daily run can finish it.
-const MAX_PAGES_PER_RUN = 25;
-const BUDGET_MS = 120_000;
-// Once the history is fully imported, only the newest pages need re-reading.
+// A full walk at 50/page is ~22 invoice pages + ~33 payment pages (~55 requests,
+// ~3 minutes at the pacing below), so one daily run can finish it inside the
+// 300 s function limit and well under the 200/hour API quota.
+const MAX_PAGES_PER_RUN = 60;
+const BUDGET_MS = 250_000;
+// Once the history is fully imported, only the newest pages need re-reading
+// (a feed can ask for more: refunds land on payments weeks after the fact).
 const REFRESH_PAGES = 2;
 // ...but a refresh only sees the NEWEST invoices, and invoices are ordered by
 // creation date, not payment date. A long-overdue invoice settled months later
@@ -72,20 +77,31 @@ function fullSyncDue(lastFull: string | null): boolean {
   return age > FULL_MAX_AGE_MS;
 }
 
+/** Per-run scratch shared by a feed's page writers. */
+interface WriteContext { seenKeys: Map<string, number> }
+
 interface Feed {
   key: string;
   envelope: string;
   path: (page: number) => string;
+  write: (rows: Record<string, unknown>[], ctx: WriteContext) => Promise<void>;
+  /** Newest pages re-read on a refresh (default REFRESH_PAGES). */
+  refreshPages?: number;
 }
 
-// Invoices ONLY. Every invoice carries `paid` and `refunded`, so lifetime
-// revenue is already answerable from this feed — there is no need to also walk
-// /payments (1,391 records at 10 per page, ~140 requests against a rate limit,
-// hours of backfill) to compute a number invoices already contain. The payments
-// feed adds only per-charge detail (card retries, methods) that nothing here uses.
+// Invoices carry `paid` and `refunded`, so LIFETIME revenue per customer is
+// answerable from the invoice feeds alone. Payments are mirrored too, because a
+// MONTH's revenue is a cash-basis question: an October invoice settled by check
+// on Nov 1 is November money, a September invoice paid Oct 21 is October money,
+// and a refund issued against a manual charge never shows on any invoice. That
+// is how Sweep&Go's own reports count a month, so it is how Profitability counts
+// one. 50 per page: ~33 pages for the whole payment history.
 const FEEDS: Feed[] = [
-  { key: "recurring", envelope: "invoices", path: (p) => `/invoices?type=recurring&page=${p}&length=${PER_PAGE}` },
-  { key: "one_time", envelope: "invoices", path: (p) => `/invoices?type=one_time&page=${p}&length=${PER_PAGE}` },
+  { key: "recurring", envelope: "invoices", path: (p) => `/invoices?type=recurring&page=${p}&length=${PER_PAGE}`, write: (rows) => writeInvoicePage(rows) },
+  { key: "one_time", envelope: "invoices", path: (p) => `/invoices?type=one_time&page=${p}&length=${PER_PAGE}`, write: (rows) => writeInvoicePage(rows) },
+  // Refunds are recorded ON the original payment row (status + amount_refunded), with
+  // no refund date, and can arrive weeks later — so a refresh re-reads ~2 months.
+  { key: "payments", envelope: "payments", path: (p) => `/payments?page=${p}&length=${PER_PAGE}`, write: (rows, ctx) => writePaymentPage(rows, ctx), refreshPages: 4 },
 ];
 
 function token(): string | undefined {
@@ -192,6 +208,57 @@ async function writeInvoicePage(rows: Record<string, unknown>[]): Promise<void> 
   }
 }
 
+/** "Payment for invoice(s) 1715-…" → the invoice number(s), else null. */
+function invoiceNumberFrom(description: unknown): string | null {
+  const m = String(description || "").match(/invoice\(s\)\s+(.+)$/i);
+  return m ? m[1].trim() : null;
+}
+
+/**
+ * The payments feed has NO id. A row is identified by what it is — date, amount,
+ * method, description, payer — plus an occurrence counter so two identical failed
+ * card retries on the same day stay two rows. Refunds change only `status` and
+ * `amount_refunded`, which are deliberately NOT part of the key, so a later refund
+ * updates the original row instead of duplicating it.
+ */
+function paymentKey(r: Record<string, unknown>, ctx: WriteContext): string {
+  const ident = [r.date, r.amount, r.type, r.description, r.client_name, r.commercial_client, r.commercial_location]
+    .map((v) => (v === null || v === undefined ? "" : String(v))).join("|");
+  const n = (ctx.seenKeys.get(ident) || 0) + 1;
+  ctx.seenKeys.set(ident, n);
+  return createHash("sha1").update(`${ident}|${n}`).digest("hex");
+}
+
+/** "2026-10-01" → a DATE (midnight UTC, so Postgres stores the calendar day as given). */
+function parseDay(v: unknown): Date | null {
+  const m = String(v || "").match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))) : null;
+}
+
+async function writePaymentPage(rows: Record<string, unknown>[], ctx: WriteContext): Promise<void> {
+  for (const r of rows) {
+    const paidOn = parseDay(r.date);
+    if (!paidOn) continue;
+    const key = paymentKey(r, ctx);
+    const payer = (r.client_name as string) || (r.commercial_client as string) || "";
+    const data = {
+      paidOn,
+      amountCents: cents(r.amount),
+      refundedCents: cents(r.amount_refunded),
+      tipCents: cents(r.tip_amount),
+      status: (r.status as string) || null,
+      method: (r.type as string) || null,
+      description: (r.description as string) || null,
+      invoiceNumber: invoiceNumberFrom(r.description),
+      clientName: (r.client_name as string) || null,
+      nameKey: nameKey(payer),
+      commercialClient: (r.commercial_client as string) || null,
+      commercialLocation: (r.commercial_location as string) || null,
+      syncedAt: new Date(),
+    };
+    await prisma.sngPayment.upsert({ where: { key }, create: { key, ...data }, update: data });
+  }
+}
 
 export interface BillingSyncResult {
   ok: boolean;
@@ -211,7 +278,7 @@ export interface BillingSyncResult {
  * runs until the data is exhausted, the time budget is spent, or the API rate
  * limit stops us — whichever comes first. Progress is always preserved.
  */
-export async function syncSngBilling(opts: { refreshOnly?: boolean } = {}): Promise<BillingSyncResult> {
+export async function syncSngBilling(opts: { refreshOnly?: boolean; /** Walk every feed now, whether or not the nightly pass is due. */ full?: boolean } = {}): Promise<BillingSyncResult> {
   if (!token()) return { ok: false, complete: false, rows: 0, error: "SWEEPANDGO_API_TOKEN not set" };
   await setSetting(LAST_RUN_KEY, new Date().toISOString());
   const refreshOnly = Boolean(opts.refreshOnly);
@@ -230,6 +297,7 @@ export async function syncSngBilling(opts: { refreshOnly?: boolean } = {}): Prom
   const unknown = new Set<string>();
   let rows = 0;
   let pagesThisRun = 0;
+  const ctx: WriteContext = { seenKeys: new Map() };
 
   // Three cases. Mid-backfill (state.feed set) we continue the full walk. A due
   // nightly pass also walks everything. Otherwise we just refresh the newest pages.
@@ -237,7 +305,7 @@ export async function syncSngBilling(opts: { refreshOnly?: boolean } = {}): Prom
     getSetting(COMPLETE_KEY).catch(() => null),
     getSetting(FULL_KEY).catch(() => null),
   ]);
-  const refreshing = refreshOnly || (Boolean(completedAt) && !state.feed && !restartWalk && !fullSyncDue(lastFull));
+  const refreshing = refreshOnly || (!opts.full && Boolean(completedAt) && !state.feed && !restartWalk && !fullSyncDue(lastFull));
 
   const startIndex = refreshOnly ? 0 : Math.max(0, FEEDS.findIndex((f) => f.key === state.feed));
   for (let fi = startIndex; fi < FEEDS.length; fi++) {
@@ -246,7 +314,7 @@ export async function syncSngBilling(opts: { refreshOnly?: boolean } = {}): Prom
     let lastPage = Number.POSITIVE_INFINITY;
 
     while (page <= lastPage) {
-      if (refreshing && page > REFRESH_PAGES) break;
+      if (refreshing && page > (feed.refreshPages ?? REFRESH_PAGES)) break;
       if (!refreshing && pagesThisRun >= MAX_PAGES_PER_RUN) {
         await saveState({ feed: feed.key, page });
         return { ok: true, complete: false, rows, resumeAt: `${feed.key}:${page}`, ...(unknown.size ? { unknownStatuses: [...unknown] } : {}) };
@@ -283,7 +351,7 @@ export async function syncSngBilling(opts: { refreshOnly?: boolean } = {}): Prom
 
       if (data.length === 0) break;
 
-      await writeInvoicePage(data);
+      await feed.write(data, ctx);
       rows += data.length;
       pagesThisRun++;
 
@@ -322,6 +390,23 @@ export async function recordBillingSyncResult(result: BillingSyncResult): Promis
 export async function requestBillingRefresh(at = new Date()): Promise<void> {
   await setSetting(REFRESH_REQUESTED_KEY, at.toISOString()).catch((e) =>
     console.error("[billing] could not flag refresh:", e instanceof Error ? e.message : e));
+}
+
+/**
+ * Is a full walk waiting to happen? True while a feed has never been imported (the
+ * payments mirror is empty) or a walk stopped part-way (rate limit / time budget).
+ * The 15-minute cron finishes these instead of leaving them for tomorrow's daily run.
+ */
+export async function billingWalkPending(): Promise<{ pending: boolean; reason: string }> {
+  const [payments, raw] = await Promise.all([
+    prisma.sngPayment.count().catch(() => -1),
+    getSetting(STATE_KEY).catch(() => null),
+  ]);
+  if (payments === 0) return { pending: true, reason: "payments mirror is empty" };
+  let state: { feed?: string } = {};
+  try { state = raw ? JSON.parse(raw) : {}; } catch { state = {}; }
+  if (state.feed) return { pending: true, reason: `walk stopped at ${state.feed}` };
+  return { pending: false, reason: "" };
 }
 
 /** Is a webhook-requested refresh due now? (Full walks are left to the daily run.) */
