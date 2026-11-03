@@ -79,7 +79,11 @@ const answers =
 
 const dot = (color: string) => `<td width="9" height="9" bgcolor="${color}" style="border-radius:5px;font-size:0;line-height:0;">&nbsp;</td>`;
 const dotGap = `<td width="6" style="font-size:0;line-height:0;">&nbsp;</td>`;
-const typing = `<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>${dot(MUTED)}${dotGap}${dot(LIGHT)}${dotGap}${dot(LIGHTER)}</tr></table>`;
+// Mid-tone dots: mail clients that darken the bubble for dark mode (Gmail, Outlook) invert
+// light greys into near-black, so the handoff's #8497A8/#B9C6D0/#D5DEE5 vanished there.
+// These stay visible on both the light bubble and an inverted dark one (owner, 2026-11-02).
+const DOT_1 = "#4E6275", DOT_2 = "#6E8294", DOT_3 = "#8EA0B0";
+const typing = `<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>${dot(DOT_1)}${dotGap}${dot(DOT_2)}${dotGap}${dot(DOT_3)}</tr></table>`;
 
 const chatHtml =
   `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">` +
