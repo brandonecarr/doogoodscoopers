@@ -37,6 +37,7 @@ export interface LeadVars {
   // quote-recovery coupon) are also provided at runtime via the index signature
   // below — see getLeadPersonalization. Quote leads also get {{frequency}} ("Weekly"),
   // {{monthlyRate}} ("$89", from the quote the wizard stored) and {{resumeCode}}.
+  // {{initials}} ("JL") is for chat-style avatars in designed emails.
   // {{unsubscribeUrl}} is filled per recipient by the email sender.
   [key: string]: string;
 }
@@ -56,6 +57,7 @@ export const EMPTY_LEAD_VARS: LeadVars = {
   frequency: "",
   monthlyRate: "",
   resumeCode: "",
+  initials: "",
   unsubscribeUrl: "",
   reviewCount: "",
   review1Text: "",
@@ -155,6 +157,19 @@ export function monthlyRateFrom(quotedPrice: string | null | undefined): string 
  * and any last name accidentally typed into the first-name field, so texts read
  * "Hi Robert" not "Hi Robert P" or "Hi Robert P Zeigler".
  */
+/**
+ * One or two uppercase initials for a chat-style avatar: first + last name ("JL"),
+ * just the first when that's all we have ("J"), and "Me" when the lead has no name
+ * at all so the avatar circle never renders empty.
+ */
+export function initialsOf(firstName: string, lastName: string, fullName = ""): string {
+  const first = (firstName || fullName).trim().split(/\s+/)[0] || "";
+  const words = fullName.trim().split(/\s+/).filter(Boolean);
+  const last = (lastName || (words.length > 1 ? words[words.length - 1] : "")).trim();
+  const letters = ((first[0] || "") + (last[0] || "")).toUpperCase();
+  return letters || "Me";
+}
+
 export function firstNameOf(full: string): string {
   return (full || "").trim().split(/\s+/)[0] || "";
 }
@@ -206,6 +221,7 @@ export async function getLeadPersonalization(leadType: LeadSource, leadId: strin
   const [base, reviewLink, recovery] = await Promise.all([baseLeadVars(leadType, leadId), getReviewLink(), recoverySettings()]);
   base.reviewLink = reviewLink;
   base.coupon = recovery.coupon;
+  base.initials = initialsOf(base.firstName, base.lastName, base.name);
   Object.assign(base, await reviewTokens(base.city));
   // Only quote leads have a Sweep&Go quote to resume; everyone else gets the plain quote page.
   base.resumeLink = leadType === "QUOTE_FORM" ? await resumeLinkForLead(leadId, opts.channel, recovery) : recovery.quoteUrl;

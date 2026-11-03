@@ -4,7 +4,7 @@
  * Client-safe: no database access.
  */
 export const SAMPLE_TOKENS: Record<string, string> = {
-  firstName: "Jamie", lastName: "Lee", name: "Jamie Lee", city: "Fontana", zipCode: "92336",
+  firstName: "Jamie", lastName: "Lee", name: "Jamie Lee", initials: "JL", city: "Fontana", zipCode: "92336",
   dogs: "2 dogs", numberOfDogs: "2", dogWord: "dogs",
   resumeLink: "https://doogoodscoopers.com/r/?c=SAMPLE", resumeCode: "KMN7YM", coupon: "WELCOME25",
   reviewLink: "https://g.page/r/review", frequency: "Weekly", monthlyRate: "$89", unsubscribeUrl: "#",

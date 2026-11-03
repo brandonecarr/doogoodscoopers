@@ -277,6 +277,16 @@ export function stackGapCss(design: Design): string {
   return gaps.map((g) => `\n    .dgs-sg-${g} .dgs-col-gap{padding-bottom:${g}px !important;}`).join("");
 }
 
+/**
+ * Big display headlines (Georgia 38px in the drip emails) wrap into five lines on a
+ * phone; the handoffs all specify 30/36 there. Emitted only when the design has a
+ * level-1 title larger than 32px, so modest headlines are left alone.
+ */
+function mobileTitleCss(design: Design): string {
+  const big = design.sections.some((s) => s.columns.some((c) => c.blocks.some((b) => b.type === "title" && b.level === 1 && (b.style.size ?? design.styles.text.title1.size ?? 0) > 32)));
+  return big ? `\n    h1.dgs-t{font-size:30px !important;line-height:36px !important;}` : "";
+}
+
 /** The dark-mode rules, every declaration !important so it beats the inline styles. */
 export function darkRules(design: Design): { selectors: string[]; decl: string }[] {
   const d = darkOf(design.styles);
@@ -374,7 +384,7 @@ ${googleFontLink(design)}
     .dgs-mobile{display:block !important;max-height:none !important;}
     tr.dgs-mobile{display:table-row !important;}
     td.dgs-mobile{display:table-cell !important;}
-    td.dgs-stack{display:block !important;width:100% !important;padding-left:0 !important;padding-right:0 !important;}${stackGapCss(design)}
+    td.dgs-stack{display:block !important;width:100% !important;padding-left:0 !important;padding-right:0 !important;}${stackGapCss(design)}${mobileTitleCss(design)}
   }${darkCss(design)}
 </style>
 </head>
