@@ -56,17 +56,43 @@ function nameFrom(full: string | null | undefined, fallback: string): string {
  * Average invoiced amount per customer for the last COMPLETE month (the current month is
  * still being billed: mid-month signups, paused and overdue customers get invoiced later).
  * Invoices are grouped by their billing period (falling back to creation date).
+ *
+ * Promo coupons do NOT count (owner, 2026-11-06): Sweep&Go invoices carry only the
+ * discounted total, so a customer whose coupon was active that month is counted at
+ * their subscription LIST price instead (main plan + add-ons, normalized to a month).
+ * Everyone else is counted at what they were actually invoiced.
  */
 async function averageMonthlyCost(now = new Date()): Promise<TvBusiness["avgMonthlyCost"]> {
   const thisMonth = now.toLocaleDateString("en-CA", { year: "numeric", month: "2-digit", timeZone: "America/Los_Angeles" }).slice(0, 7);
   const rows = await prisma.$queryRaw<Array<{ month: string; customers: number; invoices: number; avgCents: number }>>`
-    SELECT month, COUNT(*)::int AS customers, SUM(n)::int AS invoices, ROUND(AVG(total))::int AS "avgCents"
-    FROM (
-      SELECT to_char(COALESCE("periodStart", "sngCreatedAt"), 'YYYY-MM') AS month, "nameKey", COUNT(*) AS n, SUM("totalCents") AS total
+    WITH per_customer AS (
+      SELECT to_char(COALESCE("periodStart", "sngCreatedAt"), 'YYYY-MM') AS month,
+             date_trunc('month', COALESCE("periodStart", "sngCreatedAt")) AS month_start,
+             "nameKey", COUNT(*) AS n, SUM("totalCents") AS total
       FROM "SngInvoice"
       WHERE COALESCE("periodStart", "sngCreatedAt") IS NOT NULL AND "nameKey" <> ALL(${TEST_NAME_KEYS})
-      GROUP BY 1, 2
-    ) per_customer
+      GROUP BY 1, 2, 3
+    ), priced AS (
+      SELECT c.*,
+        -- A coupon that was still running during this month.
+        EXISTS (SELECT 1 FROM "SngSubscription" s
+                 WHERE s."nameKey" = c."nameKey" AND s."couponPercent" > 0
+                   AND s."couponEnd" >= c.month_start
+                   AND COALESCE(s."startDate", c.month_start) < c.month_start + interval '1 month') AS discounted,
+        -- List price of every subscription line active that month, as a monthly amount.
+        (SELECT COALESCE(SUM(s."priceCents" * CASE lower(COALESCE(s."billingInterval", 'monthly'))
+                   WHEN 'weekly' THEN 52 / 12.0 WHEN 'bi-weekly' THEN 26 / 12.0 WHEN 'bi_weekly' THEN 26 / 12.0
+                   WHEN 'quarterly' THEN 1 / 3.0 ELSE 1 END), 0)
+           FROM "SngSubscription" s
+          WHERE s."nameKey" = c."nameKey"
+            AND lower(COALESCE(s."billingInterval", '')) NOT IN ('one_time', 'one-time')
+            AND COALESCE(s."startDate", c.month_start) < c.month_start + interval '1 month'
+            AND COALESCE(s."canceledAt", s."endDate", '2999-01-01') >= c.month_start) AS list_cents
+      FROM per_customer c
+    )
+    SELECT month, COUNT(*)::int AS customers, SUM(n)::int AS invoices,
+           ROUND(AVG(CASE WHEN discounted AND list_cents > 0 THEN list_cents ELSE total END))::int AS "avgCents"
+    FROM priced
     GROUP BY month
     HAVING SUM(n) >= 10 AND month < ${thisMonth}
     ORDER BY month DESC
