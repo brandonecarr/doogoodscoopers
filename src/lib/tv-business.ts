@@ -57,20 +57,29 @@ function nameFrom(full: string | null | undefined, fallback: string): string {
  * still being billed: mid-month signups, paused and overdue customers get invoiced later).
  * Invoices are grouped by their billing period (falling back to creation date).
  *
- * Promo coupons do NOT count (owner, 2026-11-06): Sweep&Go invoices carry only the
- * discounted total, so a customer whose coupon was active that month is counted at
- * their subscription LIST price instead (main plan + add-ons, normalized to a month).
- * Everyone else is counted at what they were actually invoiced.
+ * Only RECURRING billing counts (owner, 2026-11-06):
+ *  - one-off invoices (initial cleanup, one-time jobs, prorated first periods) are skipped;
+ *  - a customer's first billed month is skipped entirely, because Sweep&Go bundles the
+ *    initial cleanup and the prorated first period into that first "subscription" invoice;
+ *  - promo coupons don't count: Sweep&Go invoices carry only the discounted total, so a
+ *    customer whose coupon was active that month is counted at their subscription LIST
+ *    price instead (main plan + add-ons, normalized to a month).
  */
 async function averageMonthlyCost(now = new Date()): Promise<TvBusiness["avgMonthlyCost"]> {
   const thisMonth = now.toLocaleDateString("en-CA", { year: "numeric", month: "2-digit", timeZone: "America/Los_Angeles" }).slice(0, 7);
   const rows = await prisma.$queryRaw<Array<{ month: string; customers: number; invoices: number; avgCents: number }>>`
-    WITH per_customer AS (
-      SELECT to_char(COALESCE("periodStart", "sngCreatedAt"), 'YYYY-MM') AS month,
-             date_trunc('month', COALESCE("periodStart", "sngCreatedAt")) AS month_start,
-             "nameKey", COUNT(*) AS n, SUM("totalCents") AS total
-      FROM "SngInvoice"
-      WHERE COALESCE("periodStart", "sngCreatedAt") IS NOT NULL AND "nameKey" <> ALL(${TEST_NAME_KEYS})
+    WITH first_month AS (
+      SELECT "nameKey", MIN(to_char(COALESCE("periodStart", "sngCreatedAt"), 'YYYY-MM')) AS month
+      FROM "SngInvoice" WHERE COALESCE("periodStart", "sngCreatedAt") IS NOT NULL GROUP BY 1
+    ), per_customer AS (
+      SELECT to_char(COALESCE(i."periodStart", i."sngCreatedAt"), 'YYYY-MM') AS month,
+             date_trunc('month', COALESCE(i."periodStart", i."sngCreatedAt")) AS month_start,
+             i."nameKey", COUNT(*) AS n, SUM(i."totalCents") AS total
+      FROM "SngInvoice" i
+      JOIN first_month f ON f."nameKey" = i."nameKey"
+      WHERE COALESCE(i."periodStart", i."sngCreatedAt") IS NOT NULL AND i."nameKey" <> ALL(${TEST_NAME_KEYS})
+        AND i.type = 'subscription'
+        AND to_char(COALESCE(i."periodStart", i."sngCreatedAt"), 'YYYY-MM') > f.month
       GROUP BY 1, 2, 3
     ), priced AS (
       SELECT c.*,
